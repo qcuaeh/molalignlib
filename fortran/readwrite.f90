@@ -1,0 +1,218 @@
+module readwrite
+use iso_fortran_env, only: input_unit
+use iso_fortran_env, only: output_unit
+use iso_fortran_env, only: error_unit
+use globals
+use utilities
+use chemistry
+implicit none
+private
+public readmol
+public writemol
+public file_unit
+
+integer, parameter :: file_unit = 999
+
+contains
+
+subroutine readmol(mol_format, natom, title, label, molec, nbond, bonds, znum)
+    character(*), intent(in) :: mol_format
+    integer, intent(out) :: natom, nbond
+    integer, dimension(:, :), allocatable, intent(out) :: bonds
+    real, dimension(:, :), allocatable, intent(out) :: molec
+    character(*), intent(out) :: title
+    character(*), dimension(:), allocatable, intent(out) :: label
+    integer, dimension(:), allocatable, intent(out) :: znum
+
+    integer i
+
+    select case (mol_format)
+    case ('xyz')
+        call readxyzfile(natom, title, label, molec)
+        allocate (bonds(2, maxcoord*natom))
+    case ('mol')
+        call readmolfile(natom, title, label, molec, nbond, bonds)
+    case default
+        write (error_unit, '(a)') 'Unknown file format'
+        stop
+    end select
+
+    allocate (znum(natom))
+
+    do i = 1, natom
+        call readlabel(label(i), znum(i))
+    end do
+
+end subroutine
+
+subroutine readxyzfile(natom, title, label, molec)
+    integer, intent(out) :: natom
+    real, dimension(:, :), allocatable, intent(out) :: molec
+    character(*), dimension(:), allocatable, intent(out) :: label
+    character(*), intent(out) :: title
+    integer i, stat
+
+    read (input_unit, *, iostat=stat) natom
+    if (stat < 0) then
+        write (error_unit, '(a)') 'Unexpected end of file!'
+        stop
+    end if
+
+    allocate (label(natom), molec(3, natom))
+
+    read (input_unit, '(a)', iostat=stat) title
+    if (stat < 0) then
+        write (error_unit, '(a)') 'Unexpected end of file!'
+        stop
+    end if
+
+    do i = 1, natom
+        read (input_unit, *, iostat=stat) label(i), molec(:, i)
+        if (stat < 0) then
+            write (error_unit, '(a)') 'Unexpected end of file!'
+            stop
+        end if
+    end do
+
+end subroutine
+
+subroutine readmolfile(natom, title, label, molec, nbond, bonds)
+    integer, intent(out) :: natom, nbond
+    integer, dimension(:, :), allocatable, intent(out) :: bonds
+    real, dimension(:, :), allocatable, intent(out) :: molec
+    character(*), dimension(:), allocatable, intent(out) :: label
+    character(*), intent(out) :: title
+    integer i, stat
+
+    read (input_unit, '(a)', iostat=stat) title
+    if (stat < 0) then
+        write (error_unit, '(a)') 'Unexpected end of file!'
+        stop
+    end if
+
+    read (input_unit, *, iostat=stat)
+    if (stat < 0) then
+        write (error_unit, '(a)') 'Unexpected end of file!'
+        stop
+    end if
+
+    read (input_unit, *, iostat=stat)
+    if (stat < 0) then
+        write (error_unit, '(a)') 'Unexpected end of file!'
+        stop
+    end if
+
+    read (input_unit, *, iostat=stat) natom, nbond
+    if (stat < 0) then
+        write (error_unit, '(a)') 'Unexpected end of file!'
+        stop
+    end if
+
+    allocate (label(natom), molec(3, natom), bonds(2, maxcoord*natom))
+
+    do i = 1, natom
+        read (input_unit, *, iostat=stat) molec(:, i), label(i)
+        if (stat < 0) then
+            write (error_unit, '(a)') 'Unexpected end of file!'
+            stop
+        end if
+    end do
+
+    do i = 1, nbond
+        read (input_unit, *, iostat=stat) bonds(:, i)
+        if (stat < 0) then
+            write (error_unit, '(a)') 'Unexpected end of file!'
+            stop
+        end if
+    end do
+
+    read (input_unit, *, iostat=stat)
+    if (stat < 0) then
+        write (error_unit, '(a)') 'Unexpected end of file!'
+        stop
+    end if
+
+    read (input_unit, *, iostat=stat)
+    if (stat < 0) then
+        write (error_unit, '(a)') 'Unexpected end of file!'
+        stop
+    end if
+
+    read (input_unit, *, iostat=stat)
+    if (stat < 0) then
+        write (error_unit, '(a)') 'Unexpected end of file!'
+        stop
+    end if
+
+end subroutine
+
+subroutine writemol(file_unit, natom, atomap, title, label, znum, molec, nbond, bonds)
+    character(*), intent(in) :: title
+    character(*), dimension(:), intent(in) :: label
+    integer, intent(in) :: file_unit, natom, nbond
+    integer, dimension(:), intent(in) :: atomap, znum
+    integer, dimension(:, :), intent(in) :: bonds
+    real, dimension(:, :), intent(in) :: molec
+
+    select case (output_format)
+    case ('xyz')
+        call writexyzfile(file_unit, natom, atomap, title, znum, molec)
+    case ('mol2')
+        call writemol2file(file_unit, natom, atomap, title, label, znum, molec, nbond, bonds)
+    case default
+        write (error_unit, '(a)') 'Unknown file format'
+        stop
+    end select
+
+end subroutine
+
+subroutine writexyzfile(file_unit, natom, atomap, title, znum, molec)
+    integer, intent(in) :: file_unit, natom
+    integer, dimension(:), intent(in) :: atomap, znum
+    real, dimension(:, :), intent(in) :: molec
+    character(*), intent(in) :: title
+
+    integer i
+
+    write (file_unit, '(i0)') natom
+    write (file_unit, '(a)') trim(title)
+    do i = 1, natom
+        write (file_unit, '(a, 3(2x, f12.6))') elsym(znum(atomap(i))), molec(:, atomap(i))
+    end do
+
+end subroutine
+
+subroutine writemol2file(file_unit, natom, atomap, title, label, znum, molec, nbond, bonds)
+    integer, intent(in) :: file_unit, natom, nbond
+    integer, dimension(:), intent(in) :: atomap, znum
+    integer, dimension(:, :), intent(in) :: bonds
+    real, dimension(:, :), intent(in) :: molec
+    character(*), dimension(:), intent(in) :: label
+    character(*), intent(in) :: title
+
+    integer i
+    integer unmapping(natom)
+
+    unmapping = inversemap(atomap)
+
+    write (file_unit, '(a)') '@<TRIPOS>MOLECULE'
+    write (file_unit, '(a)') trim(title)
+    write (file_unit, '(5(i4, x))') natom, nbond, 0, 0, 0
+    write (file_unit, '(a)') 'SMALL'
+    write (file_unit, '(a)') 'NO_CHARGES'
+    write (file_unit, '(a)') '@<TRIPOS>ATOM'
+
+    do i = 1, natom
+        write (file_unit, '(i4, x, a2, 3(x, f12.6), x, a8, x, i2, x, a4, x, f7.3)') &
+            i, elsym(znum(atomap(i))), molec(:, atomap(i)), label(atomap(i)), 1, 'MOL1', 0.
+    end do
+
+    write (file_unit, '(a)') '@<TRIPOS>BOND'
+
+    do i = 1, nbond
+        write (file_unit, '(i4, x, 2(x, i4), x, a2)') i, unmapping(bonds(:, i)), '1'
+    end do
+
+end subroutine
+
+end module
