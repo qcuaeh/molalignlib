@@ -54,7 +54,7 @@ shopt -s nullglob
 
 SRCDIR=./source
 SRCLIST=./srclist
-BLDDIR=./build
+BLDDIR=./build_dir
 BINDIR=./bin
 BINARY=ralign
 
