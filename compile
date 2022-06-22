@@ -18,7 +18,6 @@ compile () {
 }
 
 build () {
-   echo Building $3...
    case "$1" in
      single ) prec_options='' ;;
      double ) prec_options='-fdefault-real-8' ;;
@@ -31,36 +30,33 @@ build () {
      * ) echo Invalid optimization option: $2; exit ;;
    esac
    FORTRAN="gfortran $bld_options $prec_options -L/usr/lib64/atlas -llapack"
-   if [[ -f $SBLDIR/$3 ]]; then
-      OBJDIR=$BLDDIR/$1/$2/$3
-      srclist=()
-      if [[ -d $OBJDIR ]]; then
-         if [[ $RECOMPILE != true ]]; then
-            for f in "$OBJDIR"/*; do 
-               rm "$f"
-            done
-         fi
-      else
-         mkdir -p "$OBJDIR"
+   OBJDIR=$BLDDIR/$1/$2
+   srclist=()
+   if [[ -d $OBJDIR ]]; then
+      if [[ $RECOMPILE != true ]]; then
+         for f in "$OBJDIR"/*; do 
+            rm "$f"
+         done
       fi
-      while IFS= read -r line; do
-         srclist+=("$line")
-      done < <(grep -v '^#' "$SBLDIR/$3")
-      compile "${srclist[@]}"
-      echo Linking "$BINDIR/$3"
-      $FORTRAN "${objlist[@]}" -o "$BINDIR/$3"
    else
-      echo There is no build spec for $3
+      mkdir -p "$OBJDIR"
    fi
+   while IFS= read -r line; do
+      srclist+=("$line")
+   done < <(grep -v '^#' "$SRCLIST")
+   compile "${srclist[@]}"
+   echo Linking $BINARY
+   $FORTRAN "${objlist[@]}" -o "$BINDIR/$BINARY"
    echo
 } 
 
 shopt -s nullglob
 
 SRCDIR=./source
-SBLDIR=./source/build
+SRCLIST=./srclist
 BLDDIR=./build
 BINDIR=./bin
+BINARY=ralign
 
 if [[ -d $BINDIR ]]; then
    for file in "$BINDIR"/*; do 
@@ -86,4 +82,4 @@ while true; do
    esac
 done
 
-build "$precision" "$buildtype" ralign
+build "$precision" "$buildtype"
