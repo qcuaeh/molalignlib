@@ -126,6 +126,8 @@ subroutine remapatoms(natom, nblock, blocksize, blocktype, mol0, ncoord0, adjlis
             atomap = auxmap
         end do
 
+        newdist = leastsquaredist(natom, weights, mol0, mol1, atomap)
+
 ! Check for new best mapping
 
         map_found = .false.

@@ -1,0 +1,89 @@
+#!/bin/bash
+
+# Compile selected source files
+compile () {
+   objlist=()
+   for file in "$@"; do
+      srcfile=$SRCDIR/$file
+      bldfile=$OBJDIR/$file
+      objfile=$OBJDIR/${file%.*}.o
+      objlist+=($objfile)
+      if ! test -e "$objfile" || ! test -e "$bldfile" || ! diff -q "$srcfile" "$bldfile" > /dev/null; then
+         rm -f "$objfile"
+         cp -p "$srcfile" "$bldfile"
+         echo Compiling "$file"
+         $FORTRAN -c "$srcfile" -o "$objfile" -I "$OBJDIR" -J "$OBJDIR" || exit
+      fi
+   done
+}
+
+build () {
+   echo Building $3...
+   case "$1" in
+     single ) prec_options='' ;;
+     double ) prec_options='-fdefault-real-8' ;;
+     * ) echo Invalid precision option: $1; exit ;;
+   esac
+   case "$2" in
+     standard ) bld_options='-O3' ;;
+     debug ) bld_options='-g -fbounds-check -fbacktrace -ffpe-trap=zero,invalid,overflow -O0 -Wall' ;;
+     fast ) bld_options='-O3 -ffast-math' ;;
+     * ) echo Invalid optimization option: $2; exit ;;
+   esac
+   FORTRAN="gfortran $bld_options $prec_options -L/usr/lib64/atlas -llapack"
+   if [[ -f $SBLDIR/$3 ]]; then
+      OBJDIR=$BLDDIR/$1/$2/$3
+      srclist=()
+      if [[ -d $OBJDIR ]]; then
+         if [[ $RECOMPILE != true ]]; then
+            for f in "$OBJDIR"/*; do 
+               rm "$f"
+            done
+         fi
+      else
+         mkdir -p "$OBJDIR"
+      fi
+      while IFS= read -r line; do
+         srclist+=("$line")
+      done < <(grep -v '^#' "$SBLDIR/$3")
+      compile "${srclist[@]}"
+      echo Linking "$BINDIR/$3"
+      $FORTRAN "${objlist[@]}" -o "$BINDIR/$3"
+   else
+      echo There is no build spec for $3
+   fi
+   echo
+} 
+
+shopt -s nullglob
+
+SRCDIR=./source
+SBLDIR=./source/build
+BLDDIR=./build
+BINDIR=./bin
+
+if [[ -d $BINDIR ]]; then
+   for file in "$BINDIR"/*; do 
+      rm "$file"
+   done
+else
+   mkdir "$BINDIR"
+fi
+
+TEMP=$(getopt -a -o '' -l single,double,fast,debug -- "$@")
+if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
+eval set -- "$TEMP"
+
+precision=double
+buildtype=standard
+while true; do
+   case "$1" in
+      --fast ) buildtype=fast; shift ;;
+      --debug ) buildtype=debug; shift ;;
+      --single ) precision=single; shift ;;
+      --double ) precision=double; shift ;;
+      -- ) shift; break ;;
+   esac
+done
+
+build "$precision" "$buildtype" ralign
