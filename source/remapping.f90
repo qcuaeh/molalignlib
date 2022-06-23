@@ -28,11 +28,11 @@ logical function match_stop_test(trials, matches) result(stop_test)
     stop_test = matches < maxcount
 end function
 
-subroutine remapatoms(natom, nblock, blocksize, mol0, mol1, weights, mapcount, atomaplist, bias)
+subroutine remapatoms(natom, nblock, blocksize, atoms0, atoms1, weights, mapcount, atomaplist, bias)
 
 ! natom: number of points to align
-! mol0: coordinates of first molecule
-! mol1: coordinates of second molecule
+! atoms0: coordinates of first molecule
+! atoms1: coordinates of second molecule
 ! nblock: number of block atoms
 ! blocksize: size of atom block (number of atoms in the block)
 ! newdist: total square distance between molecules
@@ -47,8 +47,8 @@ subroutine remapatoms(natom, nblock, blocksize, mol0, mol1, weights, mapcount, a
     integer, intent(in) :: natom, nblock
     integer, dimension(:), intent(in) :: blocksize
     integer, dimension(:, :), intent(out) :: atomaplist
-    real, dimension(:, :), intent(inout) :: mol1
-    real, dimension(:, :), intent(in) :: mol0
+    real, dimension(:, :), intent(inout) :: atoms1
+    real, dimension(:, :), intent(in) :: atoms0
     real, dimension(:), intent(in) :: weights
     real, dimension(:, :), intent(in) :: bias
 
@@ -73,7 +73,7 @@ subroutine remapatoms(natom, nblock, blocksize, mol0, mol1, weights, mapcount, a
 
 ! Save original coordinates
 
-    origmol1 = mol1
+    origmol1 = atoms1
 
 ! Initialize loop variables
 
@@ -90,37 +90,37 @@ subroutine remapatoms(natom, nblock, blocksize, mol0, mol1, weights, mapcount, a
 
 ! Apply random rotation
 
-        call rotate(natom, randrotquat(randvec3()), mol1)
+        call rotate(natom, randrotquat(randvec3()), atoms1)
 
 ! Find the best mappping to minimize euclidean distance
 
-        call assignatoms(natom, weights, mol0, mol1, nblock, blocksize, bias, atomap)
-        rotquat = leastrotquat(natom, weights, mol0, mol1, atomap)
+        call assignatoms(natom, weights, atoms0, atoms1, nblock, blocksize, bias, atomap)
+        rotquat = leastrotquat(natom, weights, atoms0, atoms1, atomap)
         prodquat = rotquat
         meanrot = rotangle(rotquat)
-        call rotate(natom, rotquat, mol1)
+        call rotate(natom, rotquat, atoms1)
         iteration = 1
 
         do while (iterative)
-            olddist = squaredist(natom, weights, mol0, mol1, atomap) &
+            olddist = squaredist(natom, weights, atoms0, atoms1, atomap) &
                     + biasingdist(natom, weights, bias, atomap)
-            call assignatoms(natom, weights, mol0, mol1, nblock, blocksize, bias, auxmap)
+            call assignatoms(natom, weights, atoms0, atoms1, nblock, blocksize, bias, auxmap)
             if (all(auxmap == atomap)) exit
-            newdist = squaredist(natom, weights, mol0, mol1, auxmap) &
+            newdist = squaredist(natom, weights, atoms0, atoms1, auxmap) &
                     + biasingdist(natom, weights, bias, auxmap)
             if (newdist > olddist) then
                 call warning('new newdist is larger than old newdist!', 'mapatoms')
 !                print *, olddist, newdist
             end if
-            rotquat = leastrotquat(natom, weights, mol0, mol1, auxmap)
+            rotquat = leastrotquat(natom, weights, atoms0, atoms1, auxmap)
             prodquat = quatmul(rotquat, prodquat)
-            call rotate(natom, rotquat, mol1)
+            call rotate(natom, rotquat, atoms1)
             iteration = iteration + 1
             meanrot = meanrot + (rotangle(rotquat) - meanrot)/iteration
             atomap = auxmap
         end do
 
-        newdist = leastsquaredist(natom, weights, mol0, mol1, atomap)
+        newdist = leastsquaredist(natom, weights, atoms0, atoms1, atomap)
 
 ! Check for new best mapping
 
@@ -189,7 +189,7 @@ subroutine remapatoms(natom, nblock, blocksize, mol0, mol1, weights, mapcount, a
 
 ! Restore original coordinates
 
-        mol1 = origmol1
+        atoms1 = origmol1
 
     end do
 

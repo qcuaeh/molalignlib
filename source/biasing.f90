@@ -5,10 +5,10 @@ implicit none
 
 contains
 
-subroutine setadjbias(natom, nblock, blocksize, mol0, mol1, bias)
+subroutine setadjbias(natom, nblock, blocksize, atoms0, atoms1, bias)
     integer, intent(in) :: natom, nblock
     integer, dimension(:), intent(in) :: blocksize
-    real, dimension(:, :), intent(in) :: mol0, mol1
+    real, dimension(:, :), intent(in) :: atoms0, atoms1
     real, dimension(:, :), intent(out) :: bias
 
     integer h, i, j, offset
@@ -18,7 +18,7 @@ subroutine setadjbias(natom, nblock, blocksize, mol0, mol1, bias)
         offset = 0
         do h = 1, nblock
             do j = offset + 1, offset + blocksize(h)
-                d0(j, i) = sqrt(sum((mol0(:, j) - mol0(:, i))**2))
+                d0(j, i) = sqrt(sum((atoms0(:, j) - atoms0(:, i))**2))
             end do
             call sort(d0(:, i), offset + 1, offset + blocksize(h))
             offset = offset + blocksize(h)
@@ -29,7 +29,7 @@ subroutine setadjbias(natom, nblock, blocksize, mol0, mol1, bias)
         offset = 0
         do h = 1, nblock
             do j = offset + 1, offset + blocksize(h)
-                d1(j, i) = sqrt(sum((mol1(:, j) - mol1(:, i))**2))
+                d1(j, i) = sqrt(sum((atoms1(:, j) - atoms1(:, i))**2))
             end do
             call sort(d1(:, i), offset + 1, offset + blocksize(h))
             offset = offset + blocksize(h)

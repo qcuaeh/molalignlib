@@ -1,5 +1,5 @@
-subroutine superpose(natom, mol0, mol1, label0, label1, mapcount, atomaplist, rotmatlist)
-! Purpose: Superimpose coordinates of atom sets mol0 and mol1
+subroutine superpose(natom, atoms0, atoms1, label0, label1, mapcount, atomaplist, rotmatlist)
+! Purpose: Superimpose coordinates of atom sets atoms0 and atoms1
 
 use iso_fortran_env, only: output_unit
 use iso_fortran_env, only: error_unit
@@ -22,7 +22,7 @@ integer, intent(out) :: mapcount
 real, dimension(3, 3, maxcount), intent(out) :: rotmatlist
 integer, dimension(natom, maxcount), intent(out) :: atomaplist
 character(32), dimension(natom), intent(inout) :: label0, label1
-real, dimension(3, natom), intent(inout) :: mol0, mol1
+real, dimension(3, natom), intent(inout) :: atoms0, atoms1
 
 integer i
 integer nblock0, nblock1
@@ -90,8 +90,8 @@ reorder0 = inversemap(order0)
 label0 = label0(order0)
 label1 = label1(order1)
 
-mol0 = mol0(:, order0)
-mol1 = mol1(:, order1)
+atoms0 = atoms0(:, order0)
+atoms1 = atoms1(:, order1)
 
 znum0 = znum0(order0)
 znum1 = znum1(order1)
@@ -112,12 +112,12 @@ end if
 
 ! Translate molecules to their centroid
 
-call translate(natom, centroid(natom, weights, mol0), mol0)
-call translate(natom, centroid(natom, weights, mol1), mol1)
+call translate(natom, centroid(natom, weights, atoms0), atoms0)
+call translate(natom, centroid(natom, weights, atoms1), atoms1)
 
 ! Set bias for non equivalent atoms 
 
-call setadjbias(natom, nblock0, blocksize0, mol0, mol1, bias)
+call setadjbias(natom, nblock0, blocksize0, atoms0, atoms1, bias)
 
 ! Initialize random number generator
 
@@ -127,19 +127,19 @@ call random_seed(put=seed)
 ! Remap atoms to minimize distance and difference
 
 if (maxcount >= 1) then
-    call remapatoms(natom, nblock0, blocksize0, mol0, mol1, weights, mapcount, atomaplist, bias)
+    call remapatoms(natom, nblock0, blocksize0, atoms0, atoms1, weights, mapcount, atomaplist, bias)
 else
     mapcount = 1
     atomaplist(:, 1) = [(i, i=1, natom)]
     call print_header()
-    call print_stats(0, 0, 0, 0., 0., 0., leastsquaredist(natom, weights, mol0, mol1, atomaplist(:, 1)))
+    call print_stats(0, 0, 0, 0., 0., 0., leastsquaredist(natom, weights, atoms0, atoms1, atomaplist(:, 1)))
     call print_footer(.false., .false., 0, 0)
 end if
 
 ! Calculate rotation quaternions
 
 do i = 1, mapcount
-    rotmatlist(:, :, i) = quat2mat(leastrotquat(natom, weights, mol0, mol1, atomaplist(:, i)))
+    rotmatlist(:, :, i) = quat2mat(leastrotquat(natom, weights, atoms0, atoms1, atomaplist(:, i)))
 end do
 
 ! Restore original atom order
@@ -147,8 +147,8 @@ end do
 label0 = label0(reorder0)
 label1 = label1(reorder0)
 
-mol0 = mol0(:, reorder0)
-mol1 = mol1(:, reorder0)
+atoms0 = atoms0(:, reorder0)
+atoms1 = atoms1(:, reorder0)
 
 do i = 1, mapcount
     atomaplist(:, i) = atomaplist(reorder0, i)

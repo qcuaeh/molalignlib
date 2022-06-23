@@ -4,7 +4,7 @@ use hungarian
 implicit none
 contains
 
-subroutine assignatoms(natom, weights, mol0, mol1, nblock, blocksize, bias, atomap)
+subroutine assignatoms(natom, weights, atoms0, atoms1, nblock, blocksize, bias, atomap)
 ! Purpose: Find best correspondence between points shapes
 
 ! nblock: Number of block atoms
@@ -15,9 +15,9 @@ subroutine assignatoms(natom, weights, mol0, mol1, nblock, blocksize, bias, atom
     integer, intent(in) :: natom, nblock
     integer, dimension(:), intent(in) :: blocksize
     real, dimension(:), intent(in) :: weights
-    real, dimension(:, :), intent(in) :: mol0
+    real, dimension(:, :), intent(in) :: atoms0
     real, dimension(:, :), intent(in) :: bias
-    real, dimension(:, :), intent(inout) :: mol1
+    real, dimension(:, :), intent(inout) :: atoms1
     integer, dimension(:), intent(out) :: atomap
 
     integer h, i, j, offset
@@ -33,7 +33,7 @@ subroutine assignatoms(natom, weights, mol0, mol1, nblock, blocksize, bias, atom
 
         do i = offset + 1, offset + blocksize(h)
             do j = offset + 1, offset + blocksize(h)
-                costs(i - offset, j - offset) = weights(i)*(sum((mol1(:, j) - mol0(:, i))**2) + scaling**2*bias(i, j))
+                costs(i - offset, j - offset) = weights(i)*(sum((atoms1(:, j) - atoms0(:, i))**2) + scaling**2*bias(i, j))
             end do
         end do
 

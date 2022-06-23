@@ -272,10 +272,10 @@ subroutine delTrack (track, nvec, vec)
 end subroutine delTrack
 
 ! calculates the dihedral angle between 4 atom indices
-subroutine calc_dihedral (ind_add, vec4ind, mol, calc, dihed)
+subroutine calc_dihedral (ind_add, vec4ind, atoms, calc, dihed)
     integer, intent(in) :: ind_add
     integer, intent(inout) :: vec4ind(4)
-    real, dimension(:, :), intent(in) :: mol
+    real, dimension(:, :), intent(in) :: atoms
     logical, intent(out) :: calc
     real, intent(out) :: dihed
     real :: x, y
@@ -302,9 +302,9 @@ subroutine calc_dihedral (ind_add, vec4ind, mol, calc, dihed)
     end do
 
     ! vectors between atoms
-    r1(:) =  mol(:,vec4ind(2)) - mol(:,vec4ind(1))
-    r2(:) = -mol(:,vec4ind(3)) + mol(:,vec4ind(2))
-    r3(:) =  mol(:,vec4ind(4)) - mol(:,vec4ind(3))
+    r1(:) =  atoms(:,vec4ind(2)) - atoms(:,vec4ind(1))
+    r2(:) = -atoms(:,vec4ind(3)) + atoms(:,vec4ind(2))
+    r3(:) =  atoms(:,vec4ind(4)) - atoms(:,vec4ind(3))
 
     ! normalize
     r1(:) = r1(:)/sqrt(dot_product(r1, r1))
