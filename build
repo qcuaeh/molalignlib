@@ -24,9 +24,9 @@ build () {
      * ) echo Invalid precision option: $1; exit ;;
    esac
    case "$2" in
-     standard ) bld_options='-O3' ;;
-     debug ) bld_options='-g -fbounds-check -fbacktrace -ffpe-trap=zero,invalid,overflow -O0 -Wall' ;;
+     safe ) bld_options='-O3' ;;
      fast ) bld_options='-O3 -ffast-math' ;;
+     debug ) bld_options='-g -fbounds-check -fbacktrace -ffpe-trap=zero,invalid,overflow -O0 -Wall' ;;
      * ) echo Invalid optimization option: $2; exit ;;
    esac
    FORTRAN="gfortran $bld_options $prec_options -L/usr/lib64/atlas -llapack"
@@ -59,7 +59,7 @@ BINDIR=./bin
 BINARY=ralign
 
 if [[ -d $BINDIR ]]; then
-   for file in "$BINDIR"/*; do 
+   for file in "$BINDIR"/*; do
       rm "$file"
    done
 else
@@ -70,11 +70,11 @@ TEMP=$(getopt -a -o '' -l single,double,fast,debug -- "$@")
 if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
 eval set -- "$TEMP"
 
+buildtype=fast
 precision=double
-buildtype=standard
 while true; do
    case "$1" in
-      --fast ) buildtype=fast; shift ;;
+      --safe ) buildtype=safe; shift ;;
       --debug ) buildtype=debug; shift ;;
       --single ) precision=single; shift ;;
       --double ) precision=double; shift ;;

@@ -52,14 +52,13 @@ do while (getarg(arg))
         converge = .true.
     case ('-bias')
         biased = .true.
+        call readoptarg(arg, tolerance)
     case ('-testing')
         testing = .true.
     case ('-live')
         live = .true.
     case ('-scale')
         call readoptarg(arg, scaling)
-    case ('-tol')
-        call readoptarg(arg, tolerance)
     case ('-weight')
         call readoptarg(arg, weighting)
     case ('-out')
