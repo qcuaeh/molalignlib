@@ -10,11 +10,11 @@ public leastrotquat
 
 contains
 
-function squaredist(natom, weights, atoms0, atoms, atomap) result(dist)
+function squaredist(natom, weights, atoms0, atoms1, atomap) result(dist)
     integer, intent(in) :: natom
     integer, dimension(:), intent(in) :: atomap
     real, dimension(:), intent(in) :: weights
-    real, dimension(:, :), intent(in) :: atoms0, atoms
+    real, dimension(:, :), intent(in) :: atoms0, atoms1
 
     integer i
     real dist
@@ -22,16 +22,16 @@ function squaredist(natom, weights, atoms0, atoms, atomap) result(dist)
     dist = 0
 
     do i = 1, natom
-        dist = dist + weights(i)*sum((atoms(:, atomap(i)) - atoms0(:, i))**2)
+        dist = dist + weights(i)*sum((atoms1(:, atomap(i)) - atoms0(:, i))**2)
     end do
 
 end function
 
-function squarenorm(natom, weights, atoms0, atoms, atomap) result(norm)
+function squarenorm(natom, weights, atoms0, atoms1, atomap) result(norm)
     integer, intent(in) :: natom
     integer, dimension(:), intent(in) :: atomap
     real, dimension(:), intent(in) :: weights
-    real, dimension(:, :), intent(in) :: atoms0, atoms
+    real, dimension(:, :), intent(in) :: atoms0, atoms1
 
     integer i
     real norm
@@ -39,82 +39,82 @@ function squarenorm(natom, weights, atoms0, atoms, atomap) result(norm)
     norm = 0
 
     do i = 1, natom
-        norm = norm + 2*weights(i)*(sum(atoms(:, atomap(i))**2) + sum(atoms0(:, i)**2))
+        norm = norm + 2*weights(i)*(sum(atoms1(:, atomap(i))**2) + sum(atoms0(:, i)**2))
     end do
 
 end function
 
-!function leastsquaredist(natom, weights, atoms0, atoms, atomap) result(dist)
+!function leastsquaredist(natom, weights, atoms0, atoms1, atomap) result(dist)
 ! Calculate least square distance from eigenvalues
 !    integer, intent(in) :: natom
 !    integer, dimension(:), intent(in) :: atomap
 !    real, dimension(:), intent(in) :: weights
-!    real, dimension(:, :), intent(in) :: atoms0, atoms
+!    real, dimension(:, :), intent(in) :: atoms0, atoms1
 !
 !    real dist, kearsleymat(4, 4), eigval(4)
 !
-!    call buildkearsleymat(natom, weights, atoms0, atoms, atomap, kearsleymat)
+!    call buildkearsleymat(natom, weights, atoms0, atoms1, atomap, kearsleymat)
 !    call syeval4(kearsleymat, eigval)
 !    dist = eigval(1)
 !
 !end function
 
-function leastsquaredist(natom, weights, atoms0, atoms, atomap) result(dist)
+function leastsquaredist(natom, weights, atoms0, atoms1, atomap) result(dist)
 ! Calculate least square distance from aligned coordinates
     integer, intent(in) :: natom
     integer, dimension(:), intent(in) :: atomap
     real, dimension(:), intent(in) :: weights
-    real, dimension(:, :), intent(in) :: atoms0, atoms
+    real, dimension(:, :), intent(in) :: atoms0, atoms1
 
     real dist
 
-    dist = squaredist(natom, weights, atoms0, aligned(natom, weights, atoms0, atoms, atomap), atomap)
+    dist = squaredist(natom, weights, atoms0, aligned(natom, weights, atoms0, atoms1, atomap), atomap)
 
 end function
 
-function leastrotquat(natom, weights, atoms0, atoms, atomap) result(quat)
+function leastrotquat(natom, weights, atoms0, atoms1, atomap) result(quat)
     integer, intent(in) :: natom
     integer, dimension(:), intent(in) :: atomap
     real, dimension(:), intent(in) :: weights
-    real, dimension(:, :), intent(in) :: atoms0, atoms
+    real, dimension(:, :), intent(in) :: atoms0, atoms1
 
     real quat(4), kearsleymat(4, 4), eigval(4)
 
-    call buildkearsleymat(natom, weights, atoms0, atoms, atomap, kearsleymat)
+    call buildkearsleymat(natom, weights, atoms0, atoms1, atomap, kearsleymat)
     call syevec4(kearsleymat, eigval)
     quat = kearsleymat(:, 1)
 
 end function
 
-function aligned(natom, weights, atoms0, atoms, atomap)
+function aligned(natom, weights, atoms0, atoms1, atomap)
     integer, intent(in) :: natom
     integer, dimension(:), intent(in) :: atomap
     real, dimension(:), intent(in) :: weights
-    real, dimension(:, :), intent(in) :: atoms0, atoms
+    real, dimension(:, :), intent(in) :: atoms0, atoms1
 
     integer i
     real aligned(3, natom), kearsleymat(4, 4), eigval(4)
 
-    call buildkearsleymat(natom, weights, atoms0, atoms, atomap, kearsleymat)
+    call buildkearsleymat(natom, weights, atoms0, atoms1, atomap, kearsleymat)
     call syevec4(kearsleymat, eigval)
-    aligned = rotated(natom, kearsleymat(:, 1), atoms)
+    aligned = rotated(natom, kearsleymat(:, 1), atoms1)
 
 end function
 
-subroutine buildkearsleymat(natom, weights, atoms0, atoms, atomap, kearsleymat)
+subroutine buildkearsleymat(natom, weights, atoms0, atoms1, atomap, kearsleymat)
 ! Purpose: Find the best orientation by least squares minimization
 ! Reference: Acta Cryst. (1989). A45, 208-210
 
 ! weights: Atomic weights
 ! atoms0: Reference atomic coordinates
-! atoms: Atomic coordinates
+! atoms1: Atomic coordinates
 ! rotquat: Rotation quaternion vector
 ! ssd: Root mean square distance from least squares
 
     integer, intent(in) :: natom
     integer, dimension(:), intent(in) :: atomap
     real, dimension(:), intent(in) :: weights
-    real, dimension(:, :), intent(in) :: atoms0, atoms
+    real, dimension(:, :), intent(in) :: atoms0, atoms1
 
     integer i
     real kearsleymat(4, 4), p(3, natom), q(3, natom), auxmat(4, 4)
@@ -122,8 +122,8 @@ subroutine buildkearsleymat(natom, weights, atoms0, atoms, atomap, kearsleymat)
     kearsleymat = 0.0
 
     do i = 1, natom
-        p(:, i) = atoms0(:, i) + atoms(:, atomap(i))
-        q(:, i) = atoms0(:, i) - atoms(:, atomap(i))
+        p(:, i) = atoms0(:, i) + atoms1(:, atomap(i))
+        q(:, i) = atoms0(:, i) - atoms1(:, atomap(i))
     end do
 
 ! Calculate upper diagonal elements of the matrix
