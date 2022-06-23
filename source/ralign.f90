@@ -2,7 +2,7 @@ module ralign
 
 use iso_fortran_env, only: output_unit
 use iso_fortran_env, only: error_unit
-use globals
+use options
 use random
 use sorting
 use rotation
@@ -34,11 +34,11 @@ subroutine alignatoms(mol0, mol1, label0, label1, bonds0, bonds1, mapcount, atom
 ! Purpose: Find best product to reactant map
 
     integer, intent(out) :: mapcount
-    integer, dimension(:, :), allocatable, intent(out) :: atomaplist
+    integer, dimension(:, :), intent(out) :: atomaplist
+    real, dimension(:, :, :), intent(out) :: rotmatlist
     integer, dimension(:, :), intent(inout) :: bonds0, bonds1
-    real, dimension(:, :), intent(inout) :: mol0, mol1
-    real, dimension(:, :, :), allocatable, intent(out) :: rotmatlist
     character(32), dimension(:), intent(inout) :: label0, label1
+    real, dimension(:, :), intent(inout) :: mol0, mol1
 
     integer i
     integer natom0, natom1
@@ -92,8 +92,6 @@ subroutine alignatoms(mol0, mol1, label0, label1, bonds0, bonds1, mapcount, atom
 
     allocate(weights0(natom0))
     allocate(bias(natom0, natom1))
-    allocate(rotmatlist(3, 3, maxrecord))
-    allocate(atomaplist(natom0, maxrecord))
     allocate(order0(natom0), order1(natom1), reorder0(natom0))
     allocate(blocktype0(natom0), blocktype1(natom1))
     allocate(blocksize0(natom0), blocksize1(natom1))

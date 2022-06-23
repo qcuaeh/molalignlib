@@ -1,4 +1,4 @@
-module globals
+module options
 
 real scaling, tolerance
 integer maxcoord, maxcount, maxlevel, maxrecord

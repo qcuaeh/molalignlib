@@ -1,5 +1,5 @@
 module biasing
-use globals
+use options
 use sorting
 implicit none
 

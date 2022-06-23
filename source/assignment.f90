@@ -1,5 +1,5 @@
 module assignment
-use globals
+use options
 use hungarian
 implicit none
 contains

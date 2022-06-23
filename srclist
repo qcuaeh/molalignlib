@@ -5,7 +5,7 @@ hungarian.f90
 utilities.f90
 printing.f90
 chemistry.f90
-globals.f90
+options.f90
 random.f90
 decoding.f90
 assignment.f90

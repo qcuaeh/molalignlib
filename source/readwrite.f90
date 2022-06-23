@@ -2,7 +2,7 @@ module readwrite
 use iso_fortran_env, only: input_unit
 use iso_fortran_env, only: output_unit
 use iso_fortran_env, only: error_unit
-use globals
+use options
 use utilities
 use chemistry
 implicit none

@@ -1,6 +1,6 @@
 program main
 
-    use globals
+    use options
     use decoding
     use readwrite
     use utilities
@@ -77,6 +77,11 @@ program main
     call readmol('xyz', title0, label0, mol0, bonds0)
     call readmol('xyz', title1, label1, mol1, bonds1)
 
+    ! Allocate records
+
+    allocate(rotmatlist(3, 3, maxrecord))
+    allocate(atomaplist(size(mol0, dim=2), maxrecord))
+
     ! Align atoms
 
     call alignatoms(mol0, mol1, label0, label1, bonds0, bonds1, mapcount, atomaplist, rotmatlist)
@@ -85,7 +90,7 @@ program main
 
     do i = 1, mapcount
         open (file_unit, file='aligned_'//str(i)//'.'//trim(output_format), action='write', status='replace')
-        call writemol(file_unit, [(i, i=1, size(label0))], title0, label0, mol0, bonds0)
+        call writemol(file_unit, [(i, i=1, size(mol0, dim=2))], title0, label0, mol0, bonds0)
         call writemol(file_unit, atomaplist(:, i), title1, label1, &
             rotated(size(mol1, dim=2), rotmatlist(:, :, i), mol1), &
             bonds1)

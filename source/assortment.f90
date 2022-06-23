@@ -1,5 +1,5 @@
 module assortment
-use globals
+use options
 use utilities
 use sorting
 use chemistry

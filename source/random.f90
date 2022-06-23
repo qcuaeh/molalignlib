@@ -1,5 +1,5 @@
 module random
-use globals
+use options
 implicit none
 
 interface shuffle
