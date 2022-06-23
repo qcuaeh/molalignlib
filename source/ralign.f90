@@ -1,7 +1,7 @@
 program ralign
 
 use options
-use actions
+use messages
 use decoding
 use readwrite
 use utilities
@@ -9,11 +9,11 @@ use rotation
 
 implicit none
 
-integer mapcount
+integer natom, mapcount
 integer, dimension(:, :), allocatable :: atomaplist
 real, dimension(:, :, :), allocatable :: rotmatlist
 integer, dimension(:, :), allocatable :: bonds0, bonds1
-real, dimension(:, :), allocatable :: mol0, mol1
+real, dimension(:, :), allocatable :: atoms0, atoms1
 character(32), dimension(:), allocatable :: label0, label1
 character(512) title0, title1
 
@@ -74,26 +74,32 @@ end do
 
 ! Read coordinates
 
-call readmol('xyz', title0, label0, mol0, bonds0)
-call readmol('xyz', title1, label1, mol1, bonds1)
+call readmol('xyz', title0, label0, atoms0, bonds0)
+call readmol('xyz', title1, label1, atoms1, bonds1)
+
+! Check number of atoms
+
+if (size(label0) == size(label1)) then
+    natom = size(label0)
+else
+    call error('The molecules do not have the same number of atoms!')
+end if
 
 ! Allocate records
 
 allocate(rotmatlist(3, 3, maxrecord))
-allocate(atomaplist(size(mol0, dim=2), maxrecord))
+allocate(atomaplist(natom, maxrecord))
 
 ! Align atoms
 
-call superpose(mol0, mol1, label0, label1, bonds0, bonds1, mapcount, atomaplist, rotmatlist)
+call superpose(natom, atoms0, atoms1, label0, label1, mapcount, atomaplist, rotmatlist)
 
 ! Write aligned coordinates
 
 do i = 1, mapcount
     open (file_unit, file='aligned_'//str(i)//'.'//trim(output_format), action='write', status='replace')
-    call writemol(file_unit, [(i, i=1, size(mol0, dim=2))], title0, label0, mol0, bonds0)
-    call writemol(file_unit, atomaplist(:, i), title1, label1, &
-        rotated(size(mol1, dim=2), rotmatlist(:, :, i), mol1), &
-        bonds1)
+    call writemol(file_unit, [(i, i=1, natom)], title0, label0, atoms0, bonds0)
+    call writemol(file_unit, atomaplist(:, i), title1, label1, rotated(natom, rotmatlist(:, :, i), atoms1), bonds1)
     close (file_unit)
 end do
 
