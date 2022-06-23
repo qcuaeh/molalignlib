@@ -24,7 +24,7 @@ program main
 
     biased = .false.
     iterative = .false.
-    testable = .false.
+    testing = .false.
     live = .false.
 
     maxcoord = 0
@@ -52,8 +52,8 @@ program main
             stop_test => match_stop_test
         case ('-bias')
             biased = .true.
-        case ('-test')
-            testable = .true.
+        case ('-testing')
+            testing = .true.
         case ('-live')
             live = .true.
         case ('-scale')
