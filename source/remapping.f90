@@ -78,7 +78,7 @@ subroutine remapatoms(natom, nblock, blocksize, mol0, mol1, weights, mapcount, a
 
 ! Apply random rotation
 
-        call rotate(natom, getrotquat(randvec3()), mol1)
+        call rotate(natom, randrotquat(randvec3()), mol1)
 
 ! Find the best mappping to minimize euclidean distance
 

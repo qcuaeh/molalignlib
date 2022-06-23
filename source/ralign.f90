@@ -4,12 +4,13 @@ use iso_fortran_env, only: output_unit
 use iso_fortran_env, only: error_unit
 use globals
 use random
+use sorting
+use rotation
+use translation
 use decoding
 use utilities
 use alignment
-use sorting
 use remapping
-use translation
 use assortment
 use chemistry
 use messages
@@ -18,14 +19,14 @@ implicit none
 
 contains
 
-subroutine alignatoms(mol0, mol1, label0, label1, bonds0, bonds1, mapcount, atomaplist, rotquatlist)
+subroutine alignatoms(mol0, mol1, label0, label1, bonds0, bonds1, mapcount, atomaplist, rotmatlist)
 ! Purpose: Find best product to reactant map
 
     integer, intent(out) :: mapcount
     integer, dimension(:, :), allocatable, intent(out) :: atomaplist
     integer, dimension(:, :), intent(inout) :: bonds0, bonds1
     real, dimension(:, :), intent(inout) :: mol0, mol1
-    real, dimension(:, :), allocatable, intent(out) :: rotquatlist
+    real, dimension(:, :, :), allocatable, intent(out) :: rotmatlist
     character(32), dimension(:), intent(inout) :: label0, label1
 
     integer i
@@ -74,7 +75,7 @@ subroutine alignatoms(mol0, mol1, label0, label1, bonds0, bonds1, mapcount, atom
 
     allocate(weights0(natom0))
     allocate(bias(natom0, natom1))
-    allocate(rotquatlist(4, maxrecord))
+    allocate(rotmatlist(3, 3, maxrecord))
     allocate(atomaplist(natom0, maxrecord))
     allocate(order0(natom0), order1(natom1), reorder0(natom0))
     allocate(blocktype0(natom0), blocktype1(natom1))
@@ -96,21 +97,6 @@ subroutine alignatoms(mol0, mol1, label0, label1, bonds0, bonds1, mapcount, atom
     ! Calculate normalized weights
 
     weights0 = atomweight(znum0)/sum(atomweight(znum0))
-
-    ! Print stats and return if maxcount is zero
-
-    if (maxcount == 0) then
-        if (any(label0 /= label1)) then
-            call error('Can not align because the atomic labels do not match!')
-        end if
-        mapcount = 1
-        atomaplist(:, 1) = [(i, i=1, natom0)]
-        rotquatlist(:, 1) = leastrotquat(natom0, weights0, mol0, mol1, atomaplist(:, 1))
-        call print_header()
-        call print_stats(0, 0, 0, 0., 0., 0., leastsquaredist(natom0, weights0, mol0, mol1, atomaplist(:, 1)))
-        call print_footer(.false., .false., 0, 0)
-        return
-    end if
 
     ! Group atoms by label
 
@@ -162,12 +148,20 @@ subroutine alignatoms(mol0, mol1, label0, label1, bonds0, bonds1, mapcount, atom
 
     ! Remap atoms to minimize distance and difference
 
-    call remapatoms(natom0, nblock0, blocksize0, mol0, mol1, weights0, mapcount, atomaplist, bias)
+    if (maxcount >= 1) then
+        call remapatoms(natom0, nblock0, blocksize0, mol0, mol1, weights0, mapcount, atomaplist, bias)
+    else
+        mapcount = 1
+        atomaplist(:, 1) = [(i, i=1, natom0)]
+        call print_header()
+        call print_stats(0, 0, 0, 0., 0., 0., leastsquaredist(natom0, weights0, mol0, mol1, atomaplist(:, 1)))
+        call print_footer(.false., .false., 0, 0)
+    end if
 
     ! Calculate rotation quaternions
 
     do i = 1, mapcount
-        rotquatlist(:, i) = leastrotquat(natom0, weights0, mol0, mol1, atomaplist(:, i))
+        rotmatlist(:, :, i) = quat2mat(leastrotquat(natom0, weights0, mol0, mol1, atomaplist(:, i)))
     end do
 
     ! Restore original atom order

@@ -168,9 +168,9 @@ subroutine writexyzfile(file_unit, mapping, title, label, atoms)
 
     integer i
 
-    write (file_unit, '(i0)') size(atoms, dim=1)
+    write (file_unit, '(i0)') size(atoms, dim=2)
     write (file_unit, '(a)') trim(title)
-    do i = 1, size(atoms, dim=1)
+    do i = 1, size(atoms, dim=2)
         write (file_unit, '(a, 3(2x, f12.6))') elsym(znum(label(mapping(i)))), atoms(:, mapping(i))
     end do
 
@@ -191,19 +191,19 @@ subroutine writemol2file(file_unit, mapping, title, label, atoms, bonds)
 
     write (file_unit, '(a)') '@<TRIPOS>MOLECULE'
     write (file_unit, '(a)') trim(title)
-    write (file_unit, '(5(i4, x))') size(atoms, dim=1), size(bonds, dim=1), 0, 0, 0
+    write (file_unit, '(5(i4, x))') size(atoms, dim=2), size(bonds, dim=2), 0, 0, 0
     write (file_unit, '(a)') 'SMALL'
     write (file_unit, '(a)') 'NO_CHARGES'
     write (file_unit, '(a)') '@<TRIPOS>ATOM'
 
-    do i = 1, size(atoms, dim=1)
+    do i = 1, size(atoms, dim=2)
         write (file_unit, '(i4, x, a2, 3(x, f12.6), x, a8, x, i2, x, a4, x, f7.3)') &
             i, elsym(znum(label(mapping(i)))), atoms(:, mapping(i)), label(mapping(i)), 1, 'MOL1', 0.
     end do
 
     write (file_unit, '(a)') '@<TRIPOS>BOND'
 
-    do i = 1, size(bonds, dim=1)
+    do i = 1, size(bonds, dim=2)
         write (file_unit, '(i4, x, 2(x, i4), x, a2)') i, unmapping(bonds(:, i)), '1'
     end do
 

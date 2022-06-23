@@ -11,7 +11,7 @@ program main
 
     integer mapcount
     integer, dimension(:, :), allocatable :: atomaplist
-    real, dimension(:, :), allocatable :: rotquatlist
+    real, dimension(:, :, :), allocatable :: rotmatlist
     integer, dimension(:, :), allocatable :: bonds0, bonds1
     real, dimension(:, :), allocatable :: mol0, mol1
     character(32), dimension(:), allocatable :: label0, label1
@@ -79,7 +79,7 @@ program main
 
     ! Align atoms
 
-    call alignatoms(mol0, mol1, label0, label1, bonds0, bonds1, mapcount, atomaplist, rotquatlist)
+    call alignatoms(mol0, mol1, label0, label1, bonds0, bonds1, mapcount, atomaplist, rotmatlist)
 
     ! Write aligned coordinates
 
@@ -87,7 +87,7 @@ program main
         open (file_unit, file='aligned_'//str(i)//'.'//trim(output_format), action='write', status='replace')
         call writemol(file_unit, [(i, i=1, size(label0))], title0, label0, mol0, bonds0)
         call writemol(file_unit, atomaplist(:, i), title1, label1, &
-            rotated(size(mol1, dim=2), rotquatlist(:, i), mol1), &
+            rotated(size(mol1, dim=2), rotmatlist(:, :, i), mol1), &
             bonds1)
         close (file_unit)
     end do

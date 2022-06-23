@@ -3,10 +3,11 @@ implicit none
 private
 public rotate
 public rotated
+public quat2mat
 public quatmul
 public rotangle
-public getrotmat
-public getrotquat
+public randrotmat
+public randrotquat
 
 interface rotate
     module procedure matrotate
@@ -20,7 +21,7 @@ end interface
 
 contains
 
-function rotquat2mat(rotquat) result(rotmat)
+function quat2mat(rotquat) result(rotmat)
 ! Purpose: Apply rotation quaternion to atomic coordinates
 
 ! rotquat: Rotation quaternion
@@ -50,7 +51,7 @@ function quatrotated(natom, rotquat, coords)
     real, intent(in) :: coords(3, natom)
     real quatrotated(3, natom)
 
-    quatrotated = matrotated(natom, rotquat2mat(rotquat), coords)
+    quatrotated = matrotated(natom, quat2mat(rotquat), coords)
 
 end function
 
@@ -86,8 +87,8 @@ subroutine quatrotate(natom, rotquat, coords)
 
 ! Rotate atomic coordinates
 
-!    call matrotate(natom, rotquat2mat(rotquat), coords)
-     coords = matmul(rotquat2mat(rotquat), coords)
+!    call matrotate(natom, quat2mat(rotquat), coords)
+     coords = matmul(quat2mat(rotquat), coords)
 
 end subroutine
 
@@ -122,7 +123,7 @@ function rotangle(q)
 !        90./asin(1.)*2*atan2(sqrt(sum(q(2:4)**2)), q(1))
 end function
 
-function getrotquat(x) result(rotquat)
+function randrotquat(x) result(rotquat)
 ! Purpose: Generate a random rotation quaternion.
 ! Reference: Academic Press Graphics Gems Series archive Graphics
 !            Gems III archive. Pages: 129 - 132.
@@ -145,14 +146,14 @@ function getrotquat(x) result(rotquat)
     s2 = sin(a2)
     c2 = cos(a2)
 
-!   Quaternion (w, x, y, z), w must be first as required by rotquat2mat
+!   Quaternion (w, x, y, z), w must be first as required by quat2mat
     rotquat = [ c2*r2, s1*r1, c1*r1, s2*r2 ]
 
 !    print *, sum(rotquat**2)
 
 end function
 
-function getrotmat(x) result(rotmat)
+function randrotmat(x) result(rotmat)
 ! Purpose: Generate a random rotation matrix.
 ! Reference: Academic Press Graphics Gems Series archive Graphics
 !            Gems III archive. Pages: 117 - 120.
