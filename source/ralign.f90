@@ -36,6 +36,8 @@ real, dimension(:), allocatable :: weights
 real, dimension(:, :), allocatable :: bias
 real, dimension(nelem) :: atomweight
 
+procedure (generic_test), pointer :: stop_test => null()
+
 if (maxcount < 0) then
     call error('Argument is missing!')
 end if
@@ -128,7 +130,7 @@ call random_seed(put=seed)
 ! Remap atoms to minimize distance and difference
 
 if (maxcount >= 1) then
-    call remapatoms(natom, nblock0, blocksize0, atoms0, atoms1, weights, mapcount, atomaplist, bias)
+    call remapatoms(natom, nblock0, blocksize0, atoms0, atoms1, weights, mapcount, atomaplist, stop_test, bias)
 else
     mapcount = 1
     atomaplist(:, 1) = [(i, i=1, natom)]

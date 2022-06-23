@@ -17,6 +17,12 @@ use printing
 
 implicit none
 
+abstract interface
+    logical function generic_test(x, y)
+        integer, intent(in) :: x, y
+    end function
+end interface
+
 contains
 
 logical function trial_stop_test(trials, matches) result(stop_test)
@@ -29,7 +35,7 @@ logical function match_stop_test(trials, matches) result(stop_test)
     stop_test = matches < maxcount
 end function
 
-subroutine remapatoms(natom, nblock, blocksize, atoms0, atoms1, weights, mapcount, atomaplist, bias)
+subroutine remapatoms(natom, nblock, blocksize, atoms0, atoms1, weights, mapcount, atomaplist, stop_test, bias)
 
 ! natom: number of points to align
 ! atoms0: coordinates of first molecule
@@ -52,6 +58,7 @@ subroutine remapatoms(natom, nblock, blocksize, atoms0, atoms1, weights, mapcoun
     real, dimension(:, :), intent(in) :: atoms0
     real, dimension(:), intent(in) :: weights
     real, dimension(:, :), intent(in) :: bias
+    procedure (generic_test), pointer, intent(in) :: stop_test
 
     logical map_found, overflow
     integer i, imap, jmap, ntrial, iteration, newdiff, matchcount
