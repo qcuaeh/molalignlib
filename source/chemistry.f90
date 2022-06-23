@@ -1,7 +1,7 @@
 module chemistry
 ! Purpose: Definition of physical constants
 use iso_fortran_env, only: error_unit
-use utilities
+use strutils
 
 ! elsym: Element symbols
 ! valency: Eleement valenc

@@ -1,7 +1,7 @@
 module assortment
 use options
-use utilities
 use sorting
+use maputils
 use chemistry
 implicit none
 private

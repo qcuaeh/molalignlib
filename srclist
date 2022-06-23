@@ -1,8 +1,10 @@
 messages.f90
 lapack.f90
+math.f90
 sorting.f90
 hungarian.f90
-utilities.f90
+strutils.f90
+maputils.f90
 printing.f90
 chemistry.f90
 options.f90

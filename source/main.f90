@@ -4,7 +4,7 @@ use options
 use messages
 use decoding
 use readwrite
-use utilities
+use strutils
 use rotation
 
 implicit none
