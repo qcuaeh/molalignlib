@@ -16,5 +16,5 @@ alignment.f90
 readwrite.f90
 biasing.f90
 remapping.f90
-superpose.f90
 ralign.f90
+main.f90
