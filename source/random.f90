@@ -39,7 +39,7 @@ subroutine init_random_seed(seed)
         [ 437395160, 1404128605, 572505362, -1187264075, 454383258, 525702629, 973594203, 1758310677 ]
     call random_seed(size=n)
     allocate(seed(n))
-    if (debug) then
+    if (testable) then
         do i = 1, n
             seed(i) = debug_seed(mod(i - 1, 8) + 1)
         end do

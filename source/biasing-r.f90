@@ -5,21 +5,6 @@ implicit none
 
 contains
 
-logical function bias_none(array) result(bias_test)
-    real, dimension(:), intent(in) :: array
-    bias_test = .false.
-end function
-
-logical function bias_test1(array) result(bias_test)
-    real, dimension(:), intent(in) :: array
-    bias_test = sum(abs(array)) > size(array)*tolerance
-end function
-
-logical function bias_test2(array) result(bias_test)
-    real, dimension(:), intent(in) :: array
-    bias_test = any(abs(array) > tolerance)
-end function
-
 subroutine setadjbias(natom, nblock, blocksize, blocktype, mol0, ncoord0, adjlist0, &
 mol1, ncoord1, adjlist1, weights, bias)
     integer, intent(in) :: natom, nblock
@@ -58,16 +43,18 @@ mol1, ncoord1, adjlist1, weights, bias)
     offset = 0
     bias(:, :) = 0.
 
-    do h = 1, nblock
-        do i = offset + 1, offset + blocksize(h)
-            do j = offset + 1, offset + blocksize(h)
-                if (bias_test(d1(:, j) - d0(:, i))) then
-                    bias(i, j) = 1.
-                end if
+    if (biased) then
+        do h = 1, nblock
+            do i = offset + 1, offset + blocksize(h)
+                do j = offset + 1, offset + blocksize(h)
+                    if (any(abs(d1(:, j) - d0(:, i)) > tolerance)) then
+                        bias(i, j) = 1.
+                    end if
+                end do
             end do
+            offset = offset + blocksize(h)
         end do
-        offset = offset + blocksize(h)
-    end do
+    end if
 
 end subroutine
 

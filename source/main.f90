@@ -1,195 +1,105 @@
-subroutine main
-! Purpose: Find best product to reactant map
-
-    use iso_fortran_env, only: output_unit
-    use iso_fortran_env, only: error_unit
+program main
 
     use globals
-    use random
     use decoding
-    use utilities
-    use alignment
-    use sorting
-    use remapping
-    use translation
-    use assortment
-    use chemistry
     use readwrite
-    use messages
+    use utilities
+    use rotation
 
     implicit none
 
-    integer i
     integer mapcount
-    integer natom0, natom1, nbond0, nbond1
-    integer nblock0, nblock1, nequiv0, nequiv1
-    integer, dimension(:), allocatable :: seed
-    integer, dimension(:), allocatable :: znum0, znum1
-    integer, dimension(:), allocatable :: ncoord0, ncoord1, nadjeq0, nadjeq1
-    integer, dimension(:), allocatable :: blocksize0, blocksize1, blocktype0, blocktype1
-    integer, dimension(:), allocatable :: equivtype0, equivtype1, equivsize0, equivsize1
-    integer, dimension(:), allocatable :: identitymap, order0, order1
-    integer, dimension(:, :), allocatable :: adjlist0, adjlist1, bonds0, bonds1
-    integer, dimension(:, :), allocatable :: adjeqsize0, adjeqsize1
     integer, dimension(:, :), allocatable :: atomaplist
-    logical, dimension(:, :), allocatable ::  adjmat0, adjmat1
-    real, dimension(:), allocatable :: weights0
+    real, dimension(:, :), allocatable :: rotquatlist
+    integer, dimension(:, :), allocatable :: bonds0, bonds1
     real, dimension(:, :), allocatable :: mol0, mol1
-    real, dimension(:, :), allocatable :: bias
-    real, dimension(nelem) :: atomweight, adjrad
-    character(512) title0, title1
-    character(128) prefix, suffix
     character(32), dimension(:), allocatable :: label0, label1
+    character(512) title0, title1
 
-    if (maxcount < 0) then
-        call error('Argument is missing!')
-    end if
+    integer i
+    character(32) arg
 
-    call split_name(output_file, prefix, suffix)
+    ! Set default options 
 
-    select case (suffix)
-    case ('xyz')
-        output_format = 'xyz'
-    case ('mol2')
-        output_format = 'mol2'
-    case default
-        call error(trim(output_file)//' has an unknown extension!')
-    end select
+    biased = .false.
+    iterative = .false.
+    testable = .false.
+    live = .false.
 
-    select case (weighting)
-    case ('none')
-        atomweight = [(1., i=1, nelem)]
-    case ('mass')
-        atomweight = stdmatom
-    case ('valency')
-        atomweight = valency
-    case default
-        call error('Invalid weighting option: '//trim(weighting))
-    end select
+    maxcoord = 0
+    maxcount = -1
+    maxrecord = 9
 
-    ! Set adjacency radii and check them
+    scaling = 1000.
+    tolerance = 0.1
 
-    adjrad = covrad + 0.25*(vdwrad - covrad)
+    weighting = 'none'
 
-    if (any(adjrad < covrad) .or. any(adjrad > vdwrad)) then
-        call error('There are unphysical atomic radii!')
-    end if
+    stop_test => trial_stop_test
 
-    ! Read molecule files
+    ! Get user options 
 
-    call readmol('xyz', natom0, title0, label0, mol0, nbond0, bonds0, znum0)
-    call readmol('xyz', natom1, title1, label1, mol1, nbond1, bonds1, znum1)
+    call initarg()
 
-    ! Abort if number of atoms differ
+    do while (getarg(arg))
 
-    if (natom0 /= natom1) then
-        call error('The molecules are not isomers!')
-    end if
+        select case (arg)
+        case ('-iter')
+            iterative = .true.
+        case ('-converge')
+            stop_test => match_stop_test
+        case ('-bias')
+            biased = .true.
+        case ('-test')
+            testable = .true.
+        case ('-live')
+            live = .true.
+        case ('-scale')
+            call readoptarg(arg, scaling)
+        case ('-tol')
+            call readoptarg(arg, tolerance)
+        case ('-weight')
+            call readoptarg(arg, weighting)
+        case ('-out')
+            call readoptarg(arg, output_format)
+        case ('-n')
+            call readoptarg(arg, maxrecord)
+        case default
+            call readarg(arg, maxcount)
+        end select
 
-    ! Allocate arrays
+    end do
 
-    allocate(weights0(natom0))
-    allocate(identitymap(natom0))
-    allocate(ncoord0(natom0), ncoord1(natom1))
-    allocate(adjmat0(natom0, natom0), adjmat1(natom1, natom1))
-    allocate(adjlist0(maxcoord, natom0), adjlist1(maxcoord, natom1))
+    ! Read coordinates
 
-    ! Print stats and return if maxcount is zero
+    call readmol('xyz', title0, label0, mol0, bonds0)
+    call readmol('xyz', title1, label1, mol1, bonds1)
 
-    if (maxcount == 0) then
-        if (any(label0 /= label1)) then
-            call error('Can not align because the atomic labels do not match!')
-        end if
-        identitymap = [(i, i=1, natom0)]
-        weights0 = atomweight(znum0)/sum(atomweight(znum0))
-        call print_header()
-        call print_stats(0, 0, 0, 0., 0., 0., leastsquaredist(natom0, weights0, mol0, mol1, identitymap))
-        call print_footer(.false., .false., 0, 0)
-        open (file_unit, file=trim(prefix)//'_0.'//trim(suffix), action='write', status='replace')
-        call writemol(file_unit, natom0, identitymap, 'Reference', label0, znum0, &
-            mol0, nbond0, bonds0)
-        call writemol(file_unit, natom1, identitymap, 'Alignment=0', label1, znum1, &
-            aligned(natom0, weights0, mol0, mol1, identitymap), nbond1, bonds1)
-        close (file_unit)
-        stop
-    end if
+    ! Align atoms
 
-    allocate(order0(natom0), order1(natom1))
-    allocate(adjeqsize0(maxcoord, natom0), adjeqsize1(maxcoord, natom1))
-    allocate(blocktype0(natom0), blocktype1(natom1), blocksize0(natom0), blocksize1(natom1))
-    allocate(equivtype0(natom0), equivtype1(natom1), equivsize0(natom0), equivsize1(natom1))
-    allocate(nadjeq0(natom0), nadjeq1(natom1))
-    allocate(atomaplist(natom0, maxrecord))
-    allocate(bias(natom0, natom1))
+    call ralign(mol0, mol1, label0, label1, bonds0, bonds1, mapcount, atomaplist, rotquatlist)
 
-    ! Group atoms by label
-
-    call grouplabels(natom0, label0, nblock0, blocksize0, blocktype0)
-    call grouplabels(natom1, label1, nblock1, blocksize1, blocktype1)
-
-    ! Sort equivalent atoms in contiguous blocks
-
-    order0 = sortorder(equivtype0, natom0)
-    order1 = sortorder(equivtype1, natom1)
-
-    blocktype0 = blocktype0(order0)
-    blocktype1 = blocktype1(order1)
-
-    label0 = label0(order0)
-    label1 = label1(order1)
-
-    mol0 = mol0(:, order0)
-    mol1 = mol1(:, order1)
-
-    znum0 = znum0(order0)
-    znum1 = znum1(order1)
-
-    order0 = inversemap(order0)
-    order1 = inversemap(order1)
-
-    ! Abort if there are incompatible atomic symbols
-
-    if (any(label0 /= label1)) then
-        call error('The molecules do not have the same number of atoms!')
-    end if
-
-    ! Abort if there are incompatible atomic labels
-
-    if (any(label0 /= label1)) then
-        call error('There are incompatible atomic labels!')
-    end if
-
-    ! Calculate normalized weights
-
-    weights0 = atomweight(znum0)/sum(atomweight(znum0))
-
-    ! Translate molecules to their centroid
-
-    call translate(natom0, centroid(natom0, weights0, mol0), mol0)
-    call translate(natom1, centroid(natom1, weights0, mol1), mol1)
-
-    ! Set bias for non equivalent atoms 
-
-    call setadjbias(natom0, nblock0, blocksize0, blocktype0, mol0, ncoord0, adjlist0, mol1, &
-        ncoord1, adjlist1, weights0, bias)
-
-    ! Initialize random number generator
-
-    call init_random_seed(seed)
-    call random_seed(put=seed)
-
-    ! Remap atoms to minimize distance and difference
-
-    call remapatoms(natom0, nblock0, blocksize0, blocktype0, mol0, ncoord0, adjlist0, adjmat0, &
-        nequiv0, equivsize0, equivtype0, nadjeq0, adjeqsize0, mol1, ncoord1, adjlist1, adjmat1, &
-        nequiv1, equivsize1, equivtype1, nadjeq1, adjeqsize1, weights0, mapcount, atomaplist, bias)
+    ! Write aligned coordinates
 
     do i = 1, mapcount
-        open (file_unit, file=trim(prefix)//'_'//str(i)//'.'//trim(suffix), action='write', status='replace')
-        call writemol(file_unit, natom0, order0, title0, label0, znum0, mol0, nbond0, bonds0)
-        call writemol(file_unit, natom1, atomaplist(order0, i), title1, label1, &
-            znum1, aligned(natom0, weights0, mol0, mol1, atomaplist(:, i)), nbond1, bonds1)
+        open (file_unit, file='aligned_'//str(i)//'.'//trim(output_format), action='write', status='replace')
+        call writemol(file_unit, [(i, i=1, size(label0))], title0, label0, mol0, bonds0)
+        call writemol(file_unit, atomaplist(:, i), title1, label1, &
+            rotated(size(mol1, dim=1), rotquatlist(:, i), mol1), &
+            bonds1)
         close (file_unit)
     end do
 
-end subroutine
+contains
+
+    logical function trial_stop_test(trials, matches) result(stop_test)
+        integer, intent(in) :: trials, matches
+        stop_test = trials < maxcount
+    end function
+
+    logical function match_stop_test(trials, matches) result(stop_test)
+        integer, intent(in) :: trials, matches
+        stop_test = matches < maxcount
+    end function
+
+end program

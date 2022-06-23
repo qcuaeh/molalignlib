@@ -1,4 +1,3 @@
-#!/bin/sh
 gfortran -fPIC -c messages.f90
 gfortran -fPIC -c lapack.f90
 gfortran -fPIC -c sorting.f90

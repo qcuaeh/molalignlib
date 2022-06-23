@@ -16,16 +16,6 @@ implicit none
 
 contains
 
-logical function trial_stop_test(trials, matches) result(stop_test)
-    integer, intent(in) :: trials, matches
-    stop_test = trials < maxcount
-end function
-
-logical function match_stop_test(trials, matches) result(stop_test)
-    integer, intent(in) :: trials, matches
-    stop_test = matches < maxcount
-end function
-
 subroutine remapatoms(natom, nblock, blocksize, blocktype, mol0, ncoord0, adjlist0, adjmat0, &
     nequiv0, equivsize0, equivtype0, nadjeq0, adjeqsize0, mol1, ncoord1, adjlist1, adjmat1, &
     nequiv1, equivsize1, equivtype1, nadjeq1, adjeqsize1, weights, mapcount, atomaplist, bias)

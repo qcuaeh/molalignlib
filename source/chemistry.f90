@@ -73,10 +73,9 @@ integer, dimension(nelem), parameter :: valency(nelem) = [ &
 
 contains
 
-subroutine readlabel(label, znum)
-    character(*), intent(inout) :: label
-    integer, intent(out) :: znum
+integer function znum(label)
 
+    character(*), intent(in) :: label
     integer m, n
 
     n = len_trim(label)
@@ -84,24 +83,22 @@ subroutine readlabel(label, znum)
 
     if (m == 0) then
         znum = atomic_number(label)
-        label = elsym(znum)
     else
         if (verify(label(m:n), '0123456789') /= 0) then 
             write (error_unit, '(2a)') 'Invalid label: ', trim(label)
             stop
         end if
         znum = atomic_number(label(1:m-1))
-        label = trim(elsym(znum))//label(m:n)
     end if
 
-end subroutine
+end function
 
 function atomic_number(symbol) result(z)
     character(*), intent(in) :: symbol
     integer z
 
     do z = 1, nelem
-        if (upper(symbol) == upper(elsym(z))) then
+        if (symbol == upper(elsym(z))) then
             return
         end if
     end do
