@@ -37,7 +37,7 @@ program main
     weighting = 'none'
     output_format = 'xyz'
 
-    stop_test => trial_stop_test
+    converge = .false.
 
     ! Get user options 
 
@@ -49,7 +49,7 @@ program main
         case ('-iter')
             iterative = .true.
         case ('-converge')
-            stop_test => match_stop_test
+            converge = .true.
         case ('-bias')
             biased = .true.
         case ('-testing')
@@ -91,17 +91,5 @@ program main
             bonds1)
         close (file_unit)
     end do
-
-contains
-
-    logical function trial_stop_test(trials, matches) result(stop_test)
-        integer, intent(in) :: trials, matches
-        stop_test = trials < maxcount
-    end function
-
-    logical function match_stop_test(trials, matches) result(stop_test)
-        integer, intent(in) :: trials, matches
-        stop_test = matches < maxcount
-    end function
 
 end program

@@ -19,6 +19,17 @@ implicit none
 
 contains
 
+logical function trial_stop_test(trials, matches) result(stop_test)
+    integer, intent(in) :: trials, matches
+    stop_test = trials < maxcount
+end function
+
+logical function match_stop_test(trials, matches) result(stop_test)
+    integer, intent(in) :: trials, matches
+    stop_test = matches < maxcount
+end function
+
+
 subroutine alignatoms(mol0, mol1, label0, label1, bonds0, bonds1, mapcount, atomaplist, rotmatlist)
 ! Purpose: Find best product to reactant map
 
@@ -44,6 +55,12 @@ subroutine alignatoms(mol0, mol1, label0, label1, bonds0, bonds1, mapcount, atom
 
     if (maxcount < 0) then
         call error('Argument is missing!')
+    end if
+
+    if (converge) then
+        stop_test => match_stop_test
+    else
+        stop_test => trial_stop_test
     end if
 
     select case (weighting)
