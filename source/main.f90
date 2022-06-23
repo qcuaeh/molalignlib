@@ -5,6 +5,7 @@ program main
     use readwrite
     use utilities
     use rotation
+    use ralign
 
     implicit none
 
@@ -34,6 +35,7 @@ program main
     tolerance = 0.1
 
     weighting = 'none'
+    output_format = 'xyz'
 
     stop_test => trial_stop_test
 
@@ -77,7 +79,7 @@ program main
 
     ! Align atoms
 
-    call ralign(mol0, mol1, label0, label1, bonds0, bonds1, mapcount, atomaplist, rotquatlist)
+    call alignatoms(mol0, mol1, label0, label1, bonds0, bonds1, mapcount, atomaplist, rotquatlist)
 
     ! Write aligned coordinates
 
@@ -85,7 +87,7 @@ program main
         open (file_unit, file='aligned_'//str(i)//'.'//trim(output_format), action='write', status='replace')
         call writemol(file_unit, [(i, i=1, size(label0))], title0, label0, mol0, bonds0)
         call writemol(file_unit, atomaplist(:, i), title1, label1, &
-            rotated(size(mol1, dim=1), rotquatlist(:, i), mol1), &
+            rotated(size(mol1, dim=2), rotquatlist(:, i), mol1), &
             bonds1)
         close (file_unit)
     end do

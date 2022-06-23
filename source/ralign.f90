@@ -1,29 +1,32 @@
-subroutine ralign(mol0, mol1, label0, label1, bonds0, bonds1, mapcount, atomaplist, rotquatlist)
+module ralign
+
+use iso_fortran_env, only: output_unit
+use iso_fortran_env, only: error_unit
+use globals
+use random
+use decoding
+use utilities
+use alignment
+use sorting
+use remapping
+use translation
+use assortment
+use chemistry
+use messages
+
+implicit none
+
+contains
+
+subroutine alignatoms(mol0, mol1, label0, label1, bonds0, bonds1, mapcount, atomaplist, rotquatlist)
 ! Purpose: Find best product to reactant map
-
-    use iso_fortran_env, only: output_unit
-    use iso_fortran_env, only: error_unit
-
-    use globals
-    use random
-    use decoding
-    use utilities
-    use alignment
-    use sorting
-    use remapping
-    use translation
-    use assortment
-    use chemistry
-    use messages
-
-    implicit none
 
     integer, intent(out) :: mapcount
     integer, dimension(:, :), allocatable, intent(out) :: atomaplist
     real, dimension(:, :), allocatable, intent(out) :: rotquatlist
-    real, dimension(:, :), allocatable, intent(inout) :: mol0, mol1
-    character(32), dimension(:), allocatable, intent(inout) :: label0, label1
-    integer, dimension(:, :), allocatable, intent(inout) :: bonds0, bonds1
+    real, dimension(:, :), intent(inout) :: mol0, mol1
+    character(32), dimension(:), intent(inout) :: label0, label1
+    integer, dimension(:, :), intent(inout) :: bonds0, bonds1
 
     integer i
     integer natom0, natom1, nbond0, nbond1
@@ -66,13 +69,13 @@ subroutine ralign(mol0, mol1, label0, label1, bonds0, bonds1, mapcount, atomapli
 
     ! Get number of atoms
 
-    natom0 = size(mol0, dim=1)
-    natom1 = size(mol1, dim=1)
+    natom0 = size(mol0, dim=2)
+    natom1 = size(mol1, dim=2)
 
     ! Get number of bonds
 
-    nbond0 = size(bonds0, dim=1)
-    nbond1 = size(bonds1, dim=1)
+    nbond0 = size(bonds0, dim=2)
+    nbond1 = size(bonds1, dim=2)
 
     ! Abort if number of atoms differ
 
@@ -117,13 +120,13 @@ subroutine ralign(mol0, mol1, label0, label1, bonds0, bonds1, mapcount, atomapli
         return
     end if
 
-    allocate(order0(natom0), order1(natom1))
+    allocate(order0(natom0), order1(natom1), reorder0(natom0))
     allocate(adjeqsize0(maxcoord, natom0), adjeqsize1(maxcoord, natom1))
     allocate(blocktype0(natom0), blocktype1(natom1), blocksize0(natom0), blocksize1(natom1))
     allocate(equivtype0(natom0), equivtype1(natom1), equivsize0(natom0), equivsize1(natom1))
     allocate(nadjeq0(natom0), nadjeq1(natom1))
     allocate(atomaplist(natom0, maxrecord))
-    allocate(rotquatlist(3, maxrecord))
+    allocate(rotquatlist(4, maxrecord))
     allocate(bias(natom0, natom1))
 
     ! Group atoms by label
@@ -187,7 +190,7 @@ subroutine ralign(mol0, mol1, label0, label1, bonds0, bonds1, mapcount, atomapli
         nequiv0, equivsize0, equivtype0, nadjeq0, adjeqsize0, mol1, ncoord1, adjlist1, adjmat1, &
         nequiv1, equivsize1, equivtype1, nadjeq1, adjeqsize1, weights0, mapcount, atomaplist, bias)
 
-    ! Calculate optimal rotation matrices
+    ! Calculate rotation quaternions
 
     do i = 1, mapcount
         rotquatlist(:, i) = leastrotquat(natom0, weights0, mol0, mol1, atomaplist(:, i))
@@ -206,3 +209,5 @@ subroutine ralign(mol0, mol1, label0, label1, bonds0, bonds1, mapcount, atomapli
     end do
 
 end subroutine
+
+end module
