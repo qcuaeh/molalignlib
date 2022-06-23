@@ -18,6 +18,16 @@ implicit none
 
 contains
 
+logical function trial_stop_test(trials, matches) result(stop_test)
+    integer, intent(in) :: trials, matches
+    stop_test = trials < maxcount
+end function
+
+logical function match_stop_test(trials, matches) result(stop_test)
+    integer, intent(in) :: trials, matches
+    stop_test = matches < maxcount
+end function
+
 subroutine remapatoms(natom, nblock, blocksize, mol0, mol1, weights, mapcount, atomaplist, bias)
 
 ! natom: number of points to align
