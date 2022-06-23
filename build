@@ -52,7 +52,7 @@ build () {
 
 shopt -s nullglob
 
-SRCDIR=./source
+SRCDIR=./fortran
 SRCLIST=./srclist
 BLDDIR=./build_dir
 BINDIR=./bin
