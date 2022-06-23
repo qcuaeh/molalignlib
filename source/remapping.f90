@@ -16,37 +16,29 @@ implicit none
 
 contains
 
-subroutine remapatoms(natom, nblock, blocksize, blocktype, mol0, ncoord0, adjlist0, adjmat0, &
-    nequiv0, equivsize0, equivtype0, nadjeq0, adjeqsize0, mol1, ncoord1, adjlist1, adjmat1, &
-    nequiv1, equivsize1, equivtype1, nadjeq1, adjeqsize1, weights, mapcount, atomaplist, bias)
+subroutine remapatoms(natom, nblock, blocksize, mol0, mol1, weights, mapcount, atomaplist, bias)
 
 ! natom: number of points to align
 ! mol0: coordinates of first molecule
 ! mol1: coordinates of second molecule
 ! nblock: number of block atoms
 ! blocksize: size of atom block (number of atoms in the block)
-! blocktype: block number of atom
 ! newdist: total square distance between molecules
 ! mindist: minimum distance
 ! atomap: mapping between the corresponding atoms in both molecules
 ! atomaplist: mapping list of minimum distances or differences
-! adjmat0: first adjacency matrix
-! adjmat1: second adjacency matrix
 ! matches: number of equivalent orientations
 ! maxcount: maximum number of searching cycles
 ! ntrial: random rotation trial counter
 
-    integer, intent(in) :: natom, nblock, nequiv0, nequiv1
-    logical, dimension(:, :), intent(in) ::  adjmat0, adjmat1
-    integer, dimension(:), intent(in) :: ncoord0, ncoord1, nadjeq0, nadjeq1
-    integer, dimension(:), intent(in) :: blocksize, blocktype, equivsize0, equivsize1, equivtype0, equivtype1
-    integer, dimension(:, :), intent(in) :: adjlist0, adjlist1, adjeqsize0, adjeqsize1
-    real, dimension(:, :), intent(in) :: mol0
+    integer, intent(out) :: mapcount
+    integer, intent(in) :: natom, nblock
+    integer, dimension(:), intent(in) :: blocksize
+    integer, dimension(:, :), intent(out) :: atomaplist
     real, dimension(:, :), intent(inout) :: mol1
+    real, dimension(:, :), intent(in) :: mol0
     real, dimension(:), intent(in) :: weights
     real, dimension(:, :), intent(in) :: bias
-    integer, intent(out) :: mapcount
-    integer, dimension(:, :), intent(out) :: atomaplist
 
     logical map_found, overflow
     integer i, imap, jmap, ntrial, iteration, newdiff, matchcount

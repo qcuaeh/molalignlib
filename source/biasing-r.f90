@@ -5,13 +5,9 @@ implicit none
 
 contains
 
-subroutine setadjbias(natom, nblock, blocksize, blocktype, mol0, ncoord0, adjlist0, &
-mol1, ncoord1, adjlist1, weights, bias)
+subroutine setadjbias(natom, nblock, blocksize, mol0, mol1, bias)
     integer, intent(in) :: natom, nblock
-    integer, dimension(:), intent(in) :: ncoord0, ncoord1
-    integer, dimension(:), intent(in) :: blocktype, blocksize
-    integer, dimension(:, :), intent(in) :: adjlist0, adjlist1
-    real, dimension(:), intent(in) :: weights
+    integer, dimension(:), intent(in) :: blocksize
     real, dimension(:, :), intent(in) :: mol0, mol1
     real, dimension(:, :), intent(out) :: bias
 
