@@ -2,18 +2,18 @@ module ralign
 
 use iso_fortran_env, only: output_unit
 use iso_fortran_env, only: error_unit
+
 use options
 use random
 use sorting
 use rotation
 use translation
-use decoding
-use utilities
 use alignment
 use remapping
 use assortment
 use chemistry
 use messages
+!use utilities
 
 implicit none
 
@@ -29,8 +29,7 @@ logical function match_stop_test(trials, matches) result(stop_test)
     stop_test = matches < maxcount
 end function
 
-
-subroutine alignatoms(mol0, mol1, label0, label1, bonds0, bonds1, mapcount, atomaplist, rotmatlist)
+subroutine superpose(mol0, mol1, label0, label1, bonds0, bonds1, mapcount, atomaplist, rotmatlist)
 ! Purpose: Find best product to reactant map
 
     integer, intent(out) :: mapcount
