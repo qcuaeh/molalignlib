@@ -24,20 +24,15 @@ character(32) arg
 
 biased = .false.
 iterative = .false.
+converge = .false.
 testing = .false.
 live = .false.
-
 maxcoord = 0
 maxcount = -1
 maxrecord = 9
-
 scaling = 1000.
-tolerance = 0.1
-
 weighting = 'none'
 output_format = 'xyz'
-
-converge = .false.
 
 ! Get user options 
 
