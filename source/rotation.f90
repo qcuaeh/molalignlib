@@ -6,8 +6,8 @@ public rotated
 public quat2mat
 public quatmul
 public rotangle
-public randrotmat
-public randrotquat
+public getrotmat
+public getrotquat
 
 interface rotate
     module procedure matrotate
@@ -123,7 +123,7 @@ function rotangle(q)
 !        90./asin(1.)*2*atan2(sqrt(sum(q(2:4)**2)), q(1))
 end function
 
-function randrotquat(x) result(rotquat)
+function getrotquat(x) result(rotquat)
 ! Purpose: Generate a random rotation quaternion.
 ! Reference: Academic Press Graphics Gems Series archive Graphics
 !            Gems III archive. Pages: 129 - 132.
@@ -153,7 +153,7 @@ function randrotquat(x) result(rotquat)
 
 end function
 
-function randrotmat(x) result(rotmat)
+function getrotmat(x) result(rotmat)
 ! Purpose: Generate a random rotation matrix.
 ! Reference: Academic Press Graphics Gems Series archive Graphics
 !            Gems III archive. Pages: 117 - 120.
