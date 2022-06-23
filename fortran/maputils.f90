@@ -15,12 +15,12 @@ function inversemap(mapping)
     end do
 end function
 
-logical function goodmap(mapping, n)
+logical function consistentmap(mapping, n)
     integer, intent(in) :: n, mapping(:)
     integer i
-    goodmap = .false.
+    consistentmap = .false.
     if (any(sorted(mapping, n) /= [(i, i=1, n)])) then
-        goodmap = .true.
+        consistentmap = .true.
     end if
 end function
 
