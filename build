@@ -1,62 +1,64 @@
 #!/bin/bash
 
+PROGRAM=ralign
+FORTRAN=gfortran
+OPTIONS='-L/usr/lib64/atlas'
+SRCDIR=./fortran
+SRCLIST=./srclist
+BUILDIR=./build_dir
+BINDIR=./bin
+
 # Compile selected source files
 compile () {
    objlist=()
    for file in "$@"; do
       srcfile=$SRCDIR/$file
-      bldfile=$OBJDIR/$file
-      objfile=$OBJDIR/${file%.*}.o
+      bldfile=$objdir/$file
+      objfile=$objdir/${file%.*}.o
       objlist+=($objfile)
       if ! test -e "$objfile" || ! test -e "$bldfile" || ! diff -q "$srcfile" "$bldfile" > /dev/null; then
          rm -f "$objfile"
          cp -p "$srcfile" "$bldfile"
          echo Compiling "$file"
-         $FORTRAN -c "$srcfile" -o "$objfile" -I "$OBJDIR" -J "$OBJDIR" || exit
+         $FORTRAN $options -c "$srcfile" -o "$objfile" -I "$objdir" -J "$objdir" || exit
       fi
    done
 }
 
 build () {
    case "$1" in
-     single ) prec_options='' ;;
-     double ) prec_options='-fdefault-real-8' ;;
+     single ) precopts='' ;;
+     double ) precopts='-fdefault-real-8' ;;
      * ) echo Invalid precision option: $1; exit ;;
    esac
    case "$2" in
-     safe ) bld_options='-O3' ;;
-     fast ) bld_options='-O3 -ffast-math' ;;
-     debug ) bld_options='-g -fbounds-check -fbacktrace -ffpe-trap=zero,invalid,overflow -O0 -Wall' ;;
+     safe ) buildopts='-O3' ;;
+     fast ) buildopts='-O3 -ffast-math' ;;
+     debug ) buildopts='-g -fbounds-check -fbacktrace -ffpe-trap=zero,invalid,overflow -O0 -Wall' ;;
      * ) echo Invalid optimization option: $2; exit ;;
    esac
-   FORTRAN="gfortran $bld_options $prec_options -L/usr/lib64/atlas -llapack"
-   OBJDIR=$BLDDIR/$1/$2
    srclist=()
-   if [[ -d $OBJDIR ]]; then
+   objdir=$BUILDIR/$1/$2
+   options="-llapack $OPTIONS $buildopts $precopts"
+   if [[ -d $objdir ]]; then
       if [[ $RECOMPILE != true ]]; then
-         for f in "$OBJDIR"/*; do 
+         for f in "$objdir"/*; do 
             rm "$f"
          done
       fi
    else
-      mkdir -p "$OBJDIR"
+      mkdir -p "$objdir"
    fi
    while IFS= read -r line; do
       srclist+=("$line")
    done < <(grep -v '^#' "$SRCLIST")
    compile "${srclist[@]}"
-   echo Linking $BINARY
-   $FORTRAN "${objlist[@]}" -o "$BINDIR/$BINARY"
+   echo Linking $PROGRAM
+   $FORTRAN $options "${objlist[@]}" -o "$BINDIR/$PROGRAM"
    echo
 } 
 
 shopt -s nullglob
-
-SRCDIR=./fortran
-SRCLIST=./srclist
-BLDDIR=./build_dir
-BINDIR=./bin
-BINARY=ralign
 
 if [[ -d $BINDIR ]]; then
    for file in "$BINDIR"/*; do
