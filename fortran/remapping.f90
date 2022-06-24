@@ -1,5 +1,4 @@
 module remapping
-use common
 
 use iso_fortran_env, only: output_unit
 use iso_fortran_env, only: error_unit

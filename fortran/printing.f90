@@ -1,6 +1,9 @@
 module printing
-use common
+
 use iso_fortran_env, only: output_unit
+
+use options
+
 implicit none
 
 contains

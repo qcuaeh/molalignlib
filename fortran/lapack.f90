@@ -1,7 +1,9 @@
 module lapack
 ! Convenience interfaces to lapack subroutines
-use, intrinsic :: iso_fortran_env, only: sp=>real32, dp=>real64
+
 implicit none
+
+integer, parameter :: sp = 4, dp = 8
 
 private
 public syeval3

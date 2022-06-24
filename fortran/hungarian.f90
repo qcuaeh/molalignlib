@@ -1,8 +1,5 @@
 module hungarian
-use common
 !https://wp.csiro.au/alanmiller/assndx.f90
-contains
-
 ! Code converted using TO_F90 by Alan Miller
 ! Date: 2002-03-06  Time: 08:36:31
 
@@ -13,6 +10,12 @@ contains
 ! Revision 1.1.1.1  1996/04/01 15:02:49  mclareni
 ! Mathlib gen/H (H301)
 ! Author: F. Bourgeois, 15 February 1994
+
+use options
+
+implicit none
+
+contains
 
 subroutine assndx(mode, a, n, m, k, sum)
 ! N.B. Arguments IDA, IW & IDW have been removed.
@@ -28,8 +31,6 @@ subroutine assndx(mode, a, n, m, k, sum)
 !                    J. SIAM, vol.5, 32-38.
 ! Silver, R. (1960) `An algorithm for the assignment problem', Comm. ACM, vol.3,
 !                   605-606.   The algorithm (CACM 27) is in Algol.
-
-implicit none
 
 integer, intent(in)   :: mode
 real(wp), intent(in out)  :: a(:,:)

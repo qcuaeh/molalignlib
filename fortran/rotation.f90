@@ -1,6 +1,9 @@
 module rotation
-use common
+
+use options
+
 implicit none
+
 private
 public rotate
 public rotated

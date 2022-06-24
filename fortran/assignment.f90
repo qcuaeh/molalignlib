@@ -1,6 +1,5 @@
 module assignment
 
-use common
 use options
 use hungarian
 

@@ -1,8 +1,8 @@
 module superposition
+
 use iso_fortran_env, only: output_unit
 use iso_fortran_env, only: error_unit
 
-use common
 use options
 use random
 use sorting

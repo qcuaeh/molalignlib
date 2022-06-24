@@ -1,10 +1,9 @@
 program ralign
 
-use common
 use options
+use strutils
 use messages
 use decoding
-use strutils
 use rotation
 use readwrite
 use superposition
@@ -61,10 +60,12 @@ do while (getarg(arg))
         call readoptarg(arg, scaling)
     case ('-weight')
         call readoptarg(arg, weighting)
-    case ('-record')
+    case ('-records')
         call readoptarg(arg, maxrecord)
     case ('-out')
         call readoptarg(arg, outformat)
+    case default
+        call error('Invalid option: '//trim(arg))
     end select
 
 end do

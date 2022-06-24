@@ -1,6 +1,8 @@
 module maputils
-use common
+
+use options
 use sorting
+
 implicit none
 
 contains

@@ -1,5 +1,7 @@
 module math
-use common
+
+use options
+
 implicit none
 
 contains

@@ -1,15 +1,14 @@
+options.f90
 messages.f90
-common.f90
 lapack.f90
 math.f90
+random.f90
 sorting.f90
 hungarian.f90
 strutils.f90
 maputils.f90
 printing.f90
 chemistry.f90
-options.f90
-random.f90
 decoding.f90
 assignment.f90
 assortment.f90

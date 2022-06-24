@@ -1,6 +1,6 @@
 module options
-use common
 
+integer, parameter :: wp = 8
 integer maxtrial, maxmatch
 logical live, iterative, biased, trialing, matching, testing
 character(32) weighting, outformat

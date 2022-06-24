@@ -1,6 +1,7 @@
 module random
-use common
+
 use options
+
 implicit none
 
 interface shuffle

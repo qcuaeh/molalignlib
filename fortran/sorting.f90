@@ -1,7 +1,10 @@
 module sorting
+
 use iso_fortran_env, only: error_unit
-use common
+
+use options
 use messages
+
 implicit none
 
 private

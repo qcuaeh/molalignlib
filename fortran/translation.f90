@@ -1,6 +1,9 @@
 module translation
-use common
+
+use options
+
 implicit none
+
 private
 public translate
 public translated

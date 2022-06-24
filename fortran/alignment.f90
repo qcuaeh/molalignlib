@@ -1,8 +1,11 @@
 module alignment
-use common
+
+use options
 use lapack
 use rotation
+
 implicit none
+
 private
 public aligned
 public squaredist
