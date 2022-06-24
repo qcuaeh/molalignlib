@@ -1,4 +1,5 @@
 module hungarian
+use common
 !https://wp.csiro.au/alanmiller/assndx.f90
 contains
 
@@ -31,16 +32,16 @@ subroutine assndx(mode, a, n, m, k, sum)
 implicit none
 
 integer, intent(in)   :: mode
-real, intent(in out)  :: a(:,:)
+real(wp), intent(in out)  :: a(:,:)
 integer, intent(in)   :: n
 integer, intent(in)   :: m
 integer, intent(out)  :: k(:)
-real, intent(out)     :: sum
+real(wp), intent(out)     :: sum
 
 logical  :: lsw
 integer  :: i, icbl, icl, icl0, iflag, imax, imin, ipp, irl, irs, &
             j, j1, jsv, new
-real     :: rmin
+real(wp)     :: rmin
 integer, allocatable  :: iw(:,:)
 
 if (n < 1 .or. m < 1) then

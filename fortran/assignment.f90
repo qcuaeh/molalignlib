@@ -1,4 +1,5 @@
 module assignment
+use common
 use options
 use hungarian
 implicit none
@@ -14,16 +15,16 @@ subroutine assignatoms(natom, weights, atoms0, atoms1, nblock, blocksize, bias, 
 
     integer, intent(in) :: natom, nblock
     integer, dimension(:), intent(in) :: blocksize
-    real, dimension(:), intent(in) :: weights
-    real, dimension(:, :), intent(in) :: atoms0
-    real, dimension(:, :), intent(in) :: bias
-    real, dimension(:, :), intent(inout) :: atoms1
+    real(wp), dimension(:), intent(in) :: weights
+    real(wp), dimension(:, :), intent(in) :: atoms0
+    real(wp), dimension(:, :), intent(in) :: bias
+    real(wp), dimension(:, :), intent(inout) :: atoms1
     integer, dimension(:), intent(out) :: atomap
 
     integer h, i, j, offset
     integer, dimension(natom) :: blockmap
-    real, dimension(natom, natom) :: costs
-    real blocksum
+    real(wp), dimension(natom, natom) :: costs
+    real(wp) blocksum
 
 ! Fill distance matrix for each block
 
@@ -50,10 +51,10 @@ end subroutine
 
 function biasingdist(natom, weights, bias, mapping)
     integer, intent(in) :: natom
-    real, dimension(:), intent(in) :: weights
+    real(wp), dimension(:), intent(in) :: weights
     integer, dimension(:), intent(in) :: mapping
-    real, dimension(:, :), intent(in) :: bias
-    real biasingdist
+    real(wp), dimension(:, :), intent(in) :: bias
+    real(wp) biasingdist
     integer i
 
     biasingdist = 0.

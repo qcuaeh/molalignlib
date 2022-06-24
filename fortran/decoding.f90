@@ -1,4 +1,5 @@
 module decoding
+use common
 use iso_fortran_env, only: error_unit
 implicit none
 integer iarg
@@ -86,7 +87,7 @@ end subroutine
 
 subroutine readrealoptarg(arg, optval)
     character(32), intent(in) :: arg
-    real, intent(out) :: optval
+    real(wp), intent(out) :: optval
     character(32) optarg
     integer stat
 

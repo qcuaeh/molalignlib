@@ -1,5 +1,6 @@
 program ralign
 
+use common
 use options
 use messages
 use decoding
@@ -13,8 +14,8 @@ implicit none
 integer natom0, natom1
 integer nrecord, maxrecord
 integer, dimension(:, :), allocatable :: atomaplist
-real, dimension(:, :, :), allocatable :: rotmatlist
-real, dimension(:, :), allocatable :: atoms0, atoms1
+real(wp), dimension(:, :, :), allocatable :: rotmatlist
+real(wp), dimension(:, :), allocatable :: atoms0, atoms1
 character(32), dimension(:), allocatable :: labels0, labels1
 character(512) title0, title1
 

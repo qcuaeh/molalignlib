@@ -1,4 +1,5 @@
 module translation
+use common
 implicit none
 private
 public translate
@@ -14,8 +15,8 @@ function centroid(natom, weights, coords) result(vector)
 ! coords: Atomic coordinates
 
     integer, intent(in) :: natom
-    real, intent(in) :: weights(natom), coords(3, natom)
-    real vector(3)
+    real(wp), intent(in) :: weights(natom), coords(3, natom)
+    real(wp) vector(3)
 
     integer i
 
@@ -39,8 +40,8 @@ function translated(natom, vector, coords)
 ! coords: Atomic coordinates
 
     integer, intent(in) :: natom
-    real, intent(in) :: coords(3, natom), vector(3)
-    real translated(3, natom)
+    real(wp), intent(in) :: coords(3, natom), vector(3)
+    real(wp) translated(3, natom)
 
     integer i
 
@@ -57,8 +58,8 @@ subroutine translate(natom, vector, coords)
 ! coords: Atomic coordinates
 
     integer, intent(in) :: natom
-    real, intent(in) :: vector(3)
-    real, intent(inout) :: coords(3, natom)
+    real(wp), intent(in) :: vector(3)
+    real(wp), intent(inout) :: coords(3, natom)
 
     integer i
 

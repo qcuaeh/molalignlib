@@ -1,4 +1,5 @@
 module remapping
+use common
 
 use iso_fortran_env, only: output_unit
 use iso_fortran_env, only: error_unit
@@ -53,25 +54,25 @@ subroutine remapatoms(natom, nblock, blocksize, atoms0, atoms1, weights, bias, m
 
     integer, intent(in) :: natom, nblock, maxrecord
     integer, dimension(:), intent(in) :: blocksize
-    real, dimension(:, :), intent(in) :: atoms0
-    real, dimension(:), intent(in) :: weights
-    real, dimension(:, :), intent(in) :: bias
+    real(wp), dimension(:, :), intent(in) :: atoms0
+    real(wp), dimension(:), intent(in) :: weights
+    real(wp), dimension(:, :), intent(in) :: bias
     procedure (generic_test), pointer, intent(in) :: stop_test
 
     integer, intent(out) :: nrecord
     integer, dimension(:, :), intent(out) :: atomaplist
-    real, dimension(:, :), intent(inout) :: atoms1
+    real(wp), dimension(:, :), intent(inout) :: atoms1
 
     logical map_found, overflow
     integer i, imap, jmap, trialcount, iteration, newdiff, matchcount
     integer, dimension(natom) :: atomap, auxmap, equivset0, equivset1
     integer, dimension(maxrecord) :: earliest, matches
-    real u, olddist, newdist, meanrot
-    real, dimension(4) :: rotquat, prodquat
-    real, dimension(maxrecord) :: mindist, avgiter, avgmeanrot, avgtotrot
+    real(wp) u, olddist, newdist, meanrot
+    real(wp), dimension(4) :: rotquat, prodquat
+    real(wp), dimension(maxrecord) :: mindist, avgiter, avgmeanrot, avgtotrot
     integer :: nfrag0, nfrag1
     integer, dimension(natom) :: fragroot0, fragroot1, fragid0, fragid1
-    real, dimension(3, natom) :: origmol1
+    real(wp), dimension(3, natom) :: origmol1
 
 ! Print header and initial stats
 

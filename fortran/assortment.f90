@@ -1,4 +1,5 @@
 module assortment
+use common
 use options
 use sorting
 use maputils

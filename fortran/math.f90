@@ -1,12 +1,13 @@
 module math
+use common
 implicit none
 
 contains
 
 function trace(natom, matrix)
 integer, intent(in) :: natom
-real, dimension(:, :), intent(in) :: matrix
-real trace
+real(wp), dimension(:, :), intent(in) :: matrix
+real(wp) trace
 integer i
 trace = 0
 do i = 1, natom
@@ -15,8 +16,8 @@ end do
 end function
 
 function det33(a) result(det)
-real, dimension(3,3), intent(in)  :: a
-real det
+real(wp), dimension(3,3), intent(in)  :: a
+real(wp) det
 det = a(1,1)*a(2,2)*a(3,3)  &
     - a(1,1)*a(2,3)*a(3,2)  &
     - a(1,2)*a(2,1)*a(3,3)  &
@@ -27,9 +28,9 @@ end function
 
 function mymatmul(a, b, m, o, n) result(ab)
     integer, intent(in) :: m, o ,n
-    real, intent (in) :: a(m, o)
-    real, intent (in) :: b(o, n)
-    real ab(m, n)
+    real(wp), intent (in) :: a(m, o)
+    real(wp), intent (in) :: b(o, n)
+    real(wp) ab(m, n)
     integer i, j
     do i = 1, n
         ab(:, i) = 0.0

@@ -1,4 +1,5 @@
 module strutils
+use common
 use iso_fortran_env, only: error_unit
 implicit none
 
@@ -50,7 +51,7 @@ function int2str(x) result(strx)
 end function
 
 function real2str(x) result(strx)
-    real, intent(in) :: x
+    real(wp), intent(in) :: x
     character(floor(log10(x)) + 6) strx
     write (strx, '(f0.4)') x
 end function

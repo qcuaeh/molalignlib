@@ -1,3 +1,4 @@
+common.f90
 messages.f90
 lapack.f90
 math.f90

@@ -1,4 +1,5 @@
 module maputils
+use common
 use sorting
 implicit none
 

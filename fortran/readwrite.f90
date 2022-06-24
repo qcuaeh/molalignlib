@@ -1,4 +1,5 @@
 module readwrite
+use common
 
 use iso_fortran_env, only: input_unit
 use iso_fortran_env, only: output_unit
@@ -19,7 +20,7 @@ contains
 
 subroutine readxyzfile(natom, title, labels, atoms)
     integer, intent(out) :: natom
-    real, dimension(:, :), allocatable, intent(out) :: atoms
+    real(wp), dimension(:, :), allocatable, intent(out) :: atoms
     character(*), dimension(:), allocatable, intent(out) :: labels
     character(*), intent(out) :: title
     integer i, stat
@@ -52,7 +53,7 @@ end subroutine
 subroutine readmolfile(natom, title, labels, atoms, nbond, bonds)
     integer, intent(out) :: natom, nbond
     integer, dimension(:, :), allocatable, intent(out) :: bonds
-    real, dimension(:, :), allocatable, intent(out) :: atoms
+    real(wp), dimension(:, :), allocatable, intent(out) :: atoms
     character(*), dimension(:), allocatable, intent(out) :: labels
     character(*), intent(out) :: title
     integer i, stat
@@ -123,7 +124,7 @@ end subroutine
 subroutine writexyzfile(file_unit, natom, mapping, title, labels, atoms)
     integer, intent(in) :: file_unit, natom
     integer, dimension(:), intent(in) :: mapping
-    real, dimension(:, :), intent(in) :: atoms
+    real(wp), dimension(:, :), intent(in) :: atoms
     character(*), dimension(:), intent(in) :: labels
     character(*), intent(in) :: title
 
@@ -142,7 +143,7 @@ subroutine writemol2file(file_unit, natom, nbond, mapping, title, labels, atoms,
     integer, intent(in) :: file_unit, natom, nbond
     integer, dimension(:), intent(in) :: mapping
     integer, dimension(:, :), intent(in) :: bonds
-    real, dimension(:, :), intent(in) :: atoms
+    real(wp), dimension(:, :), intent(in) :: atoms
     character(*), dimension(:), intent(in) :: labels
     character(*), intent(in) :: title
 

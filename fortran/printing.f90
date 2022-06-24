@@ -1,4 +1,5 @@
 module printing
+use common
 use iso_fortran_env, only: output_unit
 implicit none
 
@@ -14,7 +15,7 @@ end subroutine
 
 subroutine print_stats(imap, earliest, matches, avgiter, avgmeanrot, avgangle, mindist)
     integer, intent(in) :: imap, earliest, matches
-    real, intent(in) :: avgiter, avgmeanrot, avgangle, mindist
+    real(wp), intent(in) :: avgiter, avgmeanrot, avgangle, mindist
     write (output_unit, '(a)', advance='no') achar(27)//'[K'
     write (output_unit, '(i4, 4x, i4, 2x, i6, 5x, f4.1, 5x, f5.1, 5x, f5.1, 3x, f9.4)') &
         imap, earliest, matches, avgiter, 90./asin(1.)*avgmeanrot, 90./asin(1.)*avgangle, sqrt(mindist)

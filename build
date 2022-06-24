@@ -27,24 +27,19 @@ compile () {
 
 build () {
    case "$1" in
-     static) code_options='';;
-     dynamic) code_options='-fPIC';;
-     *) echo Invalid code type option: $3; exit;;
+     static) binflags='';;
+     dynamic) binflags='-fPIC';;
+     *) echo Invalid code type option: $1; exit;;
    esac
    case "$2" in
-     single) preci_options='';;
-     double) preci_options='-fdefault-real-8';;
-     *) echo Invalid precision option: $1; exit;;
-   esac
-   case "$3" in
-     slow) optim_options='-O3';;
-     fast) optim_options='-O3 -ffast-math';;
-     debug) optim_options='-g -fbounds-check -fbacktrace -ffpe-trap=zero,invalid,overflow -O0 -Wall';;
+     slow) optflags='-O3';;
+     fast) optflags='-O3 -ffast-math';;
+     debug) optflags='-g -fbounds-check -fbacktrace -ffpe-trap=zero,invalid,overflow -O0 -Wall';;
      *) echo Invalid optimization option: $2; exit;;
    esac
    srclist=()
-   objdir=$BUILDIR/$1/$2/$3
-   options="-llapack $OPTIONS $optim_options $preci_options $code_options"
+   objdir=$BUILDIR/$1/$2
+   options="$OPTIONS $binflags $optflags -llapack"
    if [[ -d $objdir ]]; then
       if [[ $RECOMPILE != true ]]; then
          for f in "$objdir"/*; do 
@@ -77,20 +72,18 @@ TEMP=$(getopt -a -o '' -l single,double,slow,fast,debug,static,dynamic -- "$@")
 if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
 eval set -- "$TEMP"
 
+bintype=static
 optlevel=fast
-precision=double
-codetype=static
+
 while true; do
    case "$1" in
-      --fast) optlevel=fast; shift;;
       --slow) optlevel=slow; shift;;
+      --fast) optlevel=fast; shift;;
       --debug) optlevel=debug; shift;;
-      --single) precision=single; shift;;
-      --double) precision=double; shift;;
-      --static) codetype=static; shift;;
-      --dynamic) codetype=dynamic; shift;;
+      --static) bintype=static; shift;;
+      --dynamic) bintype=dynamic; shift;;
       --) shift; break ;;
    esac
 done
 
-build "$codetype" "$precision" "$optlevel"
+build "$bintype" "$optlevel"

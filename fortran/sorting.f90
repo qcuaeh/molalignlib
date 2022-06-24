@@ -1,4 +1,5 @@
 module sorting
+use common
 use iso_fortran_env, only: error_unit
 use messages
 implicit none
@@ -34,8 +35,8 @@ end function
 
 function realsorted(x, n) result(y)
    integer, intent(in) :: n
-   real, dimension(:), intent(in) :: x
-   real y(n)
+   real(wp), dimension(:), intent(in) :: x
+   real(wp) y(n)
    y(1:n) = x(1:n)
    call realquicksort(y, 1, n)
 end function
@@ -86,10 +87,10 @@ end subroutine
 
 recursive subroutine realquicksort(x, m, n)
    integer, intent(in) :: m, n
-   real, dimension(:), intent(inout) :: x
+   real(wp), dimension(:), intent(inout) :: x
 
    integer i, j
-   real xi, xp
+   real(wp) xi, xp
 
    xp = x((m+n)/2)
    i = m

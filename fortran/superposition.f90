@@ -3,6 +3,7 @@ module superposition
 use iso_fortran_env, only: output_unit
 use iso_fortran_env, only: error_unit
 
+use common
 use options
 use random
 use sorting
@@ -24,17 +25,17 @@ subroutine align(natom, atoms0, atoms1, labels0, labels1, maxrecord, nrecord, at
 ! Purpose: Superimpose coordinates of atom sets atoms0 and atoms1
 
 integer, intent(in) :: natom, maxrecord
-real, dimension(:, :), intent(inout) :: atoms0, atoms1
+real(wp), dimension(:, :), intent(inout) :: atoms0, atoms1
 character(32), dimension(:), intent(inout) :: labels0, labels1
 
 integer, intent(out) :: nrecord
-real, dimension(:, :, :), intent(out) :: rotmatlist
+real(wp), dimension(:, :, :), intent(out) :: rotmatlist
 integer, dimension(:, :), intent(out) :: atomaplist
 
 integer i
 integer, dimension(:), allocatable :: znum0, znum1
-real, dimension(:), allocatable :: weights
-real, dimension(nelem) :: atomweight
+real(wp), dimension(:), allocatable :: weights
+real(wp), dimension(nelem) :: atomweight
 
 procedure (generic_test), pointer :: stop_test => null()
 
@@ -87,7 +88,7 @@ call translate(natom, centroid(natom, weights, atoms1), atoms1)
 nrecord = 1
 atomaplist(:, 1) = [(i, i=1, natom)]
 call print_header()
-call print_stats(0, 0, 0, 0., 0., 0., leastsquaredist(natom, weights, atoms0, atoms1, atomaplist(:, 1)))
+call print_stats(0, 0, 0, 0.0_wp, 0.0_wp, 0.0_wp, leastsquaredist(natom, weights, atoms0, atoms1, atomaplist(:, 1)))
 call print_footer(.false., .false., 0, 0)
 
 ! Calculate rotation quaternions
@@ -103,11 +104,11 @@ subroutine realign(natom, atoms0, atoms1, labels0, labels1, maxrecord, nrecord, 
 ! Purpose: Superimpose coordinates of atom sets atoms0 and atoms1
 
 integer, intent(in) :: natom, maxrecord
-real, dimension(:, :), intent(inout) :: atoms0, atoms1
+real(wp), dimension(:, :), intent(inout) :: atoms0, atoms1
 character(32), dimension(:), intent(inout) :: labels0, labels1
 
 integer, intent(out) :: nrecord
-real, dimension(:, :, :), intent(out) :: rotmatlist
+real(wp), dimension(:, :, :), intent(out) :: rotmatlist
 integer, dimension(:, :), intent(out) :: atomaplist
 
 integer i
@@ -117,9 +118,9 @@ integer, dimension(:), allocatable :: znum0, znum1
 integer, dimension(:), allocatable :: blocktype0, blocktype1
 integer, dimension(:), allocatable :: blocksize0, blocksize1
 integer, dimension(:), allocatable :: order0, reorder0, order1
-real, dimension(:), allocatable :: weights
-real, dimension(:, :), allocatable :: bias
-real, dimension(nelem) :: atomweight
+real(wp), dimension(:), allocatable :: weights
+real(wp), dimension(:, :), allocatable :: bias
+real(wp), dimension(nelem) :: atomweight
 
 procedure (generic_test), pointer :: stop_test => null()
 

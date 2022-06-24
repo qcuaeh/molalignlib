@@ -1,4 +1,5 @@
 module random
+use common
 use options
 implicit none
 
@@ -9,7 +10,7 @@ end interface
 contains
 
 function randvec3() result(x)
-    real x(3)
+    real(wp) x(3)
     call random_number(x)
 end function
 
@@ -17,7 +18,7 @@ subroutine intshuffle(array, n)
    integer, intent(in) :: n
    integer, dimension(:), intent(inout) :: array(:)
    integer i, j, k, temp
-   real u
+   real(wp) u
 
    do k = 1, 2
       do i = 1, n

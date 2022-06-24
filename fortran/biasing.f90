@@ -1,4 +1,5 @@
 module biasing
+use common
 use options
 use sorting
 implicit none
@@ -8,11 +9,11 @@ contains
 subroutine setadjbias(natom, nblock, blocksize, atoms0, atoms1, bias)
     integer, intent(in) :: natom, nblock
     integer, dimension(:), intent(in) :: blocksize
-    real, dimension(:, :), intent(in) :: atoms0, atoms1
-    real, dimension(:, :), intent(out) :: bias
+    real(wp), dimension(:, :), intent(in) :: atoms0, atoms1
+    real(wp), dimension(:, :), intent(out) :: bias
 
     integer h, i, j, offset
-    real d0(natom, natom), d1(natom, natom)
+    real(wp) d0(natom, natom), d1(natom, natom)
 
     do i = 1, natom
         offset = 0
