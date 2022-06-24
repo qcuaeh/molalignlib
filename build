@@ -5,7 +5,7 @@ FORTRAN=gfortran
 OPTIONS='-L/usr/lib64/atlas'
 SRCDIR=./fortran
 SRCLIST=./srclist
-BUILDIR=./build_dir
+BUILDIR=./_build_dir
 BINDIR=./bin
 
 # Compile selected source files
@@ -32,7 +32,7 @@ build () {
      * ) echo Invalid precision option: $1; exit ;;
    esac
    case "$2" in
-     safe ) buildopts='-O3' ;;
+     slow ) buildopts='-O3' ;;
      fast ) buildopts='-O3 -ffast-math' ;;
      debug ) buildopts='-g -fbounds-check -fbacktrace -ffpe-trap=zero,invalid,overflow -O0 -Wall' ;;
      * ) echo Invalid optimization option: $2; exit ;;
@@ -68,7 +68,7 @@ else
    mkdir "$BINDIR"
 fi
 
-TEMP=$(getopt -a -o '' -l single,double,fast,debug -- "$@")
+TEMP=$(getopt -a -o '' -l single,double,slow,debug -- "$@")
 if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
 eval set -- "$TEMP"
 
@@ -76,7 +76,7 @@ buildtype=fast
 precision=double
 while true; do
    case "$1" in
-      --safe ) buildtype=safe; shift ;;
+      --slow ) buildtype=slow; shift ;;
       --debug ) buildtype=debug; shift ;;
       --single ) precision=single; shift ;;
       --double ) precision=double; shift ;;
