@@ -1,5 +1,4 @@
 module superposition
-
 use iso_fortran_env, only: output_unit
 use iso_fortran_env, only: error_unit
 
@@ -20,7 +19,6 @@ implicit none
 
 contains
 
-
 subroutine align(natom, atoms0, atoms1, labels0, labels1, maxrecord, nrecord, atomaplist, rotmatlist)
 ! Purpose: Superimpose coordinates of atom sets atoms0 and atoms1
 
@@ -39,15 +37,6 @@ real(wp), dimension(nelem) :: atomweight
 
 procedure (generic_test), pointer :: stop_test => null()
 
-select case (weighting)
-case ('none')
-    atomweight = [(1., i=1, nelem)]
-case ('mass')
-    atomweight = stdmatom
-case default
-    call error('Invalid weighting option: '//trim(weighting))
-end select
-
 ! Allocate arrays
 
 allocate(weights(natom))
@@ -62,13 +51,9 @@ do i = 1, natom
     znum1(i) = znum(labels1(i))
 end do
 
-! Calculate normalized weights
-
-weights = atomweight(znum0)/sum(atomweight(znum0))
-
 ! Abort if there are incompatible atomic symbols
 
-if (any(labels0 /= labels1)) then
+if (any(znum0 /= znum1)) then
     call error('The molecules are not isomers!')
 end if
 
@@ -77,6 +62,19 @@ end if
 if (any(labels0 /= labels1)) then
     call error('There are incompatible atomic labels!')
 end if
+
+! Calculate normalized weights
+
+select case (weighting)
+case ('none')
+    atomweight = [(1.0_wp, i=1, nelem)]
+case ('mass')
+    atomweight = stdmatom
+case default
+    call error('Invalid weighting option: '//trim(weighting))
+end select
+
+weights = atomweight(znum0)/sum(atomweight(znum0))
 
 ! Translate molecules to their centroid
 
@@ -100,7 +98,7 @@ end do
 end subroutine
 
 
-subroutine realign(natom, atoms0, atoms1, labels0, labels1, maxrecord, nrecord, atomaplist, rotmatlist)
+subroutine superpose(natom, atoms0, atoms1, labels0, labels1, maxrecord, nrecord, atomaplist, rotmatlist)
 ! Purpose: Superimpose coordinates of atom sets atoms0 and atoms1
 
 integer, intent(in) :: natom, maxrecord
@@ -122,26 +120,28 @@ real(wp), dimension(:), allocatable :: weights
 real(wp), dimension(:, :), allocatable :: bias
 real(wp), dimension(nelem) :: atomweight
 
-procedure (generic_test), pointer :: stop_test => null()
+procedure (generic_test), pointer :: trial_test => null()
+procedure (generic_test), pointer :: match_test => null()
 
-if (maxcount < 1) then
-    call error('Max count must be greater than zero')
+if (trialing .and. maxtrial < 1) then
+    call error('maxtrial must be greater than zero')
 end if
 
-if (converge) then
-    stop_test => match_stop_test
+if (matching .and. maxmatch < 1) then
+    call error('maxmatch must be greater than zero')
+end if
+
+if (trialing) then
+    trial_test => lowerthan
 else
-    stop_test => trial_stop_test
+    trial_test => trueconst
 end if
 
-select case (weighting)
-case ('none')
-    atomweight = [(1., i=1, nelem)]
-case ('mass')
-    atomweight = stdmatom
-case default
-    call error('Invalid weighting option: '//trim(weighting))
-end select
+if (matching) then
+    match_test => lowerthan
+else
+    match_test => trueconst
+end if
 
 ! Allocate arrays
 
@@ -160,10 +160,6 @@ do i = 1, natom
     znum0(i) = znum(labels0(i))
     znum1(i) = znum(labels1(i))
 end do
-
-! Calculate normalized weights
-
-weights = atomweight(znum0)/sum(atomweight(znum0))
 
 ! Group atoms by label
 
@@ -189,7 +185,7 @@ weights = weights(order0)
 
 ! Abort if there are incompatible atomic symbols
 
-if (any(labels0 /= labels1)) then
+if (any(znum0 /= znum1)) then
     call error('The molecules are not isomers!')
 end if
 
@@ -198,6 +194,19 @@ end if
 if (any(labels0 /= labels1)) then
     call error('There are incompatible atomic labels!')
 end if
+
+! Calculate normalized weights
+
+select case (weighting)
+case ('none')
+    atomweight = [(1.0_wp, i=1, nelem)]
+case ('mass')
+    atomweight = stdmatom
+case default
+    call error('Invalid weighting option: '//trim(weighting))
+end select
+
+weights = atomweight(znum0)/sum(atomweight(znum0))
 
 ! Translate molecules to their centroid
 
@@ -215,8 +224,8 @@ call random_seed(put=seed)
 
 ! Remap atoms to minimize distance and difference
 
-call remapatoms(natom, nblock0, blocksize0, atoms0, atoms1, weights, bias, maxrecord, nrecord, atomaplist, &
-    stop_test)
+call remapatoms(natom, nblock0, blocksize0, atoms0, atoms1, weights, bias, maxrecord, nrecord, &
+                atomaplist, trial_test, match_test)
 
 ! Calculate rotation quaternions
 

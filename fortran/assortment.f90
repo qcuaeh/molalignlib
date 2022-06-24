@@ -1,10 +1,13 @@
 module assortment
+
 use common
 use options
 use sorting
 use maputils
 use chemistry
+
 implicit none
+
 private
 public grouplabels
 

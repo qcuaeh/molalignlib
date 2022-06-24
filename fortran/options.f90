@@ -1,9 +1,9 @@
 module options
 use common
 
-integer maxcount
+integer maxtrial, maxmatch
+logical live, iterative, biased, trialing, matching, testing
+character(32) weighting, outformat
 real(wp) scaling, tolerance
-logical live, iterative, biased, converge, testing
-character(32) weighting, output_format
 
 end module

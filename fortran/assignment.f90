@@ -1,8 +1,11 @@
 module assignment
+
 use common
 use options
 use hungarian
+
 implicit none
+
 contains
 
 subroutine assignatoms(natom, weights, atoms0, atoms1, nblock, blocksize, bias, atomap)

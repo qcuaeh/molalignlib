@@ -26,18 +26,18 @@ end interface
 
 contains
 
-logical function trial_stop_test(trialcount, matchcount) result(stop_test)
-    integer, intent(in) :: trialcount, matchcount
-    stop_test = trialcount < maxcount
+logical function trueconst(counter, maxcount)
+    integer, intent(in) :: counter, maxcount
+    trueconst = .true.
 end function
 
-logical function match_stop_test(trialcount, matchcount) result(stop_test)
-    integer, intent(in) :: trialcount, matchcount
-    stop_test = matchcount < maxcount
+logical function lowerthan(counter, maxcount)
+    integer, intent(in) :: counter, maxcount
+    lowerthan = counter < maxcount
 end function
 
-subroutine remapatoms(natom, nblock, blocksize, atoms0, atoms1, weights, bias, maxrecord, nrecord, atomaplist, &
-     stop_test)
+subroutine remapatoms(natom, nblock, blocksize, atoms0, atoms1, weights, bias, maxrecord, nrecord, &
+                      atomaplist, trial_test, match_test)
 
 ! natom: number of points to align
 ! atoms0: coordinates of first molecule
@@ -50,21 +50,21 @@ subroutine remapatoms(natom, nblock, blocksize, atoms0, atoms1, weights, bias, m
 ! atomaplist: mapping list of minimum distances or differences
 ! matches: number of equivalent orientations
 ! maxcount: maximum number of searching cycles
-! trialcount: random rotation trial counter
+! ntrial: random rotation trial counter
 
     integer, intent(in) :: natom, nblock, maxrecord
     integer, dimension(:), intent(in) :: blocksize
     real(wp), dimension(:, :), intent(in) :: atoms0
     real(wp), dimension(:), intent(in) :: weights
     real(wp), dimension(:, :), intent(in) :: bias
-    procedure (generic_test), pointer, intent(in) :: stop_test
+    procedure (generic_test), pointer, intent(in) :: trial_test, match_test
 
     integer, intent(out) :: nrecord
     integer, dimension(:, :), intent(out) :: atomaplist
     real(wp), dimension(:, :), intent(inout) :: atoms1
 
     logical map_found, overflow
-    integer i, imap, jmap, trialcount, iteration, newdiff, matchcount
+    integer i, imap, jmap, ntrial, nmatch, iteration, newdiff
     integer, dimension(natom) :: atomap, auxmap, equivset0, equivset1
     integer, dimension(maxrecord) :: earliest, matches
     real(wp) u, olddist, newdist, meanrot
@@ -81,7 +81,6 @@ subroutine remapatoms(natom, nblock, blocksize, atoms0, atoms1, weights, bias, m
         call print_header()
     end if
 
-
 ! Save original coordinates
 
     origmol1 = atoms1
@@ -89,15 +88,15 @@ subroutine remapatoms(natom, nblock, blocksize, atoms0, atoms1, weights, bias, m
 ! Initialize loop variables
 
     nrecord = 0
-    trialcount = 0
-    matchcount = 0
+    ntrial = 0
+    nmatch = 0
     overflow = .false.
 
 ! Loop for map searching
 
-    do while (stop_test(trialcount, matchcount))
+    do while (trial_test(ntrial, maxtrial) .and. match_test(nmatch, maxmatch))
 
-        trialcount = trialcount + 1
+        ntrial = ntrial + 1
 
 ! Apply random rotation
 
@@ -139,7 +138,7 @@ subroutine remapatoms(natom, nblock, blocksize, atoms0, atoms1, weights, bias, m
 
         do imap = 1, nrecord
             if (all(atomap == atomaplist(:, imap))) then
-                if (imap == 1) matchcount = matchcount + 1
+                if (imap == 1) nmatch = nmatch + 1
                 matches(imap) = matches(imap) + 1
                 avgiter(imap) = avgiter(imap) + (iteration - avgiter(imap))/matches(imap)
                 avgtotrot(imap) = avgtotrot(imap) + (rotangle(prodquat) - avgtotrot(imap))/matches(imap)
@@ -160,7 +159,7 @@ subroutine remapatoms(natom, nblock, blocksize, atoms0, atoms1, weights, bias, m
             end if
             do imap = 1, maxrecord
                 if (imap > nrecord .or. newdist < mindist(imap)) then
-                    if (imap == 1) matchcount = 1
+                    if (imap == 1) nmatch = 1
                     if (nrecord < maxrecord) nrecord = nrecord + 1
                     do jmap = nrecord, imap + 1, -1
                         matches(jmap) = matches(jmap - 1)
@@ -182,7 +181,7 @@ subroutine remapatoms(natom, nblock, blocksize, atoms0, atoms1, weights, bias, m
                     avgmeanrot(imap) = meanrot
                     atomaplist(:, imap) = atomap
                     mindist(imap) = newdist
-                    earliest(imap) = trialcount
+                    earliest(imap) = ntrial
                     if (live) then
                         write (output_unit, '(a)', advance='no') achar(27)//'['//str(imap + 2)//'H'
                         call print_stats(imap, earliest(imap), matches(imap), avgiter(imap), avgmeanrot(imap), &
@@ -195,7 +194,7 @@ subroutine remapatoms(natom, nblock, blocksize, atoms0, atoms1, weights, bias, m
 
         if (live) then
             write (output_unit, '(a)', advance='no') achar(27)//'['//str(nrecord + 3)//'H'
-            call print_footer(.true., overflow, nrecord, trialcount)
+            call print_footer(.true., overflow, nrecord, ntrial)
         end if
 
 ! Restore original coordinates
@@ -210,7 +209,7 @@ subroutine remapatoms(natom, nblock, blocksize, atoms0, atoms1, weights, bias, m
             call print_stats(imap, earliest(imap), matches(imap), avgiter(imap), avgmeanrot(imap), &
                 avgtotrot(imap), mindist(imap))
         end do
-        call print_footer(.true., overflow, nrecord, trialcount)
+        call print_footer(.true., overflow, nrecord, ntrial)
     end if
 
 end subroutine
