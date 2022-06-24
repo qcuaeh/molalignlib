@@ -20,18 +20,18 @@ subroutine print_stats(imap, earliest, matches, avgiter, avgmeanrot, avgangle, m
         imap, earliest, matches, avgiter, 90./asin(1.)*avgmeanrot, 90./asin(1.)*avgangle, sqrt(mindist)
 end subroutine
 
-subroutine print_footer(remapped, overflow, mapcount, itrial)
+subroutine print_footer(remapped, overflow, nrecord, itrial)
     logical, intent(in) :: remapped, overflow
-    integer, intent(in) :: mapcount, itrial
+    integer, intent(in) :: nrecord, itrial
     write (output_unit, '(a)', advance='no') achar(27)//'[K'
     write (output_unit, '(a)') '-------------------------------------------------------------'
     write (output_unit, '(a)', advance='no') achar(27)//'[K'
     if (remapped) then
         if (overflow) then
-            write (output_unit, '(a,x,i0,x,a,x,i0,x,a)') 'Found more than', mapcount, 'mapping(s) in', &
+            write (output_unit, '(a,x,i0,x,a,x,i0,x,a)') 'Found more than', nrecord, 'mapping(s) in', &
                 itrial, 'random trial(s)'
         else
-            write (output_unit, '(a,x,i0,x,a,x,i0,x,a)') 'Found', mapcount, 'mapping(s) in', itrial, 'random trial(s)'
+            write (output_unit, '(a,x,i0,x,a,x,i0,x,a)') 'Found', nrecord, 'mapping(s) in', itrial, 'random trial(s)'
         end if
     else
         write (output_unit, '(a)') 'Only alignment performed'

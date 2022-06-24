@@ -27,19 +27,24 @@ compile () {
 
 build () {
    case "$1" in
-     single ) precopts='' ;;
-     double ) precopts='-fdefault-real-8' ;;
-     * ) echo Invalid precision option: $1; exit ;;
+     static) code_options='';;
+     dynamic) code_options='-fPIC';;
+     *) echo Invalid code type option: $3; exit;;
    esac
    case "$2" in
-     slow ) buildopts='-O3' ;;
-     fast ) buildopts='-O3 -ffast-math' ;;
-     debug ) buildopts='-g -fbounds-check -fbacktrace -ffpe-trap=zero,invalid,overflow -O0 -Wall' ;;
-     * ) echo Invalid optimization option: $2; exit ;;
+     single) preci_options='';;
+     double) preci_options='-fdefault-real-8';;
+     *) echo Invalid precision option: $1; exit;;
+   esac
+   case "$3" in
+     slow) optim_options='-O3';;
+     fast) optim_options='-O3 -ffast-math';;
+     debug) optim_options='-g -fbounds-check -fbacktrace -ffpe-trap=zero,invalid,overflow -O0 -Wall';;
+     *) echo Invalid optimization option: $2; exit;;
    esac
    srclist=()
-   objdir=$BUILDIR/$1/$2
-   options="-llapack $OPTIONS $buildopts $precopts"
+   objdir=$BUILDIR/$1/$2/$3
+   options="-llapack $OPTIONS $optim_options $preci_options $code_options"
    if [[ -d $objdir ]]; then
       if [[ $RECOMPILE != true ]]; then
          for f in "$objdir"/*; do 
@@ -68,20 +73,24 @@ else
    mkdir "$BINDIR"
 fi
 
-TEMP=$(getopt -a -o '' -l single,double,slow,debug -- "$@")
+TEMP=$(getopt -a -o '' -l single,double,slow,fast,debug,static,dynamic -- "$@")
 if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
 eval set -- "$TEMP"
 
-buildtype=fast
+optlevel=fast
 precision=double
+codetype=static
 while true; do
    case "$1" in
-      --slow ) buildtype=slow; shift ;;
-      --debug ) buildtype=debug; shift ;;
-      --single ) precision=single; shift ;;
-      --double ) precision=double; shift ;;
-      -- ) shift; break ;;
+      --fast) optlevel=fast; shift;;
+      --slow) optlevel=slow; shift;;
+      --debug) optlevel=debug; shift;;
+      --single) precision=single; shift;;
+      --double) precision=double; shift;;
+      --static) codetype=static; shift;;
+      --dynamic) codetype=dynamic; shift;;
+      --) shift; break ;;
    esac
 done
 
-build "$precision" "$buildtype"
+build "$codetype" "$precision" "$optlevel"

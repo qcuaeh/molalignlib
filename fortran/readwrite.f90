@@ -1,17 +1,23 @@
 module readwrite
+
 use iso_fortran_env, only: input_unit
 use iso_fortran_env, only: output_unit
 use iso_fortran_env, only: error_unit
+
 use options
 use strutils
 use maputils
 use chemistry
+
 implicit none
+
 private
+
 public readmol
 public writemol
 public file_unit
 
+integer, parameter :: maxcoord = 16
 integer, parameter :: file_unit = 999
 
 contains
