@@ -9,10 +9,10 @@ public grouplabels
 
 contains
 
-subroutine grouplabels(natom, label, nblock, blocksize, blocktype)
-! Group atoms by label
+subroutine grouplabels(natom, labels, nblock, blocksize, blocktype)
+! Group atoms by labels
     integer, intent(in) :: natom
-    character(*), dimension(:), intent(in) :: label
+    character(*), dimension(:), intent(in) :: labels
     integer, intent(out) :: nblock
     integer, dimension(:), intent(out) :: blocksize, blocktype
 
@@ -32,11 +32,11 @@ subroutine grouplabels(natom, label, nblock, blocksize, blocktype)
         if (remaining(i)) then
             nblock = nblock + 1
             blocksize(nblock) = 1
-            blocklabel(nblock) = label(i)
+            blocklabel(nblock) = labels(i)
             blocktype(i) = nblock
             do j = i + 1, natom
                 if (remaining(i)) then
-                    if (label(j) == label(i)) then
+                    if (labels(j) == labels(i)) then
                         blocktype(j) = nblock
                         blocksize(nblock) = blocksize(nblock) + 1
                         remaining(j) = .false.
@@ -61,7 +61,7 @@ subroutine grouplabels(natom, label, nblock, blocksize, blocktype)
     blocktype = blockorder(blocktype)
 
 !    print *, blocksize(:nblock)
-!    print *, label(blocksizeorder)
+!    print *, labels(blocksizeorder)
 
 end subroutine
 

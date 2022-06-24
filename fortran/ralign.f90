@@ -10,24 +10,24 @@ use superposition
 
 implicit none
 
-integer natom, nrecord, maxrecord
+integer natom0, natom1
+integer nrecord, maxrecord
 integer, dimension(:, :), allocatable :: atomaplist
 real, dimension(:, :, :), allocatable :: rotmatlist
-integer, dimension(:, :), allocatable :: bonds0, bonds1
 real, dimension(:, :), allocatable :: atoms0, atoms1
-character(32), dimension(:), allocatable :: label0, label1
+character(32), dimension(:), allocatable :: labels0, labels1
 character(512) title0, title1
 
 integer i
-logical argset
+logical remap
 character(32) arg
 
 ! Set default options 
 
-argset = .false.
+remap = .false.
 biased = .false.
 iterative = .false.
-matching = .false.
+converge = .false.
 testing = .false.
 live = .false.
 maxrecord = 9
@@ -42,17 +42,23 @@ call initarg()
 do while (getarg(arg))
 
     select case (arg)
+    case ('-live')
+        live = .true.
+    case ('-test')
+        testing = .true.
     case ('-iter')
         iterative = .true.
     case ('-bias')
         biased = .true.
         call readoptarg(arg, tolerance)
-    case ('-match')
-        matching = .true.
-    case ('-test')
-        testing = .true.
-    case ('-live')
-        live = .true.
+    case ('-trials')
+        remap = .true.
+        converge = .false.
+        call readoptarg(arg, maxcount)
+    case ('-matches')
+        remap = .true.
+        converge = .true.
+        call readoptarg(arg, maxcount)
     case ('-scale')
         call readoptarg(arg, scaling)
     case ('-weight')
@@ -61,45 +67,40 @@ do while (getarg(arg))
         call readoptarg(arg, maxrecord)
     case ('-out')
         call readoptarg(arg, output_format)
-    case default
-        argset = .true.
-        call readarg(arg, maxcount)
     end select
 
 end do
 
 ! Read coordinates
 
-call readmol('xyz', title0, label0, atoms0, bonds0)
-call readmol('xyz', title1, label1, atoms1, bonds1)
+call readxyzfile(natom0, title0, labels0, atoms0)
+call readxyzfile(natom1, title1, labels1, atoms1)
 
 ! Check number of atoms
 
-if (size(label0) == size(label1)) then
-    natom = size(label0)
-else
+if (natom0 /= natom1) then
     call error('The molecules do not have the same number of atoms!')
 end if
 
 ! Allocate records
 
 allocate(rotmatlist(3, 3, maxrecord))
-allocate(atomaplist(natom, maxrecord))
+allocate(atomaplist(natom0, maxrecord))
 
-! Superpose or align atoms
+! Align or realign atoms
 
-if (argset) then
-    call superpose(natom, atoms0, atoms1, label0, label1, maxrecord, nrecord, atomaplist, rotmatlist)
+if (remap) then
+    call realign(natom0, atoms0, atoms1, labels0, labels1, maxrecord, nrecord, atomaplist, rotmatlist)
 else
-    call align(natom, atoms0, atoms1, label0, label1, maxrecord, nrecord, atomaplist, rotmatlist)
+    call align(natom0, atoms0, atoms1, labels0, labels1, maxrecord, nrecord, atomaplist, rotmatlist)
 end if
 
 ! Write aligned coordinates
 
 do i = 1, nrecord
     open (file_unit, file='aligned_'//str(i)//'.'//trim(output_format), action='write', status='replace')
-    call writemol(file_unit, [(i, i=1, natom)], title0, label0, atoms0, bonds0)
-    call writemol(file_unit, atomaplist(:, i), title1, label1, rotated(natom, rotmatlist(:, :, i), atoms1), bonds1)
+    call writexyzfile(file_unit, natom0, [(i, i=1, natom0)], title0, labels0, atoms0)
+    call writexyzfile(file_unit, natom1, atomaplist(:, i), title1, labels1, rotated(natom1, rotmatlist(:, :, i), atoms1))
     close (file_unit)
 end do
 
