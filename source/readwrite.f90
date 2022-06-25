@@ -119,9 +119,8 @@ subroutine readmolfile(natom, title, labels, atoms, nbond, bonds)
 end subroutine
 
 
-subroutine writexyzfile(file_unit, natom, mapping, title, labels, atoms)
+subroutine writexyzfile(file_unit, natom, title, labels, atoms)
     integer, intent(in) :: file_unit, natom
-    integer, dimension(:), intent(in) :: mapping
     real(wp), dimension(:, :), intent(in) :: atoms
     character(*), dimension(:), intent(in) :: labels
     character(*), intent(in) :: title
@@ -131,24 +130,20 @@ subroutine writexyzfile(file_unit, natom, mapping, title, labels, atoms)
     write (file_unit, '(i0)') natom
     write (file_unit, '(a)') trim(title)
     do i = 1, natom
-        write (file_unit, '(a, 3(2x, f12.6))') elsym(znum(labels(mapping(i)))), atoms(:, mapping(i))
+        write (file_unit, '(a, 3(2x, f12.6))') elsym(znum(labels(i))), atoms(:, i)
     end do
 
 end subroutine
 
 
-subroutine writemol2file(file_unit, natom, nbond, mapping, title, labels, atoms, bonds)
+subroutine writemol2file(file_unit, natom, nbond, title, labels, atoms, bonds)
     integer, intent(in) :: file_unit, natom, nbond
-    integer, dimension(:), intent(in) :: mapping
     integer, dimension(:, :), intent(in) :: bonds
     real(wp), dimension(:, :), intent(in) :: atoms
     character(*), dimension(:), intent(in) :: labels
     character(*), intent(in) :: title
 
     integer i
-    integer unmapping(natom)
-
-    unmapping = inversemap(mapping)
 
     write (file_unit, '(a)') '@<TRIPOS>MOLECULE'
     write (file_unit, '(a)') trim(title)
@@ -159,13 +154,13 @@ subroutine writemol2file(file_unit, natom, nbond, mapping, title, labels, atoms,
 
     do i = 1, natom
         write (file_unit, '(i4, x, a2, 3(x, f12.6), x, a8, x, i2, x, a4, x, f7.3)') &
-            i, elsym(znum(labels(mapping(i)))), atoms(:, mapping(i)), labels(mapping(i)), 1, 'MOL1', 0.
+            i, elsym(znum(labels(i))), atoms(:, i), labels(i), 1, 'MOL1', 0.
     end do
 
     write (file_unit, '(a)') '@<TRIPOS>BOND'
 
     do i = 1, nbond
-        write (file_unit, '(i4, x, 2(x, i4), x, a2)') i, unmapping(bonds(:, i)), '1'
+        write (file_unit, '(i4, x, 2(x, i4), x, a2)') i, bonds(:, i), '1'
     end do
 
 end subroutine

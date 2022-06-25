@@ -1,12 +1,12 @@
 program ralign
 
 use options
-use strutils
 use messages
+use strutils
+use readwrite
 use decoding
 use rotation
-use readwrite
-!use superposition
+use translation
 
 implicit none
 
@@ -97,9 +97,10 @@ call superpose(natom0, atoms0, atoms1, labels0, labels1, center0, center1, maxre
 ! Write aligned coordinates
 
 do i = 1, nrecord
+    atoms1 = translated(natom1, -center0, rotated(natom1, rotmatlist(:, :, i), translated(natom1, center1, atoms1)))
     open (file_unit, file='aligned_'//str(i)//'.'//trim(outformat), action='write', status='replace')
-    call writexyzfile(file_unit, natom0, [(i, i=1, natom0)], title0, labels0, atoms0)
-    call writexyzfile(file_unit, natom1, atomaplist(:, i), title1, labels1, rotated(natom1, rotmatlist(:, :, i), atoms1))
+    call writexyzfile(file_unit, natom0, title0, labels0, atoms0)
+    call writexyzfile(file_unit, natom1, title1, labels1(atomaplist(:, i)), atoms1(:, atomaplist(:, i)))
     close (file_unit)
 end do
 
