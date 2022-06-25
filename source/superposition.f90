@@ -19,85 +19,6 @@ implicit none
 
 contains
 
-subroutine align(natom, atoms0, atoms1, labels0, labels1, maxrecord, nrecord, atomaplist, rotmatlist)
-! Purpose: Superimpose coordinates of atom sets atoms0 and atoms1
-
-integer, intent(in) :: natom, maxrecord
-real(wp), dimension(:, :), intent(inout) :: atoms0, atoms1
-character(32), dimension(:), intent(inout) :: labels0, labels1
-
-integer, intent(out) :: nrecord
-real(wp), dimension(:, :, :), intent(out) :: rotmatlist
-integer, dimension(:, :), intent(out) :: atomaplist
-
-integer i
-integer, dimension(:), allocatable :: znum0, znum1
-real(wp), dimension(:), allocatable :: weights
-real(wp), dimension(nelem) :: atomweight
-
-procedure (generic_test), pointer :: stop_test => null()
-
-! Allocate arrays
-
-allocate(weights(natom))
-allocate(znum0(natom), znum1(natom))
-
-! Get atomic numbers
-
-do i = 1, natom
-    labels0(i) = upper(labels0(i))
-    labels1(i) = upper(labels1(i))
-    znum0(i) = znum(labels0(i))
-    znum1(i) = znum(labels1(i))
-end do
-
-! Abort if there are incompatible atomic symbols
-
-if (any(znum0 /= znum1)) then
-    call error('The molecules are not isomers!')
-end if
-
-! Abort if there are incompatible atomic labels
-
-if (any(labels0 /= labels1)) then
-    call error('There are incompatible atomic labels!')
-end if
-
-! Calculate normalized weights
-
-select case (weighting)
-case ('none')
-    atomweight = [(1.0_wp, i=1, nelem)]
-case ('mass')
-    atomweight = stdmatom
-case default
-    call error('Invalid weighting option: '//trim(weighting))
-end select
-
-weights = atomweight(znum0)/sum(atomweight(znum0))
-
-! Translate molecules to their centroid
-
-call translate(natom, centroid(natom, weights, atoms0), atoms0)
-call translate(natom, centroid(natom, weights, atoms1), atoms1)
-
-! Align atoms
-
-nrecord = 1
-atomaplist(:, 1) = [(i, i=1, natom)]
-call print_header()
-call print_stats(0, 0, 0, 0.0_wp, 0.0_wp, 0.0_wp, leastsquaredist(natom, weights, atoms0, atoms1, atomaplist(:, 1)))
-call print_footer(.false., .false., 0, 0)
-
-! Calculate rotation quaternions
-
-do i = 1, nrecord
-    rotmatlist(:, :, i) = quat2mat(leastrotquat(natom, weights, atoms0, atoms1, atomaplist(:, i)))
-end do
-
-end subroutine
-
-
 subroutine superpose(natom, atoms0, atoms1, labels0, labels1, maxrecord, nrecord, atomaplist, rotmatlist)
 ! Purpose: Superimpose coordinates of atom sets atoms0 and atoms1
 
@@ -123,21 +44,19 @@ real(wp), dimension(nelem) :: atomweight
 procedure (generic_test), pointer :: trial_test => null()
 procedure (generic_test), pointer :: match_test => null()
 
-if (trialing .and. maxtrial < 1) then
-    call error('maxtrial must be greater than zero')
-end if
-
-if (matching .and. maxmatch < 1) then
-    call error('maxmatch must be greater than zero')
-end if
-
 if (trialing) then
+    if (maxtrial < 1) then
+        call error('maxtrial must be greater than zero')
+    end if
     trial_test => lowerthan
 else
     trial_test => trueconst
 end if
 
 if (matching) then
+    if (maxmatch < 1) then
+        call error('maxmatch must be greater than zero')
+    end if
     match_test => lowerthan
 else
     match_test => trueconst
@@ -161,27 +80,31 @@ do i = 1, natom
     znum1(i) = znum(labels1(i))
 end do
 
-! Group atoms by label
+if (remap) then
 
-call grouplabels(natom, labels0, nblock0, blocksize0, blocktype0)
-call grouplabels(natom, labels1, nblock1, blocksize1, blocktype1)
+    ! Group atoms by label
 
-! Sort equivalent atoms in contiguous blocks
+    call grouplabels(natom, labels0, nblock0, blocksize0, blocktype0)
+    call grouplabels(natom, labels1, nblock1, blocksize1, blocktype1)
 
-order0 = sortorder(blocktype0, natom)
-order1 = sortorder(blocktype1, natom)
-reorder0 = inversemap(order0)
+    ! Sort equivalent atoms in contiguous blocks
 
-labels0 = labels0(order0)
-labels1 = labels1(order1)
+    order0 = sortorder(blocktype0, natom)
+    order1 = sortorder(blocktype1, natom)
+    reorder0 = inversemap(order0)
 
-atoms0 = atoms0(:, order0)
-atoms1 = atoms1(:, order1)
+    labels0 = labels0(order0)
+    labels1 = labels1(order1)
 
-znum0 = znum0(order0)
-znum1 = znum1(order1)
+    atoms0 = atoms0(:, order0)
+    atoms1 = atoms1(:, order1)
 
-weights = weights(order0)
+    znum0 = znum0(order0)
+    znum1 = znum1(order1)
+
+    weights = weights(order0)
+
+end if
 
 ! Abort if there are incompatible atomic symbols
 
@@ -197,13 +120,13 @@ end if
 
 ! Calculate normalized weights
 
-select case (weighting)
+select case (weighter)
 case ('none')
     atomweight = [(1.0_wp, i=1, nelem)]
 case ('mass')
     atomweight = stdmatom
 case default
-    call error('Invalid weighting option: '//trim(weighting))
+    call error('Invalid weighter option: '//trim(weighter))
 end select
 
 weights = atomweight(znum0)/sum(atomweight(znum0))
@@ -213,19 +136,31 @@ weights = atomweight(znum0)/sum(atomweight(znum0))
 call translate(natom, centroid(natom, weights, atoms0), atoms0)
 call translate(natom, centroid(natom, weights, atoms1), atoms1)
 
-! Set bias for non equivalent atoms 
+if (remap) then
 
-call setadjbias(natom, nblock0, blocksize0, atoms0, atoms1, bias)
+    ! Set bias for non equivalent atoms 
 
-! Initialize random number generator
+    call setadjbias(natom, nblock0, blocksize0, atoms0, atoms1, bias)
 
-call init_random_seed(seed)
-call random_seed(put=seed)
+    ! Initialize random number generator
 
-! Remap atoms to minimize distance and difference
+    call init_random_seed(seed)
+    call random_seed(put=seed)
 
-call remapatoms(natom, nblock0, blocksize0, atoms0, atoms1, weights, bias, maxrecord, nrecord, &
-                atomaplist, trial_test, match_test)
+    ! Remap atoms to minimize distance and difference
+
+    call remapatoms(natom, nblock0, blocksize0, atoms0, atoms1, weights, bias, maxrecord, nrecord, &
+                    atomaplist, trial_test, match_test)
+
+else
+
+    nrecord = 1
+    atomaplist(:, 1) = [(i, i=1, natom)]
+    call print_header()
+    call print_stats(0, 0, 0, 0.0_wp, 0.0_wp, 0.0_wp, leastsquaredist(natom, weights, atoms0, atoms1, atomaplist(:, 1)))
+    call print_footer(.false., .false., 0, 0)
+
+end if
 
 ! Calculate rotation quaternions
 
@@ -233,17 +168,21 @@ do i = 1, nrecord
     rotmatlist(:, :, i) = quat2mat(leastrotquat(natom, weights, atoms0, atoms1, atomaplist(:, i)))
 end do
 
-! Restore original atom order
+if (remap) then
 
-labels0 = labels0(reorder0)
-labels1 = labels1(reorder0)
+    ! Restore original atom order
 
-atoms0 = atoms0(:, reorder0)
-atoms1 = atoms1(:, reorder0)
+    labels0 = labels0(reorder0)
+    labels1 = labels1(reorder0)
 
-do i = 1, nrecord
-    atomaplist(:, i) = atomaplist(reorder0, i)
-end do
+    atoms0 = atoms0(:, reorder0)
+    atoms1 = atoms1(:, reorder0)
+
+    do i = 1, nrecord
+        atomaplist(:, i) = atomaplist(reorder0, i)
+    end do
+
+end if
 
 end subroutine
 

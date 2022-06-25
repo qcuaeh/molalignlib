@@ -11,7 +11,6 @@ use chemistry
 
 implicit none
 
-integer, parameter :: maxcoord = 16
 integer, parameter :: file_unit = 999
 
 contains

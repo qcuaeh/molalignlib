@@ -85,7 +85,9 @@ case "$buildtype" in
       ;;
    library)
       echo Linking library...
+      pushd "$BINDIR"
       $F2PY --quiet --overwrite-signature -m "$NAME" -h "$OBJDIR/$NAME.pyf" "${exportlist[@]}"
-      (cd "$BINDIR" && $F2PY --quiet -I"$OBJDIR" -L"$LIBPATH" -llapack -c "$OBJDIR/$NAME.pyf" "${objectlist[@]}")
+      $F2PY --quiet -I"$OBJDIR" -L"$LIBPATH" -llapack -c "$OBJDIR/$NAME.pyf" "${objectlist[@]}"
+      popd
       ;;
 esac

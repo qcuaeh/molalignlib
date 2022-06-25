@@ -24,14 +24,15 @@ character(32) arg
 ! Set default options
 
 live = .false.
+remap = .false.
 biased = .false.
 iterative = .false.
 trialing = .false.
 matching = .false.
 testing = .false.
 maxrecord = 9
-scaling = 1000.0_wp
-weighting = 'none'
+scale = 1000.0_wp
+weighter = 'none'
 outformat = 'xyz'
 
 ! Get user options
@@ -51,15 +52,17 @@ do while (getarg(arg))
         biased = .true.
         call readoptarg(arg, tolerance)
     case ('-trials')
+        remap = .true.
         trialing = .true.
         call readoptarg(arg, maxtrial)
     case ('-matches')
+        remap = .true.
         matching = .true.
         call readoptarg(arg, maxmatch)
     case ('-scale')
-        call readoptarg(arg, scaling)
+        call readoptarg(arg, scale)
     case ('-weight')
-        call readoptarg(arg, weighting)
+        call readoptarg(arg, weighter)
     case ('-records')
         call readoptarg(arg, maxrecord)
     case ('-out')
@@ -86,13 +89,9 @@ end if
 allocate(rotmatlist(3, 3, maxrecord))
 allocate(atomaplist(natom0, maxrecord))
 
-! Align or realign atoms
+! Superpose atoms
 
-if (trialing .or. matching) then
-    call superpose(natom0, atoms0, atoms1, labels0, labels1, maxrecord, nrecord, atomaplist, rotmatlist)
-else
-    call align(natom0, atoms0, atoms1, labels0, labels1, maxrecord, nrecord, atomaplist, rotmatlist)
-end if
+call superpose(natom0, atoms0, atoms1, labels0, labels1, maxrecord, nrecord, atomaplist, rotmatlist)
 
 ! Write aligned coordinates
 
