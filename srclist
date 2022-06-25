@@ -1,4 +1,4 @@
-options.f90
+options.f90 export
 messages.f90
 lapack.f90
 math.f90
@@ -18,5 +18,5 @@ alignment.f90
 readwrite.f90
 biasing.f90
 remapping.f90
-superposition.f90
+superposition.f90 export
 ralign.f90
