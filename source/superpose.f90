@@ -1,7 +1,8 @@
 !module superposition
 !contains
 
-subroutine superpose(natom, atoms0, atoms1, labels0, labels1, maxrecord, nrecord, atomaplist, rotmatlist)
+subroutine superpose(natom, atoms0, atoms1, labels0, labels1, center0, center1, &
+    maxrecord, nrecord, atomaplist, rotmatlist)
 ! Purpose: Superimpose coordinates of atom sets atoms0 and atoms1
 
 use iso_fortran_env, only: output_unit
@@ -25,6 +26,7 @@ integer, intent(in) :: natom, maxrecord
 real(wp), dimension(3, natom), intent(in) :: atoms0, atoms1
 character(32), dimension(natom), intent(in) :: labels0, labels1
 integer, intent(out) :: nrecord
+real(wp), dimension(3), intent(out) :: center0, center1
 real(wp), dimension(3, 3, maxrecord), intent(out) :: rotmatlist
 integer, dimension(natom, maxrecord), intent(out) :: atomaplist
 
@@ -36,7 +38,6 @@ integer, dimension(:), allocatable :: order0, order1
 integer, dimension(:), allocatable :: reorder0, reorder1
 integer, dimension(:), allocatable :: blocktype0, blocktype1
 integer, dimension(:), allocatable :: blocksize0, blocksize1
-real(wp), dimension(3) :: centroid0, centroid1
 real(wp), dimension(:), allocatable :: weights
 real(wp), dimension(:, :), allocatable :: bias
 real(wp), dimension(nelem) :: atomweight
@@ -139,8 +140,8 @@ weights = atomweight(znum0)/sum(atomweight(znum0))
 
 ! Calculate atom sets centroids
 
-centroid0 = centroid(natom, weights, atoms0)
-centroid1 = centroid(natom, weights, atoms1)
+center0 = centroid(natom, weights, atoms0)
+center1 = centroid(natom, weights, atoms1)
 
 if (remap) then
 
@@ -153,8 +154,8 @@ if (remap) then
 
     call remapatoms(&
         natom, nblock0, blocksize0, weights(order0), &
-        translated(natom, centroid0, atoms0(:, order0)), &
-        translated(natom, centroid1, atoms1(:, order1)), &
+        translated(natom, center0, atoms0(:, order0)), &
+        translated(natom, center1, atoms1(:, order1)), &
         maxrecord, nrecord, atomaplist, &
         trial_test, match_test &
     )
@@ -174,8 +175,8 @@ else
         0, 0, 0, 0.0_wp, 0.0_wp, 0.0_wp, &
         leastsquaredist(&
             natom, weights, &
-            translated(natom, centroid0, atoms0), &
-            translated(natom, centroid1, atoms1), &
+            translated(natom, center0, atoms0), &
+            translated(natom, center1, atoms1), &
             atomaplist(:, 1) &
         ) &
     )

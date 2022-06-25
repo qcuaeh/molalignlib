@@ -12,11 +12,12 @@ implicit none
 
 integer natom0, natom1
 integer nrecord, maxrecord
+character(512) title0, title1
+real(wp), dimension(3) :: center0, center1
 integer, dimension(:, :), allocatable :: atomaplist
 real(wp), dimension(:, :, :), allocatable :: rotmatlist
 real(wp), dimension(:, :), allocatable :: atoms0, atoms1
 character(32), dimension(:), allocatable :: labels0, labels1
-character(512) title0, title1
 
 integer i
 character(32) arg
@@ -91,7 +92,7 @@ allocate(atomaplist(natom0, maxrecord))
 
 ! Superpose atoms
 
-call superpose(natom0, atoms0, atoms1, labels0, labels1, maxrecord, nrecord, atomaplist, rotmatlist)
+call superpose(natom0, atoms0, atoms1, labels0, labels1, center0, center1, maxrecord, nrecord, atomaplist, rotmatlist)
 
 ! Write aligned coordinates
 
