@@ -152,7 +152,7 @@ if (remap) then
 
     ! Remap atoms to minimize distance and difference
 
-    call remapatoms(&
+    call remapatoms( &
         natom, nblock0, blocksize0, weights(order0), &
         translated(natom, center0, atoms0(:, order0)), &
         translated(natom, center1, atoms1(:, order1)), &
@@ -170,10 +170,11 @@ else
 
     nrecord = 1
     atomaplist(:, 1) = [(i, i=1, natom)]
+
     call print_header()
-    call print_stats(&
+    call print_stats( &
         0, 0, 0, 0.0_wp, 0.0_wp, 0.0_wp, &
-        leastsquaredist(&
+        leastsquaredist( &
             natom, weights, &
             translated(natom, center0, atoms0), &
             translated(natom, center1, atoms1), &
