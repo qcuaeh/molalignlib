@@ -14,7 +14,7 @@ compile () {
 
 shopt -s nullglob
 
-options=$(getopt -a -o '' -l pylib,slow,fast,debug -- "$@")
+options=$(getopt -a -o '' -l lib,slow,fast,debug -- "$@")
 if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
 eval set -- "$options"
 
@@ -26,7 +26,7 @@ while true; do
       --slow) optlevel=slow; shift;;
       --fast) optlevel=fast; shift;;
       --debug) optlevel=debug; shift;;
-      --pylib) buildtype=library; shift;;
+      --lib) buildtype=library; shift;;
       --) shift; break ;;
    esac
 done

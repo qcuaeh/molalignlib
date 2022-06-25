@@ -6,7 +6,7 @@ use messages
 use decoding
 use rotation
 use readwrite
-use superposition
+!use superposition
 
 implicit none
 

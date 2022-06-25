@@ -1,4 +1,8 @@
-module superposition
+!module superposition
+!contains
+
+subroutine superpose(natom, atoms0, atoms1, labels0, labels1, maxrecord, nrecord, atomaplist, rotmatlist)
+! Purpose: Superimpose coordinates of atom sets atoms0 and atoms1
 
 use iso_fortran_env, only: output_unit
 use iso_fortran_env, only: error_unit
@@ -17,26 +21,22 @@ use messages
 
 implicit none
 
-contains
-
-subroutine superpose(natom, atoms0, atoms1, labels0, labels1, maxrecord, nrecord, atomaplist, rotmatlist)
-! Purpose: Superimpose coordinates of atom sets atoms0 and atoms1
-
 integer, intent(in) :: natom, maxrecord
-real(wp), dimension(:, :), intent(inout) :: atoms0, atoms1
-character(32), dimension(:), intent(inout) :: labels0, labels1
-
+real(wp), dimension(3, natom), intent(in) :: atoms0, atoms1
+character(32), dimension(natom), intent(in) :: labels0, labels1
 integer, intent(out) :: nrecord
-real(wp), dimension(:, :, :), intent(out) :: rotmatlist
-integer, dimension(:, :), intent(out) :: atomaplist
+real(wp), dimension(3, 3, maxrecord), intent(out) :: rotmatlist
+integer, dimension(natom, maxrecord), intent(out) :: atomaplist
 
 integer i
 integer nblock0, nblock1
 integer, dimension(:), allocatable :: seed
 integer, dimension(:), allocatable :: znum0, znum1
+integer, dimension(:), allocatable :: order0, order1
+integer, dimension(:), allocatable :: reorder0, reorder1
 integer, dimension(:), allocatable :: blocktype0, blocktype1
 integer, dimension(:), allocatable :: blocksize0, blocksize1
-integer, dimension(:), allocatable :: order0, reorder0, order1
+real(wp), dimension(3) :: centroid0, centroid1
 real(wp), dimension(:), allocatable :: weights
 real(wp), dimension(:, :), allocatable :: bias
 real(wp), dimension(nelem) :: atomweight
@@ -66,7 +66,8 @@ end if
 
 allocate(weights(natom))
 allocate(bias(natom, natom))
-allocate(order0(natom), order1(natom), reorder0(natom))
+allocate(order0(natom), order1(natom))
+allocate(reorder0(natom), reorder1(natom))
 allocate(blocktype0(natom), blocktype1(natom))
 allocate(blocksize0(natom), blocksize1(natom))
 allocate(znum0(natom), znum1(natom))
@@ -74,8 +75,6 @@ allocate(znum0(natom), znum1(natom))
 ! Get atomic numbers
 
 do i = 1, natom
-    labels0(i) = upper(labels0(i))
-    labels1(i) = upper(labels1(i))
     znum0(i) = znum(labels0(i))
     znum1(i) = znum(labels1(i))
 end do
@@ -87,35 +86,42 @@ if (remap) then
     call grouplabels(natom, labels0, nblock0, blocksize0, blocktype0)
     call grouplabels(natom, labels1, nblock1, blocksize1, blocktype1)
 
-    ! Sort equivalent atoms in contiguous blocks
+    ! Contiguous same label order
 
     order0 = sortorder(blocktype0, natom)
     order1 = sortorder(blocktype1, natom)
+
+    ! Undo contiguous same label order
+
     reorder0 = inversemap(order0)
+    reorder1 = inversemap(order1)
 
-    labels0 = labels0(order0)
-    labels1 = labels1(order1)
+    ! Abort if there are incompatible atomic symbols
 
-    atoms0 = atoms0(:, order0)
-    atoms1 = atoms1(:, order1)
+    if (any(znum0(order0) /= znum1(order1))) then
+        call error('The molecules are not isomers!')
+    end if
 
-    znum0 = znum0(order0)
-    znum1 = znum1(order1)
+    ! Abort if there are incompatible atomic labels
 
-    weights = weights(order0)
+    if (any([(upper(labels0(order0(i))) /= upper(labels1(order1(i))), i=1, natom)])) then
+        call error('There are incompatible atomic labels!')
+    end if
 
-end if
+else
 
-! Abort if there are incompatible atomic symbols
+    ! Abort if there are incompatible atomic symbols
 
-if (any(znum0 /= znum1)) then
-    call error('The molecules are not isomers!')
-end if
+    if (any(znum0 /= znum1)) then
+        call error('The molecules are not isomers!')
+    end if
 
-! Abort if there are incompatible atomic labels
+    ! Abort if there are incompatible atomic labels
 
-if (any(labels0 /= labels1)) then
-    call error('There are incompatible atomic labels!')
+    if (any([(upper(labels0(i)) /= upper(labels1(i)), i=1, natom)])) then
+        call error('There are incompatible atomic labels!')
+    end if
+
 end if
 
 ! Calculate normalized weights
@@ -131,16 +137,12 @@ end select
 
 weights = atomweight(znum0)/sum(atomweight(znum0))
 
-! Translate molecules to their centroid
+! Calculate atom sets centroids
 
-call translate(natom, centroid(natom, weights, atoms0), atoms0)
-call translate(natom, centroid(natom, weights, atoms1), atoms1)
+centroid0 = centroid(natom, weights, atoms0)
+centroid1 = centroid(natom, weights, atoms1)
 
 if (remap) then
-
-    ! Set bias for non equivalent atoms 
-
-    call setadjbias(natom, nblock0, blocksize0, atoms0, atoms1, bias)
 
     ! Initialize random number generator
 
@@ -149,41 +151,44 @@ if (remap) then
 
     ! Remap atoms to minimize distance and difference
 
-    call remapatoms(natom, nblock0, blocksize0, atoms0, atoms1, weights, bias, maxrecord, nrecord, &
-                    atomaplist, trial_test, match_test)
+    call remapatoms(&
+        natom, nblock0, blocksize0, weights(order0), &
+        translated(natom, centroid0, atoms0(:, order0)), &
+        translated(natom, centroid1, atoms1(:, order1)), &
+        maxrecord, nrecord, atomaplist, &
+        trial_test, match_test &
+    )
+
+    ! Restore original atom ordering
+
+    do i = 1, nrecord
+        atomaplist(:, i) = atomaplist(reorder0, i)
+    end do
 
 else
 
     nrecord = 1
     atomaplist(:, 1) = [(i, i=1, natom)]
     call print_header()
-    call print_stats(0, 0, 0, 0.0_wp, 0.0_wp, 0.0_wp, leastsquaredist(natom, weights, atoms0, atoms1, atomaplist(:, 1)))
+    call print_stats(&
+        0, 0, 0, 0.0_wp, 0.0_wp, 0.0_wp, &
+        leastsquaredist(&
+            natom, weights, &
+            translated(natom, centroid0, atoms0), &
+            translated(natom, centroid1, atoms1), &
+            atomaplist(:, 1) &
+        ) &
+    )
     call print_footer(.false., .false., 0, 0)
 
 end if
 
-! Calculate rotation quaternions
+! Calculate optimal rotation matrices
 
 do i = 1, nrecord
     rotmatlist(:, :, i) = quat2mat(leastrotquat(natom, weights, atoms0, atoms1, atomaplist(:, i)))
 end do
 
-if (remap) then
-
-    ! Restore original atom order
-
-    labels0 = labels0(reorder0)
-    labels1 = labels1(reorder0)
-
-    atoms0 = atoms0(:, reorder0)
-    atoms1 = atoms1(:, reorder0)
-
-    do i = 1, nrecord
-        atomaplist(:, i) = atomaplist(reorder0, i)
-    end do
-
-end if
-
 end subroutine
 
-end module
+!end module

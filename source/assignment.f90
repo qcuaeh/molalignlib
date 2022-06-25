@@ -51,17 +51,17 @@ subroutine assignatoms(natom, weights, atoms0, atoms1, nblock, blocksize, bias, 
 
 end subroutine
 
-function biasingdist(natom, weights, bias, mapping)
+function totalbias(natom, weights, bias, mapping)
     integer, intent(in) :: natom
     real(wp), dimension(:), intent(in) :: weights
     integer, dimension(:), intent(in) :: mapping
     real(wp), dimension(:, :), intent(in) :: bias
-    real(wp) biasingdist
+    real(wp) totalbias
     integer i
 
-    biasingdist = 0.
+    totalbias = 0.
     do i = 1, natom
-        biasingdist = biasingdist + weights(i)*scale**2*bias(i, mapping(i))
+        totalbias = totalbias + weights(i)*scale**2*bias(i, mapping(i))
     end do
 
 end function

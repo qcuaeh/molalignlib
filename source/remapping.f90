@@ -35,43 +35,31 @@ logical function lowerthan(counter, maxcount)
     lowerthan = counter < maxcount
 end function
 
-subroutine remapatoms(natom, nblock, blocksize, atoms0, atoms1, weights, bias, maxrecord, nrecord, &
+subroutine remapatoms(natom, nblock, blocksize, weights, atoms0, atoms1, maxrecord, nrecord, &
                       atomaplist, trial_test, match_test)
-
-! natom: number of points to align
-! atoms0: coordinates of first molecule
-! atoms1: coordinates of second molecule
-! nblock: number of block atoms
-! blocksize: size of atom block (number of atoms in the block)
-! newdist: total square distance between molecules
-! mindist: minimum distance
-! atomap: mapping between the corresponding atoms in both molecules
-! atomaplist: mapping list of minimum distances or differences
-! matches: number of equivalent orientations
-! maxcount: maximum number of searching cycles
-! ntrial: random rotation trial counter
 
     integer, intent(in) :: natom, nblock, maxrecord
     integer, dimension(:), intent(in) :: blocksize
     real(wp), dimension(:, :), intent(in) :: atoms0
+    real(wp), dimension(:, :), intent(in) :: atoms1
     real(wp), dimension(:), intent(in) :: weights
-    real(wp), dimension(:, :), intent(in) :: bias
     procedure (generic_test), pointer, intent(in) :: trial_test, match_test
-
     integer, intent(out) :: nrecord
     integer, dimension(:, :), intent(out) :: atomaplist
-    real(wp), dimension(:, :), intent(inout) :: atoms1
 
     logical map_found, overflow
     integer i, imap, jmap, ntrial, nmatch, iteration, newdiff
     integer, dimension(natom) :: atomap, auxmap, equivset0, equivset1
     integer, dimension(maxrecord) :: earliest, matches
-    real(wp) u, olddist, newdist, meanrot
+    real(wp) u, dist, biased_dist, new_biased_dist, meanrot
+    real(wp), dimension(natom, natom) :: bias
     real(wp), dimension(4) :: rotquat, prodquat
     real(wp), dimension(maxrecord) :: mindist, avgiter, avgmeanrot, avgtotrot
-    integer :: nfrag0, nfrag1
-    integer, dimension(natom) :: fragroot0, fragroot1, fragid0, fragid1
-    real(wp), dimension(3, natom) :: origmol1
+    real(wp), dimension(3, natom) :: rotatoms
+
+! Set bias for non equivalent atoms 
+
+call setadjbias(natom, nblock, blocksize, atoms0, atoms1, bias)
 
 ! Print header and initial stats
 
@@ -79,10 +67,6 @@ subroutine remapatoms(natom, nblock, blocksize, atoms0, atoms1, weights, bias, m
         write (output_unit, '(a)', advance='no') achar(27)//'[1H'//achar(27)//'[J'
         call print_header()
     end if
-
-! Save original coordinates
-
-    origmol1 = atoms1
 
 ! Initialize loop variables
 
@@ -97,39 +81,43 @@ subroutine remapatoms(natom, nblock, blocksize, atoms0, atoms1, weights, bias, m
 
         ntrial = ntrial + 1
 
+! Work with a copy of atoms1
+
+        rotatoms = atoms1
+
 ! Apply random rotation
 
-        call rotate(natom, getrotquat(randvec3()), atoms1)
+        call rotate(natom, getrotquat(randvec3()), rotatoms)
 
-! Find the best mappping to minimize euclidean distance
+! Minimize euclidean distance
 
-        call assignatoms(natom, weights, atoms0, atoms1, nblock, blocksize, bias, atomap)
-        rotquat = leastrotquat(natom, weights, atoms0, atoms1, atomap)
+        call assignatoms(natom, weights, atoms0, rotatoms, nblock, blocksize, bias, atomap)
+        rotquat = leastrotquat(natom, weights, atoms0, rotatoms, atomap)
         prodquat = rotquat
         meanrot = rotangle(rotquat)
-        call rotate(natom, rotquat, atoms1)
+        call rotate(natom, rotquat, rotatoms)
         iteration = 1
 
         do while (iterative)
-            olddist = squaredist(natom, weights, atoms0, atoms1, atomap) &
-                    + biasingdist(natom, weights, bias, atomap)
-            call assignatoms(natom, weights, atoms0, atoms1, nblock, blocksize, bias, auxmap)
+            biased_dist = squaredist(natom, weights, atoms0, rotatoms, atomap) &
+                    + totalbias(natom, weights, bias, atomap)
+            call assignatoms(natom, weights, atoms0, rotatoms, nblock, blocksize, bias, auxmap)
             if (all(auxmap == atomap)) exit
-            newdist = squaredist(natom, weights, atoms0, atoms1, auxmap) &
-                    + biasingdist(natom, weights, bias, auxmap)
-            if (newdist > olddist) then
-                call warning('new newdist is larger than old newdist!', 'mapatoms')
-!                print *, olddist, newdist
+            new_biased_dist = squaredist(natom, weights, atoms0, rotatoms, auxmap) &
+                    + totalbias(natom, weights, bias, auxmap)
+            if (new_biased_dist > biased_dist) then
+                call warning('new biased dist is larger than previous biased dist!', 'mapatoms')
+!                print *, biased_dist, new_biased_dist
             end if
-            rotquat = leastrotquat(natom, weights, atoms0, atoms1, auxmap)
+            rotquat = leastrotquat(natom, weights, atoms0, rotatoms, auxmap)
             prodquat = quatmul(rotquat, prodquat)
-            call rotate(natom, rotquat, atoms1)
+            call rotate(natom, rotquat, rotatoms)
             iteration = iteration + 1
             meanrot = meanrot + (rotangle(rotquat) - meanrot)/iteration
             atomap = auxmap
         end do
 
-        newdist = leastsquaredist(natom, weights, atoms0, atoms1, atomap)
+        dist = leastsquaredist(natom, weights, atoms0, rotatoms, atomap)
 
 ! Check for new best mapping
 
@@ -157,7 +145,7 @@ subroutine remapatoms(natom, nblock, blocksize, atoms0, atoms1, weights, bias, m
                 overflow = .true.
             end if
             do imap = 1, maxrecord
-                if (imap > nrecord .or. newdist < mindist(imap)) then
+                if (imap > nrecord .or. dist < mindist(imap)) then
                     if (imap == 1) nmatch = 1
                     if (nrecord < maxrecord) nrecord = nrecord + 1
                     do jmap = nrecord, imap + 1, -1
@@ -179,7 +167,7 @@ subroutine remapatoms(natom, nblock, blocksize, atoms0, atoms1, weights, bias, m
                     avgtotrot(imap) = rotangle(prodquat)
                     avgmeanrot(imap) = meanrot
                     atomaplist(:, imap) = atomap
-                    mindist(imap) = newdist
+                    mindist(imap) = dist
                     earliest(imap) = ntrial
                     if (live) then
                         write (output_unit, '(a)', advance='no') achar(27)//'['//str(imap + 2)//'H'
@@ -195,10 +183,6 @@ subroutine remapatoms(natom, nblock, blocksize, atoms0, atoms1, weights, bias, m
             write (output_unit, '(a)', advance='no') achar(27)//'['//str(nrecord + 3)//'H'
             call print_footer(.true., overflow, nrecord, ntrial)
         end if
-
-! Restore original coordinates
-
-        atoms1 = origmol1
 
     end do
 

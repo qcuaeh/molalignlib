@@ -101,7 +101,7 @@ function atomic_number(symbol) result(z)
     integer z
 
     do z = 1, nelem
-        if (symbol == upper(elsym(z))) then
+        if (upper(symbol) == upper(elsym(z))) then
             return
         end if
     end do
