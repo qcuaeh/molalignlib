@@ -1,8 +1,3 @@
-NAME=ralign
-F2PY=f2py3.4
-FORTRAN=gfortran
-LIBPATH=/usr/lib64/atlas
-
 # Compile source file
 compile () {
    sourcefile=$SRCDIR/$1
