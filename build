@@ -8,55 +8,19 @@ SRCLIST=./srclist
 BUILDIR=./_build_dir
 BINDIR=./bin
 
-# Compile selected source files
+# Compile source file
 compile () {
-   objlist=()
-   for file in "$@"; do
-      srcfile=$SRCDIR/$file
-      bldfile=$objdir/$file
-      objfile=$objdir/${file%.*}.o
-      objlist+=($objfile)
-      if ! test -e "$objfile" || ! test -e "$bldfile" || ! diff -q "$srcfile" "$bldfile" > /dev/null; then
-         rm -f "$objfile"
-         cp -p "$srcfile" "$bldfile"
-         echo Compiling "$file"
-         $FORTRAN $options -c "$srcfile" -o "$objfile" -I "$objdir" -J "$objdir" || exit
-      fi
-   done
-}
-
-build () {
-   case "$1" in
-     static) binflags='';;
-     dynamic) binflags='-fPIC';;
-     *) echo Invalid code type option: $1; exit;;
-   esac
-   case "$2" in
-     slow) optflags='-O3';;
-     fast) optflags='-O3 -ffast-math';;
-     debug) optflags='-g -fbounds-check -fbacktrace -ffpe-trap=zero,invalid,overflow -O0 -Wall';;
-     *) echo Invalid optimization option: $2; exit;;
-   esac
-   srclist=()
-   objdir=$BUILDIR/$1/$2
-   options="$OPTIONS $binflags $optflags -llapack"
-   if [[ -d $objdir ]]; then
-      if [[ $RECOMPILE != true ]]; then
-         for f in "$objdir"/*; do 
-            rm "$f"
-         done
-      fi
-   else
-      mkdir -p "$objdir"
+   srcfile=$SRCDIR/$1
+   bldfile=$objdir/$1
+   objfile=$objdir/${file%.*}.o
+   objlist+=($objfile)
+   if ! test -e "$objfile" || ! test -e "$bldfile" || ! diff -q "$srcfile" "$bldfile" > /dev/null; then
+      rm -f "$objfile"
+      cp -p "$srcfile" "$bldfile"
+      echo Compiling "$1"
+      $FORTRAN $options -c "$srcfile" -o "$objfile" -I "$objdir" -J "$objdir" || exit
    fi
-   while IFS= read -r line; do
-      srclist+=("$line")
-   done < <(grep -v '^#' "$SRCLIST")
-   compile "${srclist[@]}"
-   echo Linking $PROGRAM
-   $FORTRAN $options "${objlist[@]}" -o "$BINDIR/$PROGRAM"
-   echo
-} 
+}
 
 shopt -s nullglob
 
@@ -86,4 +50,37 @@ while true; do
    esac
 done
 
-build "$bintype" "$optlevel"
+case "$bintype" in
+ static) binflags='';;
+ dynamic) binflags='-fPIC';;
+ *) echo Invalid code type option: $bintype; exit;;
+esac
+
+case "$optlevel" in
+ slow) optflags='-O3';;
+ fast) optflags='-O3 -ffast-math';;
+ debug) optflags='-g -fbounds-check -fbacktrace -ffpe-trap=zero,invalid,overflow -O0 -Wall';;
+ *) echo Invalid optimization option: $optlevel; exit;;
+esac
+
+objdir=$BUILDIR/$bintype/$optlevel
+options="$OPTIONS $binflags $optflags -llapack"
+objlist=()
+
+if [[ -d $objdir ]]; then
+  if [[ $RECOMPILE != true ]]; then
+     for f in "$objdir"/*; do 
+        rm "$f"
+     done
+  fi
+else
+  mkdir -p "$objdir"
+fi
+
+while IFS= read -r file; do
+  compile "$file"
+done < <(grep -v '^#' "$SRCLIST")
+
+echo Linking $PROGRAM
+$FORTRAN $options "${objlist[@]}" -o "$BINDIR/$PROGRAM"
+echo
