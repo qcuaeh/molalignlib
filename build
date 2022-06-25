@@ -1,2 +1,2 @@
 #!/bin/bash
-RECOMPILE=false bash "$(dirname "$0")/build.sh" "$@"
+RECOMPILE=false bash "$(dirname "$0")/source/build.sh" "$@"
