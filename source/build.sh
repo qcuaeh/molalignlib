@@ -76,7 +76,7 @@ while IFS= read -r line; do
   if [[ -n $2 ]]; then
      exportlist+=("$OBJDIR/$1")
   fi
-done < <(grep -v '^#' "$SRCDIR/source-files")
+done < <(grep -v '^#' "$SRCDIR/sourcefiles")
 
 case "$buildtype" in
    program)

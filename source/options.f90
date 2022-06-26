@@ -8,7 +8,7 @@ integer, parameter :: maxcoord = 16
 
 integer maxtrial, maxmatch
 logical live, remap, iterative, biased, trialing, matching, testing
-character(32) weighter, outformat
+character(optlen) weighter, outformat
 real(wp) biasscale, tolerance
 
 end module
