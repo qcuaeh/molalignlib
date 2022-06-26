@@ -1,8 +1,5 @@
-!module superposition
-!contains
-
-subroutine superpose(natom, atoms0, atoms1, labels0, labels1, center0, center1, &
-    maxrecord, nrecord, atomaplist, rotmatlist)
+subroutine superpose(natom, maxrecord, labels0, labels1, atoms0, atoms1, &
+    center0, center1, nrecord, atomaplist, rotmatlist)
 ! Purpose: Superimpose coordinates of atom sets atoms0 and atoms1
 
 use iso_fortran_env, only: output_unit
@@ -24,7 +21,7 @@ implicit none
 
 integer, intent(in) :: natom, maxrecord
 real(wp), dimension(3, natom), intent(in) :: atoms0, atoms1
-character(32), dimension(natom), intent(in) :: labels0, labels1
+character*32, dimension(natom), intent(in) :: labels0, labels1
 integer, intent(out) :: nrecord
 real(wp), dimension(3), intent(out) :: center0, center1
 real(wp), dimension(3, 3, maxrecord), intent(out) :: rotmatlist
@@ -192,5 +189,3 @@ do i = 1, nrecord
 end do
 
 end subroutine
-
-!end module
