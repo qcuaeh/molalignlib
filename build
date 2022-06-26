@@ -1,9 +1,8 @@
 #!/bin/bash
 source "$(dirname "$0")/config"
 
-NAME=$NAME \
-F2PY=$F2PY \
-FORTRAN=$FORTRAN \
-LIBPATH=$LIBPATH \
 RECOMPILE=true \
+FORTRAN=$FORTRAN \
+LAPACK=$LAPACK \
+F2PY=$F2PY \
 bash "$(dirname "$0")/source/build.sh" "$@"

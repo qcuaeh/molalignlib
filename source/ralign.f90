@@ -19,7 +19,7 @@ integer, dimension(:, :), allocatable :: atomaplist
 real(wp), dimension(:, :, :), allocatable :: rotmatlist
 character(lbllen), dimension(:), allocatable :: labels0, labels1
 integer, dimension(:), allocatable :: znums0, znums1, types0, types1
-real(wp), dimension(:, :), allocatable :: coords0, coords1, atoms01
+real(wp), dimension(:, :), allocatable :: coords0, coords1, auxcoords
 
 integer i
 character(optlen) arg
@@ -110,13 +110,13 @@ call superpose(natom0, natom1, znums0, znums1, types0, types1, coords0, coords1,
 
 ! Write aligned coordinates
 
-allocate(atoms01(3, natom0))
+allocate(auxcoords(3, natom0))
 
 do i = 1, nrecord
-    atoms01 = translated(natom1, -center0, rotated(natom1, rotmatlist(:, :, i), translated(natom1, center1, coords1)))
+    auxcoords = translated(natom1, -center0, rotated(natom1, rotmatlist(:, :, i), translated(natom1, center1, coords1)))
     open (file_unit, file='aligned_'//str(i)//'.'//trim(outformat), action='write', status='replace')
     call writexyzfile(file_unit, natom0, title0, znums0, coords0)
-    call writexyzfile(file_unit, natom1, title1, znums1(atomaplist(:, i)), atoms01(:, atomaplist(:, i)))
+    call writexyzfile(file_unit, natom1, title1, znums1(atomaplist(:, i)), auxcoords(:, atomaplist(:, i)))
     close (file_unit)
 end do
 

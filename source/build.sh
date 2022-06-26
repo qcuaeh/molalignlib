@@ -44,6 +44,7 @@ case "$optlevel" in
    *) echo Invalid optimization level: $optlevel; exit;;
 esac
 
+NAME=ralign
 SRCDIR=$(cd -- "$(dirname "$0")" && pwd)
 ROOTDIR=$(dirname "$SRCDIR")
 BINDIR=$ROOTDIR/bin
@@ -81,13 +82,13 @@ done < <(grep -v '^#' "$SRCDIR/sourcefiles")
 case "$buildtype" in
    program)
       echo Linking program...
-      $FORTRAN -L"$LIBPATH" -llapack -o "$BINDIR/$NAME" "${objectlist[@]}"
+      $FORTRAN -L"$LAPACK" -llapack -o "$BINDIR/$NAME" "${objectlist[@]}"
       ;;
    library)
       echo Linking library...
       pushd "$BINDIR"
       $F2PY --quiet --overwrite-signature -m "$NAME" -h "$OBJDIR/$NAME.pyf" "${exportlist[@]}"
-      $F2PY --quiet -I"$OBJDIR" -L"$LIBPATH" -llapack -c "$OBJDIR/$NAME.pyf" "${objectlist[@]}"
+      $F2PY --quiet -I"$OBJDIR" -L"$LAPACK" -llapack -c "$OBJDIR/$NAME.pyf" "${objectlist[@]}"
       popd
       ;;
 esac

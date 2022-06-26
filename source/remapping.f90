@@ -55,7 +55,7 @@ subroutine remapatoms(natom, nblock, blocksize, weights, coords0, coords1, maxre
     real(wp), dimension(natom, natom) :: bias
     real(wp), dimension(4) :: rotquat, prodquat
     real(wp), dimension(maxrecord) :: mindist, avgiter, avgmeanrot, avgtotrot
-    real(wp), dimension(3, natom) :: atoms01
+    real(wp), dimension(3, natom) :: auxcoords
 
 ! Set bias for non equivalent atoms 
 
@@ -83,41 +83,41 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
 
 ! Work with a copy of coords1
 
-        atoms01 = coords1
+        auxcoords = coords1
 
 ! Apply random rotation
 
-        call rotate(natom, getrotquat(randvec3()), atoms01)
+        call rotate(natom, getrotquat(randvec3()), auxcoords)
 
 ! Minimize euclidean distance
 
-        call assignatoms(natom, weights, coords0, atoms01, nblock, blocksize, bias, atomap)
-        rotquat = leastrotquat(natom, weights, coords0, atoms01, atomap)
+        call assignatoms(natom, weights, coords0, auxcoords, nblock, blocksize, bias, atomap)
+        rotquat = leastrotquat(natom, weights, coords0, auxcoords, atomap)
         prodquat = rotquat
         meanrot = rotangle(rotquat)
-        call rotate(natom, rotquat, atoms01)
+        call rotate(natom, rotquat, auxcoords)
         iteration = 1
 
         do while (iterative)
-            biased_dist = squaredist(natom, weights, coords0, atoms01, atomap) &
+            biased_dist = squaredist(natom, weights, coords0, auxcoords, atomap) &
                     + totalbias(natom, weights, bias, atomap)
-            call assignatoms(natom, weights, coords0, atoms01, nblock, blocksize, bias, auxmap)
+            call assignatoms(natom, weights, coords0, auxcoords, nblock, blocksize, bias, auxmap)
             if (all(auxmap == atomap)) exit
-            new_biased_dist = squaredist(natom, weights, coords0, atoms01, auxmap) &
+            new_biased_dist = squaredist(natom, weights, coords0, auxcoords, auxmap) &
                     + totalbias(natom, weights, bias, auxmap)
             if (new_biased_dist > biased_dist) then
                 call warning('new biased dist is larger than previous biased dist!', 'mapatoms')
 !                print *, biased_dist, new_biased_dist
             end if
-            rotquat = leastrotquat(natom, weights, coords0, atoms01, auxmap)
+            rotquat = leastrotquat(natom, weights, coords0, auxcoords, auxmap)
             prodquat = quatmul(rotquat, prodquat)
-            call rotate(natom, rotquat, atoms01)
+            call rotate(natom, rotquat, auxcoords)
             iteration = iteration + 1
             meanrot = meanrot + (rotangle(rotquat) - meanrot)/iteration
             atomap = auxmap
         end do
 
-        dist = leastsquaredist(natom, weights, coords0, atoms01, atomap)
+        dist = leastsquaredist(natom, weights, coords0, auxcoords, atomap)
 
 ! Check for new best mapping
 
