@@ -24,7 +24,7 @@ implicit none
 
 integer, intent(in) :: natom0, natom1, maxrecord
 real(wp), intent(in) :: atoms0(3, natom0), atoms1(3, natom1)
-character*32, intent(in) :: labels0(natom0), labels1(natom1)
+character(lbllen), intent(in) :: labels0(natom0), labels1(natom1)
 integer, intent(out) :: nrecord
 real(wp), dimension(3), intent(out) :: center0, center1
 real(wp), dimension(3, 3, maxrecord), intent(out) :: rotmatlist

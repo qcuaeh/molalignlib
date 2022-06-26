@@ -13,15 +13,15 @@ implicit none
 
 integer natom0, natom1
 integer nrecord, maxrecord
-character(512) title0, title1
+character(ttllen) title0, title1
 real(wp), dimension(3) :: center0, center1
 integer, dimension(:, :), allocatable :: atomaplist
 real(wp), dimension(:, :, :), allocatable :: rotmatlist
-character(32), dimension(:), allocatable :: labels0, labels1
+character(lbllen), dimension(:), allocatable :: labels0, labels1
 real(wp), dimension(:, :), allocatable :: atoms0, atoms1, atoms01
 
 integer i
-character(32) arg
+character(optlen) arg
 
 ! Set default options
 
@@ -33,7 +33,7 @@ trialing = .false.
 matching = .false.
 testing = .false.
 maxrecord = 9
-scale = 1000.0_wp
+biasscale = 1000.0_wp
 weighter = 'none'
 outformat = 'xyz'
 
@@ -61,8 +61,8 @@ do while (getarg(arg))
         remap = .true.
         matching = .true.
         call readoptarg(arg, maxmatch)
-    case ('-scale')
-        call readoptarg(arg, scale)
+    case ('-bias-scale')
+        call readoptarg(arg, biasscale)
     case ('-weight')
         call readoptarg(arg, weighter)
     case ('-records')
@@ -70,7 +70,12 @@ do while (getarg(arg))
     case ('-out')
         call readoptarg(arg, outformat)
     case default
-        call error('Invalid option: '//trim(arg))
+        if (arg(:1) == '-') then
+            write (error_unit, '(a, x, a)') 'Unknown option:', trim(arg)
+            stop
+        else
+            call error('Invalid argument: '//trim(arg))
+        end if
     end select
 
 end do

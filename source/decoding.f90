@@ -9,14 +9,9 @@ implicit none
 integer iarg
 
 private
-public getarg
 public initarg
-public readarg
+public getarg
 public readoptarg
-
-interface readarg
-    module procedure readintarg
-end interface
 
 interface readoptarg
     module procedure getoptarg
@@ -31,7 +26,8 @@ subroutine initarg()
 end subroutine
 
 logical function getarg(arg)
-    character(32) arg
+    character(optlen) arg
+
     if (iarg <= command_argument_count()) then
         call get_command_argument(iarg, arg)
         iarg = iarg + 1
@@ -39,28 +35,12 @@ logical function getarg(arg)
     else
         getarg = .false.
     end if
+
 end function
 
-subroutine readintarg(arg, argval)
-    character(32), intent(in) :: arg
-    integer, intent(out) :: argval
-    integer stat
-
-    if (arg(:1) == '-') then
-        write (error_unit, '(a, x, a)') 'Unknown arg:', trim(arg)
-        stop
-    end if
-    read (arg, *, iostat=stat) argval
-    if (stat /= 0) then
-        write (error_unit, '(a, x, a)') 'Argument must be an integer:', trim(arg)
-        stop
-    end if
-
-end subroutine
-
-subroutine getoptarg(arg, optarg)
-    character(32), intent(in) :: arg
-    character(32), intent(out) :: optarg
+subroutine getoptarg(option, optarg)
+    character(optlen), intent(in) :: option
+    character(optlen), intent(out) :: optarg
 
     if (iarg <= command_argument_count()) then
         call get_command_argument(iarg, optarg)
@@ -69,36 +49,36 @@ subroutine getoptarg(arg, optarg)
             return
         end if
     end if
-    write (error_unit, '(a, x, a, x, a)') 'Option', trim(arg), 'requires an argument'
+    write (error_unit, '(a, x, a, x, a)') 'Option', trim(option), 'requires an argument'
     stop
 
 end subroutine
 
-subroutine readintoptarg(arg, optval)
-    character(32), intent(in) :: arg
+subroutine readintoptarg(option, optval)
+    character(optlen), intent(in) :: option
     integer, intent(out) :: optval
-    character(32) optarg
+    character(optlen) optarg
     integer stat
 
-    call getoptarg(arg, optarg)
+    call getoptarg(option, optarg)
     read (optarg, *, iostat=stat) optval
     if (stat /= 0) then
-        write (error_unit, '(a, x, a, x, a)') 'Option', trim(arg), 'requires an integer argument'
+        write (error_unit, '(a, x, a, x, a)') 'Option', trim(option), 'requires an integer argument'
         stop
     end if
 
 end subroutine
 
-subroutine readrealoptarg(arg, optval)
-    character(32), intent(in) :: arg
+subroutine readrealoptarg(option, optval)
+    character(optlen), intent(in) :: option
     real(wp), intent(out) :: optval
-    character(32) optarg
+    character(optlen) optarg
     integer stat
 
-    call getoptarg(arg, optarg)
+    call getoptarg(option, optarg)
     read (optarg, *, iostat=stat) optval
     if (stat /= 0) then
-        write (error_unit, '(a, x, a, x, a)') 'Option', trim(arg), 'requires a numeric argument'
+        write (error_unit, '(a, x, a, x, a)') 'Option', trim(option), 'requires a numeric argument'
         stop
     end if
 
