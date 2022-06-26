@@ -11,6 +11,7 @@ use translation
 
 implicit none
 
+integer i
 integer natom0, natom1
 integer nrecord, maxrecord
 character(ttllen) title0, title1
@@ -20,9 +21,7 @@ real(wp), dimension(:, :, :), allocatable :: rotmatlist
 character(lbllen), dimension(:), allocatable :: labels0, labels1
 integer, dimension(:), allocatable :: znums0, znums1, types0, types1
 real(wp), dimension(:, :), allocatable :: coords0, coords1, auxcoords
-
-integer i
-character(optlen) arg
+character(optlen) arg, path
 
 ! Set default options
 
@@ -71,20 +70,19 @@ do while (getarg(arg))
     case ('-out')
         call readoptarg(arg, outformat)
     case default
-        if (arg(:1) == '-') then
-            write (error_unit, '(a, x, a)') 'Unknown option:', trim(arg)
-            stop
-        else
-            call error('Invalid argument: '//trim(arg))
-        end if
+        call readarg(arg, path)
     end select
 
 end do
 
 ! Read coordinates
 
-call readxyzfile(natom0, title0, labels0, coords0)
-call readxyzfile(natom1, title1, labels1, coords1)
+open (file_unit, file=path, action='read')
+
+call readxyzfile(file_unit, natom0, title0, labels0, coords0)
+call readxyzfile(file_unit, natom1, title1, labels1, coords1)
+
+close (file_unit)
 
 ! Allocate arrays
 

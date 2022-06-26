@@ -14,30 +14,30 @@ compile () {
 
 shopt -s nullglob
 
-options=$(getopt -a -o '' -l lib,slow,fast,debug -- "$@")
+options=$(getopt -a -o '' -l libs,slow,fast,debug -- "$@")
 if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
 eval set -- "$options"
 
 optlevel=fast
-buildtype=program
+buildtype=executable
 
 while true; do
    case "$1" in
       --slow) optlevel=slow; shift;;
       --fast) optlevel=fast; shift;;
       --debug) optlevel=debug; shift;;
-      --lib) buildtype=library; shift;;
+      --libs) buildtype=library; shift;;
       --) shift; break ;;
    esac
 done
 
-case "$buildtype" in
-   program) libflags='';;
+case $buildtype in
+   executable) libflags='';;
    library) libflags='-fPIC';;
    *) echo Invalid build type: $buildtype; exit;;
 esac
 
-case "$optlevel" in
+case $optlevel in
    slow) optflags='-O3';;
    fast) optflags='-O3 -ffast-math';;
    debug) optflags='-g -fbounds-check -fbacktrace -ffpe-trap=zero,invalid,overflow -O0 -Wall';;
@@ -52,9 +52,9 @@ BUILDIR=$ROOTDIR/_build_dir
 OBJDIR=$BUILDIR/$buildtype/$optlevel
 
 if [[ -d $BINDIR ]]; then
-   case "$buildtype" in
-      program) rm -f "$BINDIR/$NAME";;
-      library) rm -f "$BINDIR/$NAME".*.so;;
+   case $buildtype in
+      executable) rm -f "$BINDIR"/"$NAME";;
+      library) rm -f "$BINDIR"/"$NAME".so "$BINDIR"/"$NAME".*.so;;
    esac
 else
    mkdir "$BINDIR"
@@ -75,20 +75,21 @@ while IFS= read -r line; do
   eval set -- "$line"
   compile "$1"
   if [[ -n $2 ]]; then
-     exportlist+=("$OBJDIR/$1")
+     exportlist+=("$OBJDIR"/"$1")
   fi
-done < <(grep -v '^#' "$SRCDIR/sourcefiles")
+done < <(grep -v '^#' "$SRCDIR"/sourcefiles)
 
-case "$buildtype" in
-   program)
-      echo Linking program...
-      $FORTRAN -L"$LAPACK" -llapack -o "$BINDIR/$NAME" "${objectlist[@]}"
-      ;;
-   library)
-      echo Linking library...
-      pushd "$BINDIR"
-      $F2PY --quiet --overwrite-signature -m "$NAME" -h "$OBJDIR/$NAME.pyf" "${exportlist[@]}"
-      $F2PY --quiet -I"$OBJDIR" -L"$LAPACK" -llapack -c "$OBJDIR/$NAME.pyf" "${objectlist[@]}"
-      popd
-      ;;
+case $buildtype in
+executable)
+   echo Linking executable...
+   $FORTRAN -L "$LAPACK" -llapack -o "$BINDIR"/"$NAME" "${objectlist[@]}"
+   ;;
+library)
+   echo Linking shared library...
+   $FORTRAN -shared -L "$LAPACK" -llapack -o "$BINDIR"/"$NAME".so "${objectlist[@]}"
+   echo Linking python library...
+   pushd "$BINDIR"
+   $F2PY -h "$OBJDIR"/"$NAME".pyf --overwrite-signature -m "$NAME" "${exportlist[@]}" --quiet
+   $F2PY -c "$OBJDIR"/"$NAME".pyf -I"$OBJDIR" -L"$LAPACK" -llapack "${objectlist[@]}" --quiet
+   popd
 esac

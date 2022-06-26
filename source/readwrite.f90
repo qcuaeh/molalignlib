@@ -1,7 +1,5 @@
 module readwrite
 
-use iso_fortran_env, only: input_unit
-use iso_fortran_env, only: output_unit
 use iso_fortran_env, only: error_unit
 
 use options
@@ -16,14 +14,16 @@ integer, parameter :: file_unit = 999
 contains
 
 
-subroutine readxyzfile(natom, title, labels, coords)
+subroutine readxyzfile(file_unit, natom, title, labels, coords)
+
+    integer, intent(in) :: file_unit
     integer, intent(out) :: natom
     real(wp), dimension(:, :), allocatable, intent(out) :: coords
     character(*), dimension(:), allocatable, intent(out) :: labels
     character(*), intent(out) :: title
     integer i, stat
 
-    read (input_unit, *, iostat=stat) natom
+    read (file_unit, *, iostat=stat) natom
     if (stat < 0) then
         write (error_unit, '(a)') 'Unexpected end of file!'
         stop
@@ -31,14 +31,14 @@ subroutine readxyzfile(natom, title, labels, coords)
 
     allocate (labels(natom), coords(3, natom))
 
-    read (input_unit, '(a)', iostat=stat) title
+    read (file_unit, '(a)', iostat=stat) title
     if (stat < 0) then
         write (error_unit, '(a)') 'Unexpected end of file!'
         stop
     end if
 
     do i = 1, natom
-        read (input_unit, *, iostat=stat) labels(i), coords(:, i)
+        read (file_unit, *, iostat=stat) labels(i), coords(:, i)
         if (stat < 0) then
             write (error_unit, '(a)') 'Unexpected end of file!'
             stop
@@ -48,7 +48,9 @@ subroutine readxyzfile(natom, title, labels, coords)
 end subroutine
 
 
-subroutine readmolfile(natom, title, labels, coords, nbond, bonds)
+subroutine readmolfile(file_unit, natom, title, labels, coords, nbond, bonds)
+
+    integer, intent(in) :: file_unit
     integer, intent(out) :: natom, nbond
     integer, dimension(:, :), allocatable, intent(out) :: bonds
     real(wp), dimension(:, :), allocatable, intent(out) :: coords
@@ -56,25 +58,25 @@ subroutine readmolfile(natom, title, labels, coords, nbond, bonds)
     character(*), intent(out) :: title
     integer i, stat
 
-    read (input_unit, '(a)', iostat=stat) title
+    read (file_unit, '(a)', iostat=stat) title
     if (stat < 0) then
         write (error_unit, '(a)') 'Unexpected end of file!'
         stop
     end if
 
-    read (input_unit, *, iostat=stat)
+    read (file_unit, *, iostat=stat)
     if (stat < 0) then
         write (error_unit, '(a)') 'Unexpected end of file!'
         stop
     end if
 
-    read (input_unit, *, iostat=stat)
+    read (file_unit, *, iostat=stat)
     if (stat < 0) then
         write (error_unit, '(a)') 'Unexpected end of file!'
         stop
     end if
 
-    read (input_unit, *, iostat=stat) natom, nbond
+    read (file_unit, *, iostat=stat) natom, nbond
     if (stat < 0) then
         write (error_unit, '(a)') 'Unexpected end of file!'
         stop
@@ -83,7 +85,7 @@ subroutine readmolfile(natom, title, labels, coords, nbond, bonds)
     allocate (labels(natom), coords(3, natom), bonds(2, maxcoord*natom))
 
     do i = 1, natom
-        read (input_unit, *, iostat=stat) coords(:, i), labels(i)
+        read (file_unit, *, iostat=stat) coords(:, i), labels(i)
         if (stat < 0) then
             write (error_unit, '(a)') 'Unexpected end of file!'
             stop
@@ -91,26 +93,26 @@ subroutine readmolfile(natom, title, labels, coords, nbond, bonds)
     end do
 
     do i = 1, nbond
-        read (input_unit, *, iostat=stat) bonds(:, i)
+        read (file_unit, *, iostat=stat) bonds(:, i)
         if (stat < 0) then
             write (error_unit, '(a)') 'Unexpected end of file!'
             stop
         end if
     end do
 
-    read (input_unit, *, iostat=stat)
+    read (file_unit, *, iostat=stat)
     if (stat < 0) then
         write (error_unit, '(a)') 'Unexpected end of file!'
         stop
     end if
 
-    read (input_unit, *, iostat=stat)
+    read (file_unit, *, iostat=stat)
     if (stat < 0) then
         write (error_unit, '(a)') 'Unexpected end of file!'
         stop
     end if
 
-    read (input_unit, *, iostat=stat)
+    read (file_unit, *, iostat=stat)
     if (stat < 0) then
         write (error_unit, '(a)') 'Unexpected end of file!'
         stop
@@ -120,6 +122,7 @@ end subroutine
 
 
 subroutine writexyzfile(file_unit, natom, title, znums, coords)
+
     character(*), intent(in) :: title
     integer, intent(in) :: file_unit, natom
     integer, dimension(:), intent(in) :: znums
@@ -137,6 +140,7 @@ end subroutine
 
 
 subroutine writemol2file(file_unit, natom, nbond, title, znums, coords, bonds)
+
     character(*), intent(in) :: title
     integer, intent(in) :: file_unit, natom
     integer, dimension(:), intent(in) :: znums

@@ -9,10 +9,12 @@ use strutils
 implicit none
 
 integer iarg
+logical posarg
 
 private
 
 public getarg
+public readarg
 public readoptarg
 public initarg
 public getznum
@@ -63,6 +65,7 @@ end function
 
 subroutine initarg()
     iarg = 1
+    posarg = .false.
 end subroutine
 
 logical function getarg(arg)
@@ -77,6 +80,24 @@ logical function getarg(arg)
     end if
 
 end function
+
+subroutine readarg(arg, path)
+    character(optlen), intent(in) :: arg
+    character(optlen), intent(out) :: path
+
+    if (arg(1:1) == '-') then
+        write (error_unit, '(a, x, a)') 'Unknown option:', trim(arg)
+        stop
+    end if
+    if (.not. posarg) then
+        path = arg
+        posarg = .true.
+    else
+        write (error_unit, '(a, x, a)') 'Too many arguments:', trim(arg)
+        stop
+    end if
+
+end subroutine
 
 subroutine getoptarg(option, optarg)
     character(optlen), intent(in) :: option
