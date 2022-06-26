@@ -1,8 +1,8 @@
 !module superposition
 !contains
-subroutine superpose(natom0, natom1, znums0, znums1, types0, types1, atoms0, atoms1, &
+subroutine superpose(natom0, natom1, znums0, znums1, types0, types1, coords0, coords1, &
     maxrecord, nrecord, center0, center1, atomaplist, rotmatlist)
-! Purpose: Superimpose coordinates of atom sets atoms0 and atoms1
+! Purpose: Superimpose coordinates of atom sets coords0 and coords1
 
 use iso_fortran_env, only: output_unit
 use iso_fortran_env, only: error_unit
@@ -24,7 +24,7 @@ implicit none
 integer, intent(in) :: natom0, natom1, maxrecord
 integer, dimension(natom0), intent(in) :: znums0, types0
 integer, dimension(natom1), intent(in) :: znums1, types1
-real(wp), intent(in) :: atoms0(3, natom0), atoms1(3, natom1)
+real(wp), intent(in) :: coords0(3, natom0), coords1(3, natom1)
 integer, intent(out) :: nrecord
 real(wp), dimension(3), intent(out) :: center0, center1
 real(wp), dimension(3, 3, maxrecord), intent(out) :: rotmatlist
@@ -135,8 +135,8 @@ weights = atomweight(znums0)/sum(atomweight(znums0))
 
 ! Calculate atom sets centroids
 
-center0 = centroid(natom0, weights, atoms0)
-center1 = centroid(natom1, weights, atoms1)
+center0 = centroid(natom0, weights, coords0)
+center1 = centroid(natom1, weights, coords1)
 
 if (remap) then
 
@@ -149,8 +149,8 @@ if (remap) then
 
     call remapatoms( &
         natom0, nblock0, blocksize0, weights(order0), &
-        translated(natom0, center0, atoms0(:, order0)), &
-        translated(natom1, center1, atoms1(:, order1)), &
+        translated(natom0, center0, coords0(:, order0)), &
+        translated(natom1, center1, coords1(:, order1)), &
         maxrecord, nrecord, atomaplist, trial_test, match_test &
     )
 
@@ -170,8 +170,8 @@ else
         0, 0, 0, 0.0_wp, 0.0_wp, 0.0_wp, &
         leastsquaredist( &
             natom0, weights, &
-            translated(natom0, center0, atoms0), &
-            translated(natom1, center1, atoms1), &
+            translated(natom0, center0, coords0), &
+            translated(natom1, center1, coords1), &
             atomaplist(:, 1) &
         ) &
     )
@@ -182,7 +182,7 @@ end if
 ! Calculate optimal rotation matrices
 
 do i = 1, nrecord
-    rotmatlist(:, :, i) = quat2mat(leastrotquat(natom0, weights, atoms0, atoms1, atomaplist(:, i)))
+    rotmatlist(:, :, i) = quat2mat(leastrotquat(natom0, weights, coords0, coords1, atomaplist(:, i)))
 end do
 
 end subroutine

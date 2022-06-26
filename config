@@ -1,4 +1,4 @@
 NAME=ralign
-F2PY=f2py3
+F2PY=f2py
 FORTRAN=gfortran
 LIBPATH=/usr/lib64/atlas

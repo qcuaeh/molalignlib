@@ -35,13 +35,13 @@ logical function lowerthan(counter, maxcount)
     lowerthan = counter < maxcount
 end function
 
-subroutine remapatoms(natom, nblock, blocksize, weights, atoms0, atoms1, maxrecord, nrecord, &
+subroutine remapatoms(natom, nblock, blocksize, weights, coords0, coords1, maxrecord, nrecord, &
                       atomaplist, trial_test, match_test)
 
     integer, intent(in) :: natom, nblock, maxrecord
     integer, dimension(:), intent(in) :: blocksize
-    real(wp), dimension(:, :), intent(in) :: atoms0
-    real(wp), dimension(:, :), intent(in) :: atoms1
+    real(wp), dimension(:, :), intent(in) :: coords0
+    real(wp), dimension(:, :), intent(in) :: coords1
     real(wp), dimension(:), intent(in) :: weights
     procedure (generic_test), pointer, intent(in) :: trial_test, match_test
     integer, intent(out) :: nrecord
@@ -59,7 +59,7 @@ subroutine remapatoms(natom, nblock, blocksize, weights, atoms0, atoms1, maxreco
 
 ! Set bias for non equivalent atoms 
 
-call setadjbias(natom, nblock, blocksize, atoms0, atoms1, bias)
+call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
 
 ! Print header and initial stats
 
@@ -81,9 +81,9 @@ call setadjbias(natom, nblock, blocksize, atoms0, atoms1, bias)
 
         ntrial = ntrial + 1
 
-! Work with a copy of atoms1
+! Work with a copy of coords1
 
-        atoms01 = atoms1
+        atoms01 = coords1
 
 ! Apply random rotation
 
@@ -91,25 +91,25 @@ call setadjbias(natom, nblock, blocksize, atoms0, atoms1, bias)
 
 ! Minimize euclidean distance
 
-        call assignatoms(natom, weights, atoms0, atoms01, nblock, blocksize, bias, atomap)
-        rotquat = leastrotquat(natom, weights, atoms0, atoms01, atomap)
+        call assignatoms(natom, weights, coords0, atoms01, nblock, blocksize, bias, atomap)
+        rotquat = leastrotquat(natom, weights, coords0, atoms01, atomap)
         prodquat = rotquat
         meanrot = rotangle(rotquat)
         call rotate(natom, rotquat, atoms01)
         iteration = 1
 
         do while (iterative)
-            biased_dist = squaredist(natom, weights, atoms0, atoms01, atomap) &
+            biased_dist = squaredist(natom, weights, coords0, atoms01, atomap) &
                     + totalbias(natom, weights, bias, atomap)
-            call assignatoms(natom, weights, atoms0, atoms01, nblock, blocksize, bias, auxmap)
+            call assignatoms(natom, weights, coords0, atoms01, nblock, blocksize, bias, auxmap)
             if (all(auxmap == atomap)) exit
-            new_biased_dist = squaredist(natom, weights, atoms0, atoms01, auxmap) &
+            new_biased_dist = squaredist(natom, weights, coords0, atoms01, auxmap) &
                     + totalbias(natom, weights, bias, auxmap)
             if (new_biased_dist > biased_dist) then
                 call warning('new biased dist is larger than previous biased dist!', 'mapatoms')
 !                print *, biased_dist, new_biased_dist
             end if
-            rotquat = leastrotquat(natom, weights, atoms0, atoms01, auxmap)
+            rotquat = leastrotquat(natom, weights, coords0, atoms01, auxmap)
             prodquat = quatmul(rotquat, prodquat)
             call rotate(natom, rotquat, atoms01)
             iteration = iteration + 1
@@ -117,7 +117,7 @@ call setadjbias(natom, nblock, blocksize, atoms0, atoms1, bias)
             atomap = auxmap
         end do
 
-        dist = leastsquaredist(natom, weights, atoms0, atoms01, atomap)
+        dist = leastsquaredist(natom, weights, coords0, atoms01, atomap)
 
 ! Check for new best mapping
 
