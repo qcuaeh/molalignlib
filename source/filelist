@@ -8,7 +8,7 @@ hungarian.f90
 strutils.f90
 maputils.f90
 printing.f90
-chemistry.f90
+chemdata.f90
 decoding.f90
 assignment.f90
 assortment.f90
@@ -18,5 +18,5 @@ alignment.f90
 readwrite.f90
 biasing.f90
 remapping.f90
-routines.f90 export
+superpose.f90 export
 ralign.f90

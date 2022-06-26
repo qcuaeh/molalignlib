@@ -7,7 +7,7 @@ use readwrite
 use decoding
 use rotation
 use translation
-use routines
+!use superposition
 
 implicit none
 
@@ -18,6 +18,7 @@ real(wp), dimension(3) :: center0, center1
 integer, dimension(:, :), allocatable :: atomaplist
 real(wp), dimension(:, :, :), allocatable :: rotmatlist
 character(lbllen), dimension(:), allocatable :: labels0, labels1
+integer, dimension(:), allocatable :: znums0, znums1, types0, types1
 real(wp), dimension(:, :), allocatable :: atoms0, atoms1, atoms01
 
 integer i
@@ -87,13 +88,25 @@ call readxyzfile(natom1, title1, labels1, atoms1)
 
 ! Allocate arrays
 
-allocate(atoms01(3, natom0))
+allocate(znums0(natom0), znums1(natom1))
+allocate(types0(natom0), types1(natom1))
 allocate(atomaplist(natom0, maxrecord))
 allocate(rotmatlist(3, 3, maxrecord))
+allocate(atoms01(3, natom0))
+
+! Get atomic numbers and types
+
+do i = 1, natom0
+    call getznum(labels0(i), znums0(i), types0(i))
+end do
+
+do i = 1, natom1
+    call getznum(labels1(i), znums1(i), types1(i))
+end do
 
 ! Superpose atoms
 
-call superpose(natom0, natom1, labels0, labels1, atoms0, atoms1, &
+call superpose(natom0, natom1, znums0, znums1, types0, types1, atoms0, atoms1, &
     maxrecord, nrecord, center0, center1, atomaplist, rotmatlist)
 
 ! Write aligned coordinates
@@ -101,8 +114,8 @@ call superpose(natom0, natom1, labels0, labels1, atoms0, atoms1, &
 do i = 1, nrecord
     atoms01 = translated(natom1, -center0, rotated(natom1, rotmatlist(:, :, i), translated(natom1, center1, atoms1)))
     open (file_unit, file='aligned_'//str(i)//'.'//trim(outformat), action='write', status='replace')
-    call writexyzfile(file_unit, natom0, title0, labels0, atoms0)
-    call writexyzfile(file_unit, natom1, title1, labels1(atomaplist(:, i)), atoms01(:, atomaplist(:, i)))
+    call writexyzfile(file_unit, natom0, title0, znums0, atoms0)
+    call writexyzfile(file_unit, natom1, title1, znums1(atomaplist(:, i)), atoms01(:, atomaplist(:, i)))
     close (file_unit)
 end do
 

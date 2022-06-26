@@ -1,10 +1,7 @@
-module chemistry
+module chemdata
 ! Purpose: Definition of physical constants
 
-use iso_fortran_env, only: error_unit
-
 use options
-use strutils
 
 ! elsym: Element symbols
 ! valency: Eleement valenc
@@ -63,6 +60,7 @@ real(wp), dimension(nelem), parameter :: vdwrad(nelem) = [ &
 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00        &
 ]
 
+! s-block: min(v, 2 - v), p-block: min(v, 8 - v), d,f-block: 5
 integer, dimension(nelem), parameter :: valency(nelem) = [ &
 1,                                                 0, &
 1, 2,                               3, 4, 3, 2, 1, 0, &
@@ -73,41 +71,5 @@ integer, dimension(nelem), parameter :: valency(nelem) = [ &
          5, 5, 5, 5, 5, 5, 5, 5, 5, 3, 4, 3, 2, 1, 0, &
 1, 2, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5     &
 ]
-
-contains
-
-integer function znum(label)
-
-    character(*), intent(in) :: label
-    integer m, n
-
-    n = len_trim(label)
-    m = verify(upper(trim(label)), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ')
-
-    if (m == 0) then
-        znum = atomic_number(label)
-    else
-        if (verify(label(m:n), '0123456789') /= 0) then 
-            write (error_unit, '(2a)') 'Invalid label: ', trim(label)
-            stop
-        end if
-        znum = atomic_number(label(1:m-1))
-    end if
-
-end function
-
-function atomic_number(symbol) result(z)
-    character(*), intent(in) :: symbol
-    integer z
-
-    do z = 1, nelem
-        if (upper(symbol) == upper(elsym(z))) then
-            return
-        end if
-    end do
-
-    write (error_unit, '(a)') 'Unknown atomic symbol: ', trim(symbol)
-
-end function
 
 end module

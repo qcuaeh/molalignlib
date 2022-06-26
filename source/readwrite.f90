@@ -7,7 +7,7 @@ use iso_fortran_env, only: error_unit
 use options
 use strutils
 use maputils
-use chemistry
+use chemdata
 
 implicit none
 
@@ -119,29 +119,30 @@ subroutine readmolfile(natom, title, labels, atoms, nbond, bonds)
 end subroutine
 
 
-subroutine writexyzfile(file_unit, natom, title, labels, atoms)
-    integer, intent(in) :: file_unit, natom
-    real(wp), dimension(:, :), intent(in) :: atoms
-    character(*), dimension(:), intent(in) :: labels
+subroutine writexyzfile(file_unit, natom, title, znums, atoms)
     character(*), intent(in) :: title
+    integer, intent(in) :: file_unit, natom
+    integer, dimension(:), intent(in) :: znums
+    real(wp), dimension(:, :), intent(in) :: atoms
 
     integer i
 
     write (file_unit, '(i0)') natom
     write (file_unit, '(a)') trim(title)
     do i = 1, natom
-        write (file_unit, '(a, 3(2x, f12.6))') elsym(znum(labels(i))), atoms(:, i)
+        write (file_unit, '(a, 3(2x, f12.6))') elsym(znums(i)), atoms(:, i)
     end do
 
 end subroutine
 
 
-subroutine writemol2file(file_unit, natom, nbond, title, labels, atoms, bonds)
-    integer, intent(in) :: file_unit, natom, nbond
-    integer, dimension(:, :), intent(in) :: bonds
-    real(wp), dimension(:, :), intent(in) :: atoms
-    character(*), dimension(:), intent(in) :: labels
+subroutine writemol2file(file_unit, natom, nbond, title, znums, atoms, bonds)
     character(*), intent(in) :: title
+    integer, intent(in) :: file_unit, natom
+    integer, dimension(:), intent(in) :: znums
+    real(wp), dimension(:, :), intent(in) :: atoms
+    integer, intent(in) :: nbond
+    integer, dimension(:, :), intent(in) :: bonds
 
     integer i
 
@@ -154,7 +155,7 @@ subroutine writemol2file(file_unit, natom, nbond, title, labels, atoms, bonds)
 
     do i = 1, natom
         write (file_unit, '(i4, x, a2, 3(x, f12.6), x, a8, x, i2, x, a4, x, f7.3)') &
-            i, elsym(znum(labels(i))), atoms(:, i), labels(i), 1, 'MOL1', 0.
+            i, elsym(znums(i)), atoms(:, i), elsym(znums(i)), 1, 'MOL1', 0.
     end do
 
     write (file_unit, '(a)') '@<TRIPOS>BOND'

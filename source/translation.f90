@@ -13,9 +13,6 @@ contains
 
 function centroid(natom, weights, coords) result(vector)
 ! Purpose: Get coordinates of centroid
-! natom: Number of atoms
-! znum: Atomic numbers
-! coords: Atomic coordinates
 
     integer, intent(in) :: natom
     real(wp), intent(in) :: weights(natom), coords(3, natom)
@@ -38,10 +35,6 @@ end function
 function translated(natom, vector, coords)
 ! Purpose: Translate atomic coordinates to its vector of geometry
 
-! natom: Number of atoms
-! vector: Transalte vector
-! coords: Atomic coordinates
-
     integer, intent(in) :: natom
     real(wp), intent(in) :: coords(3, natom), vector(3)
     real(wp) translated(3, natom)
@@ -56,9 +49,6 @@ end function
 
 subroutine translate(natom, vector, coords)
 ! Purpose: Move the coords to the vector of mass
-! natom: Number of atoms
-! vector: Transalte vector
-! coords: Atomic coordinates
 
     integer, intent(in) :: natom
     real(wp), intent(in) :: vector(3)

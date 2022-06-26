@@ -2,7 +2,7 @@ module options
 
 integer, parameter :: wp = 8
 integer, parameter :: optlen = 16
-integer, parameter :: lbllen = 32
+integer, parameter :: lbllen = 16
 integer, parameter :: ttllen = 256
 integer, parameter :: maxcoord = 16
 

@@ -3,26 +3,28 @@ module assortment
 use options
 use sorting
 use maputils
-use chemistry
+use chemdata
 
 implicit none
 
 private
-public grouplabels
+public getblocks
 
 contains
 
-subroutine grouplabels(natom, labels, nblock, blocksize, blocktype)
-! Group atoms by labels
+subroutine getblocks(natom, znums, types, nblock, blocksize, blockindex)
+! Purpose: Group atoms by atomic numbers and types
+
     integer, intent(in) :: natom
-    character(*), dimension(:), intent(in) :: labels
+    integer, dimension(:), intent(in) :: znums, types
     integer, intent(out) :: nblock
-    integer, dimension(:), intent(out) :: blocksize, blocktype
+    integer, dimension(:), intent(out) :: blocksize, blockindex
 
     integer i, j
     logical remaining(natom)
+    integer blockznum(natom)
+    integer blocktype(natom)
     integer blockorder(natom)
-    character(32) blocklabel(natom)
 
 ! Initialization
 
@@ -35,12 +37,13 @@ subroutine grouplabels(natom, labels, nblock, blocksize, blocktype)
         if (remaining(i)) then
             nblock = nblock + 1
             blocksize(nblock) = 1
-            blocklabel(nblock) = labels(i)
-            blocktype(i) = nblock
+            blockznum(nblock) = znums(i)
+            blocktype(nblock) = types(i)
+            blockindex(i) = nblock
             do j = i + 1, natom
                 if (remaining(i)) then
-                    if (labels(j) == labels(i)) then
-                        blocktype(j) = nblock
+                    if (znums(j) == znums(i) .and. types(j) == types(i)) then
+                        blockindex(j) = nblock
                         blocksize(nblock) = blocksize(nblock) + 1
                         remaining(j) = .false.
                     end if
@@ -49,22 +52,29 @@ subroutine grouplabels(natom, labels, nblock, blocksize, blocktype)
         end if
     end do
 
-! Order blocks alphabetically
+! Order blocks by atomic number
 
-    blockorder(:nblock) = sortorder(blocklabel, nblock)
+    blockorder(:nblock) = sortorder(blockznum, nblock)
     blocksize(:nblock) = blocksize(blockorder(:nblock))
     blockorder(:nblock) = inversemap(blockorder(:nblock))
-    blocktype = blockorder(blocktype)
+    blockindex = blockorder(blockindex)
 
-! Order blocks by category size
+! Order blocks by type
+
+    blockorder(:nblock) = sortorder(blocktype, nblock)
+    blocksize(:nblock) = blocksize(blockorder(:nblock))
+    blockorder(:nblock) = inversemap(blockorder(:nblock))
+    blockindex = blockorder(blockindex)
+
+! Order blocks by size
 
     blockorder(:nblock) = sortorder(blocksize, nblock)
     blocksize(:nblock) = blocksize(blockorder(:nblock))
     blockorder(:nblock) = inversemap(blockorder(:nblock))
-    blocktype = blockorder(blocktype)
+    blockindex = blockorder(blockindex)
 
 !    print *, blocksize(:nblock)
-!    print *, labels(blocksizeorder)
+!    print *, znums(blockorder)
 
 end subroutine
 

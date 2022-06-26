@@ -1,7 +1,6 @@
-module routines
-contains
-
-subroutine superpose(natom0, natom1, labels0, labels1, atoms0, atoms1, &
+!module superposition
+!contains
+subroutine superpose(natom0, natom1, znums0, znums1, types0, types1, atoms0, atoms1, &
     maxrecord, nrecord, center0, center1, atomaplist, rotmatlist)
 ! Purpose: Superimpose coordinates of atom sets atoms0 and atoms1
 
@@ -17,14 +16,15 @@ use translation
 use alignment
 use remapping
 use assortment
-use chemistry
+use chemdata
 use messages
 
 implicit none
 
 integer, intent(in) :: natom0, natom1, maxrecord
+integer, dimension(natom0), intent(in) :: znums0, types0
+integer, dimension(natom1), intent(in) :: znums1, types1
 real(wp), intent(in) :: atoms0(3, natom0), atoms1(3, natom1)
-character(lbllen), intent(in) :: labels0(natom0), labels1(natom1)
 integer, intent(out) :: nrecord
 real(wp), dimension(3), intent(out) :: center0, center1
 real(wp), dimension(3, 3, maxrecord), intent(out) :: rotmatlist
@@ -33,10 +33,9 @@ integer, dimension(natom0, maxrecord), intent(out) :: atomaplist
 integer i
 integer nblock0, nblock1
 integer, dimension(:), allocatable :: seed
-integer, dimension(:), allocatable :: znum0, znum1
 integer, dimension(:), allocatable :: order0, order1
 integer, dimension(:), allocatable :: reorder0, reorder1
-integer, dimension(:), allocatable :: blocktype0, blocktype1
+integer, dimension(:), allocatable :: blockidx0, blockidx1
 integer, dimension(:), allocatable :: blocksize0, blocksize1
 real(wp), dimension(:), allocatable :: weights
 real(wp), dimension(:, :), allocatable :: bias
@@ -57,9 +56,8 @@ allocate(weights(natom0))
 allocate(bias(natom0, natom1))
 allocate(order0(natom0), order1(natom1))
 allocate(reorder0(natom0), reorder1(natom1))
-allocate(blocktype0(natom0), blocktype1(natom1))
+allocate(blockidx0(natom0), blockidx1(natom1))
 allocate(blocksize0(natom0), blocksize1(natom1))
-allocate(znum0(natom0), znum1(natom1))
 
 ! Select trial exit test
 
@@ -77,24 +75,17 @@ else
     match_test => trueconst
 end if
 
-! Get atomic numbers
-
-do i = 1, natom0
-    znum0(i) = znum(labels0(i))
-    znum1(i) = znum(labels1(i))
-end do
-
 if (remap) then
 
     ! Group atoms by label
 
-    call grouplabels(natom0, labels0, nblock0, blocksize0, blocktype0)
-    call grouplabels(natom1, labels1, nblock1, blocksize1, blocktype1)
+    call getblocks(natom0, znums0, types0, nblock0, blocksize0, blockidx0)
+    call getblocks(natom1, znums1, types1, nblock1, blocksize1, blockidx1)
 
     ! Contiguous same label order
 
-    order0 = sortorder(blocktype0, natom0)
-    order1 = sortorder(blocktype1, natom1)
+    order0 = sortorder(blockidx0, natom0)
+    order1 = sortorder(blockidx1, natom1)
 
     ! Undo contiguous same label order
 
@@ -103,28 +94,28 @@ if (remap) then
 
     ! Abort if there are incompatible atomic symbols
 
-    if (any(znum0(order0) /= znum1(order1))) then
+    if (any(znums0(order0) /= znums1(order1))) then
         call error('The molecules are not isomers!')
     end if
 
-    ! Abort if there are incompatible atomic labels
+    ! Abort if there are incompatible atomic types
 
-    if (any([(upper(labels0(order0(i))) /= upper(labels1(order1(i))), i=1, natom0)])) then
-        call error('There are incompatible atomic labels!')
+    if (any(types0(order0) /= types1(order1))) then
+        call error('There are incompatible atomic types!')
     end if
 
 else
 
     ! Abort if there are incompatible atomic symbols
 
-    if (any(znum0 /= znum1)) then
+    if (any(znums0 /= znums1)) then
         call error('The molecules are not isomers!')
     end if
 
-    ! Abort if there are incompatible atomic labels
+    ! Abort if there are incompatible atomic types
 
-    if (any([(upper(labels0(i)) /= upper(labels1(i)), i=1, natom0)])) then
-        call error('There are incompatible atomic labels!')
+    if (any(types0 /= types1)) then
+        call error('There are incompatible atomic types!')
     end if
 
 end if
@@ -140,7 +131,7 @@ case default
     call error('Invalid weighter option: '//trim(weighter))
 end select
 
-weights = atomweight(znum0)/sum(atomweight(znum0))
+weights = atomweight(znums0)/sum(atomweight(znums0))
 
 ! Calculate atom sets centroids
 
@@ -195,5 +186,4 @@ do i = 1, nrecord
 end do
 
 end subroutine
-
-end module
+!end module
