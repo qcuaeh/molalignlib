@@ -7,6 +7,7 @@ use readwrite
 use decoding
 use rotation
 use translation
+use routines
 
 implicit none
 
@@ -79,22 +80,16 @@ end do
 call readxyzfile(natom0, title0, labels0, atoms0)
 call readxyzfile(natom1, title1, labels1, atoms1)
 
-! Check number of atoms
-
-if (natom0 /= natom1) then
-    call error('The molecules do not have the same number of atoms!')
-end if
-
-! Allocate records
+! Allocate arrays
 
 allocate(atoms01(3, natom0))
-allocate(rotmatlist(3, 3, maxrecord))
 allocate(atomaplist(natom0, maxrecord))
+allocate(rotmatlist(3, 3, maxrecord))
 
 ! Superpose atoms
 
-call superpose(natom0, maxrecord, labels0, labels1, atoms0, atoms1, &
-    center0, center1, nrecord, atomaplist, rotmatlist)
+call superpose(natom0, natom1, labels0, labels1, atoms0, atoms1, &
+    maxrecord, nrecord, center0, center1, atomaplist, rotmatlist)
 
 ! Write aligned coordinates
 
