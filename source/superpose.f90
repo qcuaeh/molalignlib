@@ -42,24 +42,6 @@ real(wp), dimension(nelem) :: atomweight
 procedure (generic_test), pointer :: trial_test => null()
 procedure (generic_test), pointer :: match_test => null()
 
-if (trialing) then
-    if (maxtrial < 1) then
-        call error('maxtrial must be greater than zero')
-    end if
-    trial_test => lowerthan
-else
-    trial_test => trueconst
-end if
-
-if (matching) then
-    if (maxmatch < 1) then
-        call error('maxmatch must be greater than zero')
-    end if
-    match_test => lowerthan
-else
-    match_test => trueconst
-end if
-
 ! Allocate arrays
 
 allocate(weights(natom))
@@ -69,6 +51,22 @@ allocate(reorder0(natom), reorder1(natom))
 allocate(blocktype0(natom), blocktype1(natom))
 allocate(blocksize0(natom), blocksize1(natom))
 allocate(znum0(natom), znum1(natom))
+
+! Select trial exit test
+
+if (trialing) then
+    trial_test => lowerthan
+else
+    trial_test => trueconst
+end if
+
+! Select match exit test
+
+if (matching) then
+    match_test => lowerthan
+else
+    match_test => trueconst
+end if
 
 ! Get atomic numbers
 
