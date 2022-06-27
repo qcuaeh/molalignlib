@@ -47,14 +47,15 @@ subroutine remapatoms( &
     integer, intent(out) :: nrecord
     integer, intent(out) :: atomaplist(:, :), countlist(:)
 
-    logical map_found, overflow
+    logical found, overflow
     integer i, imap, jmap, ntrial, nmatch, iteration, newdiff
     integer, dimension(natom) :: atomap, auxmap
-    integer, dimension(maxrecord) :: earliest
+    integer earliest(maxrecord)
     real(wp) :: u, dist, biased_dist, new_biased_dist, meanrot
     real(wp), dimension(4) :: rotquat, prodquat
     real(wp), dimension(maxrecord) :: mindist, avgiter, avgmeanrot, avgtotrot
-    real(wp) :: bias(natom, natom), auxcoords(3, natom)
+    real(wp) bias(natom, natom)
+    real(wp) auxcoords(3, natom)
 
 ! Set bias for non equivalent atoms 
 
@@ -120,7 +121,7 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
 
 ! Check for new best mapping
 
-        map_found = .false.
+        found = .false.
 
         do imap = 1, nrecord
             if (all(atomap == atomaplist(:, imap))) then
@@ -134,12 +135,12 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
                     call print_stats(imap, earliest(imap), countlist(imap), avgiter(imap), avgmeanrot(imap), &
                         avgtotrot(imap), mindist(imap))
                 end if
-                map_found = .true.
+                found = .true.
                 exit
             end if
         end do
 
-        if (.not. map_found) then
+        if (.not. found) then
             if (nrecord >= maxrecord) then
                 overflow = .true.
             end if

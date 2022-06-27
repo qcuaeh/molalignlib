@@ -1,5 +1,7 @@
 module assortment
 
+use iso_fortran_env, only: error_unit
+
 use options
 use sorting
 use maputils
@@ -12,13 +14,14 @@ public getblocks
 
 contains
 
-subroutine getblocks(natom, znums, types, nblock, blocksize, blockindex)
+subroutine getblocks(natom, znums, types, weights, nblock, blocksize, blockindex)
 ! Purpose: Group atoms by atomic numbers and types
 
     integer, intent(in) :: natom
     integer, dimension(:), intent(in) :: znums, types
     integer, intent(out) :: nblock
     integer, dimension(:), intent(out) :: blocksize, blockindex
+    real(wp), dimension(:), intent(in) :: weights
 
     integer i, j
     logical remaining(natom)
@@ -43,6 +46,9 @@ subroutine getblocks(natom, znums, types, nblock, blocksize, blockindex)
             do j = i + 1, natom
                 if (remaining(i)) then
                     if (znums(j) == znums(i) .and. types(j) == types(i)) then
+                        if (weights(j) /= weights(i)) then
+                            write (error_unit, '(a)') 'Error: All atoms in a block must have the same weight'
+                        end if
                         blockindex(j) = nblock
                         blocksize(nblock) = blocksize(nblock) + 1
                         remaining(j) = .false.

@@ -25,8 +25,9 @@ character(lbllen), dimension(:), allocatable :: labels0, labels1
 integer, dimension(:), allocatable :: znums0, znums1, types0, types1
 real(wp), dimension(:, :), allocatable :: coords0, coords1, auxcoords
 real(wp), dimension(:), allocatable :: weights0, weights1
-integer, allocatable :: atomaplist(:, :), countlist(:)
 real(wp), dimension(nelem) :: atomweight
+integer, allocatable :: atomaplist(:, :)
+integer, allocatable :: countlist(:)
 integer first_unit, second_unit
 character(optlen) arg, path
 
