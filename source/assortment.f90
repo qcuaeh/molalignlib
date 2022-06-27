@@ -52,6 +52,13 @@ subroutine getblocks(natom, znums, types, nblock, blocksize, blockindex)
         end if
     end do
 
+! Order blocks by atomic type
+
+    blockorder(:nblock) = sortorder(blocktype, nblock)
+    blocksize(:nblock) = blocksize(blockorder(:nblock))
+    blockorder(:nblock) = inversemap(blockorder(:nblock))
+    blockindex = blockorder(blockindex)
+
 ! Order blocks by atomic number
 
     blockorder(:nblock) = sortorder(blockznum, nblock)
@@ -59,14 +66,7 @@ subroutine getblocks(natom, znums, types, nblock, blocksize, blockindex)
     blockorder(:nblock) = inversemap(blockorder(:nblock))
     blockindex = blockorder(blockindex)
 
-! Order blocks by type
-
-    blockorder(:nblock) = sortorder(blocktype, nblock)
-    blocksize(:nblock) = blocksize(blockorder(:nblock))
-    blockorder(:nblock) = inversemap(blockorder(:nblock))
-    blockindex = blockorder(blockindex)
-
-! Order blocks by size
+! Order blocks by block size
 
     blockorder(:nblock) = sortorder(blocksize, nblock)
     blocksize(:nblock) = blocksize(blockorder(:nblock))
