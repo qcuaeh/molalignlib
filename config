@@ -1,4 +1,4 @@
-RECOMPILE=true
+RECOMPILE=false
 FORTRAN=gfortran
 LAPACK=/usr/lib64/atlas
 F2PY=f2py

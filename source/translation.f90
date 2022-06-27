@@ -5,9 +5,10 @@ use options
 implicit none
 
 private
-public translate
-public translated
+
 public centroid
+public centered
+public translated
 
 contains
 
@@ -32,7 +33,7 @@ function centroid(natom, weights, coords)
 
 end function
 
-function translated(natom, vector, coords)
+function translated(natom, coords, vector)
 ! Purpose: Translate atomic coordinates to its vector of geometry
 
     integer, intent(in) :: natom
@@ -47,19 +48,19 @@ function translated(natom, vector, coords)
 
 end function
 
-subroutine translate(natom, vector, coords)
-! Purpose: Move the coords to the vector of mass
+function centered(natom, coords, vector)
+! Purpose: Translate atomic coordinates to its vector of geometry
 
     integer, intent(in) :: natom
-    real(wp), intent(in) :: vector(3)
-    real(wp), intent(inout) :: coords(3, natom)
+    real(wp), intent(in) :: coords(3, natom), vector(3)
+    real(wp) centered(3, natom)
 
     integer i
 
     do i = 1, natom
-        coords(:, i) = coords(:, i) + vector(:)
+        centered(:, i) = coords(:, i) - vector(:)
     end do
 
-end subroutine
+end function
 
 end module

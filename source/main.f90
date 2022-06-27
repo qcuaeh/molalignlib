@@ -21,15 +21,14 @@ logical remap
 integer natom0, natom1
 integer nrecord, maxrecord
 character(ttllen) title0, title1
-real(wp) tranvec(3), rotmat(3, 3)
-real(wp), dimension(3) :: center0, center1
+real(wp) travec(3), rotmat(3, 3)
+integer, allocatable :: countlist(:)
+integer, allocatable :: atomaplist(:, :)
 character(lbllen), dimension(:), allocatable :: labels0, labels1
 integer, dimension(:), allocatable :: znums0, znums1, types0, types1
 real(wp), dimension(:, :), allocatable :: coords0, coords1
 real(wp), dimension(:), allocatable :: weights0, weights1
 real(wp), dimension(nelem) :: property
-integer, allocatable :: atomaplist(:, :)
-integer, allocatable :: countlist(:)
 integer first_unit, second_unit
 character(optlen) arg, path
 
@@ -140,11 +139,6 @@ end select
 weights0 = property(znums0)/sum(property(znums0))
 weights1 = property(znums1)/sum(property(znums1))
 
-! Calculate centroids
-
-center0 = centroid(natom0, weights0, coords0)
-center1 = centroid(natom1, weights1, coords1)
-
 ! Superpose atoms
 
 if (remap) then
@@ -158,18 +152,18 @@ if (remap) then
 
         call align( &
             natom0, natom1, &
-            znums0(atomaplist(:, i)), znums1(atomaplist(:, i)), &
-            types0(atomaplist(:, i)), types1(atomaplist(:, i)), &
-            weights0(atomaplist(:, i)), weights1(atomaplist(:, i)), &
-            coords0(:, atomaplist(:, i)), coords1(:, atomaplist(:, i)), &
-            tranvec, rotmat &
+            znums0, znums1(atomaplist(:, i)), &
+            types0, types1(atomaplist(:, i)), &
+            weights0, weights1(atomaplist(:, i)), &
+            coords0, coords1(:, atomaplist(:, i)), &
+            travec, rotmat &
         )
 
         open(third_file_unit, file='aligned_'//str(i)//'.'//trim(outformat), action='write', status='replace')
         call writexyzfile(third_file_unit, natom0, title0, znums0, coords0)
         call writexyzfile( &
             third_file_unit, natom1, title1, znums1(atomaplist(:, i)), &
-            translated(natom1, rotated(natom1, coords1(:, atomaplist(:, i)), rotmat), tranvec) &
+            translated(natom1, rotated(natom1, coords1(:, atomaplist(:, i)), rotmat), travec) &
         )
         close(third_file_unit)
 
@@ -178,7 +172,7 @@ if (remap) then
 else
 
     call align(natom0, natom1, znums0, znums1, types0, types1, weights0, weights1, &
-        coords0, coords1, tranvec, rotmat)
+        coords0, coords1, travec, rotmat)
 
 end if
 

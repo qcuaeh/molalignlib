@@ -41,7 +41,7 @@ integer, dimension(:), allocatable :: order0, order1
 integer, dimension(:), allocatable :: reorder0, reorder1
 integer, dimension(:), allocatable :: blockidx0, blockidx1
 integer, dimension(:), allocatable :: blocksize0, blocksize1
-real(wp), dimension(3) :: tranvec0, tranvec1
+real(wp), dimension(3) :: center0, center1
 
 procedure (test), pointer :: trial_test => null()
 procedure (test), pointer :: match_test => null()
@@ -114,8 +114,8 @@ end if
 
 ! Calculate centroids
 
-tranvec0 = -centroid(natom0, weights0, coords0)
-tranvec1 = -centroid(natom1, weights1, coords1)
+center0 = centroid(natom0, weights0, coords0)
+center1 = centroid(natom1, weights1, coords1)
 
 ! Initialize random number generator
 
@@ -126,8 +126,8 @@ call random_seed(put=seed)
 
 call remapatoms( &
     natom0, nblock0, blocksize0, weights0(order0), &
-    translated(natom0, tranvec0, coords0(:, order0)), &
-    translated(natom1, tranvec1, coords1(:, order1)), &
+    centered(natom0, coords0(:, order0), center0), &
+    centered(natom1, coords1(:, order1), center1), &
     maxrecord, nrecord, atomaplist, countlist, &
     trial_test, match_test &
 )
@@ -143,7 +143,7 @@ end subroutine
 ! Purpose: Superimpose coordinates of atom sets coords0 and coords1
 subroutine align( &
     natom0, natom1, znums0, znums1, types0, types1, weights0, weights1, &
-    coords0, coords1, tranvec, rotmat)
+    coords0, coords1, travec, rotmat)
 
 use iso_fortran_env, only: output_unit
 use iso_fortran_env, only: error_unit
@@ -168,11 +168,11 @@ real(wp), intent(in) :: coords0(3, natom0)
 real(wp), intent(in) :: coords1(3, natom1)
 real(wp), intent(in) :: weights0(natom0)
 real(wp), intent(in) :: weights1(natom1)
-real(wp), intent(out) :: tranvec(3)
+real(wp), intent(out) :: travec(3)
 real(wp), intent(out) :: rotmat(3, 3)
 
 integer i
-real(wp), dimension(3) :: tranvec0, tranvec1
+real(wp), dimension(3) :: center0, center1
 
 ! Check number of atoms
 
@@ -204,21 +204,21 @@ end if
 
 ! Calculate centroids
 
-tranvec0 = -centroid(natom0, weights0, coords0)
-tranvec1 = -centroid(natom1, weights1, coords1)
+center0 = centroid(natom0, weights0, coords0)
+center1 = centroid(natom1, weights1, coords1)
 
 ! Calculate optimal rotation matrix
 
 rotmat = rotquat2rotmat(leastrotquat( &
     natom0, weights0, &
-    translated(natom0, tranvec0, coords0), &
-    translated(natom1, tranvec1, coords1), &
+    centered(natom0, coords0, center0), &
+    centered(natom1, coords1, center1), &
     [(i, i=1, natom0)] &
 ))
 
 ! Calculate optimal translation vector
 
-tranvec = matmul(rotmat, tranvec1) - tranvec0
+travec = center0 - matmul(rotmat, center1)
 
 end subroutine
 
