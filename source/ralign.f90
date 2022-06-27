@@ -75,7 +75,7 @@ do while (getarg(arg))
         first_unit = input_unit
         second_unit = input_unit
     case default
-        call readpath(arg)
+        call openfile(arg)
     end select
 
 end do

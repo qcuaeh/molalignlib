@@ -16,7 +16,7 @@ integer second_unit
 private
 
 public getarg
-public readpath
+public openfile
 public readoptarg
 public initarg
 public getznum
@@ -86,7 +86,7 @@ logical function getarg(arg)
 
 end function
 
-subroutine readpath(arg)
+subroutine openfile(arg)
     character(optlen), intent(in) :: arg
 
     if (arg(1:1) == '-') then
