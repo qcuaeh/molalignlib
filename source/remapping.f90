@@ -17,7 +17,7 @@ use printing
 implicit none
 
 abstract interface
-    logical function generic_test(x, y)
+    logical function test(x, y)
         integer, intent(in) :: x, y
     end function
 end interface
@@ -43,7 +43,7 @@ subroutine remapatoms( &
     integer, dimension(:), intent(in) :: blocksize
     real(wp), dimension(:, :), intent(in) :: coords0, coords1
     real(wp), dimension(:), intent(in) :: weights
-    procedure (generic_test), pointer, intent(in) :: trial_test, match_test
+    procedure (test), pointer, intent(in) :: trial_test, match_test
     integer, intent(out) :: nrecord
     integer, intent(out) :: atomaplist(:, :), countlist(:)
 

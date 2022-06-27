@@ -20,19 +20,19 @@ logical function opened(unit)
 
 end function
 
-subroutine open_unit(arg)
+subroutine open_unit(path)
 
-    character(optlen), intent(in) :: arg
+    character(optlen), intent(in) :: path
 
     if (opened(first_file_unit)) then
         if (opened(second_file_unit)) then
             write (error_unit, '(a)') 'Too many paths'
             stop
         else
-            open(second_file_unit, file=arg, action='read')
+            open(second_file_unit, file=path, action='read')
         end if
     else
-        open(first_file_unit, file=arg, action='read')
+        open(first_file_unit, file=path, action='read')
     end if
 
 end subroutine

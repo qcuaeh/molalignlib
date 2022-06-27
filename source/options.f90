@@ -10,7 +10,7 @@ integer, parameter :: second_file_unit = 1002
 integer, parameter :: third_file_unit = 1003
 
 integer maxtrial, maxmatch
-logical live, remap, iterative, biased, trialing, matching, testing
+logical live, iterative, biased, trialing, matching, testing
 character(optlen) weighter, outformat
 real(wp) biasscale, tolerance
 

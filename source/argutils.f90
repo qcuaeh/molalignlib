@@ -15,8 +15,12 @@ public getarg
 public readarg
 public readoptarg
 
+interface readarg
+    module procedure readstrarg
+end interface
+
 interface readoptarg
-    module procedure getoptarg
+    module procedure readstroptarg
     module procedure readintoptarg
     module procedure readrealoptarg
 end interface
@@ -43,14 +47,17 @@ logical function getarg(arg)
 
 end function
 
-subroutine readarg(arg)
+subroutine readstrarg(arg, argval)
 
     character(optlen), intent(in) :: arg
+    character(optlen), intent(out) :: argval
 
     if (arg(1:1) == '-') then
         write (error_unit, '(a, x, a)') 'Unknown option:', trim(arg)
         stop
     end if
+
+    argval = arg
 
 end subroutine
 
@@ -61,13 +68,22 @@ subroutine getoptarg(option, optarg)
 
     if (iarg <= command_argument_count()) then
         call get_command_argument(iarg, optarg)
-        if (optarg(:1) /= '-') then
+        if (optarg(1:1) /= '-') then
             iarg = iarg + 1
             return
         end if
     end if
     write (error_unit, '(a, x, a, x, a)') 'Option', trim(option), 'requires an argument'
     stop
+
+end subroutine
+
+subroutine readstroptarg(option, optval)
+
+    character(optlen), intent(in) :: option
+    character(optlen), intent(out) :: optval
+
+    call getoptarg(option, optval)
 
 end subroutine
 

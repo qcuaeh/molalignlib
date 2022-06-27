@@ -1,175 +1,232 @@
-program ralign
+module ralign
+contains
 
-use iso_fortran_env, only: input_unit
-
-use options
-use chemdata
-use strutils
-use argutils
-use fileutils
-use chemutils
-use readwrite
-use translation
-use rotation
-use alignment
-!use superposition
-
-implicit none
-
-integer i
-integer natom0, natom1
-integer nrecord, maxrecord
-character(ttllen) title0, title1
-real(wp), dimension(3) :: center0, center1
-character(lbllen), dimension(:), allocatable :: labels0, labels1
-integer, dimension(:), allocatable :: znums0, znums1, types0, types1
-real(wp), dimension(:, :), allocatable :: coords0, coords1, auxcoords
-real(wp), dimension(:), allocatable :: weights0, weights1
-real(wp), dimension(nelem) :: property
-integer, allocatable :: atomaplist(:, :)
-integer, allocatable :: countlist(:)
-integer first_unit, second_unit
-character(optlen) arg, path
-
-! Set default options
-
-live = .false.
-remap = .false.
-biased = .false.
-iterative = .false.
-trialing = .false.
-matching = .false.
-testing = .false.
-maxrecord = 9
-biasscale = 1000.0_wp
-weighter = 'none'
-outformat = 'xyz'
-
-! Set defualt file units
-
-first_unit = first_file_unit
-second_unit = second_file_unit
-
-! Get user options
-
-call initarg()
-
-do while (getarg(arg))
-
-    select case (arg)
-    case ('-live')
-        live = .true.
-    case ('-test')
-        testing = .true.
-    case ('-iter')
-        iterative = .true.
-    case ('-bias')
-        biased = .true.
-        call readoptarg(arg, tolerance)
-    case ('-trials')
-        remap = .true.
-        trialing = .true.
-        call readoptarg(arg, maxtrial)
-    case ('-matches')
-        remap = .true.
-        matching = .true.
-        call readoptarg(arg, maxmatch)
-    case ('-bias-scale')
-        call readoptarg(arg, biasscale)
-    case ('-weight')
-        call readoptarg(arg, weighter)
-    case ('-records')
-        call readoptarg(arg, maxrecord)
-    case ('-out')
-        call readoptarg(arg, outformat)
-    case ('-stdin')
-        first_unit = input_unit
-        second_unit = input_unit
-    case default
-        call readarg(arg)
-        call open_unit(arg)
-    end select
-
-end do
-
-if (.not. opened(first_unit)) then
-    write (error_unit, '(a)') 'No paths were specified'
-    stop
-else if (.not. opened(second_unit)) then
-    second_unit = first_unit
-end if
-
-! Read coordinates
-
-call readxyzfile(first_unit, natom0, title0, labels0, coords0)
-call readxyzfile(second_unit, natom1, title1, labels1, coords1)
-
-! Allocate arrays
-
-allocate(znums0(natom0), znums1(natom1))
-allocate(types0(natom0), types1(natom1))
-allocate(weights0(natom0), weights1(natom1))
-allocate(atomaplist(natom0, maxrecord), countlist(maxrecord))
-
-! Get atomic numbers and types
-
-do i = 1, natom0
-    call getznum(labels0(i), znums0(i), types0(i))
-end do
-
-do i = 1, natom1
-    call getznum(labels1(i), znums1(i), types1(i))
-end do
-
-! Calculate normalized weights
-
-select case (weighter)
-case ('none')
-    property = [(1.0_wp, i=1, nelem)]
-case ('mass')
-    property = stdmatom
-case default
-    write (error_unit, '(a,x,a)') 'Invalid weighter option:', trim(weighter)
-    stop
-end select
-
-weights0 = property(znums0)
-weights1 = property(znums0)
-
-! Superpose atoms
-
-call superpose( &
+! Purpose: Superimpose coordinates of atom sets coords0 and coords1
+subroutine realign( &
     natom0, natom1, znums0, znums1, types0, types1, weights0, weights1, &
     coords0, coords1, maxrecord, nrecord, atomaplist, countlist &
 )
+
+use iso_fortran_env, only: output_unit
+use iso_fortran_env, only: error_unit
+
+use options
+use random
+use sorting
+use chemdata
+use maputils
+use rotation
+use translation
+use alignment
+use remapping
+use assortment
+
+implicit none
+
+integer, intent(in) :: natom0, natom1, maxrecord
+integer, dimension(natom0), intent(in) :: znums0, types0
+integer, dimension(natom1), intent(in) :: znums1, types1
+real(wp), intent(in) :: coords0(3, natom0)
+real(wp), intent(in) :: coords1(3, natom1)
+real(wp), intent(in) :: weights0(natom0)
+real(wp), intent(in) :: weights1(natom1)
+integer, intent(out) :: nrecord
+integer, intent(out) :: atomaplist(natom0, maxrecord)
+integer, intent(out) :: countlist(maxrecord)
+
+integer i
+integer nblock0, nblock1
+integer, dimension(:), allocatable :: seed
+integer, dimension(:), allocatable :: order0, order1
+integer, dimension(:), allocatable :: reorder0, reorder1
+integer, dimension(:), allocatable :: blockidx0, blockidx1
+integer, dimension(:), allocatable :: blocksize0, blocksize1
+real(wp), dimension(3) :: center0, center1
+
+procedure (test), pointer :: trial_test => null()
+procedure (test), pointer :: match_test => null()
+
+! Check number of atoms
+
+if (natom0 /= natom1) then
+    write (error_unit, '(a)') 'Error: The molecules have different number of atoms'
+    stop
+end if
+
+! Allocate arrays
+
+allocate(order0(natom0), order1(natom1))
+allocate(reorder0(natom0), reorder1(natom1))
+allocate(blockidx0(natom0), blockidx1(natom1))
+allocate(blocksize0(natom0), blocksize1(natom1))
+
+! Select trial exit test
+
+if (trialing) then
+    trial_test => lowerthan
+else
+    trial_test => trueconst
+end if
+
+! Select match exit test
+
+if (matching) then
+    match_test => lowerthan
+else
+    match_test => trueconst
+end if
+
+! Group atoms by label
+
+call getblocks(natom0, znums0, types0, weights0, nblock0, blocksize0, blockidx0)
+call getblocks(natom1, znums1, types1, weights1, nblock1, blocksize1, blockidx1)
+
+! Get contiguous label order
+
+order0 = sortorder(blockidx0, natom0)
+order1 = sortorder(blockidx1, natom1)
+
+! Get inverse of contiguous label order
+
+reorder0 = inversemap(order0)
+reorder1 = inversemap(order1)
+
+! Abort if there are incompatible atomic symbols
+
+if (any(znums0(order0) /= znums1(order1))) then
+    write (error_unit, '(a)') 'Error: The molecules are not isomers'
+    stop
+end if
+
+! Abort if there are incompatible atomic types
+
+if (any(types0(order0) /= types1(order1))) then
+    write (error_unit, '(a)') 'Error: There are incompatible atomic types'
+    stop
+end if
+
+! Abort if there are incompatible atomic weights
+
+if (any(weights0(order0) /= weights1(order1))) then
+    write (error_unit, '(a)') 'Error: There are incompatible atomic weights'
+    stop
+end if
 
 ! Calculate centroids
 
 center0 = centroid(natom0, weights0, coords0)
 center1 = centroid(natom1, weights1, coords1)
 
-! Write aligned coordinates
+! Initialize random number generator
 
-allocate(auxcoords(3, natom0))
+call init_random_seed(seed)
+call random_seed(put=seed)
+
+! Remap atoms to minimize distance and difference
+
+call remapatoms( &
+    natom0, nblock0, blocksize0, weights0(order0), &
+    translated(natom0, center0, coords0(:, order0)), &
+    translated(natom1, center1, coords1(:, order1)), &
+    maxrecord, nrecord, atomaplist, countlist, &
+    trial_test, match_test &
+)
+
+! Reorder back to original atom ordering
 
 do i = 1, nrecord
-    auxcoords = translated( &
-        natom1, -center0, &
-        rotated( &
-            natom1, &
-            leastrotquat( &
-                natom0, weights0, &
-                translated(natom0, center0, coords0), &
-                translated(natom1, center1, coords1), &
-                atomaplist(:, i) &
-            ), &
-            translated(natom1, center1, coords1) &
-        ) &
-    )
-    open(third_file_unit, file='aligned_'//str(i)//'.'//trim(outformat), action='write', status='replace')
-    call writexyzfile(third_file_unit, natom0, title0, znums0, coords0)
-    call writexyzfile(third_file_unit, natom1, title1, znums1(atomaplist(:, i)), auxcoords(:, atomaplist(:, i)))
-    close(third_file_unit)
+    atomaplist(:, i) = atomaplist(reorder0, i)
 end do
 
-end program
+end subroutine
+
+! Purpose: Superimpose coordinates of atom sets coords0 and coords1
+subroutine align( &
+    natom0, natom1, znums0, znums1, types0, types1, weights0, weights1, &
+    coords0, coords1, maxrecord, nrecord, atomaplist, countlist &
+)
+
+use iso_fortran_env, only: output_unit
+use iso_fortran_env, only: error_unit
+
+use options
+use random
+use sorting
+use chemdata
+use maputils
+use rotation
+use translation
+use alignment
+use remapping
+use assortment
+
+implicit none
+
+integer, intent(in) :: natom0, natom1, maxrecord
+integer, dimension(natom0), intent(in) :: znums0, types0
+integer, dimension(natom1), intent(in) :: znums1, types1
+real(wp), intent(in) :: coords0(3, natom0)
+real(wp), intent(in) :: coords1(3, natom1)
+real(wp), intent(in) :: weights0(natom0)
+real(wp), intent(in) :: weights1(natom1)
+integer, intent(out) :: nrecord
+integer, intent(out) :: atomaplist(natom0, maxrecord)
+integer, intent(out) :: countlist(maxrecord)
+
+integer i
+real(wp), dimension(3) :: center0, center1
+
+! Check number of atoms
+
+if (natom0 /= natom1) then
+    write (error_unit, '(a)') 'Error: The molecules have different number of atoms'
+    stop
+end if
+
+! Abort if there are incompatible atomic symbols
+
+if (any(znums0 /= znums1)) then
+    write (error_unit, '(a)') 'Error: The molecules are not isomers'
+    stop
+end if
+
+! Abort if there are incompatible atomic types
+
+if (any(types0 /= types1)) then
+    write (error_unit, '(a)') 'Error: There are incompatible atomic types'
+    stop
+end if
+
+! Abort if there are incompatible atomic weights
+
+if (any(weights0 /= weights1)) then
+    write (error_unit, '(a)') 'Error: There are incompatible atomic weights'
+    stop
+end if
+
+! Calculate centroids
+
+center0 = centroid(natom0, weights0, coords0)
+center1 = centroid(natom1, weights1, coords1)
+
+! Align atoms
+
+nrecord = 1
+atomaplist(:, 1) = [(i, i=1, natom0)]
+countlist(1) = 1
+
+call print_header()
+call print_stats( &
+    0, 0, 0, 0.0_wp, 0.0_wp, 0.0_wp, &
+    leastsquaredist( &
+        natom0, weights0, &
+        translated(natom0, center0, coords0), &
+        translated(natom1, center1, coords1), &
+        atomaplist(:, 1) &
+    ) &
+)
+call print_footer(.false., .false., 0, 0)
+
+end subroutine
+
+end module
