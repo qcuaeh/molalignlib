@@ -1,8 +1,11 @@
 !module superposition
 !contains
-subroutine superpose(natom0, natom1, znums0, znums1, types0, types1, coords0, coords1, &
-    maxrecord, nrecord, center0, center1, atomaplist, rotmatlist)
+
 ! Purpose: Superimpose coordinates of atom sets coords0 and coords1
+subroutine superpose( &
+    natom0, natom1, znums0, znums1, types0, types1, weights0, weights1, &
+    coords0, coords1, maxrecord, nrecord, atomaplist, countlist &
+)
 
 use iso_fortran_env, only: output_unit
 use iso_fortran_env, only: error_unit
@@ -23,11 +26,11 @@ implicit none
 integer, intent(in) :: natom0, natom1, maxrecord
 integer, dimension(natom0), intent(in) :: znums0, types0
 integer, dimension(natom1), intent(in) :: znums1, types1
+real(wp), intent(in) :: weights0(natom0), weights1(natom1)
 real(wp), intent(in) :: coords0(3, natom0), coords1(3, natom1)
 integer, intent(out) :: nrecord
-real(wp), dimension(3), intent(out) :: center0, center1
-real(wp), dimension(3, 3, maxrecord), intent(out) :: rotmatlist
-integer, dimension(natom0, maxrecord), intent(out) :: atomaplist
+integer, intent(out) :: atomaplist(natom0, maxrecord)
+integer, intent(out) :: countlist(maxrecord)
 
 integer i
 integer nblock0, nblock1
@@ -36,9 +39,7 @@ integer, dimension(:), allocatable :: order0, order1
 integer, dimension(:), allocatable :: reorder0, reorder1
 integer, dimension(:), allocatable :: blockidx0, blockidx1
 integer, dimension(:), allocatable :: blocksize0, blocksize1
-real(wp), dimension(:), allocatable :: weights
-real(wp), dimension(:, :), allocatable :: bias
-real(wp), dimension(nelem) :: atomweight
+real(wp), dimension(3) :: center0, center1
 
 procedure (generic_test), pointer :: trial_test => null()
 procedure (generic_test), pointer :: match_test => null()
@@ -52,8 +53,6 @@ end if
 
 ! Allocate arrays
 
-allocate(weights(natom0))
-allocate(bias(natom0, natom1))
 allocate(order0(natom0), order1(natom1))
 allocate(reorder0(natom0), reorder1(natom1))
 allocate(blockidx0(natom0), blockidx1(natom1))
@@ -82,12 +81,12 @@ if (remap) then
     call getblocks(natom0, znums0, types0, nblock0, blocksize0, blockidx0)
     call getblocks(natom1, znums1, types1, nblock1, blocksize1, blockidx1)
 
-    ! Contiguous same label order
+    ! Get contiguous label order
 
     order0 = sortorder(blockidx0, natom0)
     order1 = sortorder(blockidx1, natom1)
 
-    ! Undo contiguous same label order
+    ! Get inverse order
 
     reorder0 = inversemap(order0)
     reorder1 = inversemap(order1)
@@ -103,6 +102,13 @@ if (remap) then
 
     if (any(types0(order0) /= types1(order1))) then
         write (error_unit, '(a)') 'Error: There are incompatible atomic types'
+        stop
+    end if
+
+    ! Abort if there are incompatible atomic weights
+
+    if (any(weights0(order0) /= weights1(order1))) then
+        write (error_unit, '(a)') 'Error: There are incompatible atomic weights'
         stop
     end if
 
@@ -122,26 +128,19 @@ else
         stop
     end if
 
+    ! Abort if there are incompatible atomic weights
+
+    if (any(weights0 /= weights1)) then
+        write (error_unit, '(a)') 'Error: There are incompatible atomic weights'
+        stop
+    end if
+
 end if
 
-! Calculate normalized weights
+! Calculate centroids
 
-select case (weighter)
-case ('none')
-    atomweight = [(1.0_wp, i=1, nelem)]
-case ('mass')
-    atomweight = stdmatom
-case default
-    write (error_unit, '(a,x,a)') 'Invalid weighter option:', trim(weighter)
-    stop
-end select
-
-weights = atomweight(znums0)/sum(atomweight(znums0))
-
-! Calculate atom sets centroids
-
-center0 = centroid(natom0, weights, coords0)
-center1 = centroid(natom1, weights, coords1)
+center0 = centroid(natom0, weights0, coords0)
+center1 = centroid(natom1, weights1, coords1)
 
 if (remap) then
 
@@ -153,10 +152,11 @@ if (remap) then
     ! Remap atoms to minimize distance and difference
 
     call remapatoms( &
-        natom0, nblock0, blocksize0, weights(order0), &
+        natom0, nblock0, blocksize0, weights0(order0), &
         translated(natom0, center0, coords0(:, order0)), &
         translated(natom1, center1, coords1(:, order1)), &
-        maxrecord, nrecord, atomaplist, trial_test, match_test &
+        maxrecord, nrecord, atomaplist, countlist, &
+        trial_test, match_test &
     )
 
     ! Restore original atom ordering
@@ -174,7 +174,7 @@ else
     call print_stats( &
         0, 0, 0, 0.0_wp, 0.0_wp, 0.0_wp, &
         leastsquaredist( &
-            natom0, weights, &
+            natom0, weights0, &
             translated(natom0, center0, coords0), &
             translated(natom1, center1, coords1), &
             atomaplist(:, 1) &
@@ -184,11 +184,6 @@ else
 
 end if
 
-! Calculate optimal rotation matrices
-
-do i = 1, nrecord
-    rotmatlist(:, :, i) = quat2mat(leastrotquat(natom0, weights, coords0, coords1, atomaplist(:, i)))
-end do
-
 end subroutine
+
 !end module
