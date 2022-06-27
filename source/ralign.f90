@@ -1,8 +1,10 @@
 program ralign
 
+use iso_fortran_env, only: input_unit
+
 use options
-use messages
 use strutils
+use fileutils
 use readwrite
 use decoding
 use rotation
@@ -69,20 +71,26 @@ do while (getarg(arg))
         call readoptarg(arg, maxrecord)
     case ('-out')
         call readoptarg(arg, outformat)
+    case ('-stdin')
+        first_unit = input_unit
+        second_unit = input_unit
     case default
-        call readarg(arg, path)
+        call readpath(arg)
     end select
 
 end do
 
+if (.not. opened(first_unit)) then
+    write (error_unit, '(a)') 'No paths were specified'
+    stop
+else if (.not. opened(second_unit)) then
+    second_unit = first_unit
+end if
+
 ! Read coordinates
 
-open (file_unit, file=path, action='read')
-
-call readxyzfile(file_unit, natom0, title0, labels0, coords0)
-call readxyzfile(file_unit, natom1, title1, labels1, coords1)
-
-close (file_unit)
+call readxyzfile(first_unit, natom0, title0, labels0, coords0)
+call readxyzfile(second_unit, natom1, title1, labels1, coords1)
 
 ! Allocate arrays
 
@@ -112,10 +120,10 @@ allocate(auxcoords(3, natom0))
 
 do i = 1, nrecord
     auxcoords = translated(natom1, -center0, rotated(natom1, rotmatlist(:, :, i), translated(natom1, center1, coords1)))
-    open (file_unit, file='aligned_'//str(i)//'.'//trim(outformat), action='write', status='replace')
+    open(file_unit, file='aligned_'//str(i)//'.'//trim(outformat), action='write', status='replace')
     call writexyzfile(file_unit, natom0, title0, znums0, coords0)
     call writexyzfile(file_unit, natom1, title1, znums1(atomaplist(:, i)), auxcoords(:, atomaplist(:, i)))
-    close (file_unit)
+    close(file_unit)
 end do
 
 end program

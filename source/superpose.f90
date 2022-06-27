@@ -10,14 +10,13 @@ use iso_fortran_env, only: error_unit
 use options
 use random
 use sorting
+use chemdata
 use maputils
 use rotation
 use translation
 use alignment
 use remapping
 use assortment
-use chemdata
-use messages
 
 implicit none
 
@@ -47,7 +46,8 @@ procedure (generic_test), pointer :: match_test => null()
 ! Check number of atoms
 
 if (natom0 /= natom1) then
-    call error('The molecules do not have the same number of atoms!')
+    write (error_unit, '(a)') 'Error: The molecules have different number of atoms'
+    stop
 end if
 
 ! Allocate arrays
@@ -95,13 +95,15 @@ if (remap) then
     ! Abort if there are incompatible atomic symbols
 
     if (any(znums0(order0) /= znums1(order1))) then
-        call error('The molecules are not isomers!')
+        write (error_unit, '(a)') 'Error: The molecules are not isomers'
+        stop
     end if
 
     ! Abort if there are incompatible atomic types
 
     if (any(types0(order0) /= types1(order1))) then
-        call error('There are incompatible atomic types!')
+        write (error_unit, '(a)') 'Error: There are incompatible atomic types'
+        stop
     end if
 
 else
@@ -109,13 +111,15 @@ else
     ! Abort if there are incompatible atomic symbols
 
     if (any(znums0 /= znums1)) then
-        call error('The molecules are not isomers!')
+        write (error_unit, '(a)') 'Error: The molecules are not isomers'
+        stop
     end if
 
     ! Abort if there are incompatible atomic types
 
     if (any(types0 /= types1)) then
-        call error('There are incompatible atomic types!')
+        write (error_unit, '(a)') 'Error: There are incompatible atomic types'
+        stop
     end if
 
 end if
@@ -128,7 +132,8 @@ case ('none')
 case ('mass')
     atomweight = stdmatom
 case default
-    call error('Invalid weighter option: '//trim(weighter))
+    write (error_unit, '(a,x,a)') 'Invalid weighter option:', trim(weighter)
+    stop
 end select
 
 weights = atomweight(znums0)/sum(atomweight(znums0))

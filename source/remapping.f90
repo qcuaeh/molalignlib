@@ -10,7 +10,6 @@ use strutils
 use assignment
 use translation
 use alignment
-use messages
 use rotation
 use biasing
 use printing
@@ -106,7 +105,7 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
             new_biased_dist = squaredist(natom, weights, coords0, auxcoords, auxmap) &
                     + totalbias(natom, weights, bias, auxmap)
             if (new_biased_dist > biased_dist) then
-                call warning('new biased dist is larger than previous biased dist!', 'mapatoms')
+                write (error_unit, '(a)') 'New biased distance is larger than previous biased distance!'
 !                print *, biased_dist, new_biased_dist
             end if
             rotquat = leastrotquat(natom, weights, coords0, auxcoords, auxmap)

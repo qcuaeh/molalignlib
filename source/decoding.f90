@@ -5,19 +5,23 @@ use iso_fortran_env, only: error_unit
 use options
 use chemdata
 use strutils
+use fileutils
 
 implicit none
 
 integer iarg
-logical posarg
+integer first_unit
+integer second_unit
 
 private
 
 public getarg
-public readarg
+public readpath
 public readoptarg
 public initarg
 public getznum
+public first_unit
+public second_unit
 
 interface readoptarg
     module procedure getoptarg
@@ -65,7 +69,8 @@ end function
 
 subroutine initarg()
     iarg = 1
-    posarg = .false.
+    first_unit = first_file_unit
+    second_unit = second_file_unit
 end subroutine
 
 logical function getarg(arg)
@@ -81,20 +86,23 @@ logical function getarg(arg)
 
 end function
 
-subroutine readarg(arg, path)
+subroutine readpath(arg)
     character(optlen), intent(in) :: arg
-    character(optlen), intent(out) :: path
 
     if (arg(1:1) == '-') then
         write (error_unit, '(a, x, a)') 'Unknown option:', trim(arg)
         stop
     end if
-    if (.not. posarg) then
-        path = arg
-        posarg = .true.
+
+    if (opened(first_file_unit)) then
+        if (opened(second_file_unit)) then
+            write (error_unit, '(a)') 'Too many paths'
+            stop
+        else
+            open(second_file_unit, file=arg, action='read')
+        end if
     else
-        write (error_unit, '(a, x, a)') 'Too many arguments:', trim(arg)
-        stop
+        open(first_file_unit, file=arg, action='read')
     end if
 
 end subroutine

@@ -9,8 +9,6 @@ use chemdata
 
 implicit none
 
-integer, parameter :: file_unit = 999
-
 contains
 
 
