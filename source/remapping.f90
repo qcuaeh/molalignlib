@@ -48,10 +48,10 @@ subroutine remapatoms( &
     integer, intent(out) :: atomaplist(:, :), countlist(:)
 
     logical found, overflow
-    integer i, imap, jmap, ntrial, nmatch, iteration, newdiff
+    integer imap, jmap, ntrial, nmatch, iteration
     integer, dimension(natom) :: atomap, auxmap
     integer earliest(maxrecord)
-    real(wp) :: u, dist, biased_dist, new_biased_dist, meanrot
+    real(wp) :: dist, biased_dist, new_biased_dist, meanrot
     real(wp), dimension(4) :: rotquat, prodquat
     real(wp), dimension(maxrecord) :: mindist, avgiter, avgmeanrot, avgtotrot
     real(wp) bias(natom, natom)
@@ -87,7 +87,7 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
 
 ! Apply random rotation
 
-        call rotate(natom, getrotquat(randvec3()), auxcoords)
+        call rotate(natom, auxcoords, getrotquat(randvec3()))
 
 ! Minimize euclidean distance
 
@@ -95,7 +95,7 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
         rotquat = leastrotquat(natom, weights, coords0, auxcoords, atomap)
         prodquat = rotquat
         meanrot = rotangle(rotquat)
-        call rotate(natom, rotquat, auxcoords)
+        call rotate(natom, auxcoords, rotquat)
         iteration = 1
 
         do while (iterative)
@@ -111,7 +111,7 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
             end if
             rotquat = leastrotquat(natom, weights, coords0, auxcoords, auxmap)
             prodquat = quatmul(rotquat, prodquat)
-            call rotate(natom, rotquat, auxcoords)
+            call rotate(natom, auxcoords, rotquat)
             iteration = iteration + 1
             meanrot = meanrot + (rotangle(rotquat) - meanrot)/iteration
             atomap = auxmap

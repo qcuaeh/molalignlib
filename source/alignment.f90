@@ -101,7 +101,7 @@ function aligned(natom, weights, coords0, coords1, atomap)
 
     call buildkearsleymat(natom, weights, coords0, coords1, atomap, kearsleymat)
     call syevec4(kearsleymat, eigval)
-    aligned = rotated(natom, kearsleymat(:, 1), coords1)
+    aligned = rotated(natom, coords1, kearsleymat(:, 1))
 
 end function
 

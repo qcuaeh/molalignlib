@@ -5,9 +5,10 @@ use options
 implicit none
 
 private
+
 public rotate
 public rotated
-public quat2mat
+public rotquat2rotmat
 public quatmul
 public rotangle
 public getrotmat
@@ -25,7 +26,7 @@ end interface
 
 contains
 
-function quat2mat(rotquat) result(rotmat)
+function rotquat2rotmat(rotquat) result(rotmat)
 ! Purpose: Apply rotation quaternion to atomic coordinates
 
 ! rotquat: Rotation quaternion
@@ -48,30 +49,9 @@ function quat2mat(rotquat) result(rotmat)
 
 end function
 
-function quatrotated(natom, rotquat, coords)
-! Purpose: Apply rotation quaternion to atomic coordinates
-    integer, intent(in) :: natom
-    real(wp), intent(in) :: rotquat(4)
-    real(wp), intent(in) :: coords(3, natom)
-    real(wp) quatrotated(3, natom)
-
-    quatrotated = matrotated(natom, quat2mat(rotquat), coords)
-
-end function
-
-function matrotated(natom, rotmat, coords) result(rotated)
+subroutine matrotate(natom, coords, rotmat)
 ! Purpose: Apply rotation matrix to atomic coordinates
-    integer, intent(in) :: natom
-    real(wp), intent (in) :: rotmat(3, 3)
-    real(wp), intent (in) :: coords(3, natom)
-    real(wp) rotated(3, natom)
 
-    rotated = matmul(rotmat, coords)
-
-end function
-
-subroutine matrotate(natom, rotmat, coords)
-! Purpose: Apply rotation matrix to atomic coordinates
     integer, intent(in) :: natom
     real(wp), intent (in) :: rotmat(3, 3)
     real(wp), intent (inout) :: coords(3, natom)
@@ -83,20 +63,46 @@ subroutine matrotate(natom, rotmat, coords)
 
 end subroutine
 
-subroutine quatrotate(natom, rotquat, coords)
+function matrotated(natom, coords, rotmat)
+! Purpose: Apply rotation matrix to atomic coordinates
+
+    integer, intent(in) :: natom
+    real(wp), intent (in) :: rotmat(3, 3)
+    real(wp), intent (in) :: coords(3, natom)
+    real(wp) matrotated(3, natom)
+
+    matrotated = matmul(rotmat, coords)
+
+end function
+
+subroutine quatrotate(natom, coords, rotquat)
 ! Purpose: Apply rotation quaternion to atomic coordinates
+
     integer, intent(in) :: natom
     real(wp), intent(in) :: rotquat(4)
     real(wp), intent(inout) :: coords(3, natom)
 
 ! Rotate atomic coordinates
 
-!    call matrotate(natom, quat2mat(rotquat), coords)
-     coords = matmul(quat2mat(rotquat), coords)
+!    call matrotate(natom, rotquat2rotmat(rotquat), coords)
+     coords = matmul(rotquat2rotmat(rotquat), coords)
 
 end subroutine
 
+function quatrotated(natom, coords, rotquat)
+! Purpose: Apply rotation quaternion to atomic coordinates
+
+    integer, intent(in) :: natom
+    real(wp), intent(in) :: rotquat(4)
+    real(wp), intent(in) :: coords(3, natom)
+    real(wp) quatrotated(3, natom)
+
+    quatrotated = matmul(rotquat2rotmat(rotquat), coords)
+
+end function
+
 function quatmul(p, q)
+
     real(wp), dimension(4), intent(in) :: p, q
     real(wp) quatmul(4)
 
@@ -112,6 +118,7 @@ function quatmul(p, q)
 end function
 
 function rotangle(q)
+
     real(wp), dimension(4), intent(in) :: q
     real(wp) rotangle
 
@@ -150,7 +157,7 @@ function getrotquat(x) result(rotquat)
     s2 = sin(a2)
     c2 = cos(a2)
 
-!   Quaternion (w, x, y, z), w must be first as required by quat2mat
+!   Quaternion (w, x, y, z), w must be first as required by rotquat2rotmat
     rotquat = [ c2*r2, s1*r1, c1*r1, s2*r2 ]
 
 !    print *, sum(rotquat**2)

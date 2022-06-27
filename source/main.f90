@@ -21,10 +21,11 @@ logical remap
 integer natom0, natom1
 integer nrecord, maxrecord
 character(ttllen) title0, title1
+real(wp) tranvec(3), rotmat(3, 3)
 real(wp), dimension(3) :: center0, center1
 character(lbllen), dimension(:), allocatable :: labels0, labels1
 integer, dimension(:), allocatable :: znums0, znums1, types0, types1
-real(wp), dimension(:, :), allocatable :: coords0, coords1, auxcoords
+real(wp), dimension(:, :), allocatable :: coords0, coords1
 real(wp), dimension(:), allocatable :: weights0, weights1
 real(wp), dimension(nelem) :: property
 integer, allocatable :: atomaplist(:, :)
@@ -134,48 +135,51 @@ case default
     stop
 end select
 
-! Calculate normalized weights
+! Get normalized weights
 
 weights0 = property(znums0)/sum(property(znums0))
 weights1 = property(znums1)/sum(property(znums1))
-
-! Superpose atoms
-
-if (remap) then
-    call realign(natom0, natom1, znums0, znums1, types0, types1, weights0, weights1, &
-        coords0, coords1, maxrecord, nrecord, atomaplist, countlist)
-else
-    call align(natom0, natom1, znums0, znums1, types0, types1, weights0, weights1, &
-        coords0, coords1, maxrecord, nrecord, atomaplist, countlist)
-end if
 
 ! Calculate centroids
 
 center0 = centroid(natom0, weights0, coords0)
 center1 = centroid(natom1, weights1, coords1)
 
-! Write aligned coordinates
+! Superpose atoms
 
-allocate(auxcoords(3, natom0))
+if (remap) then
 
-do i = 1, nrecord
-    auxcoords = translated( &
-        natom1, -center0, &
-        rotated( &
-            natom1, &
-            leastrotquat( &
-                natom0, weights0, &
-                translated(natom0, center0, coords0), &
-                translated(natom1, center1, coords1), &
-                atomaplist(:, i) &
-            ), &
-            translated(natom1, center1, coords1) &
-        ) &
-    )
-    open(third_file_unit, file='aligned_'//str(i)//'.'//trim(outformat), action='write', status='replace')
-    call writexyzfile(third_file_unit, natom0, title0, znums0, coords0)
-    call writexyzfile(third_file_unit, natom1, title1, znums1(atomaplist(:, i)), auxcoords(:, atomaplist(:, i)))
-    close(third_file_unit)
-end do
+    call realign(natom0, natom1, znums0, znums1, types0, types1, weights0, weights1, &
+        coords0, coords1, maxrecord, nrecord, atomaplist, countlist)
+
+    ! Write aligned coordinates
+
+    do i = 1, nrecord
+
+        call align( &
+            natom0, natom1, &
+            znums0(atomaplist(:, i)), znums1(atomaplist(:, i)), &
+            types0(atomaplist(:, i)), types1(atomaplist(:, i)), &
+            weights0(atomaplist(:, i)), weights1(atomaplist(:, i)), &
+            coords0(:, atomaplist(:, i)), coords1(:, atomaplist(:, i)), &
+            tranvec, rotmat &
+        )
+
+        open(third_file_unit, file='aligned_'//str(i)//'.'//trim(outformat), action='write', status='replace')
+        call writexyzfile(third_file_unit, natom0, title0, znums0, coords0)
+        call writexyzfile( &
+            third_file_unit, natom1, title1, znums1(atomaplist(:, i)), &
+            translated(natom1, rotated(natom1, coords1(:, atomaplist(:, i)), rotmat), tranvec) &
+        )
+        close(third_file_unit)
+
+    end do
+
+else
+
+    call align(natom0, natom1, znums0, znums1, types0, types1, weights0, weights1, &
+        coords0, coords1, tranvec, rotmat)
+
+end if
 
 end program

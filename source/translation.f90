@@ -11,24 +11,24 @@ public centroid
 
 contains
 
-function centroid(natom, weights, coords) result(vector)
+function centroid(natom, weights, coords)
 ! Purpose: Get coordinates of centroid
 
     integer, intent(in) :: natom
     real(wp), intent(in) :: weights(natom), coords(3, natom)
-    real(wp) vector(3)
+    real(wp) centroid(3)
 
     integer i
 
 ! Calculate the coordinates of the center of mass
 
-    vector(:) = 0
+    centroid(:) = 0
 
     do i = 1, natom
-        vector = vector + weights(i)*coords(:, i)
+        centroid(:) = centroid(:) + weights(i)*coords(:, i)
     end do
 
-    vector = vector/sum(weights)
+    centroid(:) = centroid(:)/sum(weights)
 
 end function
 
@@ -42,7 +42,7 @@ function translated(natom, vector, coords)
     integer i
 
     do i = 1, natom
-        translated(:, i) = coords(:, i) - vector(:)
+        translated(:, i) = coords(:, i) + vector(:)
     end do
 
 end function
@@ -57,7 +57,7 @@ subroutine translate(natom, vector, coords)
     integer i
 
     do i = 1, natom
-        coords(:, i) = coords(:, i) - vector(:)
+        coords(:, i) = coords(:, i) + vector(:)
     end do
 
 end subroutine
