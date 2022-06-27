@@ -26,10 +26,10 @@ implicit none
 integer, intent(in) :: natom0, natom1, maxrecord
 integer, dimension(natom0), intent(in) :: znums0, types0
 integer, dimension(natom1), intent(in) :: znums1, types1
-real(wp), intent(in) :: weights0(natom0)
-real(wp), intent(in) :: weights1(natom1)
 real(wp), intent(in) :: coords0(3, natom0)
 real(wp), intent(in) :: coords1(3, natom1)
+real(wp), intent(inout) :: weights0(natom0)
+real(wp), intent(inout) :: weights1(natom1)
 integer, intent(out) :: nrecord
 integer, intent(out) :: atomaplist(natom0, maxrecord)
 integer, intent(out) :: countlist(maxrecord)
@@ -138,6 +138,11 @@ else
     end if
 
 end if
+
+! Normalize weights
+
+weights0 = weights0/sum(weights0)
+weights1 = weights1/sum(weights1)
 
 ! Calculate centroids
 

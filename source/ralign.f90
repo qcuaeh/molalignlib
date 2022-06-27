@@ -25,7 +25,7 @@ character(lbllen), dimension(:), allocatable :: labels0, labels1
 integer, dimension(:), allocatable :: znums0, znums1, types0, types1
 real(wp), dimension(:, :), allocatable :: coords0, coords1, auxcoords
 real(wp), dimension(:), allocatable :: weights0, weights1
-real(wp), dimension(nelem) :: atomweight
+real(wp), dimension(nelem) :: property
 integer, allocatable :: atomaplist(:, :)
 integer, allocatable :: countlist(:)
 integer first_unit, second_unit
@@ -125,16 +125,16 @@ end do
 
 select case (weighter)
 case ('none')
-    atomweight = [(1.0_wp, i=1, nelem)]
+    property = [(1.0_wp, i=1, nelem)]
 case ('mass')
-    atomweight = stdmatom
+    property = stdmatom
 case default
     write (error_unit, '(a,x,a)') 'Invalid weighter option:', trim(weighter)
     stop
 end select
 
-weights0 = atomweight(znums0)/sum(atomweight(znums0))
-weights1 = atomweight(znums0)/sum(atomweight(znums0))
+weights0 = property(znums0)
+weights1 = property(znums0)
 
 ! Superpose atoms
 
