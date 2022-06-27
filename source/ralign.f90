@@ -5,6 +5,7 @@ use iso_fortran_env, only: input_unit
 use options
 use strutils
 use argutils
+use fileutils
 use chemutils
 use translation
 use rotation
@@ -81,7 +82,8 @@ do while (getarg(arg))
         first_unit = input_unit
         second_unit = input_unit
     case default
-        call openunit(arg)
+        call readarg(arg)
+        call open_unit(arg)
     end select
 
 end do

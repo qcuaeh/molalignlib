@@ -10,10 +10,9 @@ integer iarg
 
 private
 
-public opened
-public openunit
 public initarg
 public getarg
+public readarg
 public readoptarg
 
 interface readoptarg
@@ -23,13 +22,6 @@ interface readoptarg
 end interface
 
 contains
-
-logical function opened(unit)
-
-    integer, intent(in) :: unit
-    inquire(unit, opened=opened)
-
-end function
 
 subroutine initarg()
 
@@ -51,24 +43,13 @@ logical function getarg(arg)
 
 end function
 
-subroutine openunit(arg)
+subroutine readarg(arg)
 
     character(optlen), intent(in) :: arg
 
     if (arg(1:1) == '-') then
         write (error_unit, '(a, x, a)') 'Unknown option:', trim(arg)
         stop
-    end if
-
-    if (opened(first_file_unit)) then
-        if (opened(second_file_unit)) then
-            write (error_unit, '(a)') 'Too many paths'
-            stop
-        else
-            open(second_file_unit, file=arg, action='read')
-        end if
-    else
-        open(first_file_unit, file=arg, action='read')
     end if
 
 end subroutine

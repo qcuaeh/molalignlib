@@ -6,6 +6,13 @@ use options
 
 implicit none
 
+private
+
+public str
+public lower
+public upper
+public splitext
+
 interface str
     module procedure int2str
     module procedure real2str

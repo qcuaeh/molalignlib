@@ -5,6 +5,11 @@ use sorting
 
 implicit none
 
+private
+
+public propermap
+public inversemap
+
 contains
 
 function inversemap(mapping)
