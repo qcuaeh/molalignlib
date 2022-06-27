@@ -4,11 +4,11 @@ use iso_fortran_env, only: input_unit
 
 use options
 use strutils
-use fileutils
-use readwrite
-use decoding
-use rotation
+use argutils
+use chemutils
 use translation
+use rotation
+use readwrite
 !use superposition
 
 implicit none
@@ -23,6 +23,7 @@ real(wp), dimension(:, :, :), allocatable :: rotmatlist
 character(lbllen), dimension(:), allocatable :: labels0, labels1
 integer, dimension(:), allocatable :: znums0, znums1, types0, types1
 real(wp), dimension(:, :), allocatable :: coords0, coords1, auxcoords
+integer first_unit, second_unit
 character(optlen) arg, path
 
 ! Set default options
@@ -38,6 +39,11 @@ maxrecord = 9
 biasscale = 1000.0_wp
 weighter = 'none'
 outformat = 'xyz'
+
+! Set defualt file units
+
+first_unit = first_file_unit
+second_unit = second_file_unit
 
 ! Get user options
 
@@ -75,7 +81,7 @@ do while (getarg(arg))
         first_unit = input_unit
         second_unit = input_unit
     case default
-        call openfile(arg)
+        call openunit(arg)
     end select
 
 end do
@@ -120,10 +126,10 @@ allocate(auxcoords(3, natom0))
 
 do i = 1, nrecord
     auxcoords = translated(natom1, -center0, rotated(natom1, rotmatlist(:, :, i), translated(natom1, center1, coords1)))
-    open(file_unit, file='aligned_'//str(i)//'.'//trim(outformat), action='write', status='replace')
-    call writexyzfile(file_unit, natom0, title0, znums0, coords0)
-    call writexyzfile(file_unit, natom1, title1, znums1(atomaplist(:, i)), auxcoords(:, atomaplist(:, i)))
-    close(file_unit)
+    open(third_file_unit, file='aligned_'//str(i)//'.'//trim(outformat), action='write', status='replace')
+    call writexyzfile(third_file_unit, natom0, title0, znums0, coords0)
+    call writexyzfile(third_file_unit, natom1, title1, znums1(atomaplist(:, i)), auxcoords(:, atomaplist(:, i)))
+    close(third_file_unit)
 end do
 
 end program

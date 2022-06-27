@@ -1,27 +1,20 @@
-module decoding
+module argutils
 
 use iso_fortran_env, only: error_unit
 
 use options
-use chemdata
-use strutils
-use fileutils
 
 implicit none
 
 integer iarg
-integer first_unit
-integer second_unit
 
 private
 
-public getarg
-public openfile
-public readoptarg
+public opened
+public openunit
 public initarg
-public getznum
-public first_unit
-public second_unit
+public getarg
+public readoptarg
 
 interface readoptarg
     module procedure getoptarg
@@ -31,49 +24,21 @@ end interface
 
 contains
 
-subroutine getznum(label, znum, type)
-    character(*), intent(in) :: label
-    integer, intent(out) :: znum, type
-    integer m, n, stat
+logical function opened(unit)
 
-    n = len_trim(label)
-    m = verify(upper(trim(label)), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ')
-
-    if (m == 0) then
-        type = 0
-        znum = atomic_number(label)
-    else
-        read (label(m:n), *, iostat=stat) type
-        if (stat /= 0) then
-            write (error_unit, '(2a)') 'Invalid label: ', trim(label)
-            stop
-        end if
-        znum = atomic_number(label(1:m-1))
-    end if
-
-end subroutine
-
-function atomic_number(symbol) result(z)
-    character(*), intent(in) :: symbol
-    integer z
-
-    do z = 1, nelem
-        if (upper(symbol) == upper(elsym(z))) then
-            return
-        end if
-    end do
-
-    write (error_unit, '(a)') 'Unknown atomic symbol: ', trim(symbol)
+    integer, intent(in) :: unit
+    inquire(unit, opened=opened)
 
 end function
 
 subroutine initarg()
+
     iarg = 1
-    first_unit = first_file_unit
-    second_unit = second_file_unit
+
 end subroutine
 
 logical function getarg(arg)
+
     character(optlen) arg
 
     if (iarg <= command_argument_count()) then
@@ -86,7 +51,8 @@ logical function getarg(arg)
 
 end function
 
-subroutine openfile(arg)
+subroutine openunit(arg)
+
     character(optlen), intent(in) :: arg
 
     if (arg(1:1) == '-') then
@@ -108,6 +74,7 @@ subroutine openfile(arg)
 end subroutine
 
 subroutine getoptarg(option, optarg)
+
     character(optlen), intent(in) :: option
     character(optlen), intent(out) :: optarg
 
@@ -124,6 +91,7 @@ subroutine getoptarg(option, optarg)
 end subroutine
 
 subroutine readintoptarg(option, optval)
+
     character(optlen), intent(in) :: option
     integer, intent(out) :: optval
     character(optlen) optarg
@@ -139,6 +107,7 @@ subroutine readintoptarg(option, optval)
 end subroutine
 
 subroutine readrealoptarg(option, optval)
+
     character(optlen), intent(in) :: option
     real(wp), intent(out) :: optval
     character(optlen) optarg
