@@ -8,6 +8,7 @@ private
 
 public centroid
 public centered
+public translate
 public translated
 
 contains
@@ -47,6 +48,21 @@ function translated(natom, coords, vector)
     end do
 
 end function
+
+subroutine translate(natom, coords, vector)
+! Purpose: Translate atomic coordinates to its vector of geometry
+
+    integer, intent(in) :: natom
+    real(wp), intent(in) :: vector(3)
+    real(wp), intent(inout) :: coords(3, natom)
+
+    integer i
+
+    do i = 1, natom
+        coords(:, i) = coords(:, i) + vector(:)
+    end do
+
+end subroutine
 
 function centered(natom, coords, vector)
 ! Purpose: Translate atomic coordinates to its vector of geometry

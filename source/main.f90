@@ -156,13 +156,13 @@ if (trialing .or. counting) then
             travec, rotmat &
         )
 
-        open(third_file_unit, file='aligned_'//str(i)//'.'//trim(outformat), action='write', status='replace')
-        call writexyzfile(third_file_unit, natom0, title0, znums0, coords0)
+        open(temp_file_unit, file='aligned_'//str(i)//'.'//trim(outformat), action='write', status='replace')
+        call writexyzfile(temp_file_unit, natom0, title0, znums0, coords0)
         call writexyzfile( &
-            third_file_unit, natom1, title1, znums1(atomaplist(:, i)), &
+            temp_file_unit, natom1, title1, znums1(atomaplist(:, i)), &
             translated(natom1, rotated(natom1, coords1(:, atomaplist(:, i)), rotmat), travec) &
         )
-        close(third_file_unit)
+        close(temp_file_unit)
 
     end do
 
@@ -171,9 +171,17 @@ else
     call align(natom0, natom1, znums0, znums1, types0, types1, weights0, weights1, &
         coords0, coords1, travec, rotmat)
 
+    call rotate(natom1, coords1, rotmat)
+    call translate(natom1, coords1, travec)
+
     write (output_unit, '(a,x,f0.4,x,a)') 'WSSD:', &
         squaredist(natom0, weights0, coords0, coords1, identitymap(natom0)), &
         '(only alignment performed)'
+
+    open(temp_file_unit, file='aligned.'//trim(outformat), action='write', status='replace')
+    call writexyzfile(temp_file_unit, natom0, title0, znums0, coords0)
+    call writexyzfile(temp_file_unit, natom1, title1, znums1, coords1) 
+    close(temp_file_unit)
 
 end if
 
