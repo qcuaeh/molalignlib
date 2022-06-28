@@ -56,9 +56,6 @@ subroutine matrotate(natom, coords, rotmat)
     real(wp), intent (in) :: rotmat(3, 3)
     real(wp), intent (inout) :: coords(3, natom)
 
-    integer i, k
-    real(wp) vecrot(3)
-
     coords = matmul(rotmat, coords)
 
 end subroutine
@@ -172,7 +169,7 @@ function getrotmat(x) result(rotmat)
     real(wp), intent(in) :: x(3)
     real(wp) rotmat(3, 3)
 
-    integer i, j, k
+    integer i
     real(wp) pi, a1, a2, r1, r2, s1, c1, s2, c2
     real(wp) v(3), right(3, 3), left(3, 3)
 
@@ -195,11 +192,9 @@ function getrotmat(x) result(rotmat)
 
     v = [ c2*r2, s2*r2, r1 ]
 
-    do j = 1, 3
-        left(:, j) = v(:)*v(j)
+    do i = 1, 3
+        left(:, i) = 2*v(i)*v(:)
     end do
-
-    left = 2*left
 
     do i = 1, 3
         left(i, i) = left(i, i) - 1.0_wp

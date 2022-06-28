@@ -96,7 +96,6 @@ function aligned(natom, weights, coords0, coords1, atomap)
     real(wp), dimension(:), intent(in) :: weights
     real(wp), dimension(:, :), intent(in) :: coords0, coords1
 
-    integer i
     real(wp) aligned(3, natom), kearsleymat(4, 4), eigval(4)
 
     call buildkearsleymat(natom, weights, coords0, coords1, atomap, kearsleymat)

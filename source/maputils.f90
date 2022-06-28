@@ -1,13 +1,13 @@
 module maputils
 
 use options
-use sorting
 
 implicit none
 
 private
 
-public propermap
+public resetmap
+public identitymap
 public inversemap
 
 contains
@@ -22,14 +22,21 @@ function inversemap(mapping)
     end do
 end function
 
-logical function propermap(mapping, n)
-! Check if mapping is a proper mapping
-    integer, intent(in) :: n, mapping(:)
+function identitymap(n)
+    integer, intent(in) :: n
+    integer identitymap(n)
     integer i
-    propermap = .false.
-    if (any(sorted(mapping, n) /= [(i, i=1, n)])) then
-        propermap = .true.
-    end if
+    do i = 1, n
+        identitymap(i) = i
+    end do
 end function
+
+subroutine resetmap(mapping)
+    integer, intent(out) :: mapping(:)
+    integer i
+    do i = 1, size(mapping)
+        mapping(i) = i
+    end do
+end subroutine
 
 end module

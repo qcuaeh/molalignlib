@@ -1,11 +1,11 @@
 options.f90 export
+strutils.f90
+maputils.f90
 lapack.f90
 math.f90
 random.f90
 sorting.f90
 hungarian.f90
-strutils.f90
-maputils.f90
 printing.f90
 chemdata.f90
 chemutils.f90

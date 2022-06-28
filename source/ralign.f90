@@ -171,7 +171,6 @@ real(wp), intent(in) :: weights1(natom1)
 real(wp), intent(out) :: travec(3)
 real(wp), intent(out) :: rotmat(3, 3)
 
-integer i
 real(wp), dimension(3) :: center0, center1
 
 ! Check number of atoms
@@ -213,7 +212,7 @@ rotmat = rotquat2rotmat(leastrotquat( &
     natom0, weights0, &
     centered(natom0, coords0, center0), &
     centered(natom1, coords1, center1), &
-    [(i, i=1, natom0)] &
+    identitymap(natom0) &
 ))
 
 ! Calculate optimal translation vector

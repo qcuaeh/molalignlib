@@ -3,6 +3,7 @@ module sorting
 use iso_fortran_env, only: error_unit
 
 use options
+use maputils
 
 implicit none
 
@@ -47,16 +48,16 @@ end function
 function intsortorder(x, n) result(o)
    integer, intent(in) :: n
    integer, dimension(:), intent(in) :: x
-   integer o(n), t((n+1)/2), i
-   o = [(i, i=1, n)]
+   integer o(n), t((n+1)/2)
+   call resetmap(o)
    call intmergesort(x, o, n, t)
 end function
 
 function charsortorder(x, n) result(o)
    integer, intent(in) :: n
    character(*), dimension(:), intent(in) :: x
-   integer o(n), t((n+1)/2), i
-   o = [(i, i=1, n)]
+   integer o(n), t((n+1)/2)
+   call resetmap(o)
    call charmergesort(x, o, n, t)
 end function
 
