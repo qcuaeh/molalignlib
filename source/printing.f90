@@ -11,7 +11,7 @@ contains
 subroutine print_header()
     write (output_unit, '(a)', advance='no') achar(27)//'[K'
     write (output_unit, '(1x, a, 3x, a, 3x, a, 3x, a, 3x, a, 4x, a, 5x, a)') &
-        'Map', 'Trial', 'Count', 'Cycles', 'Meanrot', 'Totalrot', 'WSSD'
+        'Map', 'Trial', 'Count', 'Cycles', 'Meanrot', 'Totalrot', 'wRMSD'
     write (output_unit, '(a)', advance='no') achar(27)//'[K'
     write (output_unit, '(a)') '-------------------------------------------------------------'
 end subroutine

@@ -174,7 +174,7 @@ else
     call rotate(natom1, coords1, rotmat)
     call translate(natom1, coords1, travec)
 
-    write (output_unit, '(a,x,f0.4,x,a)') 'WSSD:', &
+    write (output_unit, '(a,x,f0.4,x,a)') 'wRMSD:', &
         squaredist(natom0, weights0, coords0, coords1, identitymap(natom0)), &
         '(only alignment performed)'
 
