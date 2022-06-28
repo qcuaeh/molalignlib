@@ -2,7 +2,7 @@ module ralign
 contains
 
 ! Purpose: Superimpose coordinates of atom sets coords0 and coords1
-subroutine realign( &
+subroutine remap( &
     natom0, natom1, znums0, znums1, types0, types1, weights0, weights1, &
     coords0, coords1, maxrecord, nrecord, atomaplist, countlist &
 )
@@ -17,9 +17,9 @@ use chemdata
 use maputils
 use rotation
 use translation
-use alignment
-use remapping
+use optimization
 use assortment
+use alignment
 
 implicit none
 
@@ -124,7 +124,7 @@ call random_seed(put=seed)
 
 ! Remap atoms to minimize distance and difference
 
-call remapatoms( &
+call optimize_mapping( &
     natom0, nblock0, blocksize0, weights0(order0), &
     centered(natom0, coords0(:, order0), center0), &
     centered(natom1, coords1(:, order1), center1), &
@@ -149,15 +149,11 @@ use iso_fortran_env, only: output_unit
 use iso_fortran_env, only: error_unit
 
 use options
-use random
-use sorting
 use chemdata
 use maputils
 use rotation
 use translation
 use alignment
-use remapping
-use assortment
 
 implicit none
 

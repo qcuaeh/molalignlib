@@ -1,6 +1,7 @@
 program ralign
 
 use iso_fortran_env, only: input_unit
+use iso_fortran_env, only: output_unit
 
 use options
 use chemdata
@@ -17,7 +18,6 @@ use ralign
 implicit none
 
 integer i
-logical remap
 integer natom0, natom1
 integer nrecord, maxrecord
 character(ttllen) title0, title1
@@ -35,7 +35,6 @@ character(optlen) arg, path
 ! Set default options
 
 live = .false.
-remap = .false.
 biased = .false.
 iterative = .false.
 trialing = .false.
@@ -68,11 +67,9 @@ do while (getarg(arg))
         biased = .true.
         call readoptarg(arg, tolerance)
     case ('-trials')
-        remap = .true.
         trialing = .true.
         call readoptarg(arg, maxtrial)
     case ('-matches')
-        remap = .true.
         matching = .true.
         call readoptarg(arg, maxmatch)
     case ('-bias-scale')
@@ -141,9 +138,9 @@ weights1 = property(znums1)/sum(property(znums1))
 
 ! Superpose atoms
 
-if (remap) then
+if (trialing .or. matching) then
 
-    call realign(natom0, natom1, znums0, znums1, types0, types1, weights0, weights1, &
+    call remap(natom0, natom1, znums0, znums1, types0, types1, weights0, weights1, &
         coords0, coords1, maxrecord, nrecord, atomaplist, countlist)
 
     ! Write aligned coordinates
@@ -173,6 +170,9 @@ else
 
     call align(natom0, natom1, znums0, znums1, types0, types1, weights0, weights1, &
         coords0, coords1, travec, rotmat)
+
+    write (output_unit, '(a)') 'Only alignment performed'
+    write (output_unit, '(a,x,f9.4)') 'WSSD:', squaredist(natom0, weights0, coords0, coords1, identitymap(natom0))
 
 end if
 

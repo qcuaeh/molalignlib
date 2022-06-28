@@ -1,4 +1,4 @@
-module remapping
+module optimization
 
 use iso_fortran_env, only: output_unit
 use iso_fortran_env, only: error_unit
@@ -34,7 +34,7 @@ logical function lowerthan(counter, maxcount)
     lowerthan = counter < maxcount
 end function
 
-subroutine remapatoms( &
+subroutine optimize_mapping( &
     natom, nblock, blocksize, weights, coords0, coords1, maxrecord, nrecord, &
     atomaplist, countlist, trial_test, match_test &
 )
@@ -117,7 +117,7 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
             atomap = auxmap
         end do
 
-        dist = leastsquaredist(natom, weights, coords0, auxcoords, atomap)
+        dist = squaredist(natom, weights, coords0, auxcoords, atomap)
 
 ! Check for new best mapping
 
@@ -181,7 +181,7 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
 
         if (live) then
             write (output_unit, '(a)', advance='no') achar(27)//'['//str(nrecord + 3)//'H'
-            call print_footer(.true., overflow, nrecord, ntrial)
+            call print_footer(overflow, nrecord, ntrial)
         end if
 
     end do
@@ -192,7 +192,7 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
             call print_stats(imap, earliest(imap), countlist(imap), avgiter(imap), avgmeanrot(imap), &
                 avgtotrot(imap), mindist(imap))
         end do
-        call print_footer(.true., overflow, nrecord, ntrial)
+        call print_footer(overflow, nrecord, ntrial)
     end if
 
 end subroutine

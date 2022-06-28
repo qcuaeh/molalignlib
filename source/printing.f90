@@ -11,7 +11,7 @@ contains
 subroutine print_header()
     write (output_unit, '(a)', advance='no') achar(27)//'[K'
     write (output_unit, '(1x, a, 3x, a, 3x, a, 3x, a, 3x, a, 4x, a, 5x, a)') &
-        'map', 'trial', 'count', 'cycles', 'meanrot', 'totalrot', 'rmsd'
+        'Map', 'Trial', 'Count', 'Cycles', 'Meanrot', 'Totalrot', 'WSSD'
     write (output_unit, '(a)', advance='no') achar(27)//'[K'
     write (output_unit, '(a)') '-------------------------------------------------------------'
 end subroutine
@@ -24,21 +24,17 @@ subroutine print_stats(imap, earliest, matches, avgiter, avgmeanrot, avgangle, m
         imap, earliest, matches, avgiter, 90./asin(1.)*avgmeanrot, 90./asin(1.)*avgangle, sqrt(mindist)
 end subroutine
 
-subroutine print_footer(remapped, overflow, nrecord, itrial)
-    logical, intent(in) :: remapped, overflow
+subroutine print_footer(overflow, nrecord, itrial)
+    logical, intent(in) :: overflow
     integer, intent(in) :: nrecord, itrial
     write (output_unit, '(a)', advance='no') achar(27)//'[K'
     write (output_unit, '(a)') '-------------------------------------------------------------'
     write (output_unit, '(a)', advance='no') achar(27)//'[K'
-    if (remapped) then
-        if (overflow) then
-            write (output_unit, '(a,x,i0,x,a,x,i0,x,a)') 'Found more than', nrecord, 'mapping(s) in', &
-                itrial, 'random trial(s)'
-        else
-            write (output_unit, '(a,x,i0,x,a,x,i0,x,a)') 'Found', nrecord, 'mapping(s) in', itrial, 'random trial(s)'
-        end if
+    if (overflow) then
+        write (output_unit, '(a,x,i0,x,a,x,i0,x,a)') 'Found more than', nrecord, 'mapping(s) in', &
+            itrial, 'random trial(s)'
     else
-        write (output_unit, '(a)') 'Only alignment performed'
+        write (output_unit, '(a,x,i0,x,a,x,i0,x,a)') 'Found', nrecord, 'mapping(s) in', itrial, 'random trial(s)'
     end if
 end subroutine
 
