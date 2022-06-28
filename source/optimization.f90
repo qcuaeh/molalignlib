@@ -24,14 +24,14 @@ end interface
 
 contains
 
-logical function trueconst(counter, maxcount)
+logical function dummy_test(counter, maxcount)
     integer, intent(in) :: counter, maxcount
-    trueconst = .true.
+    dummy_test = .true.
 end function
 
-logical function lowerthan(counter, maxcount)
+logical function lower_than(counter, maxcount)
     integer, intent(in) :: counter, maxcount
-    lowerthan = counter < maxcount
+    lower_than = counter < maxcount
 end function
 
 subroutine optimize_mapping( &

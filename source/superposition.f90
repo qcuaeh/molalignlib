@@ -63,17 +63,17 @@ allocate(blocksize0(natom0), blocksize1(natom1))
 ! Select trial exit test
 
 if (trialing) then
-    trial_test => lowerthan
+    trial_test => lower_than
 else
-    trial_test => trueconst
+    trial_test => dummy_test
 end if
 
 ! Select match exit test
 
 if (matching) then
-    match_test => lowerthan
+    match_test => lower_than
 else
-    match_test => trueconst
+    match_test => dummy_test
 end if
 
 ! Group atoms by label
