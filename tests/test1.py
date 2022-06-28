@@ -1,6 +1,6 @@
 import numpy as np
 from ase import io
-from ralign import options, superpose
+from ralign import options, remap, align
 
 def optstr(string):
     return string + ' '*(options.optlen - len(string))
@@ -27,4 +27,4 @@ options.biasscale = 1000.0
 options.tolerance = 0.17
 options.weighter = optstr('none')
 
-superpose(znums0, znums1, types0, types1, weights0, weights1, coords0, coords1, 10)
+remap(znums0, znums1, types0, types1, weights0, weights1, coords0, coords1, 10)

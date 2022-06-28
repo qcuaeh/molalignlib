@@ -14,7 +14,7 @@ compile () {
 
 shopt -s nullglob
 
-options=$(getopt -a -o '' -l libs,slow,fast,debug -- "$@")
+options=$(getopt -a -o '' -l lib,slow,fast,debug -- "$@")
 if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
 eval set -- "$options"
 
@@ -26,7 +26,7 @@ while true; do
       --slow) optlevel=slow; shift;;
       --fast) optlevel=fast; shift;;
       --debug) optlevel=debug; shift;;
-      --libs) buildtype=library; shift;;
+      --lib) buildtype=library; shift;;
       --) shift; break ;;
    esac
 done
@@ -85,8 +85,8 @@ executable)
    $FORTRAN -L "$LAPACK" -llapack -o "$BINDIR"/"$NAME" "${objectlist[@]}"
    ;;
 library)
-   echo Linking shared library...
-   $FORTRAN -shared -L "$LAPACK" -llapack -o "$BINDIR"/"$NAME".so "${objectlist[@]}"
+#   echo Linking shared library...
+#   $FORTRAN -shared -L "$LAPACK" -llapack -o "$BINDIR"/"$NAME".so "${objectlist[@]}"
    echo Linking python library...
    pushd "$BINDIR"
    $F2PY -h "$OBJDIR"/"$NAME".pyf --overwrite-signature -m "$NAME" "${exportlist[@]}" --quiet

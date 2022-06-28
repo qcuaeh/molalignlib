@@ -1,4 +1,4 @@
-program ralign
+program main
 
 use iso_fortran_env, only: input_unit
 use iso_fortran_env, only: output_unit
@@ -13,7 +13,7 @@ use readwrite
 use translation
 use rotation
 use alignment
-use ralign
+!use ralign
 
 implicit none
 

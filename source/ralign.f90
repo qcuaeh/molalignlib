@@ -1,5 +1,5 @@
-module ralign
-contains
+!module ralign
+!contains
 
 ! Purpose: Superimpose coordinates of atom sets coords0 and coords1
 subroutine remap( &
@@ -217,4 +217,4 @@ travec = center0 - matmul(rotmat, center1)
 
 end subroutine
 
-end module
+!end module
