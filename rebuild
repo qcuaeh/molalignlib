@@ -1,8 +1,4 @@
 #!/bin/bash
+export FORTRAN LAPACK F2PY
 source "$(dirname "$0")/config"
-
-RECOMPILE=true \
-FORTRAN=$FORTRAN \
-LAPACK=$LAPACK \
-F2PY=$F2PY \
-bash "$(dirname "$0")/source/build.sh" "$@"
+RECOMPILE=true bash "$(dirname "$0")/source/build.sh" "$@"
