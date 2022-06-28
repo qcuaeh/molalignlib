@@ -1,8 +1,8 @@
-!module ralign
+!module superposition
 !contains
 
-! Purpose: Superimpose coordinates of atom sets coords0 and coords1
 subroutine remap( &
+! Purpose: Remap atoms to optimize superposition
     natom0, natom1, znums0, znums1, types0, types1, weights0, weights1, &
     coords0, coords1, maxrecord, nrecord, atomaplist, countlist &
 )
@@ -38,7 +38,7 @@ integer i
 integer nblock0, nblock1
 integer, dimension(:), allocatable :: seed
 integer, dimension(:), allocatable :: order0, order1
-integer, dimension(:), allocatable :: reorder0, reorder1
+integer, dimension(:), allocatable :: unorder0, unorder1
 integer, dimension(:), allocatable :: blockidx0, blockidx1
 integer, dimension(:), allocatable :: blocksize0, blocksize1
 real(wp), dimension(3) :: center0, center1
@@ -56,7 +56,7 @@ end if
 ! Allocate arrays
 
 allocate(order0(natom0), order1(natom1))
-allocate(reorder0(natom0), reorder1(natom1))
+allocate(unorder0(natom0), unorder1(natom1))
 allocate(blockidx0(natom0), blockidx1(natom1))
 allocate(blocksize0(natom0), blocksize1(natom1))
 
@@ -88,8 +88,8 @@ order1 = sortorder(blockidx1, natom1)
 
 ! Get inverse of contiguous label order
 
-reorder0 = inversemap(order0)
-reorder1 = inversemap(order1)
+unorder0 = inversemap(order0)
+unorder1 = inversemap(order1)
 
 ! Abort if there are incompatible atomic symbols
 
@@ -135,7 +135,7 @@ call optimize_mapping( &
 ! Reorder back to original atom ordering
 
 do i = 1, nrecord
-    atomaplist(:, i) = atomaplist(reorder0, i)
+    atomaplist(:, i) = order1(atomaplist(unorder0, i))
 end do
 
 end subroutine
@@ -168,7 +168,7 @@ real(wp), intent(out) :: travec(3)
 real(wp), intent(out) :: rotmat(3, 3)
 
 real(wp), dimension(3) :: center0, center1
-
+integer i
 ! Check number of atoms
 
 if (natom0 /= natom1) then

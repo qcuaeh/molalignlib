@@ -17,7 +17,7 @@ alignment.f90
 readwrite.f90
 biasing.f90
 optimization.f90
+superposition.f90 export
 fileutils.f90
 argutils.f90
-ralign.f90 export
 main.f90
