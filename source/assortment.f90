@@ -75,17 +75,14 @@ subroutine getblocks(natom, znums, types, weights, nblock, blocksize, blockindex
 
 ! Order blocks by block size
 
-    blockorder(:nblock) = sortorder(blocksize, nblock)
-    blocksize(:nblock) = blocksize(blockorder(:nblock))
-    blockorder(:nblock) = inversemap(blockorder(:nblock))
-    blockindex = blockorder(blockindex)
+!    blockorder(:nblock) = sortorder(blocksize, nblock)
+!    blocksize(:nblock) = blocksize(blockorder(:nblock))
+!    blockorder(:nblock) = inversemap(blockorder(:nblock))
+!    blockindex = blockorder(blockindex)
 
 ! Get contiguous label order
 
     order = sortorder(blockindex, natom)
-
-!    print *, blocksize(:nblock)
-!    print *, znums(blockorder)
 
 end subroutine
 
