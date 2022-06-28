@@ -38,7 +38,6 @@ integer i
 integer nblock0, nblock1
 integer, dimension(:), allocatable :: seed
 integer, dimension(:), allocatable :: order0, order1
-integer, dimension(:), allocatable :: unorder0, unorder1
 integer, dimension(:), allocatable :: blockidx0, blockidx1
 integer, dimension(:), allocatable :: blocksize0, blocksize1
 real(wp), dimension(3) :: center0, center1
@@ -56,7 +55,6 @@ end if
 ! Allocate arrays
 
 allocate(order0(natom0), order1(natom1))
-allocate(unorder0(natom0), unorder1(natom1))
 allocate(blockidx0(natom0), blockidx1(natom1))
 allocate(blocksize0(natom0), blocksize1(natom1))
 
@@ -80,11 +78,6 @@ end if
 
 call getblocks(natom0, znums0, types0, weights0, nblock0, blocksize0, blockidx0, order0)
 call getblocks(natom1, znums1, types1, weights1, nblock1, blocksize1, blockidx1, order1)
-
-! Get inverse of contiguous label order
-
-unorder0 = inversemap(order0)
-unorder1 = inversemap(order1)
 
 ! Abort if there are incompatible atomic symbols
 
@@ -130,7 +123,7 @@ call optimize_mapping( &
 ! Reorder back to original atom ordering
 
 do i = 1, nrecord
-    atomaplist(:, i) = order1(atomaplist(unorder0, i))
+    atomaplist(:, i) = order1(atomaplist(inversemap(order0), i))
 end do
 
 end subroutine
