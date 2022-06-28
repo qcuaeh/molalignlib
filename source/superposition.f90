@@ -70,7 +70,7 @@ end if
 
 ! Select match exit test
 
-if (matching) then
+if (counting) then
     match_test => lower_than
 else
     match_test => dummy_test
@@ -78,13 +78,8 @@ end if
 
 ! Group atoms by label
 
-call getblocks(natom0, znums0, types0, weights0, nblock0, blocksize0, blockidx0)
-call getblocks(natom1, znums1, types1, weights1, nblock1, blocksize1, blockidx1)
-
-! Get contiguous label order
-
-order0 = sortorder(blockidx0, natom0)
-order1 = sortorder(blockidx1, natom1)
+call getblocks(natom0, znums0, types0, weights0, nblock0, blocksize0, blockidx0, order0)
+call getblocks(natom1, znums1, types1, weights1, nblock1, blocksize1, blockidx1, order1)
 
 ! Get inverse of contiguous label order
 

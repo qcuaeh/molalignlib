@@ -24,14 +24,14 @@ end interface
 
 contains
 
-logical function dummy_test(counter, maxcount)
-    integer, intent(in) :: counter, maxcount
+logical function dummy_test(counter, threshold)
+    integer, intent(in) :: counter, threshold
     dummy_test = .true.
 end function
 
-logical function lower_than(counter, maxcount)
-    integer, intent(in) :: counter, maxcount
-    lower_than = counter < maxcount
+logical function lower_than(counter, threshold)
+    integer, intent(in) :: counter, threshold
+    lower_than = counter < threshold
 end function
 
 subroutine optimize_mapping( &
@@ -77,7 +77,7 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
 
 ! Loop for map searching
 
-    do while (trial_test(ntrial, maxtrial) .and. match_test(nmatch, maxmatch))
+    do while (trial_test(ntrial, maxtrial) .and. match_test(nmatch, maxcount))
 
         ntrial = ntrial + 1
 

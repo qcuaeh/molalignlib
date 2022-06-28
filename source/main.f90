@@ -38,7 +38,7 @@ live = .false.
 biased = .false.
 iterative = .false.
 trialing = .false.
-matching = .false.
+counting = .false.
 testing = .false.
 maxrecord = 9
 biasscale = 1000.0_wp
@@ -69,14 +69,14 @@ do while (getarg(arg))
     case ('-trials')
         trialing = .true.
         call readoptarg(arg, maxtrial)
-    case ('-matches')
-        matching = .true.
-        call readoptarg(arg, maxmatch)
+    case ('-count')
+        counting = .true.
+        call readoptarg(arg, maxcount)
     case ('-bias-scale')
         call readoptarg(arg, biasscale)
     case ('-weight')
         call readoptarg(arg, weighter)
-    case ('-records')
+    case ('-maps')
         call readoptarg(arg, maxrecord)
     case ('-out')
         call readoptarg(arg, outformat)
@@ -138,7 +138,7 @@ weights1 = property(znums1)/sum(property(znums1))
 
 ! Superpose atoms
 
-if (trialing .or. matching) then
+if (trialing .or. counting) then
 
     call remap(natom0, natom1, znums0, znums1, types0, types1, weights0, weights1, &
         coords0, coords1, maxrecord, nrecord, atomaplist, countlist)

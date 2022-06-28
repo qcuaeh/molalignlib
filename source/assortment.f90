@@ -14,12 +14,13 @@ public getblocks
 
 contains
 
-subroutine getblocks(natom, znums, types, weights, nblock, blocksize, blockindex)
+subroutine getblocks(natom, znums, types, weights, nblock, blocksize, blockindex, order)
 ! Purpose: Group atoms by atomic numbers and types
 
     integer, intent(in) :: natom
     integer, dimension(:), intent(in) :: znums, types
     integer, intent(out) :: nblock
+    integer, intent(out) :: order(:)
     integer, dimension(:), intent(out) :: blocksize, blockindex
     real(wp), dimension(:), intent(in) :: weights
 
@@ -78,6 +79,10 @@ subroutine getblocks(natom, znums, types, weights, nblock, blocksize, blockindex
     blocksize(:nblock) = blocksize(blockorder(:nblock))
     blockorder(:nblock) = inversemap(blockorder(:nblock))
     blockindex = blockorder(blockindex)
+
+! Get contiguous label order
+
+    order = sortorder(blockindex, natom)
 
 !    print *, blocksize(:nblock)
 !    print *, znums(blockorder)

@@ -6,9 +6,9 @@ implicit none
 
 private
 
-public initializemap
-public identitymap
 public inversemap
+public identitymap
+public initializemap
 
 contains
 
