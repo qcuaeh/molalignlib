@@ -45,8 +45,8 @@ case $optlevel in
 esac
 
 NAME=ralign
-SRCDIR=$(cd -- "$(dirname "$0")" && pwd)
-ROOTDIR=$(dirname "$SRCDIR")
+ROOTDIR=$(cd -- "$(dirname "$0")" && pwd)
+SRCDIR=$ROOTDIR/source
 BINDIR=$ROOTDIR/bin
 BUILDIR=$ROOTDIR/_build_dir
 OBJDIR=$BUILDIR/$buildtype/$optlevel
