@@ -6,7 +6,7 @@ implicit none
 
 private
 
-public resetmap
+public initializemap
 public identitymap
 public inversemap
 
@@ -31,7 +31,7 @@ function identitymap(n)
     end do
 end function
 
-subroutine resetmap(mapping)
+subroutine initializemap(mapping)
     integer, intent(out) :: mapping(:)
     integer i
     do i = 1, size(mapping)

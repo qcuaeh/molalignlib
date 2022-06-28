@@ -49,7 +49,7 @@ function intsortorder(x, n) result(o)
    integer, intent(in) :: n
    integer, dimension(:), intent(in) :: x
    integer o(n), t((n+1)/2)
-   call resetmap(o)
+   call initializemap(o)
    call intmergesort(x, o, n, t)
 end function
 
@@ -57,7 +57,7 @@ function charsortorder(x, n) result(o)
    integer, intent(in) :: n
    character(*), dimension(:), intent(in) :: x
    integer o(n), t((n+1)/2)
-   call resetmap(o)
+   call initializemap(o)
    call charmergesort(x, o, n, t)
 end function
 
