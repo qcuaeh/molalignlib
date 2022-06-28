@@ -171,8 +171,9 @@ else
     call align(natom0, natom1, znums0, znums1, types0, types1, weights0, weights1, &
         coords0, coords1, travec, rotmat)
 
-    write (output_unit, '(a)') 'Only alignment performed'
-    write (output_unit, '(a,x,f9.4)') 'WSSD:', squaredist(natom0, weights0, coords0, coords1, identitymap(natom0))
+    write (output_unit, '(a,x,f0.4,x,a)') 'WSSD:', &
+        squaredist(natom0, weights0, coords0, coords1, identitymap(natom0)), &
+        '(only alignment performed)'
 
 end if
 
