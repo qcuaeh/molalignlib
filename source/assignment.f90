@@ -36,7 +36,7 @@ subroutine assignatoms(natom, weights, coords0, coords1, nblock, blocksize, bias
 
         do i = offset + 1, offset + blocksize(h)
             do j = offset + 1, offset + blocksize(h)
-                costs(i - offset, j - offset) = weights(i)*(sum((coords1(:, j) - coords0(:, i))**2) + biasscale**2*bias(i, j))
+                costs(i - offset, j - offset) = sum((coords1(:, j) - coords0(:, i))**2) + biasscale**2*bias(i, j)
             end do
         end do
 
