@@ -14,7 +14,7 @@ compile () {
 
 shopt -s nullglob
 
-options=$(getopt -a -o '' -l lib,slow,fast,debug -- "$@")
+options=$(getopt -a -o '' -l lib,safe,fast,debug -- "$@")
 if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
 eval set -- "$options"
 
@@ -23,7 +23,7 @@ buildtype=executable
 
 while true; do
    case "$1" in
-      --slow) optlevel=slow; shift;;
+      --safe) optlevel=safe; shift;;
       --fast) optlevel=fast; shift;;
       --debug) optlevel=debug; shift;;
       --lib) buildtype=library; shift;;
@@ -38,7 +38,7 @@ case $buildtype in
 esac
 
 case $optlevel in
-   slow) optflags='-O3';;
+   safe) optflags='-O3';;
    fast) optflags='-O3 -ffast-math';;
    debug) optflags='-g -fbounds-check -fbacktrace -ffpe-trap=zero,invalid,overflow -O0 -Wall';;
    *) echo Invalid optimization level: $optlevel; exit;;
