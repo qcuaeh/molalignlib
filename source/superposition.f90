@@ -17,7 +17,7 @@ use chemdata
 use maputils
 use rotation
 use translation
-use optimization
+use minimization
 use assortment
 use alignment
 
@@ -112,7 +112,7 @@ call random_seed(put=seed)
 
 ! Remap atoms to minimize distance and difference
 
-call optimize_mapping( &
+call minimize_msd( &
     natom0, nblock0, blocksize0, weights0(order0), &
     centered(natom0, coords0(:, order0), center0), &
     centered(natom1, coords1(:, order1), center1), &

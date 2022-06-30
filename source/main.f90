@@ -6,7 +6,7 @@ use iso_fortran_env, only: output_unit
 use options
 use chemdata
 use strutils
-use argparse
+use optparse
 use fileutils
 use chemutils
 use readwrite

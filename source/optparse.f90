@@ -1,4 +1,4 @@
-module argparse
+module optparse
 
 use iso_fortran_env, only: error_unit
 
