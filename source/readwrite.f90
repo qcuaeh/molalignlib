@@ -11,7 +11,6 @@ implicit none
 
 contains
 
-
 subroutine readxyzfile(file_unit, natom, title, labels, coords)
 
     integer, intent(in) :: file_unit
@@ -46,79 +45,6 @@ subroutine readxyzfile(file_unit, natom, title, labels, coords)
 end subroutine
 
 
-subroutine readmolfile(file_unit, natom, title, labels, coords, nbond, bonds)
-
-    integer, intent(in) :: file_unit
-    integer, intent(out) :: natom, nbond
-    integer, dimension(:, :), allocatable, intent(out) :: bonds
-    real(wp), dimension(:, :), allocatable, intent(out) :: coords
-    character(*), dimension(:), allocatable, intent(out) :: labels
-    character(*), intent(out) :: title
-    integer i, stat
-
-    read (file_unit, '(a)', iostat=stat) title
-    if (stat < 0) then
-        write (error_unit, '(a)') 'Unexpected end of file!'
-        stop
-    end if
-
-    read (file_unit, *, iostat=stat)
-    if (stat < 0) then
-        write (error_unit, '(a)') 'Unexpected end of file!'
-        stop
-    end if
-
-    read (file_unit, *, iostat=stat)
-    if (stat < 0) then
-        write (error_unit, '(a)') 'Unexpected end of file!'
-        stop
-    end if
-
-    read (file_unit, *, iostat=stat) natom, nbond
-    if (stat < 0) then
-        write (error_unit, '(a)') 'Unexpected end of file!'
-        stop
-    end if
-
-    allocate (labels(natom), coords(3, natom), bonds(2, maxcoord*natom))
-
-    do i = 1, natom
-        read (file_unit, *, iostat=stat) coords(:, i), labels(i)
-        if (stat < 0) then
-            write (error_unit, '(a)') 'Unexpected end of file!'
-            stop
-        end if
-    end do
-
-    do i = 1, nbond
-        read (file_unit, *, iostat=stat) bonds(:, i)
-        if (stat < 0) then
-            write (error_unit, '(a)') 'Unexpected end of file!'
-            stop
-        end if
-    end do
-
-    read (file_unit, *, iostat=stat)
-    if (stat < 0) then
-        write (error_unit, '(a)') 'Unexpected end of file!'
-        stop
-    end if
-
-    read (file_unit, *, iostat=stat)
-    if (stat < 0) then
-        write (error_unit, '(a)') 'Unexpected end of file!'
-        stop
-    end if
-
-    read (file_unit, *, iostat=stat)
-    if (stat < 0) then
-        write (error_unit, '(a)') 'Unexpected end of file!'
-        stop
-    end if
-
-end subroutine
-
-
 subroutine writexyzfile(file_unit, natom, title, znums, coords)
 
     character(*), intent(in) :: title
@@ -135,7 +61,6 @@ subroutine writexyzfile(file_unit, natom, title, znums, coords)
     end do
 
 end subroutine
-
 
 subroutine writemol2file(file_unit, natom, nbond, title, znums, coords, bonds)
 
