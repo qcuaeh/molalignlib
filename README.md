@@ -24,7 +24,7 @@ Run the program
 
 &ensp; -live : Print live stats.  
 &ensp; -iter : Use iterative steps.  
-&ensp; -stdin : Read coordinates from stdin.  
+&ensp; -stdin : Read coordinates from standard input.  
 &ensp; -test : Use the same pseudo random number sequence on every run.  
 &ensp; -maps MAX : Set number of recorded maps to MAX.  
 &ensp; -out xyz|mol2 : Set output format to *XYZ* or *MOL2*.  
