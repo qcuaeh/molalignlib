@@ -9,15 +9,16 @@ defaults:
 &ensp; -debug : Build without optimizations with debug info.  
 &ensp; -rebuild : Recompile all source files from scratch.  
 
-The executables are created in the **bin** directory and the object
-files are stored in the **\_build_dir** directory.
+The executables are created in the *bin* directory and the object files are
+stored in the *\_build_dir* directory.
 
 Compile the library
 ===================
 
 Run `./build-lib` without arguments to compile the library with the highest
-optimization level. The script accepts the same options as **build** and the
-same notices apply.
+optimization level. The script accepts the same options as the *build* script.
+The executables are created in the *bin* directory and the object files are
+stored in the *\_build_dir* directory.
 
 Run the program
 ===============
