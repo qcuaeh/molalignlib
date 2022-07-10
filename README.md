@@ -6,19 +6,17 @@ optimization level. The script accepts the following options to change the
 defaults:
 
 &ensp; -slow : Build without optimizations.  
-&ensp; -debug : Build without optimizations with debug info.  
+&ensp; -debug : Build with debug info without optimizations.  
 &ensp; -rebuild : Recompile all source files from scratch.  
 
-The executables are created in the *bin* directory and the object files are
-stored in the *\_build_dir* directory.
+The executables will be created in the *bin* directory.
 
 Compile the library
 ===================
 
 Run `./build-lib` without arguments to compile the library with the highest
 optimization level. The script accepts the same options as the *build* script.
-The executables are created in the *bin* directory and the object files are
-stored in the *\_build_dir* directory.
+The libraries will be created in the *bin* directory.
 
 Run the program
 ===============
