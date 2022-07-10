@@ -7,18 +7,15 @@ optimization level. The script accepts the following options:
 &ensp; -debug : Build the debug version  
 &ensp; -rebuild : Recompile all source files from scratch  
 
-#### Notes
-
-* Executables are created in the "bin" directory
-* Object files are created in the "_build_dir" directory
-* The compilation list is located in ./source/compilelist
-* The optimized version is compiled with fast math
+Notice that executables are created in the "bin" directory and object
+files are created in the **\_build_dir** directory.
 
 Compile the library
 ===================
 
 Run `./build-lib` without arguments to compile the library with the highest
-optimization level. The script accepts the same options as `build`.
+optimization level. The script accepts the same options as **build** and the
+same notices apply.
 
 Run the program
 ===============
