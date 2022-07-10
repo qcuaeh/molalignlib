@@ -7,32 +7,32 @@ defaults:
 
 &ensp; -slow : Build without optimizations.  
 &ensp; -debug : Build with complete checks and debug info.  
-&ensp; -recom : Recompile all source files from scratch.  
+&ensp; -recomp : Recompile all source files from scratch.  
 
 The executables will be created in the *bin* directory.
 
-Compile the library
-===================
+Compile the shared library
+==========================
 
-Run `./build-lib` without arguments to compile the library with the highest
-optimization level. The script accepts the same options as the *build* script
-and the libraries will be created in the *bin* directory.
+Run `./build-lib` without arguments to compile the shared library with the
+highest optimization level. The script accepts the same options as the *build*
+script and the libraries will be also created in the *bin* directory.
 
 Run the program
 ===============
 
 ### Program options
 
-&ensp; -maps INTEGER : Number of recorded maps.  
-&ensp; -out xyz|mol2 : Output format can be XYZ or MOL2.  
+&ensp; -maps MAX : Set number of recorded maps to MAX.  
+&ensp; -out xyz|mol2 : Set output format to *XYZ* or *MOL2*.  
 &ensp; -live : Print live stats.  
-&ensp; -iter : Iterative trial step.  
-&ensp; -bias REAL : Tolerance for biasing.  
-&ensp; -weight none|mass : Weighting property can be none or atomic mass.  
-&ensp; -count INTEGER : Maximum map counting.  
-&ensp; -trials INTEGER : Maximum number of trials.  
-&ensp; -scale REAL : Length scale.  
-&ensp; -test : Repeateble run for testing.  
+&ensp; -iter : Use iterative steps.  
+&ensp; -bias TOL : Use biasing with tolerance TOL.  
+&ensp; -weight none|mass : Set weighting property to *None* or *Atomic Mass*.  
+&ensp; -count MAX : Set maximum map counting to MAX.  
+&ensp; -trials MAX : Set maximum number of trials to MAX.  
+&ensp; -scale FACTOR : Set length scale to FACTOR.  
+&ensp; -test : Use a repeateble random number sequence for testing.  
  
 ### Examples
  
