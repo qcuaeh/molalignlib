@@ -7,8 +7,8 @@ optimization level. The script accepts the following options:
 &ensp; -debug : Build the debug version  
 &ensp; -rebuild : Recompile all source files from scratch  
 
-Notice that executables are created in the "bin" directory and object
-files are created in the **\_build_dir** directory.
+The executables are created in the "bin" directory and the object
+files are stored in the **\_build_dir** directory.
 
 Compile the library
 ===================
