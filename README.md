@@ -1,9 +1,3 @@
-<style>
-.nobullet li {
-  list-style-type: none;
-}
-</style>
-
 Compile the program
 ===================
 
@@ -18,10 +12,8 @@ optimization level.
 
 Both scripts accept the same options:
 
-<div class="nobullet">
-* -debug : Build the debug version
-* -rebuild : Recompile all source files from scratch
-</div>
+:  -debug : Build the debug version
+:  -rebuild : Recompile all source files from scratch
 
 ### Notes
 
