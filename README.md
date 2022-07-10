@@ -30,16 +30,16 @@ Run the program
 
 ### Program options
 
--maps <recorded maps>
--out <output format (xyz|mol2)>
--live
--iter
--bias <bias tolerance>
--weight <weighting property>
--count <maximum count>
--trials <maimum trials>
--scale <bias scale>
--test
+-maps INTEGER : Number of recorded maps
+-out xyz|mol2 : Output format (XYZ or MOL2)
+-live : Print live stats
+-iter : Iterative trial step
+-bias REAL : Tolerance for biasing
+-weight STRING : Weighting property
+-count INTEGER : Maximum map counting
+-trials INTEGER : Maximum number of trials
+-scale REAL : Length scale
+-test : Repeateble run for testing
 
 ### Examples
 
