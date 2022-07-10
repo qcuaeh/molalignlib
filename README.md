@@ -7,7 +7,7 @@ optimization level. The script accepts the following options:
 &ensp; -debug : Build the debug version  
 &ensp; -rebuild : Recompile all source files from scratch  
 
-###### Notes
+Notes:
 
 * Executables are created in the "bin" directory
 * Object files are created in the "_build_dir" directory
@@ -23,7 +23,7 @@ optimization level. The script accepts the same options as `build`.
 Run the program
 ===============
 
-###### Program options
+Program options:
 
 &ensp; -maps INTEGER : Number of recorded maps  
 &ensp; -out xyz|mol2 : Output format (XYZ or MOL2)  
@@ -36,6 +36,6 @@ Run the program
 &ensp; -scale REAL : Length scale  
 &ensp; -test : Repeateble run for testing  
  
-###### Examples
+Examples:
  
 ./bin/ralign tests/r005/100cobalt_j5.xyz -iter -weight mass -bias 0.17 -test -trials 1000 -count 10
