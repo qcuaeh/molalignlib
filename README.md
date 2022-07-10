@@ -7,7 +7,7 @@ defaults:
 
 &ensp; -slow : Build without optimizations.  
 &ensp; -debug : Build with complete checks and debug info.  
-&ensp; -recomp : Recompile all source files from scratch.  
+&ensp; -recompile : Recompile all source files from scratch.  
 
 The executables will be created in the *bin* directory.
 
