@@ -22,16 +22,16 @@ Run the program
 
 ### Program options
 
-&ensp; -maps MAX : Set number of recorded maps to MAX.  
-&ensp; -out xyz|mol2 : Set output format to *XYZ* or *MOL2*.  
 &ensp; -live : Print live stats.  
 &ensp; -iter : Use iterative steps.  
+&ensp; -test : Use the same pseudo random number sequence on every run.  
+&ensp; -maps MAX : Set number of recorded maps to MAX.  
+&ensp; -out xyz|mol2 : Set output format to *XYZ* or *MOL2*.  
 &ensp; -bias TOL : Use biasing with tolerance TOL.  
 &ensp; -weight none|mass : Set weighting property to *None* or *Atomic Mass*.  
 &ensp; -count MAX : Set maximum map counting to MAX.  
 &ensp; -trials MAX : Set maximum number of trials to MAX.  
-&ensp; -scale FACTOR : Set length scale to FACTOR.  
-&ensp; -test : Use a repeateble random number sequence for testing.  
+&ensp; -scale SCALE : Set length scale to SCALE.  
  
 ### Examples
  
