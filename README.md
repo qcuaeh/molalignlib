@@ -2,21 +2,20 @@ Compile the program
 ===================
 
 Run `./build` without arguments to build the program with the highest
-optimization level. The script accepts the following options to change the
-defaults:
+optimization level. The script accepts the following options:
 
 &ensp; -slow : Build without optimizations.  
 &ensp; -debug : Build with complete checks and debug info.  
 &ensp; -recompile : Recompile all source files from scratch.  
 
-The executables will be created in the *bin* directory.
+The program files will be created in the *bin* directory.
 
 Compile the shared library
 ==========================
 
 Run `./build-lib` without arguments to compile the shared library with the
-highest optimization level. The script accepts the same options as the *build*
-script and the libraries will be also created in the *bin* directory.
+highest optimization level. This script accepts the same options as the *build*
+script and the library files will be also created in the *bin* directory.
 
 Run the program
 ===============
