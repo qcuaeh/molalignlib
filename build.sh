@@ -14,31 +14,30 @@ compile () {
 
 shopt -s nullglob
 
-options=$(getopt -a -o '' -l lib,safe,fast,debug -- "$@")
+options=$(getopt -a -o '' -l exe,lib,fast,debug -- "$@")
 if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
 eval set -- "$options"
 
 optlevel=fast
-buildtype=executable
+buildtype=program
 
 while true; do
    case "$1" in
-      --safe) optlevel=safe; shift;;
+      --prog) buildtype=program; shift;;
+      --lib) buildtype=library; shift;;
       --fast) optlevel=fast; shift;;
       --debug) optlevel=debug; shift;;
-      --lib) buildtype=library; shift;;
       --) shift; break ;;
    esac
 done
 
 case $buildtype in
-   executable) libflags='';;
+   program) libflags='';;
    library) libflags='-fPIC';;
    *) echo Invalid build type: $buildtype; exit;;
 esac
 
 case $optlevel in
-   safe) optflags='-O3';;
    fast) optflags='-O3 -ffast-math';;
    debug) optflags='-g -fbounds-check -fbacktrace -ffpe-trap=zero,invalid,overflow -O0 -Wall';;
    *) echo Invalid optimization level: $optlevel; exit;;
@@ -53,7 +52,7 @@ OBJDIR=$BUILDIR/$buildtype/$optlevel
 
 if [[ -d $BINDIR ]]; then
    case $buildtype in
-      executable) rm -f "$BINDIR"/"$NAME";;
+      program) rm -f "$BINDIR"/"$NAME";;
       library) rm -f "$BINDIR"/"$NAME".so "$BINDIR"/"$NAME".*.so;;
    esac
 else
@@ -80,8 +79,8 @@ while IFS= read -r line; do
 done < <(grep -v '^#' "$SRCDIR"/compilelist)
 
 case $buildtype in
-executable)
-   echo Linking executable...
+program)
+   echo Linking program...
    $FORTRAN -L "$LAPACK" -llapack -o "$BINDIR"/"$NAME" "${objectlist[@]}"
    ;;
 library)
