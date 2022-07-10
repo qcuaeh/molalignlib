@@ -6,8 +6,8 @@ optimization level. The script accepts the following options to change the
 defaults:
 
 &ensp; -slow : Build without optimizations.  
-&ensp; -debug : Build with debug info without optimizations.  
-&ensp; -rebuild : Recompile all source files from scratch.  
+&ensp; -debug : Build with complete checks and debug info.  
+&ensp; -recom : Recompile all source files from scratch.  
 
 The executables will be created in the *bin* directory.
 
@@ -15,8 +15,8 @@ Compile the library
 ===================
 
 Run `./build-lib` without arguments to compile the library with the highest
-optimization level. The script accepts the same options as the *build* script.
-The libraries will be created in the *bin* directory.
+optimization level. The script accepts the same options as the *build* script
+and the libraries will be created in the *bin* directory.
 
 Run the program
 ===============
