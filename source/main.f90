@@ -19,7 +19,7 @@ implicit none
 
 integer i
 integer natom0, natom1
-integer nrecord, maxrecord
+integer nrecord, maxrecords
 character(ttllen) title0, title1
 real(wp) travec(3), rotmat(3, 3)
 integer, allocatable :: countlist(:)
@@ -37,12 +37,12 @@ character(optlen) arg, path
 live = .false.
 biased = .false.
 iterative = .false.
-trialing = .false.
+aborting = .false.
 counting = .false.
 testing = .false.
-maxrecord = 9
-biasscale = 1000.0_wp
-weighter = 'none'
+maxrecords = 9
+lenscale = 1000.0_wp
+weighting = 'none'
 outformat = 'xyz'
 
 ! Set defualt file units
@@ -67,17 +67,17 @@ do while (getarg(arg))
         biased = .true.
         call readoptarg(arg, tolerance)
     case ('-trials')
-        trialing = .true.
-        call readoptarg(arg, maxtrial)
+        aborting = .true.
+        call readoptarg(arg, maxtrials)
     case ('-count')
         counting = .true.
         call readoptarg(arg, maxcount)
-    case ('-bias-scale')
-        call readoptarg(arg, biasscale)
+    case ('-scale')
+        call readoptarg(arg, lenscale)
     case ('-weight')
-        call readoptarg(arg, weighter)
+        call readoptarg(arg, weighting)
     case ('-maps')
-        call readoptarg(arg, maxrecord)
+        call readoptarg(arg, maxrecords)
     case ('-out')
         call readoptarg(arg, outformat)
     case ('-stdin')
@@ -107,7 +107,7 @@ call readxyzfile(second_unit, natom1, title1, labels1, coords1)
 allocate(znums0(natom0), znums1(natom1))
 allocate(types0(natom0), types1(natom1))
 allocate(weights0(natom0), weights1(natom1))
-allocate(atomaplist(natom0, maxrecord), countlist(maxrecord))
+allocate(atomaplist(natom0, maxrecords), countlist(maxrecords))
 
 ! Get atomic numbers and types
 
@@ -121,13 +121,13 @@ end do
 
 ! Select weighting property
 
-select case (weighter)
+select case (weighting)
 case ('none')
     property = [(1.0_wp, i=1, nelem)]
 case ('mass')
     property = stdmatom
 case default
-    write (error_unit, '(a,x,a)') 'Invalid weighter option:', trim(weighter)
+    write (error_unit, '(a,x,a)') 'Invalid weighting option:', trim(weighting)
     stop
 end select
 
@@ -138,10 +138,10 @@ weights1 = property(znums1)/sum(property(znums1))
 
 ! Superpose atoms
 
-if (trialing .or. counting) then
+if (aborting .or. counting) then
 
     call remap(natom0, natom1, znums0, znums1, types0, types1, weights0, weights1, &
-        coords0, coords1, maxrecord, nrecord, atomaplist, countlist)
+        coords0, coords1, maxrecords, nrecord, atomaplist, countlist)
 
     ! Write aligned coordinates
 

@@ -9,9 +9,9 @@ integer, parameter :: temp_file_unit = 1000
 integer, parameter :: first_file_unit = 1001
 integer, parameter :: second_file_unit = 1002
 
-integer maxtrial, maxcount
-logical live, iterative, biased, trialing, counting, testing
-character(optlen) weighter, outformat
-real(wp) biasscale, tolerance
+integer maxtrials, maxcount
+logical live, iterative, biased, aborting, counting, testing
+character(optlen) weighting, outformat
+real(wp) lenscale, tolerance
 
 end module

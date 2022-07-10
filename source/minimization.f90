@@ -35,11 +35,11 @@ logical function lower_than(counter, threshold)
 end function
 
 subroutine minimize_msd( &
-    natom, nblock, blocksize, weights, coords0, coords1, maxrecord, nrecord, &
+    natom, nblock, blocksize, weights, coords0, coords1, maxrecords, nrecord, &
     atomaplist, countlist, trial_test, match_test &
 )
 
-    integer, intent(in) :: natom, nblock, maxrecord
+    integer, intent(in) :: natom, nblock, maxrecords
     integer, dimension(:), intent(in) :: blocksize
     real(wp), dimension(:, :), intent(in) :: coords0, coords1
     real(wp), dimension(:), intent(in) :: weights
@@ -50,10 +50,10 @@ subroutine minimize_msd( &
     logical found, overflow
     integer imap, jmap, ntrial, nmatch, iteration
     integer, dimension(natom) :: atomap, auxmap
-    integer earliest(maxrecord)
+    integer earliest(maxrecords)
     real(wp) :: dist, biased_dist, new_biased_dist, meanrot
     real(wp), dimension(4) :: rotquat, prodquat
-    real(wp), dimension(maxrecord) :: mindist, avgiter, avgmeanrot, avgtotrot
+    real(wp), dimension(maxrecords) :: mindist, avgiter, avgmeanrot, avgtotrot
     real(wp) bias(natom, natom)
     real(wp) auxcoords(3, natom)
 
@@ -77,7 +77,7 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
 
 ! Loop for map searching
 
-    do while (trial_test(ntrial, maxtrial) .and. match_test(nmatch, maxcount))
+    do while (trial_test(ntrial, maxtrials) .and. match_test(nmatch, maxcount))
 
         ntrial = ntrial + 1
 
@@ -141,13 +141,13 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
         end do
 
         if (.not. found) then
-            if (nrecord >= maxrecord) then
+            if (nrecord >= maxrecords) then
                 overflow = .true.
             end if
-            do imap = 1, maxrecord
+            do imap = 1, maxrecords
                 if (imap > nrecord .or. dist < mindist(imap)) then
                     if (imap == 1) nmatch = 1
-                    if (nrecord < maxrecord) nrecord = nrecord + 1
+                    if (nrecord < maxrecords) nrecord = nrecord + 1
                     do jmap = nrecord, imap + 1, -1
                         countlist(jmap) = countlist(jmap - 1)
                         avgiter(jmap) = avgiter(jmap - 1)

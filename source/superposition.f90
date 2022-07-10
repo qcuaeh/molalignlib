@@ -4,7 +4,7 @@
 subroutine remap( &
 ! Purpose: Remap atoms to optimize superposition
     natom0, natom1, znums0, znums1, types0, types1, weights0, weights1, &
-    coords0, coords1, maxrecord, nrecord, atomaplist, countlist &
+    coords0, coords1, maxrecords, nrecord, atomaplist, countlist &
 )
 
 use iso_fortran_env, only: output_unit
@@ -23,7 +23,7 @@ use alignment
 
 implicit none
 
-integer, intent(in) :: natom0, natom1, maxrecord
+integer, intent(in) :: natom0, natom1, maxrecords
 integer, dimension(natom0), intent(in) :: znums0, types0
 integer, dimension(natom1), intent(in) :: znums1, types1
 real(wp), intent(in) :: coords0(3, natom0)
@@ -31,8 +31,8 @@ real(wp), intent(in) :: coords1(3, natom1)
 real(wp), intent(in) :: weights0(natom0)
 real(wp), intent(in) :: weights1(natom1)
 integer, intent(out) :: nrecord
-integer, intent(out) :: atomaplist(natom0, maxrecord)
-integer, intent(out) :: countlist(maxrecord)
+integer, intent(out) :: atomaplist(natom0, maxrecords)
+integer, intent(out) :: countlist(maxrecords)
 
 integer i
 integer nblock0, nblock1
@@ -60,7 +60,7 @@ allocate(blocksize0(natom0), blocksize1(natom1))
 
 ! Select trial exit test
 
-if (trialing) then
+if (aborting) then
     trial_test => lower_than
 else
     trial_test => dummy_test
@@ -116,7 +116,7 @@ call minimize_msd( &
     natom0, nblock0, blocksize0, weights0(order0), &
     centered(natom0, coords0(:, order0), center0), &
     centered(natom1, coords1(:, order1), center1), &
-    maxrecord, nrecord, atomaplist, countlist, &
+    maxrecords, nrecord, atomaplist, countlist, &
     trial_test, match_test &
 )
 
