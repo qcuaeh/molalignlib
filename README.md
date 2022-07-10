@@ -2,8 +2,8 @@ Compile the program
 ===================
 
 Run ./build without arguments to compile the executable with the highest
-optimization level. It accepts the following options to change the default
-behaviour:
+optimization level. Run ./rebuild instead of ./build to recompile all source files from scratch.
+Both scripts accept the same options:
 
 ### Optimization level options
 
@@ -14,9 +14,6 @@ behaviour:
 
 -exe : Build the executable program (default)  
 -lib : Build the shared libraries  
-
-Run ./rebuild instead of ./build to recompile all source files from scratch.
-Both scripts accept the same options.
 
 ### Notes
 
@@ -32,6 +29,7 @@ Run the program
 
 -maps INTEGER : Number of recorded maps
 -out xyz|mol2 : Output format (XYZ or MOL2)
+
 -live : Print live stats
 -iter : Iterative trial step
 -bias REAL : Tolerance for biasing
