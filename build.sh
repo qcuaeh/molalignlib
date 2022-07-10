@@ -14,18 +14,19 @@ compile () {
 
 shopt -s nullglob
 
-options=$(getopt -a -o '' -l slow,fast,debug,recom -- "$@")
+options=$(getopt -a -o '' -l slow,fast,debug,recompile -- "$@")
 if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
 eval set -- "$options"
 
 optlevel=fast
+recompile=false
 
 while true; do
    case "$1" in
       --slow) optlevel=slow; shift;;
       --fast) optlevel=fast; shift;;
       --debug) optlevel=debug; shift;;
-      --recom) recompile=true; shift;;
+      --recompile) recompile=true; shift;;
       --) shift; break ;;
    esac
 done
