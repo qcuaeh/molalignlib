@@ -12,8 +12,10 @@ optimization level.
 
 Both scripts accept the same options:
 
--debug : Build the debug version
--rebuild : Recompile all source files from scratch
+<div id="user-content-toc"><ul>
+* -debug : Build the debug version
+* -rebuild : Recompile all source files from scratch
+</ul></div>
 
 ### Notes
 
