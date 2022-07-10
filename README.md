@@ -27,18 +27,17 @@ Run the program
 
 ### Program options
 
--maps INTEGER : Number of recorded maps
--out xyz|mol2 : Output format (XYZ or MOL2)
-
--live : Print live stats
--iter : Iterative trial step
--bias REAL : Tolerance for biasing
--weight STRING : Weighting property
--count INTEGER : Maximum map counting
--trials INTEGER : Maximum number of trials
--scale REAL : Length scale
--test : Repeateble run for testing
-
+&ensp; -maps INTEGER : Number of recorded maps
+&ensp; -out xyz|mol2 : Output format (XYZ or MOL2)
+&ensp; -live : Print live stats
+&ensp; -iter : Iterative trial step
+&ensp; -bias REAL : Tolerance for biasing
+&ensp; -weight STRING : Weighting property
+&ensp; -count INTEGER : Maximum map counting
+&ensp; -trials INTEGER : Maximum number of trials
+&ensp; -scale REAL : Length scale
+&ensp; -test : Repeateble run for testing
+ 
 ### Examples
-
+ 
 ./bin/ralign tests/r005/100cobalt_j5.xyz -iter -weight mass -bias 0.17 -test -trials 1000 -count 10
