@@ -1,8 +1,8 @@
-!module superposition
+!module library
 !contains
 
 subroutine remap( &
-! Purpose: Remap atoms to optimize superposition
+! Purpose: Check and optimize mapping
     natom0, natom1, znums0, znums1, types0, types1, weights0, weights1, &
     coords0, coords1, maxrecords, nrecord, atomaplist, countlist &
 )
@@ -17,7 +17,7 @@ use chemdata
 use maputils
 use rotation
 use translation
-use minimization
+use remapping
 use assortment
 use alignment
 
@@ -112,7 +112,7 @@ call random_seed(put=seed)
 
 ! Remap atoms to minimize distance and difference
 
-call minimize_msd( &
+call optimize_mapping( &
     natom0, nblock0, blocksize0, weights0(order0), &
     centered(natom0, coords0(:, order0), center0), &
     centered(natom1, coords1(:, order1), center1), &

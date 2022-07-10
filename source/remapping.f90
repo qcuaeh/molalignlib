@@ -1,4 +1,4 @@
-module minimization
+module remapping
 
 use iso_fortran_env, only: output_unit
 use iso_fortran_env, only: error_unit
@@ -34,7 +34,7 @@ logical function lower_than(counter, threshold)
     lower_than = counter < threshold
 end function
 
-subroutine minimize_msd( &
+subroutine optimize_mapping( &
     natom, nblock, blocksize, weights, coords0, coords1, maxrecords, nrecord, &
     atomaplist, countlist, trial_test, match_test &
 )

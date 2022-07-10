@@ -16,8 +16,8 @@ rotation.f90
 alignment.f90
 readwrite.f90
 biasing.f90
-minimization.f90
-superposition.f90 export
+remapping.f90
+library.f90 export
 fileutils.f90
 optparse.f90
-main.f90
+program.f90
