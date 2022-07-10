@@ -3,9 +3,10 @@ Compile the program
 
 Run `./build` without arguments to build the program with the highest
 optimization level. The script accepts the following options to change the
-optimization level:
+defaults:
 
-&ensp; -debug : Build the debug version.  
+&ensp; -slow : Build without optimizations.  
+&ensp; -debug : Build without optimizations with debug info.  
 &ensp; -rebuild : Recompile all source files from scratch.  
 
 The executables are created in the **bin** directory and the object
@@ -21,7 +22,7 @@ same notices apply.
 Run the program
 ===============
 
-#### Program options
+### Program options
 
 &ensp; -maps INTEGER : Number of recorded maps.  
 &ensp; -out xyz|mol2 : Output format (XYZ or MOL2).  
@@ -34,6 +35,6 @@ Run the program
 &ensp; -scale REAL : Length scale.  
 &ensp; -test : Repeateble run for testing.  
  
-#### Examples
+### Examples
  
 ./bin/ralign tests/r005/100cobalt_j5.xyz -iter -weight mass -bias 0.17 -test -trials 1000 -count 10
