@@ -57,12 +57,14 @@ subroutine readxyzfile(file_unit, natom, title, labels, coords)
 end subroutine
 
 
-subroutine writexyzfile(file_unit, natom, title, znums, coords)
+subroutine writexyzfile(file_unit, natom, title, znums, coords, opt_nbond, opt_bonds)
 
     character(*), intent(in) :: title
     integer, intent(in) :: file_unit, natom
     integer, dimension(:), intent(in) :: znums
     real(wp), dimension(:, :), intent(in) :: coords
+    integer, optional, intent(in) :: opt_nbond
+    integer, target, optional, intent(in) :: opt_bonds(:, :)
 
     integer i
 
@@ -99,7 +101,11 @@ subroutine writemol2file(file_unit, natom, title, znums, coords, opt_nbond, opt_
     end if
 
     write (file_unit, '(a)') '@<TRIPOS>MOLECULE'
-    write (file_unit, '(a)') trim(title)
+    if (title /= '') then
+        write (file_unit, '(a)') trim(title)
+    else
+        write (file_unit, '(a)') 'Untitled'
+    end if
     write (file_unit, '(5(i4, x))') natom, nbond, 0, 0, 0
     write (file_unit, '(a)') 'SMALL'
     write (file_unit, '(a)') 'NO_CHARGES'
