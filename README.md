@@ -35,5 +35,5 @@ Run the program
 &ensp; -scale SCALE : Set length scale to SCALE.  
  
 ### Examples
- 
-./bin/ralign tests/r005/100cobalt_j5.xyz -iter -weight mass -bias 0.17 -test -trials 1000 -count 10
+
+    ./bin/ralign tests/r005/100cobalt_j5.xyz -iter -weight mass -bias 0.17 -test -trials 1000 -count 10
