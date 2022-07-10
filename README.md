@@ -24,7 +24,7 @@ Run the program
 ### Program options
 
 &ensp; -maps INTEGER : Number of recorded maps.  
-&ensp; -out xyz|mol2 : Output format (XYZ or MOL2).  
+&ensp; -out xyz|mol2 : Output format can be XYZ or MOL2.  
 &ensp; -live : Print live stats.  
 &ensp; -iter : Iterative trial step.  
 &ensp; -bias REAL : Tolerance for biasing.  
