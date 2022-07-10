@@ -1,19 +1,19 @@
 Compile the program
 ===================
 
-Run ./build without arguments to compile the executable with the highest
-optimization level. Run ./rebuild instead of ./build to recompile all source files from scratch.
+Run ./build without arguments to build the program with the highest
+optimization level.
+
+Compile the library
+===================
+
+Run ./build-lib without arguments to compile the library with the highest
+optimization level.
+
 Both scripts accept the same options:
 
-### Optimization level options
-
--fast : Build the optimized version (default)  
--debug : Build the debug version  
-  
-### Build type options
-
--exe : Build the executable program (default)  
--lib : Build the shared libraries  
+-debug : Build the debug version
+-rebuild : Recompile all source files from scratch
 
 ### Notes
 
