@@ -2,12 +2,13 @@ Compile the program
 ===================
 
 Run `./build` without arguments to build the program with the highest
-optimization level. The script accepts the following options:
+optimization level. The script accepts the following options to change the
+optimization level:
 
-&ensp; -debug : Build the debug version  
-&ensp; -rebuild : Recompile all source files from scratch  
+&ensp; -debug : Build the debug version.  
+&ensp; -rebuild : Recompile all source files from scratch.  
 
-The executables are created in the "bin" directory and the object
+The executables are created in the **bin** directory and the object
 files are stored in the **\_build_dir** directory.
 
 Compile the library
@@ -22,16 +23,16 @@ Run the program
 
 #### Program options
 
-&ensp; -maps INTEGER : Number of recorded maps  
-&ensp; -out xyz|mol2 : Output format (XYZ or MOL2)  
-&ensp; -live : Print live stats  
-&ensp; -iter : Iterative trial step  
-&ensp; -bias REAL : Tolerance for biasing  
-&ensp; -weight STRING : Weighting property  
-&ensp; -count INTEGER : Maximum map counting  
-&ensp; -trials INTEGER : Maximum number of trials  
-&ensp; -scale REAL : Length scale  
-&ensp; -test : Repeateble run for testing  
+&ensp; -maps INTEGER : Number of recorded maps.  
+&ensp; -out xyz|mol2 : Output format (XYZ or MOL2).  
+&ensp; -live : Print live stats.  
+&ensp; -iter : Iterative trial step.  
+&ensp; -bias REAL : Tolerance for biasing.  
+&ensp; -weight STRING : Weighting property.  
+&ensp; -count INTEGER : Maximum map counting.  
+&ensp; -trials INTEGER : Maximum number of trials.  
+&ensp; -scale REAL : Length scale.  
+&ensp; -test : Repeateble run for testing.  
  
 #### Examples
  
