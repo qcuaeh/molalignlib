@@ -28,7 +28,7 @@ Run the program
 &ensp; -live : Print live stats.  
 &ensp; -iter : Iterative trial step.  
 &ensp; -bias REAL : Tolerance for biasing.  
-&ensp; -weight STRING : Weighting property.  
+&ensp; -weight none|mass : Weighting property can be none or mass.  
 &ensp; -count INTEGER : Maximum map counting.  
 &ensp; -trials INTEGER : Maximum number of trials.  
 &ensp; -scale REAL : Length scale.  
