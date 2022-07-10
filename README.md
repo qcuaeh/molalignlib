@@ -15,7 +15,7 @@ Compile the shared library
 
 Run `./build-lib` without arguments to compile the shared library with the
 highest optimization level. This script accepts the same options as the *build*
-script and the library files will be also created in the *bin* directory.
+script and the library files will be created in the same *bin* directory.
 
 Run the program
 ===============
