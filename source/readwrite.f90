@@ -9,6 +9,18 @@ use chemdata
 
 implicit none
 
+abstract interface
+    subroutine writeabstractfile(file_unit, natom, title, znums, coords, nbond, bonds)
+        use options
+        character(*), intent(in) :: title
+        integer, intent(in) :: file_unit, natom
+        integer, dimension(:), intent(in) :: znums
+        real(wp), dimension(:, :), intent(in) :: coords
+        integer, optional, intent(in) :: nbond
+        integer, target, optional, intent(in) :: bonds(:, :)
+    end subroutine
+end interface
+
 contains
 
 subroutine readxyzfile(file_unit, natom, title, labels, coords)
@@ -62,16 +74,29 @@ subroutine writexyzfile(file_unit, natom, title, znums, coords)
 
 end subroutine
 
-subroutine writemol2file(file_unit, natom, nbond, title, znums, coords, bonds)
+subroutine writemol2file(file_unit, natom, title, znums, coords, opt_nbond, opt_bonds)
 
     character(*), intent(in) :: title
     integer, intent(in) :: file_unit, natom
     integer, dimension(:), intent(in) :: znums
     real(wp), dimension(:, :), intent(in) :: coords
-    integer, intent(in) :: nbond
-    integer, dimension(:, :), intent(in) :: bonds
+    integer, optional, intent(in) :: opt_nbond
+    integer, target, optional, intent(in) :: opt_bonds(:, :)
 
-    integer i
+    integer i, nbond
+    integer, pointer :: bonds(:, :)
+    
+
+    if (present(opt_nbond)) then
+        nbond = opt_nbond
+        if (present(opt_bonds)) then
+            bonds => opt_bonds
+        else
+            write (error_unit, '(a)') 'Bond list is missing!'
+        end if
+    else
+        nbond = 0
+    end if
 
     write (file_unit, '(a)') '@<TRIPOS>MOLECULE'
     write (file_unit, '(a)') trim(title)

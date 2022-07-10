@@ -42,8 +42,8 @@ integer, dimension(:), allocatable :: blockidx0, blockidx1
 integer, dimension(:), allocatable :: blocksize0, blocksize1
 real(wp), dimension(3) :: center0, center1
 
-procedure (test), pointer :: trial_test => null()
-procedure (test), pointer :: match_test => null()
+procedure(test), pointer :: trial_test => null()
+procedure(test), pointer :: match_test => null()
 
 ! Check number of atoms
 

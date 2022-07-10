@@ -32,6 +32,8 @@ real(wp), dimension(nelem) :: property
 integer first_unit, second_unit
 character(optlen) arg, path
 
+procedure(writeabstractfile), pointer :: writefile => null()
+
 ! Set default options
 
 live = .false.
@@ -119,6 +121,18 @@ do i = 1, natom1
     call getznum(labels1(i), znums1(i), types1(i))
 end do
 
+! Select output format
+
+select case (outformat)
+case ('xyz')
+    writefile => writexyzfile
+case ('mol2')
+    writefile => writemol2file
+case default
+    write (error_unit, '(a,x,a)') 'Invalid format:', trim(outformat)
+    stop
+end select
+
 ! Select weighting property
 
 select case (weighting)
@@ -157,8 +171,8 @@ if (aborting .or. counting) then
         )
 
         open(temp_file_unit, file='aligned_'//str(i)//'.'//trim(outformat), action='write', status='replace')
-        call writexyzfile(temp_file_unit, natom0, title0, znums0, coords0)
-        call writexyzfile( &
+        call writefile(temp_file_unit, natom0, title0, znums0, coords0)
+        call writefile( &
             temp_file_unit, natom1, title1, znums1(atomaplist(:, i)), &
             translated(natom1, rotated(natom1, coords1(:, atomaplist(:, i)), rotmat), travec) &
         )
@@ -179,8 +193,8 @@ else
         '(only alignment performed)'
 
     open(temp_file_unit, file='aligned.'//trim(outformat), action='write', status='replace')
-    call writexyzfile(temp_file_unit, natom0, title0, znums0, coords0)
-    call writexyzfile(temp_file_unit, natom1, title1, znums1, coords1) 
+    call writefile(temp_file_unit, natom0, title0, znums0, coords0)
+    call writefile(temp_file_unit, natom1, title1, znums1, coords1) 
     close(temp_file_unit)
 
 end if
