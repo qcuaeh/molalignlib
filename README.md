@@ -24,8 +24,8 @@ directory. Moreover the script accepts the following options:
 
 &ensp; -recompile : Recompile all sources from scratch.  
 
-Running the program
-===================
+Running ralign
+==============
 
 ### Program options
 
@@ -43,4 +43,15 @@ Running the program
  
 ### Examples
 
-    ./bin/ralign tests/r005/100cobalt_j5.xyz -iter -weight mass -bias 0.17 -test -trials 1000 -count 10
+Te following line will run the program using biases with a tolerance of 0.17 Å, iteration, mass weigthed coordinates, a stopping threshold of 10 counts, a maximum of 1000 trials and repeatable pseudo random numbers:
+
+    ./bin/ralign tests/r005/100cobalt_j5.xyz -bias 0.17 -iter -weight mass -count 10 -trials 1000 -test
+    
+The ouput should look as follows:
+
+     Map   Trial   Count   Cycles   Meanrot   Totalrot      RMSD
+    ------------------------------------------------------------
+       1       2      10      2.0      65.2     116.0     0.0482
+       2       1       4      1.5      78.0     110.0     2.1060
+    ------------------------------------------------------------
+    Found 2 mapping(s) in 14 random trial(s)
