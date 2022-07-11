@@ -41,8 +41,8 @@ subroutine optimize_mapping( &
 
     integer, intent(in) :: natom, nblock, maxrecords
     integer, dimension(:), intent(in) :: blocksize
-    real(wp), dimension(:, :), intent(in) :: coords0, coords1
-    real(wp), dimension(:), intent(in) :: weights
+    real, dimension(:, :), intent(in) :: coords0, coords1
+    real, dimension(:), intent(in) :: weights
     procedure (test), pointer, intent(in) :: trial_test, match_test
     integer, intent(out) :: nrecord
     integer, intent(out) :: atomaplist(:, :), countlist(:)
@@ -51,11 +51,11 @@ subroutine optimize_mapping( &
     integer imap, jmap, ntrial, nmatch, iteration
     integer, dimension(natom) :: atomap, auxmap
     integer earliest(maxrecords)
-    real(wp) :: dist, biased_dist, new_biased_dist, meanrot
-    real(wp), dimension(4) :: rotquat, prodquat
-    real(wp), dimension(maxrecords) :: mindist, avgiter, avgmeanrot, avgtotrot
-    real(wp) bias(natom, natom)
-    real(wp) auxcoords(3, natom)
+    real :: dist, biased_dist, new_biased_dist, meanrot
+    real, dimension(4) :: rotquat, prodquat
+    real, dimension(maxrecords) :: mindist, avgiter, avgmeanrot, avgtotrot
+    real bias(natom, natom)
+    real auxcoords(3, natom)
 
 ! Set bias for non equivalent atoms 
 

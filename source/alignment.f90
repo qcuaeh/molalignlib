@@ -17,11 +17,11 @@ contains
 function squaredist(natom, weights, coords0, coords1, atomap) result(dist)
     integer, intent(in) :: natom
     integer, dimension(:), intent(in) :: atomap
-    real(wp), dimension(:), intent(in) :: weights
-    real(wp), dimension(:, :), intent(in) :: coords0, coords1
+    real, dimension(:), intent(in) :: weights
+    real, dimension(:, :), intent(in) :: coords0, coords1
 
     integer i
-    real(wp) dist
+    real dist
 
     dist = 0
 
@@ -34,11 +34,11 @@ end function
 function squarenorm(natom, weights, coords0, coords1, atomap) result(norm)
     integer, intent(in) :: natom
     integer, dimension(:), intent(in) :: atomap
-    real(wp), dimension(:), intent(in) :: weights
-    real(wp), dimension(:, :), intent(in) :: coords0, coords1
+    real, dimension(:), intent(in) :: weights
+    real, dimension(:, :), intent(in) :: coords0, coords1
 
     integer i
-    real(wp) norm
+    real norm
 
     norm = 0
 
@@ -52,10 +52,10 @@ end function
 ! Calculate least square distance from eigenvalues
 !    integer, intent(in) :: natom
 !    integer, dimension(:), intent(in) :: atomap
-!    real(wp), dimension(:), intent(in) :: weights
-!    real(wp), dimension(:, :), intent(in) :: coords0, coords1
+!    real, dimension(:), intent(in) :: weights
+!    real, dimension(:, :), intent(in) :: coords0, coords1
 !
-!    real(wp) dist, kearsleymat(4, 4), eigval(4)
+!    real dist, kearsleymat(4, 4), eigval(4)
 !
 !    call buildkearsleymat(natom, weights, coords0, coords1, atomap, kearsleymat)
 !    call syeval4(kearsleymat, eigval)
@@ -67,10 +67,10 @@ function leastsquaredist(natom, weights, coords0, coords1, atomap) result(dist)
 ! Calculate least square distance from aligned coordinates
     integer, intent(in) :: natom
     integer, dimension(:), intent(in) :: atomap
-    real(wp), dimension(:), intent(in) :: weights
-    real(wp), dimension(:, :), intent(in) :: coords0, coords1
+    real, dimension(:), intent(in) :: weights
+    real, dimension(:, :), intent(in) :: coords0, coords1
 
-    real(wp) dist
+    real dist
 
     dist = squaredist(natom, weights, coords0, aligned(natom, weights, coords0, coords1, atomap), atomap)
 
@@ -79,10 +79,10 @@ end function
 function leastrotquat(natom, weights, coords0, coords1, atomap) result(quat)
     integer, intent(in) :: natom
     integer, dimension(:), intent(in) :: atomap
-    real(wp), dimension(:), intent(in) :: weights
-    real(wp), dimension(:, :), intent(in) :: coords0, coords1
+    real, dimension(:), intent(in) :: weights
+    real, dimension(:, :), intent(in) :: coords0, coords1
 
-    real(wp) quat(4), kearsleymat(4, 4), eigval(4)
+    real quat(4), kearsleymat(4, 4), eigval(4)
 
     call buildkearsleymat(natom, weights, coords0, coords1, atomap, kearsleymat)
     call syevec4(kearsleymat, eigval)
@@ -93,10 +93,10 @@ end function
 function aligned(natom, weights, coords0, coords1, atomap)
     integer, intent(in) :: natom
     integer, dimension(:), intent(in) :: atomap
-    real(wp), dimension(:), intent(in) :: weights
-    real(wp), dimension(:, :), intent(in) :: coords0, coords1
+    real, dimension(:), intent(in) :: weights
+    real, dimension(:, :), intent(in) :: coords0, coords1
 
-    real(wp) aligned(3, natom), kearsleymat(4, 4), eigval(4)
+    real aligned(3, natom), kearsleymat(4, 4), eigval(4)
 
     call buildkearsleymat(natom, weights, coords0, coords1, atomap, kearsleymat)
     call syevec4(kearsleymat, eigval)
@@ -116,11 +116,11 @@ subroutine buildkearsleymat(natom, weights, coords0, coords1, atomap, kearsleyma
 
     integer, intent(in) :: natom
     integer, dimension(:), intent(in) :: atomap
-    real(wp), dimension(:), intent(in) :: weights
-    real(wp), dimension(:, :), intent(in) :: coords0, coords1
+    real, dimension(:), intent(in) :: weights
+    real, dimension(:, :), intent(in) :: coords0, coords1
 
     integer i
-    real(wp) kearsleymat(4, 4), p(3, natom), q(3, natom), auxmat(4, 4)
+    real kearsleymat(4, 4), p(3, natom), q(3, natom), auxmat(4, 4)
 
     kearsleymat = 0.0
 

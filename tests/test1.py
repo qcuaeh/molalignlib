@@ -17,14 +17,16 @@ weights1 = np.ones(len(atoms1), dtype=float)
 coords0 = np.transpose(atoms0.get_positions())
 coords1 = np.transpose(atoms1.get_positions())
 
-options.remap = True
+# Normalize weights
+weights0 = weights0/sum(weights0)
+weights1 = weights1/sum(weights1)
+
 options.biased = True
 options.testing = True
-options.matching = True
+options.counting = True
 options.iterative = True
-options.maxmatch = 10
-options.biasscale = 1000.0
+options.maxcount = 10
+options.lenscale = 1000.0
 options.tolerance = 0.17
-options.weighter = optstr('none')
 
 remap(znums0, znums1, types0, types1, weights0, weights1, coords0, coords1, 10)

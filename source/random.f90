@@ -11,7 +11,7 @@ end interface
 contains
 
 function randvec3() result(x)
-    real(wp) x(3)
+    real x(3)
     call random_number(x)
 end function
 
@@ -19,7 +19,7 @@ subroutine intshuffle(array, n)
    integer, intent(in) :: n
    integer, dimension(:), intent(inout) :: array(:)
    integer i, j, k, temp
-   real(wp) u
+   real u
 
    do k = 1, 2
       do i = 1, n

@@ -22,7 +22,7 @@ subroutine getblocks(natom, znums, types, weights, nblock, blocksize, blockindex
     integer, intent(out) :: nblock
     integer, intent(out) :: order(:)
     integer, dimension(:), intent(out) :: blocksize, blockindex
-    real(wp), dimension(:), intent(in) :: weights
+    real, dimension(:), intent(in) :: weights
 
     integer i, j
     logical remaining(natom)

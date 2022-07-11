@@ -17,8 +17,8 @@ function centroid(natom, weights, coords)
 ! Purpose: Get coordinates of centroid
 
     integer, intent(in) :: natom
-    real(wp), intent(in) :: weights(natom), coords(3, natom)
-    real(wp) centroid(3)
+    real, intent(in) :: weights(natom), coords(3, natom)
+    real centroid(3)
 
     integer i
 
@@ -38,8 +38,8 @@ function translated(natom, coords, vector)
 ! Purpose: Translate atomic coordinates to its vector of geometry
 
     integer, intent(in) :: natom
-    real(wp), intent(in) :: coords(3, natom), vector(3)
-    real(wp) translated(3, natom)
+    real, intent(in) :: coords(3, natom), vector(3)
+    real translated(3, natom)
 
     integer i
 
@@ -53,8 +53,8 @@ subroutine translate(natom, coords, vector)
 ! Purpose: Translate atomic coordinates to its vector of geometry
 
     integer, intent(in) :: natom
-    real(wp), intent(in) :: vector(3)
-    real(wp), intent(inout) :: coords(3, natom)
+    real, intent(in) :: vector(3)
+    real, intent(inout) :: coords(3, natom)
 
     integer i
 
@@ -68,8 +68,8 @@ function centered(natom, coords, vector)
 ! Purpose: Translate atomic coordinates to its vector of geometry
 
     integer, intent(in) :: natom
-    real(wp), intent(in) :: coords(3, natom), vector(3)
-    real(wp) centered(3, natom)
+    real, intent(in) :: coords(3, natom), vector(3)
+    real centered(3, natom)
 
     integer i
 

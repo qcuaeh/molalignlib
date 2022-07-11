@@ -10,11 +10,11 @@ contains
 subroutine setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
     integer, intent(in) :: natom, nblock
     integer, dimension(:), intent(in) :: blocksize
-    real(wp), dimension(:, :), intent(in) :: coords0, coords1
-    real(wp), dimension(:, :), intent(out) :: bias
+    real, dimension(:, :), intent(in) :: coords0, coords1
+    real, dimension(:, :), intent(out) :: bias
 
     integer h, i, j, offset
-    real(wp) d0(natom, natom), d1(natom, natom)
+    real d0(natom, natom), d1(natom, natom)
 
     do i = 1, natom
         offset = 0

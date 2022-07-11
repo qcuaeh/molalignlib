@@ -21,16 +21,16 @@ integer i
 integer natom0, natom1
 integer nrecord, maxrecords
 character(ttllen) title0, title1
-real(wp) travec(3), rotmat(3, 3)
+real travec(3), rotmat(3, 3)
 integer, allocatable :: countlist(:)
 integer, allocatable :: atomaplist(:, :)
 character(lbllen), dimension(:), allocatable :: labels0, labels1
 integer, dimension(:), allocatable :: znums0, znums1, types0, types1
-real(wp), dimension(:, :), allocatable :: coords0, coords1
-real(wp), dimension(:), allocatable :: weights0, weights1
-real(wp), dimension(nelem) :: property
+real, dimension(:, :), allocatable :: coords0, coords1
+real, dimension(:), allocatable :: weights0, weights1
+real, dimension(nelem) :: property
 integer first_unit, second_unit
-character(optlen) arg, path
+character(optlen) arg, path, weighting
 
 procedure(writeabstractfile), pointer :: writefile => null()
 
@@ -43,7 +43,7 @@ aborting = .false.
 counting = .false.
 testing = .false.
 maxrecords = 9
-lenscale = 1000.0_wp
+lenscale = 1000.0
 weighting = 'none'
 outformat = 'xyz'
 
@@ -137,7 +137,7 @@ end select
 
 select case (weighting)
 case ('none')
-    property = [(1.0_wp, i=1, nelem)]
+    property = [(1.0, i=1, nelem)]
 case ('mass')
     property = stdmatom
 case default

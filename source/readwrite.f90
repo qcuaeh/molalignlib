@@ -15,7 +15,7 @@ abstract interface
         character(*), intent(in) :: title
         integer, intent(in) :: file_unit, natom
         integer, dimension(:), intent(in) :: znums
-        real(wp), dimension(:, :), intent(in) :: coords
+        real, dimension(:, :), intent(in) :: coords
         integer, optional, intent(in) :: nbond
         integer, target, optional, intent(in) :: bonds(:, :)
     end subroutine
@@ -27,7 +27,7 @@ subroutine readxyzfile(file_unit, natom, title, labels, coords)
 
     integer, intent(in) :: file_unit
     integer, intent(out) :: natom
-    real(wp), dimension(:, :), allocatable, intent(out) :: coords
+    real, dimension(:, :), allocatable, intent(out) :: coords
     character(*), dimension(:), allocatable, intent(out) :: labels
     character(*), intent(out) :: title
     integer i, stat
@@ -62,7 +62,7 @@ subroutine writexyzfile(file_unit, natom, title, znums, coords, opt_nbond, opt_b
     character(*), intent(in) :: title
     integer, intent(in) :: file_unit, natom
     integer, dimension(:), intent(in) :: znums
-    real(wp), dimension(:, :), intent(in) :: coords
+    real, dimension(:, :), intent(in) :: coords
     integer, optional, intent(in) :: opt_nbond
     integer, target, optional, intent(in) :: opt_bonds(:, :)
 
@@ -81,7 +81,7 @@ subroutine writemol2file(file_unit, natom, title, znums, coords, opt_nbond, opt_
     character(*), intent(in) :: title
     integer, intent(in) :: file_unit, natom
     integer, dimension(:), intent(in) :: znums
-    real(wp), dimension(:, :), intent(in) :: coords
+    real, dimension(:, :), intent(in) :: coords
     integer, optional, intent(in) :: opt_nbond
     integer, target, optional, intent(in) :: opt_bonds(:, :)
 

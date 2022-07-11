@@ -1,4 +1,6 @@
 #!/bin/bash
-export FORTRAN LAPACK F2PY
+export FORTRAN
+export LAPACK
+export F2PY
 source "$(dirname "$0")/config"
-BUILDTYPE=program bash "$(dirname "$0")/build.sh" "$@"
+bash "$(dirname "$0")/build.sh" "$@"

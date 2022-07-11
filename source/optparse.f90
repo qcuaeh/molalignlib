@@ -106,7 +106,7 @@ end subroutine
 subroutine readrealoptarg(option, optval)
 
     character(optlen), intent(in) :: option
-    real(wp), intent(out) :: optval
+    real, intent(out) :: optval
     character(optlen) optarg
     integer stat
 

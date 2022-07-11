@@ -1,6 +1,5 @@
 module options
 
-integer, parameter :: wp = 8
 integer, parameter :: lbllen = 16
 integer, parameter :: optlen = 256
 integer, parameter :: ttllen = 256
@@ -11,7 +10,7 @@ integer, parameter :: second_file_unit = 1002
 
 integer maxtrials, maxcount
 logical live, iterative, biased, aborting, counting, testing
-character(optlen) weighting, outformat
-real(wp) lenscale, tolerance
+character(optlen) outformat
+real lenscale, tolerance
 
 end module

@@ -17,16 +17,16 @@ subroutine assignatoms(natom, weights, coords0, coords1, nblock, blocksize, bias
 
     integer, intent(in) :: natom, nblock
     integer, dimension(:), intent(in) :: blocksize
-    real(wp), dimension(:), intent(in) :: weights
-    real(wp), dimension(:, :), intent(in) :: coords0
-    real(wp), dimension(:, :), intent(in) :: bias
-    real(wp), dimension(:, :), intent(inout) :: coords1
+    real, dimension(:), intent(in) :: weights
+    real, dimension(:, :), intent(in) :: coords0
+    real, dimension(:, :), intent(in) :: bias
+    real, dimension(:, :), intent(inout) :: coords1
     integer, dimension(:), intent(out) :: atomap
 
     integer h, i, j, offset
     integer, dimension(natom) :: blockmap
-    real(wp), dimension(natom, natom) :: costs
-    real(wp) blocksum
+    real, dimension(natom, natom) :: costs
+    real blocksum
 
 ! Fill distance matrix for each block
 
@@ -53,10 +53,10 @@ end subroutine
 
 function totalbias(natom, weights, bias, mapping)
     integer, intent(in) :: natom
-    real(wp), dimension(:), intent(in) :: weights
+    real, dimension(:), intent(in) :: weights
     integer, dimension(:), intent(in) :: mapping
-    real(wp), dimension(:, :), intent(in) :: bias
-    real(wp) totalbias
+    real, dimension(:, :), intent(in) :: bias
+    real totalbias
     integer i
 
     totalbias = 0.

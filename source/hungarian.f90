@@ -33,16 +33,16 @@ subroutine assndx(mode, a, n, m, k, sum)
 !                   605-606.   The algorithm (CACM 27) is in Algol.
 
 integer, intent(in)   :: mode
-real(wp), intent(in out)  :: a(:,:)
+real, intent(in out)  :: a(:,:)
 integer, intent(in)   :: n
 integer, intent(in)   :: m
 integer, intent(out)  :: k(:)
-real(wp), intent(out)     :: sum
+real, intent(out)     :: sum
 
 logical  :: lsw
 integer  :: i, icbl, icl, icl0, iflag, imax, imin, ipp, irl, irs, &
             j, j1, jsv, new
-real(wp)     :: rmin
+real     :: rmin
 integer, allocatable  :: iw(:,:)
 
 if (n < 1 .or. m < 1) then

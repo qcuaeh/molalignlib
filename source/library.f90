@@ -26,10 +26,10 @@ implicit none
 integer, intent(in) :: natom0, natom1, maxrecords
 integer, dimension(natom0), intent(in) :: znums0, types0
 integer, dimension(natom1), intent(in) :: znums1, types1
-real(wp), intent(in) :: coords0(3, natom0)
-real(wp), intent(in) :: coords1(3, natom1)
-real(wp), intent(in) :: weights0(natom0)
-real(wp), intent(in) :: weights1(natom1)
+real, intent(in) :: coords0(3, natom0)
+real, intent(in) :: coords1(3, natom1)
+real, intent(in) :: weights0(natom0)
+real, intent(in) :: weights1(natom1)
 integer, intent(out) :: nrecord
 integer, intent(out) :: atomaplist(natom0, maxrecords)
 integer, intent(out) :: countlist(maxrecords)
@@ -40,7 +40,7 @@ integer, dimension(:), allocatable :: seed
 integer, dimension(:), allocatable :: order0, order1
 integer, dimension(:), allocatable :: blockidx0, blockidx1
 integer, dimension(:), allocatable :: blocksize0, blocksize1
-real(wp), dimension(3) :: center0, center1
+real, dimension(3) :: center0, center1
 
 procedure(test), pointer :: trial_test => null()
 procedure(test), pointer :: match_test => null()
@@ -148,14 +148,14 @@ implicit none
 integer, intent(in) :: natom0, natom1
 integer, dimension(natom0), intent(in) :: znums0, types0
 integer, dimension(natom1), intent(in) :: znums1, types1
-real(wp), intent(in) :: coords0(3, natom0)
-real(wp), intent(in) :: coords1(3, natom1)
-real(wp), intent(in) :: weights0(natom0)
-real(wp), intent(in) :: weights1(natom1)
-real(wp), intent(out) :: travec(3)
-real(wp), intent(out) :: rotmat(3, 3)
+real, intent(in) :: coords0(3, natom0)
+real, intent(in) :: coords1(3, natom1)
+real, intent(in) :: weights0(natom0)
+real, intent(in) :: weights1(natom1)
+real, intent(out) :: travec(3)
+real, intent(out) :: rotmat(3, 3)
 
-real(wp), dimension(3) :: center0, center1
+real, dimension(3) :: center0, center1
 integer i
 ! Check number of atoms
 

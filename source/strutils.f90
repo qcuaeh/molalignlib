@@ -61,7 +61,7 @@ function int2str(x) result(strx)
 end function
 
 function real2str(x) result(strx)
-    real(wp), intent(in) :: x
+    real, intent(in) :: x
     character(floor(log10(x)) + 6) strx
     write (strx, '(f0.4)') x
 end function

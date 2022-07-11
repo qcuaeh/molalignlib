@@ -8,53 +8,66 @@ compile () {
       rm -f "$objectfile"
       cp -p "$sourcefile" "$buildfile"
       echo Compiling "$1"
-      $FORTRAN $libflags $optflags -c "$sourcefile" -o "$objectfile" -I "$BUILDIR" -J "$BUILDIR" || exit
+      $FORTRAN $libflags $precflags $optflags $extraflags -c "$sourcefile" -o "$objectfile" -I "$BUILDIR" -J "$BUILDIR" || exit
    fi
 }
-
-shopt -s nullglob
-
-options=$(getopt -a -o '' -l slow,fast,debug,recompile -- "$@")
-if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
-eval set -- "$options"
-
-optlevel=fast
-recompile=false
-
-while true; do
-   case "$1" in
-      --slow) optlevel=slow; shift;;
-      --fast) optlevel=fast; shift;;
-      --debug) optlevel=debug; shift;;
-      --recompile) recompile=true; shift;;
-      --) shift; break ;;
-   esac
-done
-
-case $BUILDTYPE in
-   program) libflags='';;
-   library) libflags='-fPIC';;
-   *) echo Invalid build type: $BUILDTYPE; exit;;
-esac
-
-case $optlevel in
-   slow) optflags='-O0';;
-   fast) optflags='-O3 -ffast-math';;
-   debug) optflags='-O0 -g -fbounds-check -fbacktrace -Wall -ffpe-trap=zero,invalid,overflow';;
-   *) echo Invalid optimization level: $optlevel; exit;;
-esac
 
 NAME=ralign
 HERE=$(cd -- "$(dirname "$0")" && pwd)
 SRCDIR=$HERE/source
 BINDIR=$HERE/bin
 BUILDROOT=$HERE/_build_dir
-BUILDIR=$BUILDROOT/$BUILDTYPE/$optlevel
+
+shopt -s nullglob
+
+options=$(getopt -a -o '' -l program,library,slow,fast,debug,single,double,recompile -- "$@")
+test $? != 0 && exit
+eval set -- "$options"
+
+binary_type=program
+precision=double
+build_type=fast
+recompile=false
+
+while true; do
+   case "$1" in
+   --program) binary_type=program; shift;;
+   --library) binary_type=library; shift;;
+   --slow) build_type=slow; shift;;
+   --fast) build_type=fast; shift;;
+   --debug) build_type=debug; shift;;
+   --single) precision=single; shift;;
+   --double) precision=double; shift;;
+   --recompile) recompile=true; shift;;
+   --) shift; break;;
+   esac
+done
+
+BUILDIR=$BUILDROOT/$binary_type/$precision/$build_type
+
+case $binary_type in
+   program) libflags='';;
+   library) libflags='-fPIC';;
+   *) echo Invalid binary type: $binary_type; exit;;
+esac
+
+case "$build_type" in
+   slow) optflags='-O0'; shift;;
+   fast) optflags='-O3 -ffast-math'; shift;;
+   debug) optflags='-O0'; extraflags='-g -fbounds-check -fbacktrace -Wall -ffpe-trap=zero,invalid,overflow'; shift;;
+   *) echo Invalid build type: $build_type; exit; break;;
+esac
+
+case "$precision" in
+   single) precflags=; precmap="{'real':{'':'float'}}"; shift;;
+   double) precflags='-fdefault-real-8'; precmap="{'real':{'':'double'}}"; shift;;
+   *) echo Invalid precision: $precision; exit; break;;
+esac
 
 if [[ -d $BINDIR ]]; then
-   case $BUILDTYPE in
-      program) rm -f "$BINDIR"/"$NAME";;
-      library) rm -f "$BINDIR"/"$NAME".so "$BINDIR"/"$NAME".*.so;;
+   case $binary_type in
+   program) rm -f "$BINDIR"/"$NAME";;
+   library) rm -f "$BINDIR"/"$NAME".so "$BINDIR"/"$NAME".*.so;;
    esac
 else
    mkdir "$BINDIR"
@@ -79,7 +92,7 @@ while IFS= read -r line; do
   fi
 done < <(grep -v '^#' "$SRCDIR"/compilelist)
 
-case $BUILDTYPE in
+case $binary_type in
 program)
    echo Linking program...
    $FORTRAN -L "$LAPACK" -llapack -o "$BINDIR"/"$NAME" "${objectlist[@]}"
@@ -89,6 +102,7 @@ library)
 #   $FORTRAN -shared -L "$LAPACK" -llapack -o "$BINDIR"/"$NAME".so "${objectlist[@]}"
    echo Linking python library...
    pushd "$BINDIR"
+   echo "$precmap" > .f2py_f2cmap
    $F2PY -h "$BUILDIR"/"$NAME".pyf --overwrite-signature -m "$NAME" "${exportlist[@]}" --quiet
    $F2PY -c "$BUILDIR"/"$NAME".pyf -I"$BUILDIR" -L"$LAPACK" -llapack "${objectlist[@]}" --quiet
    popd
