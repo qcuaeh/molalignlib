@@ -1,21 +1,29 @@
-Compile the program
-===================
+Build the binaries
+==================
 
-Run `./build` without arguments to build the program with the highest
-optimization level. The script accepts the following options:
+Run `./build` without arguments to build the program in double precision
+with all optimizations enables. The program files will be created in the
+*bin* directory. The script accepts the following options:
 
-&ensp; -slow : Build without optimizations.  
-&ensp; -debug : Build with complete checks and debug info.  
-&ensp; -recompile : Recompile all source files from scratch.  
+#### Binary type
 
-The program files will be created in the *bin* directory.
+&ensp; -program : Build the program.  
+&ensp; -library : Build the shared library.  
 
-Compile the shared library
-==========================
+### Build type
 
-Run `./build-lib` without arguments to compile the shared library with the
-highest optimization level. This script accepts the same options as the *build*
-script and the library files will be created in the same *bin* directory.
+&ensp; -fast : Enable all optimizations (default).  
+&ensp; -slow : Disable optimizations.  
+&ensp; -debug : Disable optimizations and include debug info.  
+
+### Precision
+
+&ensp; -single : Build with single precision.  
+&ensp; -double : Build with double precision (default).  
+
+### Miscellaneous
+
+&ensp; -recompile : Recompile all sources from scratch.  
 
 Run the program
 ===============
