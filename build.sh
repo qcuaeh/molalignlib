@@ -24,18 +24,18 @@ options=$(getopt -a -o '' -l program,library,slow,fast,debug,single,double,recom
 test $? != 0 && exit
 eval set -- "$options"
 
-binary_type=program
+build_type=program
 precision=double
-build_type=fast
+optim_type=fast
 recompile=false
 
 while true; do
    case "$1" in
-   --program) binary_type=program; shift;;
-   --library) binary_type=library; shift;;
-   --slow) build_type=slow; shift;;
-   --fast) build_type=fast; shift;;
-   --debug) build_type=debug; shift;;
+   --program) build_type=program; shift;;
+   --library) build_type=library; shift;;
+   --slow) optim_type=slow; shift;;
+   --fast) optim_type=fast; shift;;
+   --debug) optim_type=debug; shift;;
    --single) precision=single; shift;;
    --double) precision=double; shift;;
    --recompile) recompile=true; shift;;
@@ -43,19 +43,19 @@ while true; do
    esac
 done
 
-BUILDIR=$BUILDROOT/$binary_type/$precision/$build_type
+BUILDIR=$BUILDROOT/$build_type/$precision/$optim_type
 
-case $binary_type in
+case $build_type in
    program) libflags='';;
    library) libflags='-fPIC';;
-   *) echo Invalid binary type: $binary_type; exit;;
+   *) echo Invalid binary type: $build_type; exit;;
 esac
 
-case "$build_type" in
+case "$optim_type" in
    slow) optflags='-O0'; shift;;
    fast) optflags='-O3 -ffast-math'; shift;;
    debug) optflags='-O0'; extraflags='-g -fbounds-check -fbacktrace -Wall -ffpe-trap=zero,invalid,overflow'; shift;;
-   *) echo Invalid build type: $build_type; exit; break;;
+   *) echo Invalid build type: $optim_type; exit; break;;
 esac
 
 case "$precision" in
@@ -65,7 +65,7 @@ case "$precision" in
 esac
 
 if [[ -d $BINDIR ]]; then
-   case $binary_type in
+   case $build_type in
    program) rm -f "$BINDIR"/"$NAME";;
    library) rm -f "$BINDIR"/"$NAME".so "$BINDIR"/"$NAME".*.so;;
    esac
@@ -92,7 +92,7 @@ while IFS= read -r line; do
   fi
 done < <(grep -v '^#' "$SRCDIR"/compilelist)
 
-case $binary_type in
+case $build_type in
 program)
    echo Linking program...
    $FORTRAN -L "$LAPACK" -llapack -o "$BINDIR"/"$NAME" "${objectlist[@]}"
