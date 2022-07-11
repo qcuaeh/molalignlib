@@ -24,8 +24,8 @@ directory. Moreover the script accepts the following options:
 
 &ensp; -recompile : Recompile all sources from scratch.  
 
-Running ralign
-==============
+Running the program
+===================
 
 ### Program options
 
@@ -33,13 +33,13 @@ Running ralign
 &ensp; -iter : Use iterative steps.  
 &ensp; -stdin : Read coordinates from standard input.  
 &ensp; -test : Use the same pseudo random number sequence on every run.  
-&ensp; -maps MAX : Set number of recorded maps to MAX.  
+&ensp; -maps *MAX* : Set number of recorded maps to *MAX*.  
 &ensp; -out xyz|mol2 : Set output format to *XYZ* or *MOL2*.  
 &ensp; -weight none|mass : Set weighting property to *None* or *Atomic Mass*.  
-&ensp; -count MAX : Set maximum map counting to MAX.  
-&ensp; -trials MAX : Set maximum number of trials to MAX.  
-&ensp; -bias TOL : Use biasing with tolerance TOL.  
-&ensp; -scale SCALE : Set length scale to SCALE.  
+&ensp; -count *MAX* : Set maximum map counting to *MAX*.  
+&ensp; -trials *MAX* : Set maximum number of trials to *MAX*.  
+&ensp; -bias *TOL* : Use biasing with tolerance *TOL*.  
+&ensp; -scale *SCALE* : Set length scale to *SCALE*.  
  
 ### Examples
 
