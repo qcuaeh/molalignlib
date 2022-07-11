@@ -20,8 +20,7 @@ BUILDROOT=$HERE/_build_dir
 
 shopt -s nullglob
 
-options=$(getopt -a -o '' -l program,library,slow,fast,debug,single,double,recompile -- "$@")
-test $? != 0 && exit
+options=$(getopt -a -o '' -l program,library,slow,fast,debug,single,double,recompile -- "$@") || exit
 eval set -- "$options"
 
 build_type=program
