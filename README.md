@@ -2,7 +2,7 @@ Build the binaries
 ==================
 
 Run `./build` without arguments to build the program in double precision
-with all optimizations enables. The program will be created in the *bin*
+with all optimizations enabled. The program will be created in the *bin*
 directory. The script accepts the following options:
 
 ### Binary type
@@ -12,8 +12,8 @@ directory. The script accepts the following options:
 
 ### Build type
 
-&ensp; -fast : Enable optimizations (default).  
-&ensp; -slow : Disable optimizations.  
+&ensp; -fast : Enable all optimizations (default).  
+&ensp; -slow : Disable all optimizations.  
 &ensp; -debug : Disable optimizations and include debug info.  
 
 ### Numeric precision
