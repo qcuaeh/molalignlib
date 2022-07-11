@@ -12,7 +12,7 @@ with all optimizations enables. The program files will be created in the
 
 ### Build type
 
-&ensp; -fast : Enable all optimizations (default).  
+&ensp; -fast : Enable optimizations (default).  
 &ensp; -slow : Disable optimizations.  
 &ensp; -debug : Disable optimizations and include debug info.  
 
