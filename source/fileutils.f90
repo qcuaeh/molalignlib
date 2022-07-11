@@ -22,7 +22,7 @@ end function
 
 subroutine open_unit(path)
 
-    character(optlen), intent(in) :: path
+    character(arg_len), intent(in) :: path
 
     if (opened(first_file_unit)) then
         if (opened(second_file_unit)) then

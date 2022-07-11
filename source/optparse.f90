@@ -35,7 +35,7 @@ end subroutine
 
 logical function getarg(arg)
 
-    character(optlen) arg
+    character(arg_len) arg
 
     if (iarg <= command_argument_count()) then
         call get_command_argument(iarg, arg)
@@ -49,8 +49,8 @@ end function
 
 subroutine readstrarg(arg, argval)
 
-    character(optlen), intent(in) :: arg
-    character(optlen), intent(out) :: argval
+    character(arg_len), intent(in) :: arg
+    character(arg_len), intent(out) :: argval
 
     if (arg(1:1) == '-') then
         write (error_unit, '(a, x, a)') 'Unknown option:', trim(arg)
@@ -63,8 +63,8 @@ end subroutine
 
 subroutine getoptarg(option, optarg)
 
-    character(optlen), intent(in) :: option
-    character(optlen), intent(out) :: optarg
+    character(arg_len), intent(in) :: option
+    character(arg_len), intent(out) :: optarg
 
     if (iarg <= command_argument_count()) then
         call get_command_argument(iarg, optarg)
@@ -80,8 +80,8 @@ end subroutine
 
 subroutine readstroptarg(option, optval)
 
-    character(optlen), intent(in) :: option
-    character(optlen), intent(out) :: optval
+    character(arg_len), intent(in) :: option
+    character(arg_len), intent(out) :: optval
 
     call getoptarg(option, optval)
 
@@ -89,9 +89,9 @@ end subroutine
 
 subroutine readintoptarg(option, optval)
 
-    character(optlen), intent(in) :: option
+    character(arg_len), intent(in) :: option
     integer, intent(out) :: optval
-    character(optlen) optarg
+    character(arg_len) optarg
     integer stat
 
     call getoptarg(option, optarg)
@@ -105,9 +105,9 @@ end subroutine
 
 subroutine readrealoptarg(option, optval)
 
-    character(optlen), intent(in) :: option
+    character(arg_len), intent(in) :: option
     real, intent(out) :: optval
-    character(optlen) optarg
+    character(arg_len) optarg
     integer stat
 
     call getoptarg(option, optarg)

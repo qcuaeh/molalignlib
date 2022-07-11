@@ -60,7 +60,7 @@ allocate(blocksize0(natom0), blocksize1(natom1))
 
 ! Select trial exit test
 
-if (aborting) then
+if (bounded) then
     trial_test => lower_than
 else
     trial_test => dummy_test

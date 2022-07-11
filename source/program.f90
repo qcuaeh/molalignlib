@@ -20,17 +20,17 @@ implicit none
 integer i
 integer natom0, natom1
 integer nrecord, maxrecords
-character(ttllen) title0, title1
+character(title_len) title0, title1
 real travec(3), rotmat(3, 3)
 integer, allocatable :: countlist(:)
 integer, allocatable :: atomaplist(:, :)
-character(lbllen), dimension(:), allocatable :: labels0, labels1
+character(label_len), dimension(:), allocatable :: labels0, labels1
 integer, dimension(:), allocatable :: znums0, znums1, types0, types1
 real, dimension(:, :), allocatable :: coords0, coords1
 real, dimension(:), allocatable :: weights0, weights1
+character(arg_len) arg, path, weighting
 real, dimension(nelem) :: property
 integer first_unit, second_unit
-character(optlen) arg, path, weighting
 
 procedure(writeabstractfile), pointer :: writefile => null()
 
@@ -39,13 +39,13 @@ procedure(writeabstractfile), pointer :: writefile => null()
 live = .false.
 biased = .false.
 iterative = .false.
-aborting = .false.
+bounded = .false.
 counting = .false.
 testing = .false.
 maxrecords = 9
 lenscale = 1000.0
 weighting = 'none'
-outformat = 'xyz'
+formatout = 'xyz'
 
 ! Set defualt file units
 
@@ -69,7 +69,7 @@ do while (getarg(arg))
         biased = .true.
         call readoptarg(arg, tolerance)
     case ('-trials')
-        aborting = .true.
+        bounded = .true.
         call readoptarg(arg, maxtrials)
     case ('-count')
         counting = .true.
@@ -81,7 +81,7 @@ do while (getarg(arg))
     case ('-maps')
         call readoptarg(arg, maxrecords)
     case ('-out')
-        call readoptarg(arg, outformat)
+        call readoptarg(arg, formatout)
     case ('-stdin')
         first_unit = input_unit
         second_unit = input_unit
@@ -123,13 +123,13 @@ end do
 
 ! Select output format
 
-select case (outformat)
+select case (formatout)
 case ('xyz')
     writefile => writexyzfile
 case ('mol2')
     writefile => writemol2file
 case default
-    write (error_unit, '(a,x,a)') 'Invalid format:', trim(outformat)
+    write (error_unit, '(a,x,a)') 'Invalid format:', trim(formatout)
     stop
 end select
 
@@ -152,7 +152,7 @@ weights1 = property(znums1)/sum(property(znums1))
 
 ! Superpose atoms
 
-if (aborting .or. counting) then
+if (bounded .or. counting) then
 
     call remap(natom0, natom1, znums0, znums1, types0, types1, weights0, weights1, &
         coords0, coords1, maxrecords, nrecord, atomaplist, countlist)
@@ -170,7 +170,7 @@ if (aborting .or. counting) then
             travec, rotmat &
         )
 
-        open(temp_file_unit, file='aligned_'//str(i)//'.'//trim(outformat), action='write', status='replace')
+        open(temp_file_unit, file='aligned_'//str(i)//'.'//trim(formatout), action='write', status='replace')
         call writefile(temp_file_unit, natom0, title0, znums0, coords0)
         call writefile( &
             temp_file_unit, natom1, title1, znums1(atomaplist(:, i)), &
@@ -192,7 +192,7 @@ else
         squaredist(natom0, weights0, coords0, coords1, identitymap(natom0)), &
         '(only alignment performed)'
 
-    open(temp_file_unit, file='aligned.'//trim(outformat), action='write', status='replace')
+    open(temp_file_unit, file='aligned.'//trim(formatout), action='write', status='replace')
     call writefile(temp_file_unit, natom0, title0, znums0, coords0)
     call writefile(temp_file_unit, natom1, title1, znums1, coords1) 
     close(temp_file_unit)
