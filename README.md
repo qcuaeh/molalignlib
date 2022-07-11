@@ -5,18 +5,18 @@ Run `./build` without arguments to build the program in double precision
 with all optimizations enabled. The program will be created in the *bin*
 directory. Moreover the script accepts the following options:
 
-### Binary type
+#### Binary type:
 
 &ensp; -program : Build the program (default).  
 &ensp; -library : Build the shared library instead.  
 
-### Build type
+#### Build type:
 
 &ensp; -fast : Enable all optimizations (default).  
 &ensp; -slow : Disable all optimizations.  
 &ensp; -debug : Disable optimizations and include debug info.  
 
-### Numeric precision
+#### Numeric precision:
 
 &ensp; -single : Build with single precision.  
 &ensp; -double : Build with double precision (default).  
