@@ -2,8 +2,8 @@ Build the binaries
 ==================
 
 Run `./build` without arguments to build the program in double precision
-with all optimizations enables. The program files will be created in the
-*bin* directory. The script accepts the following options:
+with all optimizations enables. The program will be created in the *bin*
+directory. The script accepts the following options:
 
 ### Binary type
 
