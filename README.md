@@ -22,7 +22,7 @@ directory. Moreover the script accepts the following options:
 
 ### Miscellaneous
 
-&ensp; -recompile : Recompile all sources from scratch.  
+&ensp; -recompile : Recompile all source files.  
 
 Running the program
 ===================
