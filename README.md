@@ -8,7 +8,7 @@ directory. Moreover the script accepts the following options:
 ### Build type
 
 &ensp; -program : Build the program (default).  
-&ensp; -library : Build the shared library instead.  
+&ensp; -library : Build the python library.  
 
 ### Optimization level
 
