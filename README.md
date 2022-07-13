@@ -39,7 +39,7 @@ Running the program
 &ensp; -count *MAX* : Set maximum map counting to *MAX*.  
 &ensp; -trials *MAX* : Set maximum number of trials to *MAX*.  
 &ensp; -bias *TOL* : Use biasing with tolerance *TOL*.  
-&ensp; -scale *SCALE* : Set length scale to *SCALE*.  
+&ensp; -scale *NUM* : Set length scale to *NUM*.  
  
 ### Examples
 
