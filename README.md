@@ -35,7 +35,7 @@ Running the program
 &ensp; -test : Use the same pseudo random numbers on every run.  
 &ensp; -maps *MAX* : Set number of recorded maps to *MAX*.  
 &ensp; -out xyz|mol2 : Set output format to XYZ or Mol2.  
-&ensp; -weight none|mass : Set weighting to none or atomic mass.  
+&ensp; -weight none|mass : Set weights to unity or atomic masses.  
 &ensp; -count *MAX* : Set maximum map counting to *MAX*.  
 &ensp; -trials *MAX* : Set maximum number of trials to *MAX*.  
 &ensp; -bias *TOL* : Use biasing with tolerance *TOL*.  
