@@ -48,7 +48,7 @@ procedure(test), pointer :: match_test => null()
 ! Check number of atoms
 
 if (natom0 /= natom1) then
-    write (error_unit, '(a)') 'The molecules have different number of atoms'
+    write (error_unit, '(a)') 'Error: The number of atoms does not match'
     stop
 end if
 
@@ -82,21 +82,21 @@ call getblocks(natom1, znums1, types1, weights1, nblock1, blocksize1, blockidx1,
 ! Abort if there are incompatible atomic symbols
 
 if (any(znums0(order0) /= znums1(order1))) then
-    write (error_unit, '(a)') 'The molecules are not isomers'
+    write (error_unit, '(a)') 'Error: Clusters are not isomers'
     stop
 end if
 
 ! Abort if there are incompatible atomic types
 
 if (any(types0(order0) /= types1(order1))) then
-    write (error_unit, '(a)') 'There are incompatible atomic types'
+    write (error_unit, '(a)') 'Error: There are conflicting atomic types'
     stop
 end if
 
 ! Abort if there are incompatible atomic weights
 
 if (any(weights0(order0) /= weights1(order1))) then
-    write (error_unit, '(a)') 'There are incompatible atomic weights'
+    write (error_unit, '(a)') 'Error: There are conflicting atomic weights'
     stop
 end if
 
@@ -160,28 +160,28 @@ integer i
 ! Check number of atoms
 
 if (natom0 /= natom1) then
-    write (error_unit, '(a)') 'The molecules have different number of atoms'
+    write (error_unit, '(a)') 'Error: The number of atoms does not match'
     stop
 end if
 
 ! Abort if there are incompatible atomic symbols
 
 if (any(znums0 /= znums1)) then
-    write (error_unit, '(a)') 'Atomic numbers do not match'
+    write (error_unit, '(a)') 'Error: Clusters are not isomers or atoms are not properly ordered'
     stop
 end if
 
 ! Abort if there are incompatible atomic types
 
 if (any(types0 /= types1)) then
-    write (error_unit, '(a)') 'Atomic types do not match'
+    write (error_unit, '(a)') 'Error: There are conflicting atomic types or atoms are not properly ordered'
     stop
 end if
 
 ! Abort if there are incompatible atomic weights
 
 if (any(weights0 /= weights1)) then
-    write (error_unit, '(a)') 'Atomic weights do not match'
+    write (error_unit, '(a)') 'Error: There are conflicting atomic weights'
     stop
 end if
 

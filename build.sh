@@ -8,7 +8,7 @@ compile () {
       rm -f "$objectfile"
       cp -p "$sourcefile" "$buildfile"
       echo Compiling "$1"
-      $FORTRAN $libflags $precflags $optflags $extraflags -c "$sourcefile" -o "$objectfile" -I "$BUILDIR" -J "$BUILDIR" || exit
+      $FORTRAN "${compflags[@]}" -c "$sourcefile" -o "$objectfile" -I "$BUILDIR" -J "$BUILDIR" || exit
    fi
 }
 
@@ -18,53 +18,61 @@ SRCDIR=$HERE/source
 BINDIR=$HERE/bin
 BUILDROOT=$HERE/_build_dir
 
+if [[ -n $LAPACK_LIBRARY_PATH ]]; then
+    if [[ -d $LAPACK_LIBRARY_PATH ]]; then
+        linkflags+=("-L$LAPACK_LIBRARY_PATH")
+    else
+        echo Error: Path $LAPACK_LIBRARY_PATH does not exist or is not a directory
+    fi
+fi
+
 shopt -s nullglob
 
 options=$(getopt -a -o '' -l program,library,slow,fast,debug,single,double,recompile -- "$@") || exit
 eval set -- "$options"
 
-build_type=program
-precision=double
-optim_type=fast
+buildtype=program
+realprec=double
+optlevel=fast
 recompile=false
 
 while true; do
    case "$1" in
-   --program) build_type=program; shift;;
-   --library) build_type=library; shift;;
-   --slow) optim_type=slow; shift;;
-   --fast) optim_type=fast; shift;;
-   --debug) optim_type=debug; shift;;
-   --single) precision=single; shift;;
-   --double) precision=double; shift;;
+   --program) buildtype=program; shift;;
+   --library) buildtype=library; shift;;
+   --slow) optlevel=slow; shift;;
+   --fast) optlevel=fast; shift;;
+   --debug) optlevel=debug; shift;;
+   --single) realprec=single; shift;;
+   --double) realprec=double; shift;;
    --recompile) recompile=true; shift;;
    --) shift; break;;
    esac
 done
 
-BUILDIR=$BUILDROOT/$build_type/$precision/$optim_type
+BUILDIR=$BUILDROOT/$buildtype/$realprec/$optlevel
 
-case $build_type in
-   program) libflags='';;
-   library) libflags='-fPIC';;
-   *) echo Invalid binary type: $build_type; exit;;
+case $buildtype in
+   program) :;;
+   library) compflags+=(-fPIC);;
+   *) echo Invalid build type: $buildtype; exit;;
 esac
 
-case "$optim_type" in
-   slow) optflags='-O0'; shift;;
-   fast) optflags='-O3 -ffast-math'; shift;;
-   debug) optflags='-O0'; extraflags='-g -fbounds-check -fbacktrace -Wall -ffpe-trap=zero,invalid,overflow'; shift;;
-   *) echo Invalid build type: $optim_type; exit; break;;
+case "$optlevel" in
+   slow) compflags+=(-O0); shift;;
+   fast) compflags+=(-O3 -ffast-math); shift;;
+   debug) compflags+=(-O0 -g -fbounds-check -fbacktrace -Wall -ffpe-trap=zero,invalid,overflow); shift;;
+   *) echo Invalid build type: $optlevel; exit; break;;
 esac
 
-case "$precision" in
-   single) precflags=; precmap="{'real':{'':'float'}}"; shift;;
-   double) precflags='-fdefault-real-8'; precmap="{'real':{'':'double'}}"; shift;;
-   *) echo Invalid precision: $precision; exit; break;;
+case "$realprec" in
+   single) precmap="{'real':{'':'float'}}"; shift;;
+   double) compflags+=(-fdefault-real-8); precmap="{'real':{'':'double'}}"; shift;;
+   *) echo Invalid precision type: $realprec; exit; break;;
 esac
 
 if [[ -d $BINDIR ]]; then
-   case $build_type in
+   case $buildtype in
    program) rm -f "$BINDIR"/"$NAME";;
    library) rm -f "$BINDIR"/"$NAME".so "$BINDIR"/"$NAME".*.so;;
    esac
@@ -91,18 +99,18 @@ while IFS= read -r line; do
   fi
 done < <(grep -v '^#' "$SRCDIR"/compilelist)
 
-case $build_type in
+case $buildtype in
 program)
    echo Linking program...
-   $FORTRAN -L "$LAPACK" -llapack -o "$BINDIR"/"$NAME" "${objectlist[@]}"
+   $FORTRAN "${linkflags[@]}" -llapack -o "$BINDIR"/"$NAME" "${objectlist[@]}"
    ;;
 library)
 #   echo Linking shared library...
-#   $FORTRAN -shared -L "$LAPACK" -llapack -o "$BINDIR"/"$NAME".so "${objectlist[@]}"
+#   $FORTRAN -shared -L"$LAPACK_PATH" -llapack -o "$BINDIR"/"$NAME".so "${objectlist[@]}"
    echo Linking python library...
    pushd "$BINDIR"
    echo "$precmap" > .f2py_f2cmap
    $F2PY -h "$BUILDIR"/"$NAME".pyf --overwrite-signature -m "$NAME" "${exportlist[@]}" --quiet
-   $F2PY -c "$BUILDIR"/"$NAME".pyf -I"$BUILDIR" -L"$LAPACK" -llapack "${objectlist[@]}" --quiet
+   $F2PY -c "$BUILDIR"/"$NAME".pyf -I"$BUILDIR" -L"$LAPACK_PATH" -llapack "${objectlist[@]}" --quiet
    popd
 esac
