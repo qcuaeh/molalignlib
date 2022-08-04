@@ -35,22 +35,19 @@ subroutine intshuffle(array, n)
 end subroutine
 
 subroutine init_random_seed(seed)
-    integer i, n
+    integer n
     integer, allocatable :: seed(:)
-    integer, parameter, dimension(8) :: debug_seed = &
-        [ 437395160, 1404128605, 572505362, -1187264075, 454383258, 525702629, 973594203, 1758310677 ]
-    call random_seed(size=n)
-    allocate(seed(n))
     if (testing) then
-        do i = 1, n
-            seed(i) = debug_seed(mod(i - 1, 8) + 1)
-        end do
+        return
     else
         ! Read /dev/urandom to seed the random number generator
+        call random_seed(size=n)
+        allocate(seed(n))
         open(unit=99, file="/dev/urandom", access="stream", &
             form="unformatted", action="read", status="old")
         read (99) seed
         close(99)
+        call random_seed(put=seed)
     end if
 
 end subroutine

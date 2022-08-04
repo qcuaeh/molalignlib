@@ -18,34 +18,33 @@ SRCDIR=$HERE/source
 BINDIR=$HERE/bin
 BUILDROOT=$HERE/_build_dir
 
-if [[ -n $LAPACK_LIBRARY_PATH ]]; then
-    if [[ -d $LAPACK_LIBRARY_PATH ]]; then
-        linkflags+=("-L$LAPACK_LIBRARY_PATH")
+if [[ -n $LAPACK_PATH ]]; then
+    if [[ -d $LAPACK_PATH ]]; then
+        linkflags+=("-L$LAPACK_PATH")
     else
-        echo Error: Path $LAPACK_LIBRARY_PATH does not exist or is not a directory
+        echo Error: Path $LAPACK_PATH does not exist or is not a directory
     fi
 fi
 
 shopt -s nullglob
 
-options=$(getopt -a -o '' -l program,library,slow,fast,debug,single,double,recompile -- "$@") || exit
+options=$(getopt -a -o '' -l program,library,slow,fast,debug,single,double,quick -- "$@") || exit
 eval set -- "$options"
 
 buildtype=program
 realprec=double
-optlevel=fast
-recompile=false
+optlevel=optimized
+recompile=true
 
 while true; do
    case "$1" in
    --program) buildtype=program; shift;;
    --library) buildtype=library; shift;;
-   --slow) optlevel=slow; shift;;
-   --fast) optlevel=fast; shift;;
+   --optimized) optlevel=optimized; shift;;
    --debug) optlevel=debug; shift;;
    --single) realprec=single; shift;;
    --double) realprec=double; shift;;
-   --recompile) recompile=true; shift;;
+   --quick) recompile=false; shift;;
    --) shift; break;;
    esac
 done
@@ -59,8 +58,7 @@ case $buildtype in
 esac
 
 case "$optlevel" in
-   slow) compflags+=(-O0); shift;;
-   fast) compflags+=(-O3 -ffast-math); shift;;
+   optimized) compflags+=(-O3 -ffast-math); shift;;
    debug) compflags+=(-O0 -g -fbounds-check -fbacktrace -Wall -ffpe-trap=zero,invalid,overflow); shift;;
    *) echo Invalid build type: $optlevel; exit; break;;
 esac

@@ -108,7 +108,6 @@ center1 = centroid(natom1, weights1, coords1)
 ! Initialize random number generator
 
 call init_random_seed(seed)
-call random_seed(put=seed)
 
 ! Remap atoms to minimize distance and difference
 
