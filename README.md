@@ -33,11 +33,11 @@ Running the program
 &ensp; -iter : Use iterative steps.  
 &ensp; -stdin : Read coordinates from standard input.  
 &ensp; -test : Use the same pseudo random numbers on every run.  
-&ensp; -maps *MAX* : Set number of recorded maps to *MAX*.  
+&ensp; -print *NUM* : Set number of printed solutions to *NUM*.  
 &ensp; -out xyz|mol2 : Set output format to XYZ or Mol2.  
 &ensp; -weight none|mass : Set weights to unity or atomic masses.  
-&ensp; -count *MAX* : Set maximum map counting to *MAX*.  
-&ensp; -trials *MAX* : Set maximum number of trials to *MAX*.  
+&ensp; -count *MAX* : Set map counting threshold to *MAX*.  
+&ensp; -trial *MAX* : Set maximum number of trials to *MAX*.  
 &ensp; -bias *TOL* : Use biasing with tolerance *TOL*.  
 &ensp; -scale *NUM* : Set length scale to *NUM*.  
  

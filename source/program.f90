@@ -19,11 +19,11 @@ implicit none
 
 integer i
 integer natom0, natom1
-integer nrecord, maxrecords
+integer nrecord, maxrecord
 character(title_len) title0, title1
 real travec(3), rotmat(3, 3)
-integer, allocatable :: countlist(:)
-integer, allocatable :: atomaplist(:, :)
+integer, allocatable :: mapcount(:)
+integer, allocatable :: maplist(:, :)
 character(label_len), dimension(:), allocatable :: labels0, labels1
 integer, dimension(:), allocatable :: znums0, znums1, types0, types1
 real, dimension(:, :), allocatable :: coords0, coords1
@@ -40,9 +40,9 @@ live = .false.
 biased = .false.
 iterative = .false.
 bounded = .false.
-counting = .false.
+converged = .false.
 testing = .false.
-maxrecords = 9
+maxrecord = 1
 lenscale = 1000.0
 weighting = 'none'
 formatout = 'xyz'
@@ -68,18 +68,18 @@ do while (getarg(arg))
     case ('-bias')
         biased = .true.
         call readoptarg(arg, tolerance)
-    case ('-trials')
+    case ('-trial')
         bounded = .true.
-        call readoptarg(arg, maxtrials)
+        call readoptarg(arg, maxtrial)
     case ('-count')
-        counting = .true.
-        call readoptarg(arg, maxcount)
+        converged = .true.
+        call readoptarg(arg, mincount)
     case ('-scale')
         call readoptarg(arg, lenscale)
     case ('-weight')
         call readoptarg(arg, weighting)
-    case ('-maps')
-        call readoptarg(arg, maxrecords)
+    case ('-print')
+        call readoptarg(arg, maxrecord)
     case ('-out')
         call readoptarg(arg, formatout)
     case ('-stdin')
@@ -109,7 +109,7 @@ call readxyzfile(second_unit, natom1, title1, labels1, coords1)
 allocate(znums0(natom0), znums1(natom1))
 allocate(types0(natom0), types1(natom1))
 allocate(weights0(natom0), weights1(natom1))
-allocate(atomaplist(natom0, maxrecords), countlist(maxrecords))
+allocate(maplist(natom0, maxrecord), mapcount(maxrecord))
 
 ! Get atomic numbers and types
 
@@ -152,10 +152,10 @@ weights1 = property(znums1)/sum(property(znums1))
 
 ! Superpose atoms
 
-if (bounded .or. counting) then
+if (bounded .or. converged) then
 
     call remap(natom0, natom1, znums0, znums1, types0, types1, weights0, weights1, &
-        coords0, coords1, maxrecords, nrecord, atomaplist, countlist)
+        coords0, coords1, maxrecord, nrecord, maplist, mapcount)
 
     ! Write aligned coordinates
 
@@ -163,18 +163,18 @@ if (bounded .or. counting) then
 
         call align( &
             natom0, natom1, &
-            znums0, znums1(atomaplist(:, i)), &
-            types0, types1(atomaplist(:, i)), &
-            weights0, weights1(atomaplist(:, i)), &
-            coords0, coords1(:, atomaplist(:, i)), &
+            znums0, znums1(maplist(:, i)), &
+            types0, types1(maplist(:, i)), &
+            weights0, weights1(maplist(:, i)), &
+            coords0, coords1(:, maplist(:, i)), &
             travec, rotmat &
         )
 
         open(temp_file_unit, file='aligned_'//str(i)//'.'//trim(formatout), action='write', status='replace')
         call writefile(temp_file_unit, natom0, title0, znums0, coords0)
         call writefile( &
-            temp_file_unit, natom1, title1, znums1(atomaplist(:, i)), &
-            translated(natom1, rotated(natom1, coords1(:, atomaplist(:, i)), rotmat), travec) &
+            temp_file_unit, natom1, title1, znums1(maplist(:, i)), &
+            translated(natom1, rotated(natom1, coords1(:, maplist(:, i)), rotmat), travec) &
         )
         close(temp_file_unit)
 

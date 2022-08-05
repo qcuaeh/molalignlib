@@ -1,3 +1,5 @@
+shopt -s nullglob
+
 # Compile source file
 compile () {
    sourcefile=$SRCDIR/$1
@@ -16,17 +18,16 @@ NAME=ralign
 HERE=$(cd -- "$(dirname "$0")" && pwd)
 SRCDIR=$HERE/source
 BINDIR=$HERE/bin
+LIBDIR=$HERE/lib
 BUILDROOT=$HERE/_build_dir
 
-if [[ -n $LAPACK_PATH ]]; then
-    if [[ -d $LAPACK_PATH ]]; then
-        linkflags+=("-L$LAPACK_PATH")
+if [[ -n $LAPACK ]]; then
+    if [[ -d $LAPACK ]]; then
+        libpathlist+=("-L$LAPACK")
     else
-        echo Error: Path $LAPACK_PATH does not exist or is not a directory
+        echo Error: Path $LAPACK does not exist or is not a directory
     fi
 fi
-
-shopt -s nullglob
 
 options=$(getopt -a -o '' -l program,library,slow,fast,debug,single,double,quick -- "$@") || exit
 eval set -- "$options"
@@ -69,14 +70,22 @@ case "$realprec" in
    *) echo Invalid precision type: $realprec; exit; break;;
 esac
 
-if [[ -d $BINDIR ]]; then
-   case $buildtype in
-   program) rm -f "$BINDIR"/"$NAME";;
-   library) rm -f "$BINDIR"/"$NAME".so "$BINDIR"/"$NAME".*.so;;
-   esac
-else
-   mkdir "$BINDIR"
-fi
+case $buildtype in
+program)
+   if [[ -d $BINDIR ]]; then
+      rm -f "$BINDIR"/"$NAME"
+   else
+      mkdir "$BINDIR"
+   fi
+   ;;
+library)
+   if [[ -d $LIBDIR ]]; then
+      rm -f "$LIBDIR"/"$NAME".so "$LIBDIR"/"$NAME".*.so
+   else
+      mkdir "$LIBDIR"
+   fi
+   ;;
+esac
 
 if [[ -d $BUILDIR ]]; then
   if $recompile; then
@@ -100,15 +109,14 @@ done < <(grep -v '^#' "$SRCDIR"/compilelist)
 case $buildtype in
 program)
    echo Linking program...
-   $FORTRAN "${linkflags[@]}" -llapack -o "$BINDIR"/"$NAME" "${objectlist[@]}"
+   $FORTRAN "${libpathlist[@]}" -llapack -o "$BINDIR"/"$NAME" "${objectlist[@]}"
    ;;
 library)
-#   echo Linking shared library...
-#   $FORTRAN -shared -L"$LAPACK_PATH" -llapack -o "$BINDIR"/"$NAME".so "${objectlist[@]}"
-   echo Linking python library...
-   pushd "$BINDIR"
+   echo Linking libraries...
+#   $FORTRAN -shared "${libpathlist[@]}" -llapack -o "$LIBDIR"/"$NAME".so "${objectlist[@]}"
+   pushd "$LIBDIR"
    echo "$precmap" > .f2py_f2cmap
    $F2PY -h "$BUILDIR"/"$NAME".pyf --overwrite-signature -m "$NAME" "${exportlist[@]}" --quiet
-   $F2PY -c "$BUILDIR"/"$NAME".pyf -I"$BUILDIR" -L"$LAPACK_PATH" -llapack "${objectlist[@]}" --quiet
+   $F2PY -c "$BUILDIR"/"$NAME".pyf -I"$BUILDIR" "${libpathlist[@]}" -llapack "${objectlist[@]}" --quiet
    popd
 esac

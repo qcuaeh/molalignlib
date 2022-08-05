@@ -4,7 +4,7 @@
 subroutine remap( &
 ! Purpose: Check and optimize mapping
     natom0, natom1, znums0, znums1, types0, types1, weights0, weights1, &
-    coords0, coords1, maxrecords, nrecord, atomaplist, countlist &
+    coords0, coords1, maxrecord, nrecord, maplist, mapcount &
 )
 
 use iso_fortran_env, only: output_unit
@@ -23,7 +23,7 @@ use alignment
 
 implicit none
 
-integer, intent(in) :: natom0, natom1, maxrecords
+integer, intent(in) :: natom0, natom1, maxrecord
 integer, dimension(natom0), intent(in) :: znums0, types0
 integer, dimension(natom1), intent(in) :: znums1, types1
 real, intent(in) :: coords0(3, natom0)
@@ -31,8 +31,8 @@ real, intent(in) :: coords1(3, natom1)
 real, intent(in) :: weights0(natom0)
 real, intent(in) :: weights1(natom1)
 integer, intent(out) :: nrecord
-integer, intent(out) :: atomaplist(natom0, maxrecords)
-integer, intent(out) :: countlist(maxrecords)
+integer, intent(out) :: maplist(natom0, maxrecord)
+integer, intent(out) :: mapcount(maxrecord)
 
 integer i
 integer nblock0, nblock1
@@ -68,7 +68,7 @@ end if
 
 ! Select match exit test
 
-if (counting) then
+if (converged) then
     match_test => lower_than
 else
     match_test => dummy_test
@@ -115,14 +115,14 @@ call optimize_mapping( &
     natom0, nblock0, blocksize0, weights0(order0), &
     centered(natom0, coords0(:, order0), center0), &
     centered(natom1, coords1(:, order1), center1), &
-    maxrecords, nrecord, atomaplist, countlist, &
+    maxrecord, nrecord, maplist, mapcount, &
     trial_test, match_test &
 )
 
 ! Reorder back to original atom ordering
 
 do i = 1, nrecord
-    atomaplist(:, i) = order1(atomaplist(inversemap(order0), i))
+    maplist(:, i) = order1(maplist(inversemap(order0), i))
 end do
 
 end subroutine

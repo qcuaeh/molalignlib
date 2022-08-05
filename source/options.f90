@@ -8,8 +8,8 @@ integer, parameter :: first_file_unit = 1001
 integer, parameter :: second_file_unit = 1002
 integer, parameter :: maxcoord = 16
 
-integer maxtrials, maxcount
-logical live, iterative, biased, bounded, counting, testing
+integer maxtrial, mincount
+logical live, iterative, biased, bounded, converged, testing
 character(arg_len) formatout
 real lenscale, tolerance
 

@@ -35,25 +35,25 @@ logical function lower_than(counter, threshold)
 end function
 
 subroutine optimize_mapping( &
-    natom, nblock, blocksize, weights, coords0, coords1, maxrecords, nrecord, &
-    atomaplist, countlist, trial_test, match_test &
+    natom, nblock, blocksize, weights, coords0, coords1, maxrecord, nrecord, &
+    maplist, mapcount, trial_test, match_test &
 )
 
-    integer, intent(in) :: natom, nblock, maxrecords
+    integer, intent(in) :: natom, nblock, maxrecord
     integer, dimension(:), intent(in) :: blocksize
     real, dimension(:, :), intent(in) :: coords0, coords1
     real, dimension(:), intent(in) :: weights
     procedure (test), pointer, intent(in) :: trial_test, match_test
     integer, intent(out) :: nrecord
-    integer, intent(out) :: atomaplist(:, :), countlist(:)
+    integer, intent(out) :: maplist(:, :), mapcount(:)
 
     logical found, overflow
     integer imap, jmap, ntrial, nmatch, iteration
     integer, dimension(natom) :: atomap, auxmap
-    integer earliest(maxrecords)
+    integer earliest(maxrecord)
     real :: dist, biased_dist, new_biased_dist, meanrot
     real, dimension(4) :: rotquat, prodquat
-    real, dimension(maxrecords) :: mindist, avgiter, avgmeanrot, avgtotrot
+    real, dimension(maxrecord) :: mindist, avgiter, avgmeanrot, avgtotrot
     real bias(natom, natom)
     real auxcoords(3, natom)
 
@@ -77,7 +77,7 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
 
 ! Loop for map searching
 
-    do while (trial_test(ntrial, maxtrials) .and. match_test(nmatch, maxcount))
+    do while (trial_test(ntrial, maxtrial) .and. match_test(nmatch, mincount))
 
         ntrial = ntrial + 1
 
@@ -124,15 +124,15 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
         found = .false.
 
         do imap = 1, nrecord
-            if (all(atomap == atomaplist(:, imap))) then
+            if (all(atomap == maplist(:, imap))) then
                 if (imap == 1) nmatch = nmatch + 1
-                countlist(imap) = countlist(imap) + 1
-                avgiter(imap) = avgiter(imap) + (iteration - avgiter(imap))/countlist(imap)
-                avgtotrot(imap) = avgtotrot(imap) + (rotangle(prodquat) - avgtotrot(imap))/countlist(imap)
-                avgmeanrot(imap) = avgmeanrot(imap) + (meanrot - avgmeanrot(imap))/countlist(imap)
+                mapcount(imap) = mapcount(imap) + 1
+                avgiter(imap) = avgiter(imap) + (iteration - avgiter(imap))/mapcount(imap)
+                avgtotrot(imap) = avgtotrot(imap) + (rotangle(prodquat) - avgtotrot(imap))/mapcount(imap)
+                avgmeanrot(imap) = avgmeanrot(imap) + (meanrot - avgmeanrot(imap))/mapcount(imap)
                 if (live) then
                     write (output_unit, '(a)', advance='no') achar(27)//'['//str(imap + 2)//'H'
-                    call print_stats(imap, earliest(imap), countlist(imap), avgiter(imap), avgmeanrot(imap), &
+                    call print_stats(imap, earliest(imap), mapcount(imap), avgiter(imap), avgmeanrot(imap), &
                         avgtotrot(imap), mindist(imap))
                 end if
                 found = .true.
@@ -141,37 +141,37 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
         end do
 
         if (.not. found) then
-            if (nrecord >= maxrecords) then
+            if (nrecord >= maxrecord) then
                 overflow = .true.
             end if
-            do imap = 1, maxrecords
+            do imap = 1, maxrecord
                 if (imap > nrecord .or. dist < mindist(imap)) then
                     if (imap == 1) nmatch = 1
-                    if (nrecord < maxrecords) nrecord = nrecord + 1
+                    if (nrecord < maxrecord) nrecord = nrecord + 1
                     do jmap = nrecord, imap + 1, -1
-                        countlist(jmap) = countlist(jmap - 1)
+                        mapcount(jmap) = mapcount(jmap - 1)
                         avgiter(jmap) = avgiter(jmap - 1)
                         avgtotrot(jmap) = avgtotrot(jmap - 1)
                         avgmeanrot(jmap) = avgmeanrot(jmap - 1)
-                        atomaplist(:, jmap) = atomaplist(:, jmap - 1)
+                        maplist(:, jmap) = maplist(:, jmap - 1)
                         mindist(jmap) = mindist(jmap - 1)
                         earliest(jmap) = earliest(jmap - 1)
                         if (live) then
                             write (output_unit, '(a)', advance='no') achar(27)//'['//str(jmap + 2)//'H'
-                            call print_stats(jmap, earliest(jmap), countlist(jmap), avgiter(jmap), avgmeanrot(jmap), &
+                            call print_stats(jmap, earliest(jmap), mapcount(jmap), avgiter(jmap), avgmeanrot(jmap), &
                                 avgtotrot(jmap), mindist(jmap))
                         end if
                     end do
-                    countlist(imap) = 1
+                    mapcount(imap) = 1
                     avgiter(imap) = iteration
                     avgtotrot(imap) = rotangle(prodquat)
                     avgmeanrot(imap) = meanrot
-                    atomaplist(:, imap) = atomap
+                    maplist(:, imap) = atomap
                     mindist(imap) = dist
                     earliest(imap) = ntrial
                     if (live) then
                         write (output_unit, '(a)', advance='no') achar(27)//'['//str(imap + 2)//'H'
-                        call print_stats(imap, earliest(imap), countlist(imap), avgiter(imap), avgmeanrot(imap), &
+                        call print_stats(imap, earliest(imap), mapcount(imap), avgiter(imap), avgmeanrot(imap), &
                             avgtotrot(imap), mindist(imap))
                     end if
                     exit
@@ -189,7 +189,7 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
     if (.not. live) then
         call print_header()
         do imap = 1, nrecord
-            call print_stats(imap, earliest(imap), countlist(imap), avgiter(imap), avgmeanrot(imap), &
+            call print_stats(imap, earliest(imap), mapcount(imap), avgiter(imap), avgmeanrot(imap), &
                 avgtotrot(imap), mindist(imap))
         end do
         call print_footer(overflow, nrecord, ntrial)
