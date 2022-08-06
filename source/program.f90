@@ -7,7 +7,6 @@ use options
 use chemdata
 use strutils
 use optparse
-use fileutils
 use chemutils
 use readwrite
 use translation
@@ -17,26 +16,28 @@ use alignment
 
 implicit none
 
-integer i
+integer i, n, u
 integer natom0, natom1
 integer nrecord, maxrecord
-character(title_len) title0, title1
 real travec(3), rotmat(3, 3)
+character(title_len) title0, title1
 integer, allocatable :: mapcount(:)
 integer, allocatable :: maplist(:, :)
-character(label_len), dimension(:), allocatable :: labels0, labels1
 integer, dimension(:), allocatable :: znums0, znums1, types0, types1
 real, dimension(:, :), allocatable :: coords0, coords1
 real, dimension(:), allocatable :: weights0, weights1
+character(label_len), dimension(:), allocatable :: labels0, labels1
 character(arg_len) arg, path, weighting
 real, dimension(nelem) :: property
-integer first_unit, second_unit
+integer file_unit(2)
+logical stdin
 
 procedure(writeabstractfile), pointer :: writefile => null()
 
 ! Set default options
 
 live = .false.
+stdin = .false.
 biased = .false.
 iterative = .false.
 bounded = .false.
@@ -46,11 +47,6 @@ maxrecord = 1
 lenscale = 1000.0
 weighting = 'none'
 formatout = 'xyz'
-
-! Set defualt file units
-
-first_unit = first_file_unit
-second_unit = second_file_unit
 
 ! Get user options
 
@@ -83,26 +79,29 @@ do while (getarg(arg))
     case ('-out')
         call readoptarg(arg, formatout)
     case ('-stdin')
-        first_unit = input_unit
-        second_unit = input_unit
+        stdin = .true.
     case default
-        call readarg(arg, path)
-        call open_unit(path)
+        call openfile(arg, file_unit)
     end select
 
 end do
 
-if (.not. opened(first_unit)) then
-    write (error_unit, '(a)') 'No paths were specified'
-    stop
-else if (.not. opened(second_unit)) then
-    second_unit = first_unit
+if (stdin) then
+    file_unit(1) = input_unit
+    file_unit(2) = input_unit
+else
+    if (ifile == 0) then
+        write (error_unit, '(a)') 'Error: No file paths were specified'
+        stop
+    else if (ifile == 1) then
+        file_unit(2) = file_unit(1)
+    end if
 end if
 
 ! Read coordinates
 
-call readxyzfile(first_unit, natom0, title0, labels0, coords0)
-call readxyzfile(second_unit, natom1, title1, labels1, coords1)
+call readxyzfile(file_unit(1), natom0, title0, labels0, coords0)
+call readxyzfile(file_unit(2), natom1, title1, labels1, coords1)
 
 ! Allocate arrays
 
@@ -170,13 +169,11 @@ if (bounded .or. converged) then
             travec, rotmat &
         )
 
-        open(temp_file_unit, file='aligned_'//str(i)//'.'//trim(formatout), action='write', status='replace')
-        call writefile(temp_file_unit, natom0, title0, znums0, coords0)
-        call writefile( &
-            temp_file_unit, natom1, title1, znums1(maplist(:, i)), &
-            translated(natom1, rotated(natom1, coords1(:, maplist(:, i)), rotmat), travec) &
-        )
-        close(temp_file_unit)
+        open(newunit=u, file='aligned_'//str(i)//'.'//trim(formatout), action='write', status='replace')
+        call writefile(u, natom0, title0, znums0, coords0)
+        call writefile(u, natom1, title1, znums1(maplist(:, i)), &
+            translated(natom1, rotated(natom1, coords1(:, maplist(:, i)), rotmat), travec))
+        close(u)
 
     end do
 
@@ -192,10 +189,10 @@ else
         squaredist(natom0, weights0, coords0, coords1, identitymap(natom0)), &
         '(only alignment performed)'
 
-    open(temp_file_unit, file='aligned.'//trim(formatout), action='write', status='replace')
-    call writefile(temp_file_unit, natom0, title0, znums0, coords0)
-    call writefile(temp_file_unit, natom1, title1, znums1, coords1) 
-    close(temp_file_unit)
+    open(newunit=u, file='aligned.'//trim(formatout), action='write', status='replace')
+    call writefile(u, natom0, title0, znums0, coords0)
+    call writefile(u, natom1, title1, znums1, coords1) 
+    close(u)
 
 end if
 

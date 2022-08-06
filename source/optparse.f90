@@ -6,18 +6,15 @@ use options
 
 implicit none
 
-integer iarg
+integer iarg, ifile
 
 private
 
+public ifile
 public initarg
 public getarg
-public readarg
+public openfile
 public readoptarg
-
-interface readarg
-    module procedure readstrarg
-end interface
 
 interface readoptarg
     module procedure readstroptarg
@@ -29,7 +26,8 @@ contains
 
 subroutine initarg()
 
-    iarg = 1
+    iarg = 0
+    ifile = 0
 
 end subroutine
 
@@ -37,9 +35,10 @@ logical function getarg(arg)
 
     character(arg_len) arg
 
+    iarg = iarg + 1
+
     if (iarg <= command_argument_count()) then
         call get_command_argument(iarg, arg)
-        iarg = iarg + 1
         getarg = .true.
     else
         getarg = .false.
@@ -47,17 +46,24 @@ logical function getarg(arg)
 
 end function
 
-subroutine readstrarg(arg, argval)
+subroutine openfile(arg, file_unit)
 
-    character(arg_len), intent(in) :: arg
-    character(arg_len), intent(out) :: argval
+    character(arg_len) arg
+    integer file_unit(2)
 
     if (arg(1:1) == '-') then
         write (error_unit, '(a, x, a)') 'Unknown option:', trim(arg)
         stop
     end if
 
-    argval = arg
+    ifile = ifile + 1
+
+    if (ifile <= 2) then
+        open(newunit=file_unit(ifile), file=arg, action='read')
+    else
+        write (error_unit, '(a)') 'Too many paths'
+        stop
+    end if
 
 end subroutine
 
@@ -66,13 +72,15 @@ subroutine getoptarg(option, optarg)
     character(arg_len), intent(in) :: option
     character(arg_len), intent(out) :: optarg
 
+    iarg = iarg + 1
+
     if (iarg <= command_argument_count()) then
         call get_command_argument(iarg, optarg)
         if (optarg(1:1) /= '-') then
-            iarg = iarg + 1
             return
         end if
     end if
+
     write (error_unit, '(a, x, a, x, a)') 'Option', trim(option), 'requires an argument'
     stop
 
