@@ -1,3 +1,0 @@
-FORTRAN=/opt/mambaforge/bin/x86_64-conda-linux-gnu-gfortran
-F2PY=/opt/mambaforge/bin/f2py
-LAPACK=/opt/mambaforge/lib

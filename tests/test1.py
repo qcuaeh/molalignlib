@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[2]:
+# In[1]:
 
 
 import sys
@@ -11,11 +11,11 @@ from ase import io
 sys.path.insert(0, '../lib')
 from ralign import options, remap, align
 
-print(remap.__doc__)
-print(align.__doc__)
+#print(remap.__doc__)
+#print(align.__doc__)
 
 
-# In[4]:
+# In[2]:
 
 
 def optstr(string):
@@ -46,13 +46,13 @@ options.lenscale = 1000.0
 options.tolerance = 0.17
 
 
-# In[7]:
+# In[3]:
 
 
 n, maplist, mapcount = remap(znums0, znums1, types0, types1, weights0, weights1, coords0, coords1, 10)
 
 
-# In[55]:
+# In[4]:
 
 
 for i, m in enumerate([i - 1 for i in maplist.transpose()[:n]]):
@@ -60,10 +60,4 @@ for i, m in enumerate([i - 1 for i in maplist.transpose()[:n]]):
     atoms1.set_positions(np.matmul(rotmat, coords1).transpose() + travec)
     io.write('aligned_{}.xyz'.format(i + 1), atoms0,)
     io.write('aligned_{}.xyz'.format(i + 1), atoms1, append = True)
-
-
-# In[ ]:
-
-
-
 

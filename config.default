@@ -1,3 +1,0 @@
-FORTRAN=gfortran
-F2PY=f2py3
-#LAPACK=

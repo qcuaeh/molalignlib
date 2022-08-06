@@ -65,8 +65,8 @@ case "$optlevel" in
 esac
 
 case "$realprec" in
-   single) precmap="{'real':{'':'float'}}"; shift;;
-   double) compflags+=(-fdefault-real-8); precmap="{'real':{'':'double'}}"; shift;;
+   single) shift;;
+   double) compflags+=(-fdefault-real-8); shift;;
    *) echo Invalid precision type: $realprec; exit; break;;
 esac
 
@@ -115,7 +115,6 @@ library)
    echo Linking libraries...
 #   $FORTRAN -shared "${libpathlist[@]}" -llapack -o "$LIBDIR"/"$NAME".so "${objectlist[@]}"
    pushd "$LIBDIR"
-   echo "$precmap" > .f2py_f2cmap
    $F2PY -h "$BUILDIR"/"$NAME".pyf --overwrite-signature -m "$NAME" "${exportlist[@]}" --quiet
    $F2PY -c "$BUILDIR"/"$NAME".pyf -I"$BUILDIR" "${libpathlist[@]}" -llapack "${objectlist[@]}" --quiet
    popd
