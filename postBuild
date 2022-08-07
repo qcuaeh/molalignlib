@@ -1,0 +1,3 @@
+./build.sh -lpython
+cp bin/molalign.cpython-*.so tests
+cp source/molalign_wrapper.py tests
