@@ -8,14 +8,14 @@ set +a
 # Compile source file
 compile () {
    sourcefile=$sourcedir/$1
-   buildfile=$builddir/$1
-   objectfile=$builddir/${1%.*}.o
+   buildfile=$buildir/$1
+   objectfile=$buildir/${1%.*}.o
    objectlist+=("$objectfile")
    if ! test -e "$objectfile" || ! test -e "$buildfile" || ! diff -q "$sourcefile" "$buildfile" > /dev/null; then
       rm -f "$objectfile"
       cp -p "$sourcefile" "$buildfile"
       echo Compiling "$1"
-      "$F90" "${compflags[@]}" -c "$sourcefile" -o "$objectfile" -I "$builddir" -J "$builddir" || exit
+      "$F90" "${compflags[@]}" -c "$sourcefile" -o "$objectfile" -I "$buildir" -J "$buildir" || exit
    fi
 }
 
@@ -77,7 +77,7 @@ esac
 
 case $libtype in
 none)
-   builddir=$buildroot/static/$realprec/$optlevel
+   buildir=$buildroot/static/$realprec/$optlevel
    if [[ -d $bindir ]]; then
       rm -f "$bindir"/molalign
    else
@@ -85,7 +85,7 @@ none)
    fi
    ;;
 static)
-   builddir=$buildroot/static/$realprec/$optlevel
+   buildir=$buildroot/static/$realprec/$optlevel
    if [[ -d $bindir ]]; then
       rm -f "$bindir"/molalign.a
    else
@@ -94,7 +94,7 @@ static)
    ;;
 shared)
    compflags+=(-fPIC)
-   builddir=$buildroot/shared/$realprec/$optlevel
+   buildir=$buildroot/shared/$realprec/$optlevel
    if [[ -d $bindir ]]; then
       rm -f "$bindir"/molalign.so
    else
@@ -103,7 +103,7 @@ shared)
    ;;
 python)
    compflags+=(-fPIC)
-   builddir=$buildroot/shared/$realprec/$optlevel
+   buildir=$buildroot/shared/$realprec/$optlevel
    if [[ -d $bindir ]]; then
       "$PYTHON" \
 <<HEREDOC
@@ -121,22 +121,22 @@ HEREDOC
    exit
 esac
 
-if [[ -d $builddir ]]; then
+if [[ -d $buildir ]]; then
   if $recompile; then
-     rm -f "$builddir"/*
+     rm -f "$buildir"/*
   fi
 else
-  mkdir -p "$builddir"
+  mkdir -p "$buildir"
 fi
 
 objectlist=()
-exportlist=()
+f2pylist=()
 
 while IFS= read -r line; do
   eval set -- "$line"
   compile "$1"
-  if [[ -n $2 ]]; then
-     exportlist+=("$builddir"/"$1")
+  if [[ $2 == f2py ]]; then
+     f2pylist+=("$buildir"/"$1")
   fi
 done < <(grep -v '^#' "$sourcedir"/compilelist)
 
@@ -158,8 +158,8 @@ shared)
 python)
    echo Linking python library...
    export PYTHONWARNINGS=ignore::Warning:setuptools.command.install
-   "$F2PY" -h "$builddir"/molalign.pyf --overwrite-signature -m molalign "${exportlist[@]}" --f2cmap "$f2cmap" --quiet
-   "$F2PY" -c "$builddir"/molalign.pyf -I"$builddir" "${libpathlist[@]}" -llapack "${objectlist[@]}" --f2cmap "$f2cmap" \
+   "$F2PY" -h "$buildir"/molalign.pyf --overwrite-signature -m molalign "${f2pylist[@]}" --f2cmap "$f2cmap" --quiet
+   "$F2PY" -c "$buildir"/molalign.pyf -I"$buildir" "${libpathlist[@]}" -llapack "${objectlist[@]}" --f2cmap "$f2cmap" \
       --fcompiler=gnu95 --quiet
    ;;
 esac

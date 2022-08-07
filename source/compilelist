@@ -1,4 +1,4 @@
-options.f90 export
+options.f90 f2py
 strutils.f90
 maputils.f90
 lapack.f90
@@ -17,6 +17,6 @@ alignment.f90
 readwrite.f90
 biasing.f90
 remapping.f90
-library.f90 export
+library.f90 f2py
 optparse.f90
 program.f90

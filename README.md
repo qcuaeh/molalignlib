@@ -13,8 +13,8 @@ numeric precision:
 
 The program and libraries will be created in the *bin* directory.
 
-Running the program
-===================
+Usage
+=====
 
 ### Program options
 
