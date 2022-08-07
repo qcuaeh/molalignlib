@@ -12,8 +12,8 @@ directory. Moreover the script accepts the following options:
 
 ### Optimization level
 
-&ensp; -fast : Enable optimizations with fast math (default).  
-&ensp; -debug : Disable optimizations and include debug info.  
+&ensp; -optimized : Enable all optimizations (default).  
+&ensp; -debug : Enable debugging and disable optimizations.  
 
 ### Numeric precision
 
@@ -33,7 +33,7 @@ Running the program
 &ensp; -iter : Use iterative steps.  
 &ensp; -stdin : Read coordinates from standard input.  
 &ensp; -test : Use the same pseudo random numbers on every run.  
-&ensp; -print *NUM* : Set number of printed solutions to *NUM*.  
+&ensp; -rec *NUM* : Set number of printed solutions to *NUM*.  
 &ensp; -out xyz|mol2 : Set output format to XYZ or Mol2.  
 &ensp; -weight none|mass : Set weights to unity or atomic masses.  
 &ensp; -count *MAX* : Set map counting threshold to *MAX*.  
@@ -45,7 +45,7 @@ Running the program
 
 Te following line will run the program using biases with a tolerance of 0.17 Å, iteration, mass weigthed coordinates, a stopping threshold of 10 counts, a maximum of 1000 trials and repeatable pseudo random numbers:
 
-    ./bin/ralign tests/r005/100cobalt_j5.xyz -bias 0.17 -iter -weight mass -count 10 -trials 1000 -test
+    ./bin/ralign tests/r005/100cobalt_j5.xyz -bias 0.17 -iter -weight mass -count 10 -trial 1000 -test -rec 10
     
 The ouput should look as follows:
 

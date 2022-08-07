@@ -1,7 +1,9 @@
 #!/bin/bash
 shopt -s nullglob
 parentdir=$(cd -- "$(dirname "$0")" && pwd)
+set -a
 . "$(dirname "$0")/build.env"
+set +a
 
 # Compile source file
 compile () {
@@ -13,7 +15,7 @@ compile () {
       rm -f "$objectfile"
       cp -p "$sourcefile" "$buildfile"
       echo Compiling "$1"
-      $FORTRAN "${compflags[@]}" -c "$sourcefile" -o "$objectfile" -I "$builddir" -J "$builddir" || exit
+      "$F90" "${compflags[@]}" -c "$sourcefile" -o "$objectfile" -I "$builddir" -J "$builddir" || exit
    fi
 }
 
@@ -80,7 +82,7 @@ program)
    ;;
 library)
    if [[ -d $testdir ]]; then
-      rm -f "$testdir"/molalign.so "$testdir"/molalign.*.so
+      rm -f "$testdir"/molalign.*.so
    else
       mkdir "$testdir"
    fi
@@ -109,12 +111,14 @@ done < <(grep -v '^#' "$sourcedir"/compilelist)
 case $buildtype in
 program)
    echo Linking program...
-   $FORTRAN "${libpathlist[@]}" -llapack -o "$testdir"/molalign "${objectlist[@]}"
+   "$F90" "${libpathlist[@]}" -llapack -o "$testdir"/molalign "${objectlist[@]}"
    ;;
 library)
-   echo Linking libraries...
-#   $FORTRAN -shared "${libpathlist[@]}" -llapack -o "$testdir"/molalign.so "${objectlist[@]}"
    cd "$testdir"
-   $F2PY -h "$builddir"/molalign.pyf --overwrite-signature -m molalign "${exportlist[@]}" --f2cmap "$f2cmap" --quiet
-   $F2PY -c "$builddir"/molalign.pyf -I"$builddir" "${libpathlist[@]}" -llapack "${objectlist[@]}" --f2cmap "$f2cmap" --quiet
+   echo Linking libraries...
+   export PYTHONWARNINGS=ignore::Warning:setuptools.command.install
+   "$F90" -shared "${libpathlist[@]}" -llapack -o "$testdir"/molalign.$(uname -i)-$(uname -s).so "${objectlist[@]}"
+   "$F2PY" -h "$builddir"/molalign.pyf --overwrite-signature -m molalign "${exportlist[@]}" --f2cmap "$f2cmap" --quiet
+   "$F2PY" -c "$builddir"/molalign.pyf -I"$builddir" "${libpathlist[@]}" -llapack "${objectlist[@]}" --f2cmap "$f2cmap" \
+       --fcompiler=gnu95 --quiet
 esac

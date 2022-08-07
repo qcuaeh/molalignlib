@@ -1,9 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
-
-
 import sys
 import numpy as np
 from ase import Atoms
@@ -70,10 +67,4 @@ def align(atoms0, atoms1, weights, mapping):
     coords1 = atoms1.get_positions().transpose()[:, mapping]
     travec, rotmat = molalign.library.align(znums0, znums1, types0, types1, coords0, coords1, weights/sum(weights))
     return Atoms(numbers=znums1, positions=np.matmul(rotmat, coords1).transpose()+travec)
-
-
-# In[ ]:
-
-
-
 
