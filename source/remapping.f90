@@ -35,25 +35,25 @@ logical function lower_than(counter, threshold)
 end function
 
 subroutine optimize_mapping( &
-    natom, nblock, blocksize, weights, coords0, coords1, maxrecord, nrecord, &
+    natom, nblock, blocksize, weights, coords0, coords1, records, nrec, &
     maplist, mapcount, trial_test, match_test &
 )
 
-    integer, intent(in) :: natom, nblock, maxrecord
+    integer, intent(in) :: natom, nblock, records
     integer, dimension(:), intent(in) :: blocksize
     real, dimension(:, :), intent(in) :: coords0, coords1
     real, dimension(:), intent(in) :: weights
     procedure (test), pointer, intent(in) :: trial_test, match_test
-    integer, intent(out) :: nrecord
+    integer, intent(out) :: nrec
     integer, intent(out) :: maplist(:, :), mapcount(:)
 
     logical found, overflow
-    integer imap, jmap, ntrial, nmatch, iteration
+    integer imap, jmap, ntrial, nmatch, cycles
     integer, dimension(natom) :: atomap, auxmap
-    integer earliest(maxrecord)
+    integer earliest(records)
     real :: dist, biased_dist, new_biased_dist, meanrot
     real, dimension(4) :: rotquat, prodquat
-    real, dimension(maxrecord) :: mindist, avgiter, avgmeanrot, avgtotrot
+    real, dimension(records) :: mindist, avgiter, avgmeanrot, avgtotrot
     real bias(natom, natom)
     real auxcoords(3, natom)
 
@@ -70,7 +70,7 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
 
 ! Initialize loop variables
 
-    nrecord = 0
+    nrec = 0
     ntrial = 0
     nmatch = 0
     overflow = .false.
@@ -96,9 +96,9 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
         prodquat = rotquat
         meanrot = rotangle(rotquat)
         call rotate(natom, auxcoords, rotquat)
-        iteration = 1
+        cycles = 1
 
-        do while (iterative)
+        do while (iteration)
             biased_dist = squaredist(natom, weights, coords0, auxcoords, atomap) &
                     + totalbias(natom, weights, bias, atomap)
             call assignatoms(natom, weights, coords0, auxcoords, nblock, blocksize, bias, auxmap)
@@ -112,8 +112,8 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
             rotquat = leastrotquat(natom, weights, coords0, auxcoords, auxmap)
             prodquat = quatmul(rotquat, prodquat)
             call rotate(natom, auxcoords, rotquat)
-            iteration = iteration + 1
-            meanrot = meanrot + (rotangle(rotquat) - meanrot)/iteration
+            cycles = cycles + 1
+            meanrot = meanrot + (rotangle(rotquat) - meanrot)/cycles
             atomap = auxmap
         end do
 
@@ -123,11 +123,11 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
 
         found = .false.
 
-        do imap = 1, nrecord
+        do imap = 1, nrec
             if (all(atomap == maplist(:, imap))) then
                 if (imap == 1) nmatch = nmatch + 1
                 mapcount(imap) = mapcount(imap) + 1
-                avgiter(imap) = avgiter(imap) + (iteration - avgiter(imap))/mapcount(imap)
+                avgiter(imap) = avgiter(imap) + (cycles - avgiter(imap))/mapcount(imap)
                 avgtotrot(imap) = avgtotrot(imap) + (rotangle(prodquat) - avgtotrot(imap))/mapcount(imap)
                 avgmeanrot(imap) = avgmeanrot(imap) + (meanrot - avgmeanrot(imap))/mapcount(imap)
                 if (live) then
@@ -141,14 +141,14 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
         end do
 
         if (.not. found) then
-            if (nrecord >= maxrecord) then
+            if (nrec >= records) then
                 overflow = .true.
             end if
-            do imap = 1, maxrecord
-                if (imap > nrecord .or. dist < mindist(imap)) then
+            do imap = 1, records
+                if (imap > nrec .or. dist < mindist(imap)) then
                     if (imap == 1) nmatch = 1
-                    if (nrecord < maxrecord) nrecord = nrecord + 1
-                    do jmap = nrecord, imap + 1, -1
+                    if (nrec < records) nrec = nrec + 1
+                    do jmap = nrec, imap + 1, -1
                         mapcount(jmap) = mapcount(jmap - 1)
                         avgiter(jmap) = avgiter(jmap - 1)
                         avgtotrot(jmap) = avgtotrot(jmap - 1)
@@ -163,7 +163,7 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
                         end if
                     end do
                     mapcount(imap) = 1
-                    avgiter(imap) = iteration
+                    avgiter(imap) = cycles
                     avgtotrot(imap) = rotangle(prodquat)
                     avgmeanrot(imap) = meanrot
                     maplist(:, imap) = atomap
@@ -180,19 +180,19 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
         end if
 
         if (live) then
-            write (output_unit, '(a)', advance='no') achar(27)//'['//str(nrecord + 3)//'H'
-            call print_footer(overflow, nrecord, ntrial)
+            write (output_unit, '(a)', advance='no') achar(27)//'['//str(nrec + 3)//'H'
+            call print_footer(overflow, nrec, ntrial)
         end if
 
     end do
 
     if (.not. live) then
         call print_header()
-        do imap = 1, nrecord
+        do imap = 1, nrec
             call print_stats(imap, earliest(imap), mapcount(imap), avgiter(imap), avgmeanrot(imap), &
                 avgtotrot(imap), mindist(imap))
         end do
-        call print_footer(overflow, nrecord, ntrial)
+        call print_footer(overflow, nrec, ntrial)
     end if
 
 end subroutine

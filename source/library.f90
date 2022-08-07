@@ -1,11 +1,4 @@
-!module library
-!contains
-
-subroutine remap( &
-! Purpose: Check and optimize mapping
-    natom0, natom1, znums0, znums1, types0, types1, weights0, weights1, &
-    coords0, coords1, maxrecord, nrecord, maplist, mapcount &
-)
+module library
 
 use iso_fortran_env, only: output_unit
 use iso_fortran_env, only: error_unit
@@ -23,18 +16,23 @@ use alignment
 
 implicit none
 
-integer, intent(in) :: natom0, natom1, maxrecord
+contains
+
+subroutine remap(natom0, natom1, znums0, znums1, types0, types1, &
+    coords0, coords1, weights0, records, nrec, maplist, mapcount)
+! Purpose: Check and optimize mapping
+
+integer, intent(in) :: natom0, natom1, records
 integer, dimension(natom0), intent(in) :: znums0, types0
 integer, dimension(natom1), intent(in) :: znums1, types1
 real, intent(in) :: coords0(3, natom0)
 real, intent(in) :: coords1(3, natom1)
 real, intent(in) :: weights0(natom0)
-real, intent(in) :: weights1(natom1)
-integer, intent(out) :: nrecord
-integer, intent(out) :: maplist(natom0, maxrecord)
-integer, intent(out) :: mapcount(maxrecord)
+integer, intent(out) :: nrec
+integer, intent(out) :: maplist(natom0, records)
+integer, intent(out) :: mapcount(records)
 
-integer i
+integer i, h, offset
 integer nblock0, nblock1
 integer, dimension(:), allocatable :: seed
 integer, dimension(:), allocatable :: order0, order1
@@ -76,34 +74,40 @@ end if
 
 ! Group atoms by label
 
-call getblocks(natom0, znums0, types0, weights0, nblock0, blocksize0, blockidx0, order0)
-call getblocks(natom1, znums1, types1, weights1, nblock1, blocksize1, blockidx1, order1)
+call getblocks(natom0, znums0, types0, nblock0, blocksize0, blockidx0, order0)
+call getblocks(natom1, znums1, types1, nblock1, blocksize1, blockidx1, order1)
 
-! Abort if there are incompatible atomic symbols
+! Abort if there are incompatible atoms
 
 if (any(znums0(order0) /= znums1(order1))) then
     write (error_unit, '(a)') 'Error: Clusters are not isomers'
     stop
 end if
 
-! Abort if there are incompatible atomic types
+! Abort if there are incompatible types
 
 if (any(types0(order0) /= types1(order1))) then
     write (error_unit, '(a)') 'Error: There are conflicting atomic types'
     stop
 end if
 
-! Abort if there are incompatible atomic weights
+! Abort if weights differ within a block
 
-if (any(weights0(order0) /= weights1(order1))) then
-    write (error_unit, '(a)') 'Error: There are conflicting atomic weights'
-    stop
-end if
+offset = 0
+do h = 1, nblock0
+    do i = 2, blocksize0(h)
+        if (weights0(order0(offset+i)) /= weights0(order0(offset+1))) then
+            write (error_unit, '(a)') 'Error: All atoms within a block must have the same weight'
+            stop
+        end if
+    end do
+    offset = offset + blocksize0(h)
+end do
 
 ! Calculate centroids
 
 center0 = centroid(natom0, weights0, coords0)
-center1 = centroid(natom1, weights1, coords1)
+center1 = centroid(natom1, weights0, coords1)
 
 ! Initialize random number generator
 
@@ -111,26 +115,22 @@ call init_random_seed(seed)
 
 ! Remap atoms to minimize distance and difference
 
-call optimize_mapping( &
-    natom0, nblock0, blocksize0, weights0(order0), &
+call optimize_mapping(natom0, nblock0, blocksize0, weights0(order0), &
     centered(natom0, coords0(:, order0), center0), &
     centered(natom1, coords1(:, order1), center1), &
-    maxrecord, nrecord, maplist, mapcount, &
-    trial_test, match_test &
-)
+    records, nrec, maplist, mapcount, trial_test, match_test)
 
 ! Reorder back to original atom ordering
 
-do i = 1, nrecord
+do i = 1, nrec
     maplist(:, i) = order1(maplist(inversemap(order0), i))
 end do
 
 end subroutine
 
+subroutine align(natom0, natom1, znums0, znums1, types0, types1, &
+    coords0, coords1, weights0, travec, rotmat)
 ! Purpose: Superimpose coordinates of atom sets coords0 and coords1
-subroutine align( &
-    natom0, natom1, znums0, znums1, types0, types1, weights0, weights1, &
-    coords0, coords1, travec, rotmat)
 
 use iso_fortran_env, only: output_unit
 use iso_fortran_env, only: error_unit
@@ -150,7 +150,6 @@ integer, dimension(natom1), intent(in) :: znums1, types1
 real, intent(in) :: coords0(3, natom0)
 real, intent(in) :: coords1(3, natom1)
 real, intent(in) :: weights0(natom0)
-real, intent(in) :: weights1(natom1)
 real, intent(out) :: travec(3)
 real, intent(out) :: rotmat(3, 3)
 
@@ -177,26 +176,17 @@ if (any(types0 /= types1)) then
     stop
 end if
 
-! Abort if there are incompatible atomic weights
-
-if (any(weights0 /= weights1)) then
-    write (error_unit, '(a)') 'Error: There are conflicting atomic weights'
-    stop
-end if
-
 ! Calculate centroids
 
 center0 = centroid(natom0, weights0, coords0)
-center1 = centroid(natom1, weights1, coords1)
+center1 = centroid(natom1, weights0, coords1)
 
 ! Calculate optimal rotation matrix
 
-rotmat = rotquat2rotmat(leastrotquat( &
-    natom0, weights0, &
+rotmat = rotquat2rotmat(leastrotquat(natom0, weights0, &
     centered(natom0, coords0, center0), &
     centered(natom1, coords1, center1), &
-    identitymap(natom0) &
-))
+    identitymap(natom0)))
 
 ! Calculate optimal translation vector
 
@@ -204,4 +194,4 @@ travec = center0 - matmul(rotmat, center1)
 
 end subroutine
 
-!end module
+end module

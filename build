@@ -1,6 +1,0 @@
-#!/bin/bash
-export FORTRAN
-export LAPACK
-export F2PY
-source "$(dirname "$0")/build.env"
-bash "$(dirname "$0")/build.sh" "$@"

@@ -12,22 +12,22 @@ use readwrite
 use translation
 use rotation
 use alignment
-!use library
+use library
 
 implicit none
 
 integer i, n, u
 integer natom0, natom1
-integer nrecord, maxrecord
+integer nrec, records
 real travec(3), rotmat(3, 3)
 character(title_len) title0, title1
 integer, allocatable :: mapcount(:)
 integer, allocatable :: maplist(:, :)
 integer, dimension(:), allocatable :: znums0, znums1, types0, types1
 real, dimension(:, :), allocatable :: coords0, coords1
-real, dimension(:), allocatable :: weights0, weights1
 character(label_len), dimension(:), allocatable :: labels0, labels1
 character(arg_len) arg, path, weighting
+real, dimension(:), allocatable :: weights0
 real, dimension(nelem) :: property
 integer file_unit(2)
 logical stdin
@@ -39,11 +39,11 @@ procedure(writeabstractfile), pointer :: writefile => null()
 live = .false.
 stdin = .false.
 biased = .false.
-iterative = .false.
+iteration = .false.
 bounded = .false.
 converged = .false.
 testing = .false.
-maxrecord = 1
+records = 1
 lenscale = 1000.0
 weighting = 'none'
 formatout = 'xyz'
@@ -60,7 +60,7 @@ do while (getarg(arg))
     case ('-test')
         testing = .true.
     case ('-iter')
-        iterative = .true.
+        iteration = .true.
     case ('-bias')
         biased = .true.
         call readoptarg(arg, tolerance)
@@ -74,8 +74,8 @@ do while (getarg(arg))
         call readoptarg(arg, lenscale)
     case ('-weight')
         call readoptarg(arg, weighting)
-    case ('-print')
-        call readoptarg(arg, maxrecord)
+    case ('-rec')
+        call readoptarg(arg, records)
     case ('-out')
         call readoptarg(arg, formatout)
     case ('-stdin')
@@ -107,8 +107,8 @@ call readxyzfile(file_unit(2), natom1, title1, labels1, coords1)
 
 allocate(znums0(natom0), znums1(natom1))
 allocate(types0(natom0), types1(natom1))
-allocate(weights0(natom0), weights1(natom1))
-allocate(maplist(natom0, maxrecord), mapcount(maxrecord))
+allocate(maplist(natom0, records), mapcount(records))
+allocate(weights0(natom0))
 
 ! Get atomic numbers and types
 
@@ -147,27 +147,21 @@ end select
 ! Get normalized weights
 
 weights0 = property(znums0)/sum(property(znums0))
-weights1 = property(znums1)/sum(property(znums1))
 
 ! Superpose atoms
 
 if (bounded .or. converged) then
 
-    call remap(natom0, natom1, znums0, znums1, types0, types1, weights0, weights1, &
-        coords0, coords1, maxrecord, nrecord, maplist, mapcount)
+    call remap(natom0, natom1, znums0, znums1, types0, types1, &
+        coords0, coords1, weights0, records, nrec, maplist, mapcount)
 
     ! Write aligned coordinates
 
-    do i = 1, nrecord
+    do i = 1, nrec
 
-        call align( &
-            natom0, natom1, &
-            znums0, znums1(maplist(:, i)), &
-            types0, types1(maplist(:, i)), &
-            weights0, weights1(maplist(:, i)), &
-            coords0, coords1(:, maplist(:, i)), &
-            travec, rotmat &
-        )
+        call align(natom0, natom1, znums0, znums1(maplist(:, i)), types0, &
+            types1(maplist(:, i)), coords0, coords1(:, maplist(:, i)), &
+            weights0, travec, rotmat)
 
         open(newunit=u, file='aligned_'//str(i)//'.'//trim(formatout), action='write', status='replace')
         call writefile(u, natom0, title0, znums0, coords0)
@@ -179,8 +173,8 @@ if (bounded .or. converged) then
 
 else
 
-    call align(natom0, natom1, znums0, znums1, types0, types1, weights0, weights1, &
-        coords0, coords1, travec, rotmat)
+    call align(natom0, natom1, znums0, znums1, types0, types1, &
+        coords0, coords1, weights0, travec, rotmat)
 
     call rotate(natom1, coords1, rotmat)
     call translate(natom1, coords1, travec)

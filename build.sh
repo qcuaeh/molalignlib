@@ -1,25 +1,25 @@
+#!/bin/bash
 shopt -s nullglob
+parentdir=$(cd -- "$(dirname "$0")" && pwd)
+. "$(dirname "$0")/build.env"
 
 # Compile source file
 compile () {
-   sourcefile=$SRCDIR/$1
-   buildfile=$BUILDIR/$1
-   objectfile=$BUILDIR/${1%.*}.o
+   sourcefile=$sourcedir/$1
+   buildfile=$builddir/$1
+   objectfile=$builddir/${1%.*}.o
    objectlist+=("$objectfile")
    if ! test -e "$objectfile" || ! test -e "$buildfile" || ! diff -q "$sourcefile" "$buildfile" > /dev/null; then
       rm -f "$objectfile"
       cp -p "$sourcefile" "$buildfile"
       echo Compiling "$1"
-      $FORTRAN "${compflags[@]}" -c "$sourcefile" -o "$objectfile" -I "$BUILDIR" -J "$BUILDIR" || exit
+      $FORTRAN "${compflags[@]}" -c "$sourcefile" -o "$objectfile" -I "$builddir" -J "$builddir" || exit
    fi
 }
 
-NAME=ralign
-HERE=$(cd -- "$(dirname "$0")" && pwd)
-SRCDIR=$HERE/source
-BINDIR=$HERE/bin
-LIBDIR=$HERE/lib
-BUILDROOT=$HERE/_build_dir
+sourcedir=$parentdir/source
+buildroot=$parentdir/_build_dir
+testdir=$parentdir/tests
 
 if [[ -n $LAPACK ]]; then
     if [[ -d $LAPACK ]]; then
@@ -50,7 +50,7 @@ while true; do
    esac
 done
 
-BUILDIR=$BUILDROOT/$buildtype/$realprec/$optlevel
+builddir=$buildroot/$buildtype/$realprec/$optlevel
 
 case $buildtype in
    program) :;;
@@ -65,34 +65,34 @@ case "$optlevel" in
 esac
 
 case "$realprec" in
-   single) shift;;
-   double) compflags+=(-fdefault-real-8); shift;;
+   single) f2cmap=$sourcedir/single.f2cmap shift;;
+   double) compflags+=(-fdefault-real-8); f2cmap=$sourcedir/double.f2cmap; shift;;
    *) echo Invalid precision type: $realprec; exit; break;;
 esac
 
 case $buildtype in
 program)
-   if [[ -d $BINDIR ]]; then
-      rm -f "$BINDIR"/"$NAME"
+   if [[ -d $testdir ]]; then
+      rm -f "$testdir"/molalign
    else
-      mkdir "$BINDIR"
+      mkdir "$testdir"
    fi
    ;;
 library)
-   if [[ -d $LIBDIR ]]; then
-      rm -f "$LIBDIR"/"$NAME".so "$LIBDIR"/"$NAME".*.so
+   if [[ -d $testdir ]]; then
+      rm -f "$testdir"/molalign.so "$testdir"/molalign.*.so
    else
-      mkdir "$LIBDIR"
+      mkdir "$testdir"
    fi
    ;;
 esac
 
-if [[ -d $BUILDIR ]]; then
+if [[ -d $builddir ]]; then
   if $recompile; then
-     rm -f "$BUILDIR"/*
+     rm -f "$builddir"/*
   fi
 else
-  mkdir -p "$BUILDIR"
+  mkdir -p "$builddir"
 fi
 
 objectlist=()
@@ -102,20 +102,19 @@ while IFS= read -r line; do
   eval set -- "$line"
   compile "$1"
   if [[ -n $2 ]]; then
-     exportlist+=("$BUILDIR"/"$1")
+     exportlist+=("$builddir"/"$1")
   fi
-done < <(grep -v '^#' "$SRCDIR"/compilelist)
+done < <(grep -v '^#' "$sourcedir"/compilelist)
 
 case $buildtype in
 program)
    echo Linking program...
-   $FORTRAN "${libpathlist[@]}" -llapack -o "$BINDIR"/"$NAME" "${objectlist[@]}"
+   $FORTRAN "${libpathlist[@]}" -llapack -o "$testdir"/molalign "${objectlist[@]}"
    ;;
 library)
    echo Linking libraries...
-#   $FORTRAN -shared "${libpathlist[@]}" -llapack -o "$LIBDIR"/"$NAME".so "${objectlist[@]}"
-   pushd "$LIBDIR"
-   $F2PY -h "$BUILDIR"/"$NAME".pyf --overwrite-signature -m "$NAME" "${exportlist[@]}" --quiet
-   $F2PY -c "$BUILDIR"/"$NAME".pyf -I"$BUILDIR" "${libpathlist[@]}" -llapack "${objectlist[@]}" --quiet
-   popd
+#   $FORTRAN -shared "${libpathlist[@]}" -llapack -o "$testdir"/molalign.so "${objectlist[@]}"
+   cd "$testdir"
+   $F2PY -h "$builddir"/molalign.pyf --overwrite-signature -m molalign "${exportlist[@]}" --f2cmap "$f2cmap" --quiet
+   $F2PY -c "$builddir"/molalign.pyf -I"$builddir" "${libpathlist[@]}" -llapack "${objectlist[@]}" --f2cmap "$f2cmap" --quiet
 esac
