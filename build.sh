@@ -1,6 +1,6 @@
 #!/bin/bash
 shopt -s nullglob
-parentdir=$(cd -- "$(dirname "$0")" && pwd)
+
 set -a
 . "$(dirname "$0")/build.env"
 set +a
@@ -19,9 +19,10 @@ compile () {
    fi
 }
 
+parentdir=$(readlink -e "$(dirname "$0")")
 sourcedir=$parentdir/source
 buildroot=$parentdir/_build_dir
-testdir=$parentdir/tests
+bindir=$parentdir/bin
 
 if [[ -n $LAPACK ]]; then
     if [[ -d $LAPACK ]]; then
@@ -31,62 +32,93 @@ if [[ -n $LAPACK ]]; then
     fi
 fi
 
-options=$(getopt -a -o '' -l program,library,slow,fast,debug,single,double,quick -- "$@") || exit
+options=$(getopt -o l:o:r:q -- "$@") || exit
 eval set -- "$options"
 
-buildtype=program
+libtype=none
 realprec=double
-optlevel=optimized
+optlevel=fast
 recompile=true
+compflags=()
 
 while true; do
    case "$1" in
-   --program) buildtype=program; shift;;
-   --library) buildtype=library; shift;;
-   --optimized) optlevel=optimized; shift;;
-   --debug) optlevel=debug; shift;;
-   --single) realprec=single; shift;;
-   --double) realprec=double; shift;;
-   --quick) recompile=false; shift;;
-   --) shift; break;;
+   -l)
+      libtype=$2
+      shift 2;;
+   -o)
+      optlevel=$2
+      shift 2;;
+   -r)
+      realprec=$2
+      shift 2;;
+   -q)
+      recompile=false;
+      shift;;
+   --)
+      shift
+      break;;
+    *)
+      exit
    esac
 done
 
-builddir=$buildroot/$buildtype/$realprec/$optlevel
-
-case $buildtype in
-   program) :;;
-   library) compflags+=(-fPIC);;
-   *) echo Invalid build type: $buildtype; exit;;
-esac
-
-case "$optlevel" in
-   optimized) compflags+=(-O3 -ffast-math); shift;;
-   debug) compflags+=(-O0 -g -fbounds-check -fbacktrace -Wall -ffpe-trap=zero,invalid,overflow); shift;;
-   *) echo Invalid build type: $optlevel; exit; break;;
-esac
-
 case "$realprec" in
-   single) f2cmap=$sourcedir/single.f2cmap shift;;
+   single) f2cmap=$sourcedir/single.f2cmap; shift;;
    double) compflags+=(-fdefault-real-8); f2cmap=$sourcedir/double.f2cmap; shift;;
    *) echo Invalid precision type: $realprec; exit; break;;
 esac
 
-case $buildtype in
-program)
-   if [[ -d $testdir ]]; then
-      rm -f "$testdir"/molalign
+case "$optlevel" in
+   fast) compflags+=(-O3 -ffast-math); shift;;
+   debug) compflags+=(-O0 -g -fbounds-check -fbacktrace -Wall -ffpe-trap=zero,invalid,overflow); shift;;
+   *) echo Invalid optimization level: $optlevel; exit; break;;
+esac
+
+case $libtype in
+none)
+   builddir=$buildroot/static/$realprec/$optlevel
+   if [[ -d $bindir ]]; then
+      rm -f "$bindir"/molalign
    else
-      mkdir "$testdir"
+      mkdir "$bindir"
    fi
    ;;
-library)
-   if [[ -d $testdir ]]; then
-      rm -f "$testdir"/molalign.*.so
+static)
+   builddir=$buildroot/static/$realprec/$optlevel
+   if [[ -d $bindir ]]; then
+      rm -f "$bindir"/molalign.a
    else
-      mkdir "$testdir"
+      mkdir "$bindir"
    fi
    ;;
+shared)
+   compflags+=(-fPIC)
+   builddir=$buildroot/shared/$realprec/$optlevel
+   if [[ -d $bindir ]]; then
+      rm -f "$bindir"/molalign.so
+   else
+      mkdir "$bindir"
+   fi
+   ;;
+python)
+   compflags+=(-fPIC)
+   builddir=$buildroot/shared/$realprec/$optlevel
+   if [[ -d $bindir ]]; then
+      "$PYTHON" \
+<<HEREDOC
+import os, sys, sysconfig
+name = 'OS' if sys.version_info < (3, 3, 1) else 'EXT_SUFFIX'
+file = 'molalign.' + sysconfig.get_config_var(name)
+if os.path.exists(file): os.remove(file)
+HEREDOC
+   else
+      mkdir "$bindir"
+   fi
+   ;;
+*)
+   echo Invalid library type: $libtype
+   exit
 esac
 
 if [[ -d $builddir ]]; then
@@ -108,17 +140,26 @@ while IFS= read -r line; do
   fi
 done < <(grep -v '^#' "$sourcedir"/compilelist)
 
-case $buildtype in
-program)
+cd "$bindir"
+
+case $libtype in
+none)
    echo Linking program...
-   "$F90" "${libpathlist[@]}" -llapack -o "$testdir"/molalign "${objectlist[@]}"
+   "$F90" "${libpathlist[@]}" -llapack -o molalign "${objectlist[@]}"
    ;;
-library)
-   cd "$testdir"
-   echo Linking libraries...
+static)
+   echo Linking static library...
+   ar r molalign.a "${objectlist[@]}"
+   ;;
+shared)
+   echo Linking shared library...
+   "$F90" -shared "${libpathlist[@]}" -llapack -o molalign.so "${objectlist[@]}"
+   ;;
+python)
+   echo Linking python library...
    export PYTHONWARNINGS=ignore::Warning:setuptools.command.install
-   "$F90" -shared "${libpathlist[@]}" -llapack -o "$testdir"/molalign.$(uname -i)-$(uname -s).so "${objectlist[@]}"
    "$F2PY" -h "$builddir"/molalign.pyf --overwrite-signature -m molalign "${exportlist[@]}" --f2cmap "$f2cmap" --quiet
    "$F2PY" -c "$builddir"/molalign.pyf -I"$builddir" "${libpathlist[@]}" -llapack "${objectlist[@]}" --f2cmap "$f2cmap" \
-       --fcompiler=gnu95 --quiet
+      --fcompiler=gnu95 --quiet
+   ;;
 esac

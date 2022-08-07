@@ -1,28 +1,30 @@
 Building
 ========
 
-Run `./build` without arguments to build the program in double precision
-with optimizations enabled. The program will be created in the *bin*
-directory. Moreover the script accepts the following options:
+Run `./build` without arguments to build the program in double precision with
+all optimizations enabled. The script accepts the following options to build
+the library instead of the program or to change the optimization level and the
+numeric precision:
 
-### Build type
+### Library type (-l)
 
-&ensp; -program : Build the program (default).  
-&ensp; -library : Build the python library.  
+&ensp; static : Build the static library
+&ensp; shared : Build the shared library
+&ensp; python : Build the python library.  
 
-### Optimization level
+### Optimization level (-o)
 
-&ensp; -optimized : Enable all optimizations (default).  
-&ensp; -debug : Enable debugging and disable optimizations.  
+&ensp; fast : Enable all optimizations (default).  
+&ensp; debug : Enable debugging and disable optimizations.  
 
-### Numeric precision
+### Real number precision (-r)
 
-&ensp; -single : Use single precision.  
-&ensp; -double : Use double precision (default).  
+&ensp; single : Use single precision.  
+&ensp; double : Use double precision (default).  
 
-### Miscellaneous
+### Quick recompile (-q)
 
-&ensp; -recompile : Recompile all source files.  
+The program and libraries will be created in the *bin* directory.
 
 Running the program
 ===================
@@ -43,7 +45,9 @@ Running the program
  
 ### Examples
 
-Te following line will run the program using biases with a tolerance of 0.17 Å, iteration, mass weigthed coordinates, a stopping threshold of 10 counts, a maximum of 1000 trials and repeatable pseudo random numbers:
+Te following line will run the program using biases with a tolerance of 0.17 Å,
+iteration, mass weigthed coordinates, a stopping threshold of 10 counts, a maximum
+of 1000 trials and repeatable pseudo random numbers:
 
     ./bin/ralign tests/r005/100cobalt_j5.xyz -bias 0.17 -iter -weight mass -count 10 -trial 1000 -test -rec 10
     
