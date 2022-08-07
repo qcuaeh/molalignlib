@@ -1,28 +1,15 @@
 Building
 ========
 
-Run `./build` without arguments to build the program in double precision with
+Run `./build.sh` without arguments to build the program in double precision with
 all optimizations enabled. The script accepts the following options to build
 the library instead of the program or to change the optimization level and the
 numeric precision:
 
-### Library type (-l)
-
-&ensp; static : Build the static library
-&ensp; shared : Build the shared library
-&ensp; python : Build the python library.  
-
-### Optimization level (-o)
-
-&ensp; fast : Enable all optimizations (default).  
-&ensp; debug : Enable debugging and disable optimizations.  
-
-### Real number precision (-r)
-
-&ensp; single : Use single precision.  
-&ensp; double : Use double precision (default).  
-
-### Quick recompile (-q)
+&ensp; -o fast|debug : Set the optimization level.  
+&ensp; -r single|double : Set the precision for real numbers.  
+&ensp; -l static|shared|python : Build the library instead of the program.  
+&ensp; -q : Quick compile (recompile only modified source files).  
 
 The program and libraries will be created in the *bin* directory.
 
@@ -34,14 +21,14 @@ Running the program
 &ensp; -live : Print live stats.  
 &ensp; -iter : Use iterative steps.  
 &ensp; -stdin : Read coordinates from standard input.  
-&ensp; -test : Use the same pseudo random numbers on every run.  
-&ensp; -rec *NUM* : Set number of printed solutions to *NUM*.  
 &ensp; -out xyz|mol2 : Set output format to XYZ or Mol2.  
+&ensp; -test : Use the same pseudo random numbers on every run.  
+&ensp; -rec *RECS* : Set the number of recorded solutions to *RECS*.  
 &ensp; -weight none|mass : Set weights to unity or atomic masses.  
 &ensp; -count *MAX* : Set map counting threshold to *MAX*.  
 &ensp; -trial *MAX* : Set maximum number of trials to *MAX*.  
 &ensp; -bias *TOL* : Use biasing with tolerance *TOL*.  
-&ensp; -scale *NUM* : Set length scale to *NUM*.  
+&ensp; -scale *SCAL* : Set length scale to *SCAL*.  
  
 ### Examples
 
