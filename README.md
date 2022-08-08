@@ -4,6 +4,8 @@ molalign
 
 **molalign** is a fortran program to solve the approximate congruence problem for atomic systems.
 
+![graphic](graphic.png)
+
 Building
 --------
 
@@ -13,7 +15,7 @@ instead of the program or to change the optimization level and the numeric preci
 
 &ensp; -o fast|debug : Set the optimization level.  
 &ensp; -r single|double : Set the precision for real numbers.  
-&ensp; -l static|shared|python : Build the library instead of the program.  
+&ensp; -l static|shared|python : Build the static/shared/python library, not the program.  
 &ensp; -q : Quick compile (recompile only modified source files).  
 
 The program and libraries will be created in the *bin* directory.
