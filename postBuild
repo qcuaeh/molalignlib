@@ -1,4 +1,3 @@
 #!/bin/bash
 $HOME/build.sh -lpython
-mv $HOME/bin/molalign.cpython-*.so $HOME/tests
-mv $HOME/source/molalign_wrapper.py $HOME/tests
+rm -r $HOME/_build_dir

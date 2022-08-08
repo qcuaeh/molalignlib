@@ -23,6 +23,7 @@ parentdir=$(readlink -e "$(dirname "$0")")
 sourcedir=$parentdir/source
 buildroot=$parentdir/_build_dir
 bindir=$parentdir/bin
+libdir=$parentdir/lib
 
 if [[ -n $LAPACK ]]; then
     if [[ -d $LAPACK ]]; then
@@ -86,25 +87,25 @@ none)
    ;;
 static)
    buildir=$buildroot/static/$realprec/$optlevel
-   if [[ -d $bindir ]]; then
-      rm -f "$bindir"/molalign.a
+   if [[ -d $libdir ]]; then
+      rm -f "$libdir"/molalign.a
    else
-      mkdir "$bindir"
+      mkdir "$libdir"
    fi
    ;;
 shared)
    compflags+=(-fPIC)
    buildir=$buildroot/shared/$realprec/$optlevel
-   if [[ -d $bindir ]]; then
-      rm -f "$bindir"/molalign.so
+   if [[ -d $libdir ]]; then
+      rm -f "$libdir"/molalign.so
    else
-      mkdir "$bindir"
+      mkdir "$libdir"
    fi
    ;;
 python)
    compflags+=(-fPIC)
    buildir=$buildroot/shared/$realprec/$optlevel
-   if [[ -d $bindir ]]; then
+   if [[ -d $libdir ]]; then
       "$PYTHON" \
 <<HEREDOC
 import os, sys, sysconfig
@@ -113,7 +114,7 @@ file = 'molalign.' + sysconfig.get_config_var(name)
 if os.path.exists(file): os.remove(file)
 HEREDOC
    else
-      mkdir "$bindir"
+      mkdir "$libdir"
    fi
    ;;
 *)
@@ -140,26 +141,29 @@ while IFS= read -r line; do
   fi
 done < <(grep -v '^#' "$sourcedir"/compilelist)
 
-cd "$bindir"
-
 case $libtype in
 none)
+   cd "$bindir"
    echo Linking program...
    "$F90" "${libpathlist[@]}" -llapack -o molalign "${objectlist[@]}"
    ;;
 static)
+   cd "$libdir"
    echo Linking static library...
    ar r molalign.a "${objectlist[@]}"
    ;;
 shared)
+   cd "$libdir"
    echo Linking shared library...
    "$F90" -shared "${libpathlist[@]}" -llapack -o molalign.so "${objectlist[@]}"
    ;;
 python)
+   cd "$libdir"
    echo Linking python library...
    export PYTHONWARNINGS=ignore::Warning:setuptools.command.install
    "$F2PY" -h "$buildir"/molalign.pyf --overwrite-signature -m molalign "${f2pylist[@]}" --f2cmap "$f2cmap" --quiet
    "$F2PY" -c "$buildir"/molalign.pyf -I"$buildir" "${libpathlist[@]}" -llapack "${objectlist[@]}" --f2cmap "$f2cmap" \
       --fcompiler=gnu95 --quiet
+   cp "$sourcedir"/molalign_wrapper.py "$libdir"
    ;;
 esac
