@@ -1,5 +1,11 @@
-Building
+molalign
 ========
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qcuaeh/molalign.git/HEAD?labpath=tests)
+
+**molalign** is a fortran program to solve the approximate congruence problem for atomic systems.
+
+Building
+--------
 
 Run `./build.sh` without arguments to build the program in double precision with
 all optimizations enabled. The script accepts the following options to build
@@ -14,7 +20,7 @@ numeric precision:
 The program and libraries will be created in the *bin* directory.
 
 Usage
-=====
+-----
 
 ### Program options
 
