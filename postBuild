@@ -1,3 +1,4 @@
-./build.sh -lpython
-cp bin/molalign.cpython-*.so tests
-cp source/molalign_wrapper.py tests
+#!/bin/bash
+$HOME/build.sh -lpython
+mv $HOME/bin/molalign.cpython-*.so $HOME/tests
+mv $HOME/source/molalign_wrapper.py $HOME/tests

@@ -108,7 +108,7 @@ python)
       "$PYTHON" \
 <<HEREDOC
 import os, sys, sysconfig
-name = 'OS' if sys.version_info < (3, 3, 1) else 'EXT_SUFFIX'
+name = 'OS' if sys.version_info < (3, 4) else 'EXT_SUFFIX'
 file = 'molalign.' + sysconfig.get_config_var(name)
 if os.path.exists(file): os.remove(file)
 HEREDOC
