@@ -29,20 +29,20 @@ Usage
 &ensp; -stdin : Read coordinates from standard input.  
 &ensp; -out xyz|mol2 : Set output format to XYZ or Mol2.  
 &ensp; -test : Use the same pseudo random numbers on every run.  
-&ensp; -weight none|mass : Set weights to unity or atomic masses.  
 &ensp; -rec *NUM* : Set the number of recorded solutions to *NUM*.  
-&ensp; -count *NUM* : Set counting convergence threshold to *NUM*.  
+&ensp; -count *NUM* : Set count convergence threshold to *NUM*.  
 &ensp; -trial *MAX* : Set maximum number of trials to *MAX*.  
+&ensp; -weight : Use mass weighted mean square distance.  
 &ensp; -bias *TOL* : Use biasing with tolerance *TOL*.  
 &ensp; -scale *SCALE* : Set length scale to *SCALE*.  
  
 ### Examples
 
 Te following line will run the program using biases with a tolerance of 0.17 Å,
-iteration, mass weigthed coordinates, a stopping threshold of 10 counts, a maximum
-of 1000 trials and repeatable pseudo random numbers:
+iteration, mass weigthed mean square distance, a convergence threshold of 10 counts,
+a maximum of 1000 trials and repeatable pseudo random numbers:
 
-    ./bin/ralign tests/r005/100cobalt_j5.xyz -bias 0.17 -iter -weight mass -count 10 -trial 1000 -test -rec 10
+    ./bin/ralign tests/r005/Co100.xyz -bias 0.17 -iter -weight -count 10 -trial 1000 -rec 10 -test
     
 The ouput should look as follows:
 

@@ -20,13 +20,13 @@ integer i, n, u
 integer natom0, natom1
 integer nrec, records
 real travec(3), rotmat(3, 3)
+character(arg_len) arg, path
 character(title_len) title0, title1
 integer, allocatable :: mapcount(:)
 integer, allocatable :: maplist(:, :)
 integer, dimension(:), allocatable :: znums0, znums1, types0, types1
 real, dimension(:, :), allocatable :: coords0, coords1
 character(label_len), dimension(:), allocatable :: labels0, labels1
-character(arg_len) arg, path, weighting
 real, dimension(:), allocatable :: weights0
 real, dimension(nelem) :: property
 integer file_unit(2)
@@ -45,7 +45,7 @@ converged = .false.
 testing = .false.
 records = 1
 lenscale = 1000.0
-weighting = 'none'
+property = [(1.0, i=1, nelem)]
 formatout = 'xyz'
 
 ! Get user options
@@ -61,6 +61,8 @@ do while (getarg(arg))
         testing = .true.
     case ('-iter')
         iteration = .true.
+    case ('-weight')
+        property = stdmatom
     case ('-bias')
         biased = .true.
         call readoptarg(arg, tolerance)
@@ -72,8 +74,6 @@ do while (getarg(arg))
         call readoptarg(arg, mincount)
     case ('-scale')
         call readoptarg(arg, lenscale)
-    case ('-weight')
-        call readoptarg(arg, weighting)
     case ('-rec')
         call readoptarg(arg, records)
     case ('-out')
@@ -98,6 +98,18 @@ else
     end if
 end if
 
+! Select output format
+
+select case (formatout)
+case ('xyz')
+    writefile => writexyzfile
+case ('mol2')
+    writefile => writemol2file
+case default
+    write (error_unit, '(a,x,a)') 'Invalid format:', trim(formatout)
+    stop
+end select
+
 ! Read coordinates
 
 call readxyzfile(file_unit(1), natom0, title0, labels0, coords0)
@@ -119,30 +131,6 @@ end do
 do i = 1, natom1
     call getznum(labels1(i), znums1(i), types1(i))
 end do
-
-! Select output format
-
-select case (formatout)
-case ('xyz')
-    writefile => writexyzfile
-case ('mol2')
-    writefile => writemol2file
-case default
-    write (error_unit, '(a,x,a)') 'Invalid format:', trim(formatout)
-    stop
-end select
-
-! Select weighting property
-
-select case (weighting)
-case ('none')
-    property = [(1.0, i=1, nelem)]
-case ('mass')
-    property = stdmatom
-case default
-    write (error_unit, '(a,x,a)') 'Invalid weighting option:', trim(weighting)
-    stop
-end select
 
 ! Get normalized weights
 
