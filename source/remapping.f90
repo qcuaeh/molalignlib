@@ -36,7 +36,7 @@ end function
 
 subroutine optimize_mapping( &
     natom, nblock, blocksize, weights, coords0, coords1, records, nrec, &
-    maplist, mapcount, trial_test, match_test &
+    maplist, mapcount, mindist, trial_test, match_test &
 )
 
     integer, intent(in) :: natom, nblock, records
@@ -46,6 +46,7 @@ subroutine optimize_mapping( &
     procedure (test), pointer, intent(in) :: trial_test, match_test
     integer, intent(out) :: nrec
     integer, intent(out) :: maplist(:, :), mapcount(:)
+    real, intent(out) :: mindist(:)
 
     logical found, overflow
     integer imap, jmap, ntrial, nmatch, cycles
@@ -53,7 +54,7 @@ subroutine optimize_mapping( &
     integer earliest(records)
     real :: dist, biased_dist, new_biased_dist, meanrot
     real, dimension(4) :: rotquat, prodquat
-    real, dimension(records) :: mindist, avgiter, avgmeanrot, avgtotrot
+    real, dimension(records) :: avgiter, avgmeanrot, avgtotrot
     real bias(natom, natom)
     real auxcoords(3, natom)
 

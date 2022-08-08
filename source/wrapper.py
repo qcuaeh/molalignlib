@@ -84,9 +84,9 @@ class Aligner(Atoms):
         types1 = np.ones(len(other), dtype=int)
         coords0 = self.get_positions().transpose()
         coords1 = other.get_positions().transpose()
-        n, maplist, mapcount = molalign.library.remap(znums0, znums1, types0, types1, \
-            coords0, coords1, self.weights, self.records)
-        return [i - 1 for i in maplist.transpose()[:n]], mapcount[:n]
+        n, maplist, mapcount, mindist = molalign.library.remap(znums0, znums1, types0, \
+            types1, coords0, coords1, self.weights, self.records)
+        return [i - 1 for i in maplist.transpose()[:n]], mapcount[:n], mindist[:n]
     def aligned(self, other, mapping):
         if not isinstance(other, Atoms):
             print('An Atoms object was expected as first argument')

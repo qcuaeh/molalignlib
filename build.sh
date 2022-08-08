@@ -164,6 +164,6 @@ python)
    "$F2PY" -h "$buildir"/molalign.pyf --overwrite-signature -m molalign "${f2pylist[@]}" --f2cmap "$f2cmap" --quiet
    "$F2PY" -c "$buildir"/molalign.pyf -I"$buildir" "${libpathlist[@]}" -llapack "${objectlist[@]}" --f2cmap "$f2cmap" \
       --fcompiler=gnu95 --quiet
-   cp "$sourcedir"/molalign_wrapper.py "$libdir"
+   cp "$sourcedir"/wrapper.py "$libdir"
    ;;
 esac

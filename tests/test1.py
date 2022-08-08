@@ -5,7 +5,7 @@
 
 
 from ase import io
-from molalign_wrapper import Aligner
+from wrapper import Aligner
 
 
 # In[ ]:
@@ -19,7 +19,7 @@ aligner = Aligner(atoms0, records=10, count=10, bias=0.17, iteration=True, weigh
 # In[ ]:
 
 
-maplist, mapcount = aligner.remapping(atoms1)
+maplist, mapcount, mindist = aligner.remapping(atoms1)
 
 
 # In[ ]:

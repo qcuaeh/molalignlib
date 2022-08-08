@@ -34,7 +34,6 @@ function lower(str)
         i = index(uppercase, str(j:j))
         if (i > 0) lower(j:j) = lowercase(i:i)
     end do
-
 end function
 
 function upper(str)
@@ -51,7 +50,6 @@ function upper(str)
         i = index(lowercase, str(j:j))
         if (i > 0) upper(j:j) = uppercase(i:i)
     end do
-
 end function
 
 function int2str(x) result(strx)
@@ -78,7 +76,6 @@ subroutine splitext(filename, prefix, suffix)
     end if
     prefix = filename(:pos-1)
     suffix = filename(pos+1:)
-
 end subroutine
 
 end module
