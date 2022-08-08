@@ -7,10 +7,9 @@ molalign
 Building
 --------
 
-Run `./build.sh` without arguments to build the program in double precision with
-all optimizations enabled. The script accepts the following options to build
-the library instead of the program or to change the optimization level and the
-numeric precision:
+Run `./build.sh` without arguments to build the program in double precision with all
+optimizations enabled. The script accepts the following options to build the library
+instead of the program or to change the optimization level and the numeric precision:
 
 &ensp; -o fast|debug : Set the optimization level.  
 &ensp; -r single|double : Set the precision for real numbers.  
@@ -26,23 +25,28 @@ Usage
 
 &ensp; -live : Print live stats.  
 &ensp; -iter : Use iterative steps.  
+&ensp; -mass : Use mass weighted distances.  
 &ensp; -stdin : Read coordinates from standard input.  
 &ensp; -out xyz|mol2 : Set output format to XYZ or Mol2.  
 &ensp; -test : Use the same pseudo random numbers on every run.  
 &ensp; -rec *NUM* : Set the number of recorded solutions to *NUM*.  
 &ensp; -count *NUM* : Set count convergence threshold to *NUM*.  
 &ensp; -trial *MAX* : Set maximum number of trials to *MAX*.  
-&ensp; -weight : Use mass weighted mean square distance.  
 &ensp; -bias *TOL* : Use biasing with tolerance *TOL*.  
 &ensp; -scale *SCALE* : Set length scale to *SCALE*.  
  
 ### Examples
 
-Te following line will run the program using biases with a tolerance of 0.17 Å,
-iteration, mass weigthed mean square distance, a convergence threshold of 10 counts,
-a maximum of 1000 trials and repeatable pseudo random numbers:
+Te following command will run the program with
+a convergence threshold of 10 counts,
+a maximum of 1000 trials,
+up to 10 recorded mappings,
+biasing with tolerance of 0.17 Å,
+iteration,
+mass weighted distances
+and repeatable pseudo random numbers:
 
-    ./bin/ralign tests/r005/Co100.xyz -bias 0.17 -iter -weight -count 10 -trial 1000 -rec 10 -test
+    ./bin/molalign tests/r005/Co100.xyz -count 10 -max 1000 -rec 10 -bias 0.17 -iter -mass -test
     
 The ouput should look as follows:
 

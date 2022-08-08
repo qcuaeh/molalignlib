@@ -9,17 +9,17 @@ from ase import Atoms
 #print(molalign.library.align.__doc__)
 
 class Aligner(Atoms):
-    def __init__(self, atoms, records=1, scale=1000., count=None, trial=None, bias=None, \
-                 iteration=False, weighted=False, testing=False):
+    def __init__(self, atoms, rec=1, scale=1000., count=None, max=None, bias=None, \
+                 iteration=False, mass_weighted=False, testing=False):
         if isinstance(atoms, Atoms):
             self.__dict__.update(atoms.__dict__)
         else:
             print('An Atoms object was expected as argument')
             raise SystemExit
-        if type(records) is int:
-            self.records = records
+        if type(rec) is int:
+            self.records = rec
         else:
-            print('"records" must be an integer')
+            print('"rec" must be an integer')
             raise SystemExit
         if type(scale) is float:
             molalign.options.lenscale = scale
@@ -35,14 +35,14 @@ class Aligner(Atoms):
             else:
                 print('"count" must be an integer')
                 raise SystemExit
-        if trial is None:
+        if max is None:
             molalign.options.bounded = False
         else:
-            if type(trial) is int:
+            if type(max) is int:
                 molalign.options.bounded = True
-                molalign.options.maxtrial = trial
+                molalign.options.maxtrial = max
             else:
-                print('"trial" must be an integer')
+                print('"max" must be an integer')
                 raise SystemExit
         if type(iteration) is bool:
             molalign.options.iteration = iteration
@@ -63,13 +63,13 @@ class Aligner(Atoms):
             else:
                 print('"bias" must be a real')
                 raise SystemExit
-        if type(weighted) is bool:
-            if weighted:
+        if type(mass_weighted) is bool:
+            if mass_weighted:
                 self.weights = atoms.get_masses()/sum(atoms.get_masses())
             else:
                 self.weights = np.ones(len(atoms), dtype=float)/len(atoms)
         else:
-            print('"weighted" must be a boolean')
+            print('"mass_weighted" must be a boolean')
             raise SystemExit
     def remapping(self, other):
         if not isinstance(other, Atoms):

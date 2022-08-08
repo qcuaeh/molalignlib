@@ -60,12 +60,12 @@ program ralign
             testing = .true.
         case ('-iter')
             iteration = .true.
-        case ('-weight')
+        case ('-mass')
             property = stdmatom
         case ('-bias')
             biased = .true.
             call readoptarg(arg, tolerance)
-        case ('-trial')
+        case ('-max')
             bounded = .true.
             call readoptarg(arg, maxtrial)
         case ('-count')
