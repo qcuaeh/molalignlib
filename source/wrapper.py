@@ -9,51 +9,46 @@ from ase import Atoms
 #print(molalign.library.align.__doc__)
 
 class Aligner(Atoms):
-    def __init__(self, atoms, rec=1, scale=1000., count=None, max=None, bias=None, \
+    def __init__(self, atoms, rec=1, count=None, max=None, scale=1000., bias=None, \
                  iteration=False, mass_weighted=False, testing=False):
         if isinstance(atoms, Atoms):
             self.__dict__.update(atoms.__dict__)
         else:
-            print('An Atoms object was expected as argument')
-            raise SystemExit
+            raise TypeError('An Atoms object was expected as argument')
         if type(rec) is int:
             self.records = rec
         else:
-            print('"rec" must be an integer')
-            raise SystemExit
+            raise TypeError('"rec" must be an integer')
         if type(scale) is float:
             molalign.options.lenscale = scale
         else:
-            print('"scale" must be a real')
-            raise SystemExit
+            raise TypeError('"scale" must be a real')
         if count is None:
-            molalign.options.converged = False
+            molalign.options.converge = False
         else:
             if type(count) is int:
-                molalign.options.converged = True
+                molalign.options.converge = True
                 molalign.options.mincount = count
             else:
-                print('"count" must be an integer')
-                raise SystemExit
+                raise TypeError('"count" must be an integer')
         if max is None:
-            molalign.options.bounded = False
+            molalign.options.abort = False
         else:
             if type(max) is int:
-                molalign.options.bounded = True
+                molalign.options.abort = True
                 molalign.options.maxtrial = max
             else:
-                print('"max" must be an integer')
-                raise SystemExit
+                raise TypeError('"max" must be an integer')
+        if not molalign.options.converge and not molalign.options.abort:
+            raise ValueError('either "count" or "max" must be defined')
         if type(iteration) is bool:
             molalign.options.iteration = iteration
         else:
-            print('"iteration" must be a boolean')
-            raise SystemExit
+            raise TypeError('"iteration" must be a boolean')
         if type(testing) is bool:
             molalign.options.testing = testing
         else:
-            print('"testing" must be a boolean')
-            raise SystemExit
+            raise TypeError('"testing" must be a boolean')
         if bias is None:
             molalign.options.biased = False
         else:
@@ -61,23 +56,19 @@ class Aligner(Atoms):
                 molalign.options.biased = True
                 molalign.options.tolerance = bias
             else:
-                print('"bias" must be a real')
-                raise SystemExit
+                raise TypeError('"bias" must be a real')
         if type(mass_weighted) is bool:
             if mass_weighted:
                 self.weights = atoms.get_masses()/sum(atoms.get_masses())
             else:
                 self.weights = np.ones(len(atoms), dtype=float)/len(atoms)
         else:
-            print('"mass_weighted" must be a boolean')
-            raise SystemExit
+            raise TypeError('"mass_weighted" must be a boolean')
     def remapping(self, other):
         if not isinstance(other, Atoms):
-            print('An Atoms object was expected as argument')
-            raise SystemExit
+            raise TypeError('An Atoms object was expected as argument')
         if len(other) != len(self):
-            print('Argument does no have the right length')
-            raise SystemExit
+            raise ValueError('Argument does no have the right length')
         znums0 = self.get_atomic_numbers()
         znums1 = other.get_atomic_numbers()
         types0 = np.ones(len(self), dtype=int)
@@ -89,17 +80,13 @@ class Aligner(Atoms):
         return [i - 1 for i in maplist.transpose()[:n]], mapcount[:n], mindist[:n]
     def aligned(self, other, mapping):
         if not isinstance(other, Atoms):
-            print('An Atoms object was expected as first argument')
-            raise SystemExit
+            raise TypeError('An Atoms object was expected as first argument')
         if len(other) != len(self):
-            print('First argument does no have the right length')
-            raise SystemExit
+            raise ValueError('First argument does no have the right length')
         if type(mapping) is not np.ndarray or mapping.dtype is not np.dtype('int32'):
-            print('An integer numpy array was expected as second argument')
-            raise SystemExit
+            raise TypeError('An integer numpy array was expected as second argument')
         if len(mapping) != len(self):
-            print('Second argument does no have the right length')
-            raise SystemExit
+            raise ValueError('Second argument does no have the right length')
         znums0 = self.get_atomic_numbers()
         znums1 = other.get_atomic_numbers()[mapping]
         types0 = np.ones(len(self), dtype=int)

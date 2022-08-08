@@ -36,14 +36,14 @@ end function
 
 subroutine optimize_mapping( &
     natom, nblock, blocksize, weights, coords0, coords1, records, nrec, &
-    maplist, mapcount, mindist, trial_test, match_test &
+    maplist, mapcount, mindist, abort_test, converge_test &
 )
 
     integer, intent(in) :: natom, nblock, records
     integer, dimension(:), intent(in) :: blocksize
     real, dimension(:, :), intent(in) :: coords0, coords1
     real, dimension(:), intent(in) :: weights
-    procedure (test), pointer, intent(in) :: trial_test, match_test
+    procedure (test), pointer, intent(in) :: abort_test, converge_test
     integer, intent(out) :: nrec
     integer, intent(out) :: maplist(:, :), mapcount(:)
     real, intent(out) :: mindist(:)
@@ -78,7 +78,7 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
 
 ! Loop for map searching
 
-    do while (trial_test(ntrial, maxtrial) .and. match_test(nmatch, mincount))
+    do while (abort_test(ntrial, maxtrial) .and. converge_test(nmatch, mincount))
 
         ntrial = ntrial + 1
 

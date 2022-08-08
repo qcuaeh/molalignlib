@@ -38,15 +38,15 @@ Usage
 ### Examples
 
 Te following command will run the program with
+up to 10 recorded mappings,
 a convergence threshold of 10 counts,
 a maximum of 1000 trials,
-up to 10 recorded mappings,
-biasing with tolerance of 0.17 Å,
+biasing with a tolerance of 0.17 Å,
 iteration,
 mass weighted distances
 and repeatable pseudo random numbers:
 
-    ./bin/molalign tests/r005/Co100.xyz -count 10 -max 1000 -rec 10 -bias 0.17 -iter -mass -test
+    ./bin/molalign tests/r005/Co100.xyz -rec 10 -count 10 -max 1000 -bias 0.17 -iter -mass -test
     
 The ouput should look as follows:
 

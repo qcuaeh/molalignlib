@@ -41,8 +41,8 @@ subroutine remap(natom0, natom1, znums0, znums1, types0, types1, &
     integer, dimension(:), allocatable :: blocksize0, blocksize1
     real, dimension(3) :: center0, center1
 
-    procedure(test), pointer :: trial_test => null()
-    procedure(test), pointer :: match_test => null()
+    procedure(test), pointer :: abort_test => null()
+    procedure(test), pointer :: converge_test => null()
 
     ! Check number of atoms
 
@@ -57,20 +57,26 @@ subroutine remap(natom0, natom1, znums0, znums1, types0, types1, &
     allocate(blockidx0(natom0), blockidx1(natom1))
     allocate(blocksize0(natom0), blocksize1(natom1))
 
-    ! Select trial exit test
+    ! Associate abortion test
 
-    if (bounded) then
-        trial_test => lower_than
+    if (abort) then
+        abort_test => lower_than
     else
-        trial_test => dummy_test
+        abort_test => dummy_test
     end if
 
-    ! Select match exit test
+    ! Associate convergence test
 
-    if (converged) then
-        match_test => lower_than
+    if (converge) then
+        converge_test => lower_than
     else
-        match_test => dummy_test
+        converge_test => dummy_test
+    end if
+
+    if (associated(converge_test, dummy_test) .and. &
+        associated(abort_test, dummy_test)) then
+        write (error_unit, '(a)') 'Error: There is no stopping test associated'
+        stop
     end if
 
     ! Group atoms by label
@@ -119,7 +125,7 @@ subroutine remap(natom0, natom1, znums0, znums1, types0, types1, &
     call optimize_mapping(natom0, nblock0, blocksize0, weights0(order0), &
         centered(natom0, coords0(:, order0), center0), &
         centered(natom1, coords1(:, order1), center1), &
-        records, nrec, maplist, mapcount, mindist, trial_test, match_test)
+        records, nrec, maplist, mapcount, mindist, abort_test, converge_test)
 
     ! Reorder back to original atom ordering
 

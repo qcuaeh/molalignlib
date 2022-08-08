@@ -39,8 +39,8 @@ program ralign
     stdin = .false.
     biased = .false.
     iteration = .false.
-    bounded = .false.
-    converged = .false.
+    abort = .false.
+    converge = .false.
     testing = .false.
     records = 1
     lenscale = 1000.0
@@ -66,10 +66,10 @@ program ralign
             biased = .true.
             call readoptarg(arg, tolerance)
         case ('-max')
-            bounded = .true.
+            abort = .true.
             call readoptarg(arg, maxtrial)
         case ('-count')
-            converged = .true.
+            converge = .true.
             call readoptarg(arg, mincount)
         case ('-scale')
             call readoptarg(arg, lenscale)
@@ -137,7 +137,7 @@ program ralign
 
     ! Superpose atoms
 
-    if (bounded .or. converged) then
+    if (abort .or. converge) then
 
         call remap(natom0, natom1, znums0, znums1, types0, types1, &
             coords0, coords1, weights0, records, nrec, maplist, mapcount, mindist)
@@ -170,7 +170,7 @@ program ralign
             squaredist(natom0, weights0, coords0, coords1, identitymap(natom0)), &
             '(only alignment performed)'
 
-        open(newunit=u, file='aligned.'//trim(formatout), action='write', status='replace')
+        open(newunit=u, file='aligned_1.'//trim(formatout), action='write', status='replace')
         call writefile(u, natom0, title0, znums0, coords0)
         call writefile(u, natom1, title1, znums1, coords1) 
         close(u)

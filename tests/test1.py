@@ -4,6 +4,7 @@
 # In[ ]:
 
 
+import sys
 from ase import io
 from wrapper import Aligner
 
@@ -13,7 +14,12 @@ from wrapper import Aligner
 
 atoms0 = io.read('r005/Co100.xyz', index=0)
 atoms1 = io.read('r005/Co100.xyz', index=1)
-aligner = Aligner(atoms0, count=10, max=1000, rec=10, bias=0.17, iteration=True, mass_weighted=True, testing=True)
+
+
+# In[ ]:
+
+
+aligner = Aligner(atoms0, rec=10, count=10, max=1000, bias=0.17, iteration=True, mass_weighted=True, testing=True)
 
 
 # In[ ]:

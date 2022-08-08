@@ -6,7 +6,7 @@ integer, parameter :: label_len = 16
 integer, parameter :: maxcoord = 16
 
 integer maxtrial, mincount
-logical live, iteration, biased, bounded, converged, testing
+logical live, iteration, biased, abort, converge, testing
 character(arg_len) formatout
 real lenscale, tolerance
 
