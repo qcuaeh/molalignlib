@@ -19,14 +19,13 @@ aligner = Aligner(atoms0, records=10, count=10, bias=0.17, iteration=True, weigh
 # In[ ]:
 
 
-maplist, mapcount = aligner.remap(atoms1)
+maplist, mapcount = aligner.remapping(atoms1)
 
 
 # In[ ]:
 
 
 for i, mapping in enumerate(maplist, start=1):
-    atoms1_aligned = aligner.align(atoms1, mapping)
     io.write('aligned_{}.xyz'.format(i), atoms0,)
-    io.write('aligned_{}.xyz'.format(i), atoms1_aligned, append = True)
+    io.write('aligned_{}.xyz'.format(i), aligner.aligned(atoms1, mapping), append=True)
 

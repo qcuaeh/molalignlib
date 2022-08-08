@@ -14,14 +14,14 @@ class Aligner(Atoms):
         if isinstance(atoms, Atoms):
             self.__dict__.update(atoms.__dict__)
         else:
-            print('"atoms" must be an Atoms object')
+            print('An Atoms object was expected as argument')
             raise SystemExit
-        if isinstance(records, int):
+        if type(records) is int:
             self.records = records
         else:
             print('"records" must be an integer')
             raise SystemExit
-        if isinstance(scale, float):
+        if type(scale) is float:
             molalign.options.lenscale = scale
         else:
             print('"scale" must be a real')
@@ -29,7 +29,7 @@ class Aligner(Atoms):
         if count is None:
             molalign.options.converged = False
         else:
-            if isinstance(count, int):
+            if type(count) is int:
                 molalign.options.converged = True
                 molalign.options.mincount = count
             else:
@@ -38,18 +38,18 @@ class Aligner(Atoms):
         if trial is None:
             molalign.options.bounded = False
         else:
-            if isinstance(trial, int):
+            if type(trial) is int:
                 molalign.options.bounded = True
                 molalign.options.maxtrial = trial
             else:
                 print('"trial" must be an integer')
                 raise SystemExit
-        if isinstance(iteration, bool):
+        if type(iteration) is bool:
             molalign.options.iteration = iteration
         else:
             print('"iteration" must be a boolean')
             raise SystemExit
-        if isinstance(testing, bool):
+        if type(testing) is bool:
             molalign.options.testing = testing
         else:
             print('"testing" must be a boolean')
@@ -57,13 +57,13 @@ class Aligner(Atoms):
         if bias is None:
             molalign.options.biased = False
         else:
-            if isinstance(bias, float):
+            if type(bias) is float:
                 molalign.options.biased = True
                 molalign.options.tolerance = bias
             else:
                 print('"bias" must be a real')
                 raise SystemExit
-        if isinstance(weighted, bool):
+        if type(weighted) is bool:
             if weighted:
                 self.weights = atoms.get_masses()/sum(atoms.get_masses())
             else:
@@ -71,7 +71,13 @@ class Aligner(Atoms):
         else:
             print('"weighted" must be a boolean')
             raise SystemExit
-    def remap(self, other):
+    def remapping(self, other):
+        if not isinstance(other, Atoms):
+            print('An Atoms object was expected as argument')
+            raise SystemExit
+        if len(other) != len(self):
+            print('Argument does no have the right length')
+            raise SystemExit
         znums0 = self.get_atomic_numbers()
         znums1 = other.get_atomic_numbers()
         types0 = np.ones(len(self), dtype=int)
@@ -81,7 +87,19 @@ class Aligner(Atoms):
         n, maplist, mapcount = molalign.library.remap(znums0, znums1, types0, types1, \
             coords0, coords1, self.weights, self.records)
         return [i - 1 for i in maplist.transpose()[:n]], mapcount[:n]
-    def align(self, other, mapping):
+    def aligned(self, other, mapping):
+        if not isinstance(other, Atoms):
+            print('An Atoms object was expected as first argument')
+            raise SystemExit
+        if len(other) != len(self):
+            print('First argument does no have the right length')
+            raise SystemExit
+        if type(mapping) is not np.ndarray or mapping.dtype is not np.dtype('int32'):
+            print('An integer numpy array was expected as second argument')
+            raise SystemExit
+        if len(mapping) != len(self):
+            print('Second argument does no have the right length')
+            raise SystemExit
         znums0 = self.get_atomic_numbers()
         znums1 = other.get_atomic_numbers()[mapping]
         types0 = np.ones(len(self), dtype=int)
@@ -90,5 +108,6 @@ class Aligner(Atoms):
         coords1 = other.get_positions().transpose()[:, mapping]
         travec, rotmat = molalign.library.align(znums0, znums1, types0, types1, coords0, \
              coords1, self.weights)
-        return Atoms(numbers=znums1, positions=np.matmul(rotmat, coords1).transpose()+travec)
+        coords1 = np.matmul(rotmat, coords1).transpose() + travec
+        return Atoms(numbers=znums1, positions=coords1)
 

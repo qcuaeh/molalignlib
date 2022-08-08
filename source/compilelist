@@ -1,7 +1,7 @@
 options.f90 f2py
 strutils.f90
 maputils.f90
-lapack.f90
+eigen.f90
 math.f90
 random.f90
 sorting.f90

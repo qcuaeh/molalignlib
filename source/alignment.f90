@@ -1,7 +1,7 @@
 module alignment
 
 use options
-use lapack
+use eigen
 use rotation
 
 implicit none
