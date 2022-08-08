@@ -29,9 +29,9 @@ Usage
 &ensp; -stdin : Read coordinates from standard input.  
 &ensp; -out xyz|mol2 : Set output format to XYZ or Mol2.  
 &ensp; -test : Use the same pseudo random numbers on every run.  
-&ensp; -rec *RECORDS* : Set the number of recorded solutions to *RECORDS*.  
 &ensp; -weight none|mass : Set weights to unity or atomic masses.  
-&ensp; -count *MAX* : Set map counting threshold to *MAX*.  
+&ensp; -rec *NUM* : Set the number of recorded solutions to *NUM*.  
+&ensp; -count *NUM* : Set counting convergence threshold to *NUM*.  
 &ensp; -trial *MAX* : Set maximum number of trials to *MAX*.  
 &ensp; -bias *TOL* : Use biasing with tolerance *TOL*.  
 &ensp; -scale *SCALE* : Set length scale to *SCALE*.  
