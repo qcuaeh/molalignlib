@@ -32,14 +32,14 @@ class Aligner(Atoms):
             else:
                 raise TypeError('"count" must be an integer')
         if max is None:
-            molalign.options.abort = False
+            molalign.options.complete = False
         else:
             if type(max) is int:
-                molalign.options.abort = True
+                molalign.options.complete = True
                 molalign.options.maxtrial = max
             else:
                 raise TypeError('"max" must be an integer')
-        if not molalign.options.converge and not molalign.options.abort:
+        if not molalign.options.converge and not molalign.options.complete:
             raise ValueError('either "count" or "max" must be defined')
         if type(iteration) is bool:
             molalign.options.iteration = iteration

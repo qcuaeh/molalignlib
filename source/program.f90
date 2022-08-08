@@ -39,7 +39,7 @@ program ralign
     stdin = .false.
     biased = .false.
     iteration = .false.
-    abort = .false.
+    complete = .false.
     converge = .false.
     testing = .false.
     records = 1
@@ -66,7 +66,7 @@ program ralign
             biased = .true.
             call readoptarg(arg, tolerance)
         case ('-max')
-            abort = .true.
+            complete = .true.
             call readoptarg(arg, maxtrial)
         case ('-count')
             converge = .true.
@@ -137,7 +137,7 @@ program ralign
 
     ! Superpose atoms
 
-    if (abort .or. converge) then
+    if (complete .or. converge) then
 
         call remap(natom0, natom1, znums0, znums1, types0, types1, &
             coords0, coords1, weights0, records, nrec, maplist, mapcount, mindist)
