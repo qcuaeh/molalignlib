@@ -1,10 +1,6 @@
 #!/bin/bash
 shopt -s nullglob
 
-set -a
-. "$(dirname "$0")/build.env"
-set +a
-
 # Compile source file
 compile () {
    sourcefile=$sourcedir/$1
@@ -21,9 +17,14 @@ compile () {
 
 parentdir=$(readlink -e "$(dirname "$0")")
 sourcedir=$parentdir/source
+configdir=$parentdir/config
 buildroot=$parentdir/_build_dir
 bindir=$parentdir/bin
 libdir=$parentdir/lib
+
+set -a
+. "$configdir/environment"
+set +a
 
 if [[ -n $LAPACK ]]; then
     if [[ -d $LAPACK ]]; then
@@ -65,8 +66,8 @@ while true; do
 done
 
 case "$realprec" in
-   single) f2cmap=$sourcedir/single.f2cmap; shift;;
-   double) compflags+=(-fdefault-real-8); f2cmap=$sourcedir/double.f2cmap; shift;;
+   single) f2cmap=$configdir/single.f2cmap; shift;;
+   double) compflags+=(-fdefault-real-8); f2cmap=$configdir/double.f2cmap; shift;;
    *) echo Invalid precision type: $realprec; exit; break;;
 esac
 
@@ -139,7 +140,7 @@ while IFS= read -r line; do
   if [[ $2 == f2py ]]; then
      f2pylist+=("$buildir"/"$1")
   fi
-done < <(grep -v '^#' "$sourcedir"/compilelist)
+done < <(grep -v '^#' "$configdir"/compilelist)
 
 case $libtype in
 none)
