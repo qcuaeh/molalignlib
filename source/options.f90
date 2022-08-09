@@ -7,7 +7,6 @@ integer, parameter :: maxcoord = 16
 
 integer maxtrial, mincount
 logical live, iteration, biased, complete, converge, testing
-character(arg_len) formatout
 real lenscale, tolerance
 
 end module

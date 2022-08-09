@@ -31,23 +31,6 @@ function squaredist(natom, weights, coords0, coords1, atomap) result(dist)
 
 end function
 
-function squarenorm(natom, weights, coords0, coords1, atomap) result(norm)
-    integer, intent(in) :: natom
-    integer, dimension(:), intent(in) :: atomap
-    real, dimension(:), intent(in) :: weights
-    real, dimension(:, :), intent(in) :: coords0, coords1
-
-    integer i
-    real norm
-
-    norm = 0
-
-    do i = 1, natom
-        norm = norm + 2*weights(i)*(sum(coords1(:, atomap(i))**2) + sum(coords0(:, i)**2))
-    end do
-
-end function
-
 !function leastsquaredist(natom, weights, coords0, coords1, atomap) result(dist)
 ! Calculate least square distance from eigenvalues
 !    integer, intent(in) :: natom

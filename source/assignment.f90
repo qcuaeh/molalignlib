@@ -7,7 +7,7 @@ implicit none
 
 contains
 
-subroutine assignatoms(natom, weights, coords0, coords1, nblock, blocksize, bias, atomap)
+subroutine assignatoms(natom, coords0, coords1, nblock, blocksize, bias, atomap)
 ! Purpose: Find best correspondence between points shapes
 
 ! nblock: Number of block atoms
@@ -17,7 +17,6 @@ subroutine assignatoms(natom, weights, coords0, coords1, nblock, blocksize, bias
 
     integer, intent(in) :: natom, nblock
     integer, dimension(:), intent(in) :: blocksize
-    real, dimension(:), intent(in) :: weights
     real, dimension(:, :), intent(in) :: coords0
     real, dimension(:, :), intent(in) :: bias
     real, dimension(:, :), intent(inout) :: coords1

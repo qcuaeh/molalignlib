@@ -161,7 +161,6 @@ subroutine align(natom0, natom1, znums0, znums1, types0, types1, &
     real, intent(out) :: rotmat(3, 3)
 
     real, dimension(3) :: center0, center1
-    integer i
     ! Check number of atoms
 
     if (natom0 /= natom1) then

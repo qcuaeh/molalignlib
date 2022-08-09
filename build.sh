@@ -11,7 +11,7 @@ compile () {
       rm -f "$objectfile"
       cp -p "$sourcefile" "$buildfile"
       echo Compiling "$1"
-      "$F90" "${compflags[@]}" -c "$sourcefile" -o "$objectfile" -I "$buildir" -J "$buildir" || exit
+      "$F90" "${flags[@]}" -c "$sourcefile" -o "$objectfile" -I "$buildir" -J "$buildir" || exit
    fi
 }
 
@@ -34,41 +34,42 @@ if [[ -n $LAPACK ]]; then
     fi
 fi
 
-options=$(getopt -o l:o:r:q -- "$@") || exit
+options=$(getopt -o l:r:dq -- "$@") || exit
 eval set -- "$options"
 
 libtype=none
 realprec=double
-optlevel=fast
+comptype=normal
 recompile=true
-compflags=()
 
 while true; do
    case "$1" in
    -l) libtype=$2; shift 2;;
-   -o) optlevel=$2; shift 2;;
    -r) realprec=$2; shift 2;;
+   -d) comptype=debug; shift;;
    -q) recompile=false; shift;;
    --) shift; break;;
    *) exit
    esac
 done
 
+flags=()
+
 case "$realprec" in
    single) f2cmap=$configdir/single_f2cmap; shift;;
-   double) compflags+=(-fdefault-real-8); f2cmap=$configdir/double_f2cmap; shift;;
+   double) flags+=(-fdefault-real-8); f2cmap=$configdir/double_f2cmap; shift;;
    *) echo Invalid precision type: $realprec; exit;
 esac
 
-case "$optlevel" in
-   fast) compflags+=(-O3 -ffast-math); shift;;
-   debug) compflags+=(-O0 -g -fbounds-check -fbacktrace -Wall -ffpe-trap=zero,invalid,overflow); shift;;
-   *) echo Invalid optimization level: $optlevel; exit;
+case "$comptype" in
+   normal) flags+=(-O3 -ffast-math); shift;;
+   debug) flags+=(-O0 -g -fbounds-check -fbacktrace -Wall -ffpe-trap=zero,invalid,overflow); shift;;
+   *) echo Invalid optimization level: $comptype; exit;
 esac
 
 case $libtype in
 none)
-   buildir=$buildroot/static/$realprec/$optlevel
+   buildir=$buildroot/static/$realprec/$comptype
    if [[ -d $bindir ]]; then
       rm -f "$bindir"/molalign
    else
@@ -76,7 +77,7 @@ none)
    fi
    ;;
 static)
-   buildir=$buildroot/static/$realprec/$optlevel
+   buildir=$buildroot/static/$realprec/$comptype
    if [[ -d $libdir ]]; then
       rm -f "$libdir"/molalign.a
    else
@@ -84,8 +85,8 @@ static)
    fi
    ;;
 shared)
-   compflags+=(-fPIC)
-   buildir=$buildroot/shared/$realprec/$optlevel
+   flags+=(-fPIC)
+   buildir=$buildroot/shared/$realprec/$comptype
    if [[ -d $libdir ]]; then
       rm -f "$libdir"/molalign.so
    else
@@ -93,8 +94,8 @@ shared)
    fi
    ;;
 python)
-   compflags+=(-fPIC)
-   buildir=$buildroot/shared/$realprec/$optlevel
+   flags+=(-fPIC)
+   buildir=$buildroot/shared/$realprec/$comptype
    if [[ -d $libdir ]]; then
       "$PYTHON" \
 <<HEREDOC

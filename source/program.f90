@@ -20,7 +20,7 @@ program ralign
     integer file_unit(2)
     integer nrec, records
     integer natom0, natom1
-    character(arg_len) arg, path
+    character(arg_len) arg, wformat
     character(title_len) title0, title1
     integer, allocatable :: mapcount(:), maplist(:, :)
     integer, dimension(:), allocatable :: znums0, znums1, types0, types1
@@ -30,8 +30,6 @@ program ralign
     real travec(3), rotmat(3, 3)
     real property(nelem)
     logical stdin
-
-    procedure(writeabstractfile), pointer :: writefile => null()
 
     ! Set default options
 
@@ -45,7 +43,7 @@ program ralign
     records = 1
     lenscale = 1000.0
     property = [(1.0, i=1, nelem)]
-    formatout = 'xyz'
+    wformat = 'xyz'
 
     ! Get user options
 
@@ -76,7 +74,7 @@ program ralign
         case ('-rec')
             call readoptarg(arg, records)
         case ('-out')
-            call readoptarg(arg, formatout)
+            call readoptarg(arg, wformat)
         case ('-stdin')
             stdin = .true.
         case default
@@ -96,18 +94,6 @@ program ralign
             file_unit(2) = file_unit(1)
         end if
     end if
-
-    ! Select output format
-
-    select case (formatout)
-    case ('xyz')
-        writefile => writexyzfile
-    case ('mol2')
-        writefile => writemol2file
-    case default
-        write (error_unit, '(a,x,a)') 'Invalid format:', trim(formatout)
-        stop
-    end select
 
     ! Read coordinates
 
@@ -150,9 +136,9 @@ program ralign
                 types1(maplist(:, i)), coords0, coords1(:, maplist(:, i)), &
                 weights0, travec, rotmat)
 
-            open(newunit=u, file='aligned_'//str(i)//'.'//trim(formatout), action='write', status='replace')
-            call writefile(u, natom0, title0, znums0, coords0)
-            call writefile(u, natom1, title1, znums1(maplist(:, i)), &
+            open(newunit=u, file='aligned_'//str(i)//'.'//trim(wformat), action='write', status='replace')
+            call writefile(u, wformat, natom0, title0, znums0, coords0)
+            call writefile(u, wformat, natom1, title1, znums1(maplist(:, i)), &
                 translated(natom1, rotated(natom1, coords1(:, maplist(:, i)), rotmat), travec))
             close(u)
 
@@ -170,9 +156,9 @@ program ralign
             squaredist(natom0, weights0, coords0, coords1, identitymap(natom0)), &
             '(only alignment performed)'
 
-        open(newunit=u, file='aligned_1.'//trim(formatout), action='write', status='replace')
-        call writefile(u, natom0, title0, znums0, coords0)
-        call writefile(u, natom1, title1, znums1, coords1) 
+        open(newunit=u, file='aligned_1.'//trim(wformat), action='write', status='replace')
+        call writefile(u, wformat, natom0, title0, znums0, coords0)
+        call writefile(u, wformat, natom1, title1, znums1, coords1) 
         close(u)
 
     end if

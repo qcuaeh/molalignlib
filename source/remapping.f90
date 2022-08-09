@@ -92,7 +92,7 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
 
 ! Minimize euclidean distance
 
-        call assignatoms(natom, weights, coords0, auxcoords, nblock, blocksize, bias, atomap)
+        call assignatoms(natom, coords0, auxcoords, nblock, blocksize, bias, atomap)
         rotquat = leastrotquat(natom, weights, coords0, auxcoords, atomap)
         prodquat = rotquat
         meanrot = rotangle(rotquat)
@@ -102,7 +102,7 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
         do while (iteration)
             biased_dist = squaredist(natom, weights, coords0, auxcoords, atomap) &
                     + totalbias(natom, weights, bias, atomap)
-            call assignatoms(natom, weights, coords0, auxcoords, nblock, blocksize, bias, auxmap)
+            call assignatoms(natom, coords0, auxcoords, nblock, blocksize, bias, auxmap)
             if (all(auxmap == atomap)) exit
             new_biased_dist = squaredist(natom, weights, coords0, auxcoords, auxmap) &
                     + totalbias(natom, weights, bias, auxmap)

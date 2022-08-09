@@ -9,19 +9,42 @@ use chemdata
 
 implicit none
 
-abstract interface
-    subroutine writeabstractfile(file_unit, natom, title, znums, coords, nbond, bonds)
-        use options
-        character(*), intent(in) :: title
-        integer, intent(in) :: file_unit, natom
-        integer, dimension(:), intent(in) :: znums
-        real, dimension(:, :), intent(in) :: coords
-        integer, optional, intent(in) :: nbond
-        integer, target, optional, intent(in) :: bonds(:, :)
-    end subroutine
-end interface
-
 contains
+
+subroutine writefile(file_unit, wformat, natom, title, znums, coords, opt_nbond, opt_bonds)
+
+    integer, intent(in) :: file_unit, natom
+    integer, dimension(:), intent(in) :: znums
+    integer, optional, intent(in) :: opt_nbond
+    integer, target, optional, intent(in) :: opt_bonds(:, :)
+    real, dimension(:, :), intent(in) :: coords
+    character(*), intent(in) :: title, wformat
+
+    integer nbond
+    integer, pointer :: bonds(:, :)
+    
+    if (present(opt_nbond)) then
+        nbond = opt_nbond
+        if (present(opt_bonds)) then
+            bonds => opt_bonds
+        else
+            write (error_unit, '(a)') 'Bond list is missing!'
+        end if
+    else
+        nbond = 0
+    end if
+
+    select case (wformat)
+    case ('xyz')
+        call writexyzfile(file_unit, natom, title, znums, coords)
+    case ('mol2')
+        call writemol2file(file_unit, natom, title, znums, coords, nbond, bonds)
+    case default
+        write (error_unit, '(a,x,a)') 'Invalid format:', trim(wformat)
+        stop
+    end select
+
+end subroutine
 
 subroutine readxyzfile(file_unit, natom, title, labels, coords)
 
@@ -57,14 +80,12 @@ subroutine readxyzfile(file_unit, natom, title, labels, coords)
 end subroutine
 
 
-subroutine writexyzfile(file_unit, natom, title, znums, coords, opt_nbond, opt_bonds)
+subroutine writexyzfile(file_unit, natom, title, znums, coords)
 
     character(*), intent(in) :: title
     integer, intent(in) :: file_unit, natom
     integer, dimension(:), intent(in) :: znums
     real, dimension(:, :), intent(in) :: coords
-    integer, optional, intent(in) :: opt_nbond
-    integer, target, optional, intent(in) :: opt_bonds(:, :)
 
     integer i
 
@@ -76,30 +97,17 @@ subroutine writexyzfile(file_unit, natom, title, znums, coords, opt_nbond, opt_b
 
 end subroutine
 
-subroutine writemol2file(file_unit, natom, title, znums, coords, opt_nbond, opt_bonds)
+subroutine writemol2file(file_unit, natom, title, znums, coords, nbond, bonds)
 
     character(*), intent(in) :: title
     integer, intent(in) :: file_unit, natom
     integer, dimension(:), intent(in) :: znums
     real, dimension(:, :), intent(in) :: coords
-    integer, optional, intent(in) :: opt_nbond
-    integer, target, optional, intent(in) :: opt_bonds(:, :)
+    integer, intent(in) :: nbond
+    integer, target, intent(in) :: bonds(:, :)
 
-    integer i, nbond
-    integer, pointer :: bonds(:, :)
+    integer i
     
-
-    if (present(opt_nbond)) then
-        nbond = opt_nbond
-        if (present(opt_bonds)) then
-            bonds => opt_bonds
-        else
-            write (error_unit, '(a)') 'Bond list is missing!'
-        end if
-    else
-        nbond = 0
-    end if
-
     write (file_unit, '(a)') '@<TRIPOS>MOLECULE'
     if (title /= '') then
         write (file_unit, '(a)') trim(title)

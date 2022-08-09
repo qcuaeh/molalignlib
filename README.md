@@ -1,41 +1,42 @@
 molalign
 ========
+[![License: LGPL v3](https://img.shields.io/badge/License-LGPL_v3-blue.svg)](https://www.gnu.org/licenses/lgpl-3.0)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qcuaeh/molalign.git/HEAD?labpath=tests)
 
-**molalign** is a fortran program to solve the approximate congruence problem for atomic systems.
+**molalign** is a fortran program based on random rotations and the Hungarian algorithm to solve the approximate congruence problem for atomic systems.
 
 ![graphic](graphic.png)
 
 Building
 --------
 
-Run `./build.sh` without arguments to build the program in double precision with all
-optimizations enabled. The script accepts the following options to build the library
-instead of the program or to change the optimization level and the numeric precision:
+Run `./build.sh` without arguments to build the program in double
+precision with all optimizations enabled. The script accepts the
+following options to change the default behaviour:
 
--o fast|debug : Set the optimization level.  
--r single|double : Set the precision for real numbers.  
--l static|shared|python : Build the library, not the program.  
--q : Quick compile (recompile only modified source files).  
+-q: Recompile only modified source files.  
+-d: Compile non optimized code with debug info.  
+-r single|double: Set the real precision to single or double (default).  
+-l static|shared|python: Build the selected library instead of the program.  
 
-The program and libraries will be created in the *bin* directory.
+After runnig the script the program will be created in the *bin* directory and the libraries in the *lib* directory.
 
 Usage
 -----
 
 ### Program options
 
--live : Print live stats.  
--iter : Use iterative steps.  
--mass : Use mass weighted distances.  
--stdin : Read coordinates from standard input.  
--out xyz|mol2 : Set output format to XYZ or Mol2.  
--test : Use the same pseudo random numbers on every run.  
--rec *NUM* : Set the number of recorded solutions to *NUM*.  
--count *NUM* : Set count convergence threshold to *NUM*.  
--trial *MAX* : Set maximum number of trials to *MAX*.  
--bias *TOL* : Use biasing with tolerance *TOL*.  
--scale *SCALE* : Set length scale to *SCALE*.  
+-live: Print live stats.  
+-iter: Use iterative steps.  
+-mass: Use mass weighted distances.  
+-stdin: Read coordinates from standard input.  
+-out xyz|mol2: Set output format to XYZ or Mol2.  
+-test: Use the same pseudo random numbers on every run.  
+-rec *NUM*: Set the number of recorded solutions to *NUM*.  
+-count *NUM*: Set count convergence threshold to *NUM*.  
+-trial *MAX*: Set maximum number of trials to *MAX*.  
+-bias *TOL*: Use biasing with tolerance *TOL*.  
+-scale *SCALE*: Set length scale to *SCALE*.  
  
 ### Examples
 
