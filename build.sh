@@ -45,36 +45,25 @@ compflags=()
 
 while true; do
    case "$1" in
-   -l)
-      libtype=$2
-      shift 2;;
-   -o)
-      optlevel=$2
-      shift 2;;
-   -r)
-      realprec=$2
-      shift 2;;
-   -q)
-      recompile=false;
-      shift;;
-   --)
-      shift
-      break;;
-    *)
-      exit
+   -l) libtype=$2; shift 2;;
+   -o) optlevel=$2; shift 2;;
+   -r) realprec=$2; shift 2;;
+   -q) recompile=false; shift;;
+   --) shift; break;;
+   *) exit
    esac
 done
 
 case "$realprec" in
-   single) f2cmap=$configdir/single.f2cmap; shift;;
-   double) compflags+=(-fdefault-real-8); f2cmap=$configdir/double.f2cmap; shift;;
-   *) echo Invalid precision type: $realprec; exit; break;;
+   single) f2cmap=$configdir/single_f2cmap; shift;;
+   double) compflags+=(-fdefault-real-8); f2cmap=$configdir/double_f2cmap; shift;;
+   *) echo Invalid precision type: $realprec; exit;
 esac
 
 case "$optlevel" in
    fast) compflags+=(-O3 -ffast-math); shift;;
    debug) compflags+=(-O0 -g -fbounds-check -fbacktrace -Wall -ffpe-trap=zero,invalid,overflow); shift;;
-   *) echo Invalid optimization level: $optlevel; exit; break;;
+   *) echo Invalid optimization level: $optlevel; exit;
 esac
 
 case $libtype in
