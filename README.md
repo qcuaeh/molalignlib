@@ -13,10 +13,10 @@ Run `./build.sh` without arguments to build the program in double precision with
 optimizations enabled. The script accepts the following options to build the library
 instead of the program or to change the optimization level and the numeric precision:
 
-&ensp; -o fast|debug : Set the optimization level.  
-&ensp; -r single|double : Set the precision for real numbers.  
-&ensp; -l static|shared|python : Build the static/shared/python library, not the program.  
-&ensp; -q : Quick compile (recompile only modified source files).  
+-o fast|debug : Set the optimization level.  
+-r single|double : Set the precision for real numbers.  
+-l static|shared|python : Build the library, not the program.  
+-q : Quick compile (recompile only modified source files).  
 
 The program and libraries will be created in the *bin* directory.
 
@@ -25,17 +25,17 @@ Usage
 
 ### Program options
 
-&ensp; -live : Print live stats.  
-&ensp; -iter : Use iterative steps.  
-&ensp; -mass : Use mass weighted distances.  
-&ensp; -stdin : Read coordinates from standard input.  
-&ensp; -out xyz|mol2 : Set output format to XYZ or Mol2.  
-&ensp; -test : Use the same pseudo random numbers on every run.  
-&ensp; -rec *NUM* : Set the number of recorded solutions to *NUM*.  
-&ensp; -count *NUM* : Set count convergence threshold to *NUM*.  
-&ensp; -trial *MAX* : Set maximum number of trials to *MAX*.  
-&ensp; -bias *TOL* : Use biasing with tolerance *TOL*.  
-&ensp; -scale *SCALE* : Set length scale to *SCALE*.  
+-live : Print live stats.  
+-iter : Use iterative steps.  
+-mass : Use mass weighted distances.  
+-stdin : Read coordinates from standard input.  
+-out xyz|mol2 : Set output format to XYZ or Mol2.  
+-test : Use the same pseudo random numbers on every run.  
+-rec *NUM* : Set the number of recorded solutions to *NUM*.  
+-count *NUM* : Set count convergence threshold to *NUM*.  
+-trial *MAX* : Set maximum number of trials to *MAX*.  
+-bias *TOL* : Use biasing with tolerance *TOL*.  
+-scale *SCALE* : Set length scale to *SCALE*.  
  
 ### Examples
 
@@ -49,7 +49,7 @@ mass weighted distances
 and repeatable pseudo random numbers:
 
     ./bin/molalign tests/r005/Co100.xyz -rec 10 -count 10 -max 1000 -bias 0.17 -iter -mass -test
-    
+ 
 The ouput should look as follows:
 
      Map   Trial   Count   Cycles   Meanrot   Totalrot      RMSD
