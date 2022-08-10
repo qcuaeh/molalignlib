@@ -17,13 +17,12 @@ compile () {
 
 parentdir=$(readlink -e "$(dirname "$0")")
 sourcedir=$parentdir/source
-configdir=$parentdir/config
-buildroot=$parentdir/_build_dir
+buildroot=$parentdir/__build__
 bindir=$parentdir/bin
 libdir=$parentdir/lib
 
 set -a
-. "$configdir/environment"
+. "$parentdir/build.env"
 set +a
 
 if [[ -n $LAPACK ]]; then
@@ -34,13 +33,13 @@ if [[ -n $LAPACK ]]; then
     fi
 fi
 
-options=$(getopt -o l:r:dq -- "$@") || exit
-eval set -- "$options"
-
 libtype=none
 realprec=double
-comptype=normal
+comptype=fast
 recompile=true
+
+options=$(getopt -o l:r:dq -- "$@") || exit
+eval set -- "$options"
 
 while true; do
    case "$1" in
@@ -56,13 +55,13 @@ done
 flags=()
 
 case "$realprec" in
-   single) f2cmap=$configdir/single_f2cmap; shift;;
-   double) flags+=(-fdefault-real-8); f2cmap=$configdir/double_f2cmap; shift;;
+   single) f2cmap=$sourcedir/f2cmap_single; shift;;
+   double) flags+=(-fdefault-real-8); f2cmap=$sourcedir/f2cmap_double; shift;;
    *) echo Invalid precision type: $realprec; exit;
 esac
 
 case "$comptype" in
-   normal) flags+=(-O3 -ffast-math); shift;;
+   fast) flags+=(-O3 -ffast-math); shift;;
    debug) flags+=(-O0 -g -fbounds-check -fbacktrace -Wall -ffpe-trap=zero,invalid,overflow); shift;;
    *) echo Invalid optimization level: $comptype; exit;
 esac
@@ -86,7 +85,7 @@ static)
    ;;
 shared)
    flags+=(-fPIC)
-   buildir=$buildroot/shared/$realprec/$comptype
+   buildir=$buildroot/dynamic/$realprec/$comptype
    if [[ -d $libdir ]]; then
       rm -f "$libdir"/molalign.so
    else
@@ -95,7 +94,7 @@ shared)
    ;;
 python)
    flags+=(-fPIC)
-   buildir=$buildroot/shared/$realprec/$comptype
+   buildir=$buildroot/dynamic/$realprec/$comptype
    if [[ -d $libdir ]]; then
       "$PYTHON" \
 <<HEREDOC
@@ -130,7 +129,7 @@ while IFS= read -r line; do
   if [[ $2 == f2py ]]; then
      f2pylist+=("$buildir"/"$1")
   fi
-done < <(grep -v '^#' "$configdir"/compilelist)
+done < <(grep -v '^#' "$sourcedir"/compilelist)
 
 case $libtype in
 none)
