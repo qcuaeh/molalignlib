@@ -27,21 +27,21 @@ program ralign
     character(label_len), dimension(:), allocatable :: labels0, labels1
     real, dimension(:, :), allocatable :: coords0, coords1
     real, allocatable :: weights0(:), mindist(:)
-    real travec(3), rotmat(3, 3)
-    real property(nelem)
-    logical stdin
+    real travec(3), rotmat(3, 3), property(nelem)
+    logical stdin, biastol_t
 
     ! Set default options
 
     live = .false.
     stdin = .false.
     biased = .false.
-    iteration = .false.
+    iterated = .false.
     complete = .false.
     converge = .false.
     testing = .false.
     records = 1
-    lenscale = 1000.0
+    biastol_t = .false.
+    biasscale = 1000.0
     property = [(1.0, i=1, nelem)]
     wformat = 'xyz'
 
@@ -57,20 +57,22 @@ program ralign
         case ('-test')
             testing = .true.
         case ('-iter')
-            iteration = .true.
-        case ('-mass')
-            property = stdmatom
+            iterated = .true.
         case ('-bias')
             biased = .true.
-            call readoptarg(arg, tolerance)
-        case ('-max')
-            complete = .true.
-            call readoptarg(arg, maxtrial)
+        case ('-weight')
+            property = stdmatom
         case ('-count')
             converge = .true.
-            call readoptarg(arg, mincount)
+            call readoptarg(arg, convcount)
+        case ('-trial')
+            complete = .true.
+            call readoptarg(arg, maxtrial)
+        case ('-tol')
+            biastol_t = .true.
+            call readoptarg(arg, biastol)
         case ('-scale')
-            call readoptarg(arg, lenscale)
+            call readoptarg(arg, biasscale)
         case ('-rec')
             call readoptarg(arg, records)
         case ('-out')
@@ -93,6 +95,11 @@ program ralign
         else if (ifile == 1) then
             file_unit(2) = file_unit(1)
         end if
+    end if
+
+    if (biased .and. .not. biastol_t) then
+        write (error_unit, '(a)') 'Error: "biased" is True but "biastol" is not set'
+        stop
     end if
 
     ! Read coordinates

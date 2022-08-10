@@ -27,16 +27,17 @@ Usage
 ### Program options
 
 -live: Print live stats.  
--iter: Use iterative steps.  
--mass: Use mass weighted distances.  
--stdin: Read coordinates from standard input.  
--out xyz|mol2: Set output format to XYZ or Mol2.  
+-bias: Use biased distances.  
+-iter: Perform iterative steps.  
+-tol: Set biasing tolerance to *TOL*.  
+-scale *SCALE*: Set biasing scale to *SCALE*.  
 -test: Use the same pseudo random numbers on every run.  
 -rec *NUM*: Set the number of recorded solutions to *NUM*.  
--count *NUM*: Set count convergence threshold to *NUM*.  
--trial *MAX*: Set maximum number of trials to *MAX*.  
--bias *TOL*: Use biasing with tolerance *TOL*.  
--scale *SCALE*: Set length scale to *SCALE*.  
+-count *NUM*: Set the count convergence threshold to *NUM*.  
+-trial *MAX*: Set the maximum number of trials to *MAX*.  
+-out xyz|mol2: Set the output format to XYZ or Mol2.  
+-stdin: Read coordinates from standard input.  
+-weight: Use mass weighted distances.  
  
 ### Examples
 
@@ -49,7 +50,7 @@ iteration,
 mass weighted distances
 and repeatable pseudo random numbers:
 
-    ./bin/molalign tests/r005/Co100.xyz -rec 10 -count 10 -max 1000 -bias 0.17 -iter -mass -test
+    ./bin/molalign tests/r005/Co100.xyz -rec 10 -count 10 -trial 1000 -bias -tol 0.17 -iter -test
  
 The ouput should look as follows:
 

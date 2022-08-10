@@ -41,8 +41,8 @@ subroutine remap(natom0, natom1, znums0, znums1, types0, types1, &
     integer, dimension(:), allocatable :: blocksize0, blocksize1
     real, dimension(3) :: center0, center1
 
-    procedure(test), pointer :: complete_test => null()
-    procedure(test), pointer :: converge_test => null()
+    procedure(abstract_test), pointer :: complete_test => null()
+    procedure(abstract_test), pointer :: converge_test => null()
 
     ! Check number of atoms
 

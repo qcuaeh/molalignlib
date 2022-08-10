@@ -18,9 +18,9 @@ atoms1 = io.read('r005/Co100.xyz', index=1)
 # In[ ]:
 
 
-aligner = Aligner(atoms0, rec=10, count=10, max=1000, bias=0.17, iteration=True, mass_weighted=True, testing=True)
+aligner = Aligner(atoms0, records=10, conv_count=10, max_trial=1000, biased=True, bias_tol=0.17, iterated=True, testing=True)
 maplist, mapcount, mindist = aligner.remapping(atoms1)
 for i, mapping in enumerate(maplist, start=1):
-    io.write('aligned_{}.xyz'.format(i), atoms0,)
+    io.write('aligned_{}.xyz'.format(i), atoms0)
     io.write('aligned_{}.xyz'.format(i), aligner.aligned(atoms1, mapping), append=True)
 

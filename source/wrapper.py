@@ -9,61 +9,55 @@ from ase import Atoms
 #print(molalign.library.align.__doc__)
 
 class Aligner(Atoms):
-    def __init__(self, atoms, rec=1, count=None, max=None, scale=1000., bias=None, \
-                 iteration=False, mass_weighted=False, testing=False):
-        if isinstance(atoms, Atoms):
-            self.__dict__.update(atoms.__dict__)
-        else:
+    def __init__(self, atoms, records=1, conv_count=None, max_trial=None, biased=False, \
+                 bias_scale=1000., bias_tol=None, iterated=False, weighted=False, testing=False):
+        if not isinstance(atoms, Atoms):
             raise TypeError('An Atoms object was expected as argument')
-        if type(rec) is int:
-            self.records = rec
-        else:
-            raise TypeError('"rec" must be an integer')
-        if type(scale) is float:
-            molalign.options.lenscale = scale
-        else:
-            raise TypeError('"scale" must be a real')
-        if count is None:
+        if type(records) is not int:
+            raise TypeError('"records" must be integer')
+        if type(bias_scale) is not float:
+            raise TypeError('"bias_scale" must be real')
+        if type(weighted) is not bool:
+            raise TypeError('"weighted" must be boolean')
+        if type(testing) is not bool:
+            raise TypeError('"testing" must be boolean')
+        if type(biased) is not bool:
+            raise TypeError('"biased" must be boolean')
+        if type(iterated) is not bool:
+            raise TypeError('"iterated" must be boolean')
+        if conv_count is not None and type(conv_count) is not int:
+            raise TypeError('"conv_count" must be integer')
+        if max_trial is not None and type(max_trial) is not int:
+            raise TypeError('"max_trial" must be integer')
+        if bias_tol is not None and type(bias_tol) is not float:
+            raise TypeError('"bias_tol" must be real')
+        self.__dict__.update(atoms.__dict__)
+        self.records = records
+        molalign.options.biased = biased
+        molalign.options.biasscale = bias_scale
+        molalign.options.iterated = iterated
+        molalign.options.testing = testing
+        if conv_count is None and max_trial is None:
+            raise ValueError('either "conv_count" or "max_trial" must be set')
+        if conv_count is None:
             molalign.options.converge = False
         else:
-            if type(count) is int:
-                molalign.options.converge = True
-                molalign.options.mincount = count
-            else:
-                raise TypeError('"count" must be an integer')
-        if max is None:
+            molalign.options.converge = True
+            molalign.options.convcount = conv_count
+        if max_trial is None:
             molalign.options.complete = False
         else:
-            if type(max) is int:
-                molalign.options.complete = True
-                molalign.options.maxtrial = max
+            molalign.options.complete = True
+            molalign.options.maxtrial = max_trial
+        if biased:
+            if bias_tol is None:
+                raise ValueError('"biased" is True but "bias_tol" is not set')
             else:
-                raise TypeError('"max" must be an integer')
-        if not molalign.options.converge and not molalign.options.complete:
-            raise ValueError('either "count" or "max" must be defined')
-        if type(iteration) is bool:
-            molalign.options.iteration = iteration
+                molalign.options.biastol = bias_tol
+        if weighted:
+            self.weights = atoms.get_masses()/sum(atoms.get_masses())
         else:
-            raise TypeError('"iteration" must be a boolean')
-        if type(testing) is bool:
-            molalign.options.testing = testing
-        else:
-            raise TypeError('"testing" must be a boolean')
-        if bias is None:
-            molalign.options.biased = False
-        else:
-            if type(bias) is float:
-                molalign.options.biased = True
-                molalign.options.tolerance = bias
-            else:
-                raise TypeError('"bias" must be a real')
-        if type(mass_weighted) is bool:
-            if mass_weighted:
-                self.weights = atoms.get_masses()/sum(atoms.get_masses())
-            else:
-                self.weights = np.ones(len(atoms), dtype=float)/len(atoms)
-        else:
-            raise TypeError('"mass_weighted" must be a boolean')
+            self.weights = np.ones(len(atoms), dtype=float)/len(atoms)
     def remapping(self, other):
         if not isinstance(other, Atoms):
             raise TypeError('An Atoms object was expected as argument')
