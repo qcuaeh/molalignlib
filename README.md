@@ -28,7 +28,7 @@ Usage
 
 -live: Print live stats.  
 -bias: Use biased distances.  
--iter: Perform iterative steps.  
+-iter: Perform iterated trials.  
 -tol: Set biasing tolerance to *TOL*.  
 -scale *SCALE*: Set biasing scale to *SCALE*.  
 -test: Use the same pseudo random numbers on every run.  
