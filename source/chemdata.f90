@@ -4,10 +4,10 @@ module chemdata
 use options
 
 ! elsym: Element symbols
-! valency: Eleement valenc
+! valency: Element valenc
 ! stdmatom: Standard atomic masses
-! covrad: Atomic covalent radii (Angstrom
-! vdwrad: Atomic van der Waals radii (Angstrom
+! covrad: Atomic covalent radii (Angstrom)
+! vdwrad: Atomic van der Waals radii (Angstrom)
 
 implicit none
 
