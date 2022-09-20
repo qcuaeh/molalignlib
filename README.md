@@ -41,7 +41,9 @@ Usage
  
 ### Examples
 
-Te following command will run the program with
+#### Example 1
+
+The following command will run the program with
 up to 10 recorded mappings,
 a convergence threshold of 10 counts,
 a maximum of 1000 trials,
@@ -60,3 +62,43 @@ The ouput should look as follows:
        2       1       4      1.5      78.0     110.0     2.1060
     ------------------------------------------------------------
     Found 2 mapping(s) in 14 random trial(s)
+
+
+#### Example 2
+
+The following command will run the program with
+a maximum of 2000 trials,
+biasing with a tolerance of 0.17 Å,
+iteration,
+mass weighted distances
+and repeatable pseudo random numbers:
+
+    ./bin/molalign tests/r005/Au161Pd40.xyz -trial 2000 -bias -tol 0.17 -iter -weight -test
+
+The output should look as follows:
+
+     Map   Trial   Count   Cycles   Meanrot   Totalrot      RMSD
+    ------------------------------------------------------------
+       1      14      17      1.0      21.9      21.9     0.1010
+    ------------------------------------------------------------
+    Found more than 1 mapping(s) in 2000 random trial(s)
+
+#### Example 3
+
+The following command will run the program with
+a maximum of 2000 trials,
+biasing with a tolerance of 0.17 Å,
+iteration,
+mass weighted distances
+and repeatable pseudo random numbers:
+
+    ./bin/molalign tests/r005/LJ150.xyz -trial 1000  -bias -scale 1.0 -tol 0.17  -test
+
+The output should look as follows:
+     Map   Trial   Count   Cycles   Meanrot   Totalrot      RMSD
+    ------------------------------------------------------------
+       1     312       2      1.0      14.2      14.2     0.0482
+    ------------------------------------------------------------
+    Found more than 1 mapping(s) in 1000 random trial(s)
+
+
