@@ -27,10 +27,10 @@ Usage
 ### Program options
 
 -live: Print live stats.  
--bias: Use biased distances.  
 -iter: Perform iterated trials.  
--tol: Set biasing tolerance to *TOL* (must be set with -bias).  
--scale *SCALE*: Set biasing scale to *SCALE* (default is 1000).  
+-tol *ϵ*: Set biasing tolerance to *ϵ*.  
+-bias: Use biased distances (must be used together with -tol).  
+-scale *α*: Set biasing scale to *α* (default is *α* = 1000).  
 -test: Use the same pseudo random numbers on every run.  
 -rec *NUM*: Set the number of recorded solutions to *NUM* (defaullt is 1).  
 -count *NUM*: Set the count convergence threshold to *NUM*.  
