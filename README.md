@@ -29,10 +29,10 @@ Usage
 -live: Print live stats.  
 -bias: Use biased distances.  
 -iter: Perform iterated trials.  
--tol: Set biasing tolerance to *TOL*.  
--scale *SCALE*: Set biasing scale to *SCALE*.  
+-tol: Set biasing tolerance to *TOL* (must be set with -bias).  
+-scale *SCALE*: Set biasing scale to *SCALE* (default is 1000).  
 -test: Use the same pseudo random numbers on every run.  
--rec *NUM*: Set the number of recorded solutions to *NUM*.  
+-rec *NUM*: Set the number of recorded solutions to *NUM* (defaullt is 1).  
 -count *NUM*: Set the count convergence threshold to *NUM*.  
 -trial *MAX*: Set the maximum number of trials to *MAX*.  
 -out xyz|mol2: Set the output format to XYZ or Mol2.  
@@ -86,10 +86,9 @@ The output should look as follows:
 #### Example 3
 
 The following command will run the program with
-a maximum of 2000 trials,
+a maximum of 1000 trials,
 biasing with a tolerance of 0.17 Å,
-iteration,
-mass weighted distances
+scale of 1.0 
 and repeatable pseudo random numbers:
 
     ./bin/molalign tests/r005/LJ150.xyz -trial 1000  -bias -scale 1.0 -tol 0.17  -test
