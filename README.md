@@ -29,13 +29,13 @@ Usage
 -live: Print live stats.  
 -iter: Perform iterated trials.  
 -tol *ϵ*: Set biasing tolerance to *ϵ*.  
--test: Use the same pseudo random numbers on every run.  
 -count *N*: Set the count convergence threshold to *N*.  
 -trial *MAX*: Set the maximum number of trials to *MAX*.  
 -bias: Use biased distances (must be used together with -tol).  
 -rec *N*: Set the number of recorded solutions to *N* (defaullt is *N* = 1).  
--out xyz|mol2: Set the output format to XYZ or Mol2 (default is XYZ.  
+-out xyz|mol2: Set the output format to XYZ or Mol2 (default is XYZ).  
 -scale *α*: Set biasing scale to *α* (default is *α* = 1000).  
+-test: Use the same pseudo random numbers on every run.  
 -stdin: Read coordinates from standard input.  
 -weight: Use mass weighted distances.  
  
