@@ -95,6 +95,7 @@ and repeatable pseudo random numbers:
     ./bin/molalign tests/r005/LJ150.xyz -trial 1000  -bias -scale 1.0 -tol 0.17  -test
 
 The output should look as follows:
+
      Map   Trial   Count   Cycles   Meanrot   Totalrot      RMSD
     ------------------------------------------------------------
        1     312       2      1.0      14.2      14.2     0.0482
