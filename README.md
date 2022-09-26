@@ -5,7 +5,7 @@ molalign
 
 **molalign** is a fortran program based on random rotations and the Hungarian algorithm to solve the approximate congruence problem for atomic systems.
 
-![graphic](graphic.png)
+![graphic1](assets/graphic1.png)
 
 Building
 --------
@@ -30,7 +30,7 @@ Usage
 -iter: Perform iterated trials.  
 -tol *ϵ*: Set biasing tolerance to *ϵ*.  
 -count *N*: Set the count convergence threshold to *N*.  
--trial *MAX*: Set the maximum number of trials to *MAX*.  
+-trials *MAX*: Set the maximum number of trials to *MAX*.  
 -bias: Use biased distances (must be used together with -tol).  
 -rec *N*: Set the number of recorded solutions to *N* (defaullt is *N* = 1).  
 -out xyz|mol2: Set the output format to XYZ or Mol2 (default is XYZ).  
@@ -46,13 +46,12 @@ Usage
 The following command will run the program with
 up to 10 recorded mappings,
 a convergence threshold of 10 counts,
-a maximum of 1000 trials,
 biasing with a tolerance of 0.17 Å,
 iteration,
 mass weighted distances
 and repeatable pseudo random numbers:
 
-    ./bin/molalign tests/r005/Co100.xyz -rec 10 -count 10 -trial 1000 -bias -tol 0.17 -iter -test
+    ./bin/molalign tests/r005/Co100.xyz -rec 10 -count 10 -bias -tol 0.17 -iter -test
  
 The ouput should look as follows:
 
@@ -73,7 +72,7 @@ iteration,
 mass weighted distances
 and repeatable pseudo random numbers:
 
-    ./bin/molalign tests/r005/Au161Pd40.xyz -trial 2000 -bias -tol 0.17 -iter -weight -test
+    ./bin/molalign tests/r005/Au161Pd40.xyz -trials 2000 -bias -tol 0.17 -iter -weight -test
 
 The output should look as follows:
 
@@ -82,23 +81,4 @@ The output should look as follows:
        1      14      17      1.0      21.9      21.9     0.1010
     ------------------------------------------------------------
     Found more than 1 mapping(s) in 2000 random trial(s)
-
-#### Example 3
-
-The following command will run the program with
-a maximum of 1000 trials,
-biasing with a tolerance of 0.17 Å,
-scale of 1.0 
-and repeatable pseudo random numbers:
-
-    ./bin/molalign tests/r005/LJ150.xyz -trial 1000  -bias -scale 1.0 -tol 0.17 -test
-
-The output should look as follows:
-
-     Map   Trial   Count   Cycles   Meanrot   Totalrot      RMSD
-    ------------------------------------------------------------
-       1     312       2      1.0      14.2      14.2     0.0482
-    ------------------------------------------------------------
-    Found more than 1 mapping(s) in 1000 random trial(s)
-
 
