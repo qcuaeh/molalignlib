@@ -52,7 +52,7 @@ subroutine openfile(arg, file_unit)
     integer file_unit(2)
 
     if (arg(1:1) == '-') then
-        write (error_unit, '(a, x, a)') 'Unknown option:', trim(arg)
+        write (error_unit, '(a,1x,a)') 'Unknown option:', trim(arg)
         stop
     end if
 
@@ -81,7 +81,7 @@ subroutine getoptarg(option, optarg)
         end if
     end if
 
-    write (error_unit, '(a, x, a, x, a)') 'Option', trim(option), 'requires an argument'
+    write (error_unit, '(a,1x,a,1x,a)') 'Option', trim(option), 'requires an argument'
     stop
 
 end subroutine
@@ -105,7 +105,7 @@ subroutine readintoptarg(option, optval)
     call getoptarg(option, optarg)
     read (optarg, *, iostat=stat) optval
     if (stat /= 0) then
-        write (error_unit, '(a, x, a, x, a)') 'Option', trim(option), 'requires an integer argument'
+        write (error_unit, '(a,1x,a,1x,a)') 'Option', trim(option), 'requires an integer argument'
         stop
     end if
 
@@ -121,7 +121,7 @@ subroutine readrealoptarg(option, optval)
     call getoptarg(option, optarg)
     read (optarg, *, iostat=stat) optval
     if (stat /= 0) then
-        write (error_unit, '(a, x, a, x, a)') 'Option', trim(option), 'requires a numeric argument'
+        write (error_unit, '(a,1x,a,1x,a)') 'Option', trim(option), 'requires a numeric argument'
         stop
     end if
 

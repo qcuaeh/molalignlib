@@ -1,5 +1,7 @@
 module random
 
+use iso_fortran_env, only: output_unit
+
 use options
 
 implicit none
@@ -35,26 +37,26 @@ subroutine init_random_seed(seed)
 
     integer n, u
     integer, allocatable :: seed(:)
-    integer, parameter, dimension(12) :: test_seed = &
-        [ 287027030, -719361131, 574274270, 292048305, &
-          185733336, -1598963619, 572469522, 1446716853, &
-          437591706, 1398099429, 570932571, -1177695979 ]
 
-    if (testing) then
-!        call random_seed(size=n)
-!        allocate(seed(n))
-!        call random_seed(get=seed)
-        seed = test_seed
-    else
+    call random_seed(size=n)
+    allocate(seed(n))
+
+    if (.not. testing) then
         ! Read /dev/urandom to seed the random number generator
-        call random_seed(size=n)
-        allocate(seed(n))
         open(newunit=u, file="/dev/urandom", access="stream", &
             form="unformatted", action="read", status="old")
         read (u) seed
         close(u)
+        call random_seed(put=seed)
     end if
-    call random_seed(put=seed)
+
+    if (debug) then
+        call random_seed(get=seed)
+        write (output_unit, '(a)') 'Random seed:'
+        write (output_unit, *) n
+        write (output_unit, *) seed
+        write (output_unit, *)
+    end if
 
 end subroutine
 

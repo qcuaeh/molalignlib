@@ -71,7 +71,7 @@ subroutine splitext(filename, prefix, suffix)
 
     pos = scan(trim(filename), '.', BACK=.true.)
     if (pos <= 1 .or. pos >= len_trim(filename)) then
-        write (error_unit, '(a, x, a, x, a)') trim(filename), 'is not a valid file name!'
+        write (error_unit, '(a,1x,a,1x,a)') trim(filename), 'is not a valid file name!'
         stop
     end if
     prefix = filename(:pos-1)

@@ -78,7 +78,7 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
 
 ! Loop for map searching
 
-    do while (complete_test(ntrial, maxtrial) .and. converge_test(nmatch, convcount))
+    do while (complete_test(ntrial, maxtrials) .and. converge_test(nmatch, convcount))
 
         ntrial = ntrial + 1
 

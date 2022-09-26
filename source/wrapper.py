@@ -9,7 +9,7 @@ from ase import Atoms
 #print(molalign.library.align.__doc__)
 
 class Aligner(Atoms):
-    def __init__(self, atoms, records=1, conv_count=None, max_trial=None, biased=False, \
+    def __init__(self, atoms, records=1, count=None, trials=None, biased=False, \
                  bias_scale=1000., bias_tol=None, iterated=False, weighted=False, testing=False):
         if not isinstance(atoms, Atoms):
             raise TypeError('An Atoms object was expected as argument')
@@ -25,35 +25,35 @@ class Aligner(Atoms):
             raise TypeError('"biased" must be boolean')
         if type(iterated) is not bool:
             raise TypeError('"iterated" must be boolean')
-        if conv_count is not None and type(conv_count) is not int:
-            raise TypeError('"conv_count" must be integer')
-        if max_trial is not None and type(max_trial) is not int:
-            raise TypeError('"max_trial" must be integer')
+        if count is not None and type(count) is not int:
+            raise TypeError('"count" must be integer')
+        if trials is not None and type(trials) is not int:
+            raise TypeError('"trials" must be integer')
         if bias_tol is not None and type(bias_tol) is not float:
             raise TypeError('"bias_tol" must be real')
         self.__dict__.update(atoms.__dict__)
         self.records = records
         molalign.options.biased = biased
-        molalign.options.biasscale = bias_scale
+        molalign.options.bias_scale = bias_scale
         molalign.options.iterated = iterated
         molalign.options.testing = testing
-        if conv_count is None and max_trial is None:
-            raise ValueError('either "conv_count" or "max_trial" must be set')
-        if conv_count is None:
+        if count is None and trials is None:
+            raise ValueError('either "count" or "trials" must be set')
+        if count is None:
             molalign.options.converge = False
         else:
             molalign.options.converge = True
-            molalign.options.convcount = conv_count
-        if max_trial is None:
-            molalign.options.complete = False
+            molalign.options.convcount = count
+        if trials is None:
+            molalign.options.terminate = False
         else:
-            molalign.options.complete = True
-            molalign.options.maxtrial = max_trial
+            molalign.options.terminate = True
+            molalign.options.maxtrials = trials
         if biased:
             if bias_tol is None:
                 raise ValueError('"biased" is True but "bias_tol" is not set')
             else:
-                molalign.options.biastol = bias_tol
+                molalign.options.bias_tol = bias_tol
         if weighted:
             self.weights = atoms.get_masses()/sum(atoms.get_masses())
         else:

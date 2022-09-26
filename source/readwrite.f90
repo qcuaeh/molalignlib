@@ -11,14 +11,14 @@ implicit none
 
 contains
 
-subroutine writefile(file_unit, wformat, natom, title, znums, coords, opt_nbond, opt_bonds)
+subroutine writefile(file_unit, format_w, natom, title, znums, coords, opt_nbond, opt_bonds)
 
     integer, intent(in) :: file_unit, natom
     integer, dimension(:), intent(in) :: znums
     integer, optional, intent(in) :: opt_nbond
     integer, target, optional, intent(in) :: opt_bonds(:, :)
     real, dimension(:, :), intent(in) :: coords
-    character(*), intent(in) :: title, wformat
+    character(*), intent(in) :: title, format_w
 
     integer nbond
     integer, pointer :: bonds(:, :)
@@ -34,13 +34,13 @@ subroutine writefile(file_unit, wformat, natom, title, znums, coords, opt_nbond,
         nbond = 0
     end if
 
-    select case (wformat)
+    select case (format_w)
     case ('xyz')
         call writexyzfile(file_unit, natom, title, znums, coords)
     case ('mol2')
         call writemol2file(file_unit, natom, title, znums, coords, nbond, bonds)
     case default
-        write (error_unit, '(a,x,a)') 'Invalid format:', trim(wformat)
+        write (error_unit, '(a,1x,a)') 'Invalid format:', trim(format_w)
         stop
     end select
 
@@ -92,7 +92,7 @@ subroutine writexyzfile(file_unit, natom, title, znums, coords)
     write (file_unit, '(i0)') natom
     write (file_unit, '(a)') trim(title)
     do i = 1, natom
-        write (file_unit, '(a, 3(2x, f12.6))') elsym(znums(i)), coords(:, i)
+        write (file_unit, '(a,3(2x,f12.6))') elsym(znums(i)), coords(:, i)
     end do
 
 end subroutine
@@ -114,20 +114,20 @@ subroutine writemol2file(file_unit, natom, title, znums, coords, nbond, bonds)
     else
         write (file_unit, '(a)') 'Untitled'
     end if
-    write (file_unit, '(5(i4, x))') natom, nbond, 0, 0, 0
+    write (file_unit, '(5(i4,1x))') natom, nbond, 0, 0, 0
     write (file_unit, '(a)') 'SMALL'
     write (file_unit, '(a)') 'NO_CHARGES'
     write (file_unit, '(a)') '@<TRIPOS>ATOM'
 
     do i = 1, natom
-        write (file_unit, '(i4, x, a2, 3(x, f12.6), x, a8, x, i2, x, a4, x, f7.3)') &
+        write (file_unit, '(i4,1x,a2,3(1x,f12.6),1x,a8,1x,i2,1x,a4,1x,f7.3)') &
             i, elsym(znums(i)), coords(:, i), elsym(znums(i)), 1, 'MOL1', 0.
     end do
 
     write (file_unit, '(a)') '@<TRIPOS>BOND'
 
     do i = 1, nbond
-        write (file_unit, '(i4, x, 2(x, i4), x, a2)') i, bonds(:, i), '1'
+        write (file_unit, '(i4,1x,2(1x,i4),1x,a2)') i, bonds(:, i), '1'
     end do
 
 end subroutine

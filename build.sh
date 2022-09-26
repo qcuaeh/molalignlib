@@ -52,7 +52,7 @@ while true; do
    esac
 done
 
-flags=()
+flags=(-std=f2008)
 
 case "$realprec" in
    single) f2cmap=$sourcedir/f2cmap_single; shift;;

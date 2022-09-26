@@ -20,7 +20,7 @@ program ralign
     integer file_unit(2)
     integer nrec, records
     integer natom0, natom1
-    character(arg_len) arg, wformat
+    character(arg_len) arg, format_w
     character(title_len) title0, title1
     integer, allocatable :: mapcount(:), maplist(:, :)
     integer, dimension(:), allocatable :: znums0, znums1, types0, types1
@@ -28,7 +28,7 @@ program ralign
     real, dimension(:, :), allocatable :: coords0, coords1
     real, allocatable :: weights0(:), mindist(:)
     real travec(3), rotmat(3, 3), property(nelem)
-    logical stdin, biastol_t
+    logical stdin, bias_tol_flag
 
     ! Set default options
 
@@ -36,14 +36,15 @@ program ralign
     stdin = .false.
     biased = .false.
     iterated = .false.
-    complete = .false.
+    terminate = .false.
     converge = .false.
     testing = .false.
+    debug = .false.
+    bias_tol_flag = .false.
     records = 1
-    biastol_t = .false.
-    biasscale = 1000.0
+    bias_scale = 1000.0
     property = [(1.0, i=1, nelem)]
-    wformat = 'xyz'
+    format_w = 'xyz'
 
     ! Get user options
 
@@ -56,6 +57,8 @@ program ralign
             live = .true.
         case ('-test')
             testing = .true.
+        case ('-debug')
+            debug = .true.
         case ('-iter')
             iterated = .true.
         case ('-bias')
@@ -65,18 +68,18 @@ program ralign
         case ('-count')
             converge = .true.
             call readoptarg(arg, convcount)
-        case ('-trial')
-            complete = .true.
-            call readoptarg(arg, maxtrial)
+        case ('-trials')
+            terminate = .true.
+            call readoptarg(arg, maxtrials)
         case ('-tol')
-            biastol_t = .true.
-            call readoptarg(arg, biastol)
+            bias_tol_flag = .true.
+            call readoptarg(arg, bias_tol)
         case ('-scale')
-            call readoptarg(arg, biasscale)
+            call readoptarg(arg, bias_scale)
         case ('-rec')
             call readoptarg(arg, records)
         case ('-out')
-            call readoptarg(arg, wformat)
+            call readoptarg(arg, format_w)
         case ('-stdin')
             stdin = .true.
         case default
@@ -97,8 +100,8 @@ program ralign
         end if
     end if
 
-    if (biased .and. .not. biastol_t) then
-        write (error_unit, '(a)') 'Error: "biased" is True but "biastol" is not set'
+    if (biased .and. .not. bias_tol_flag) then
+        write (error_unit, '(a)') 'Error: "biased" is True but "bias_tol" is not set'
         stop
     end if
 
@@ -130,7 +133,7 @@ program ralign
 
     ! Superpose atoms
 
-    if (complete .or. converge) then
+    if (terminate .or. converge) then
 
         call remap(natom0, natom1, znums0, znums1, types0, types1, &
             coords0, coords1, weights0, records, nrec, maplist, mapcount, mindist)
@@ -143,9 +146,9 @@ program ralign
                 types1(maplist(:, i)), coords0, coords1(:, maplist(:, i)), &
                 weights0, travec, rotmat)
 
-            open(newunit=u, file='aligned_'//str(i)//'.'//trim(wformat), action='write', status='replace')
-            call writefile(u, wformat, natom0, title0, znums0, coords0)
-            call writefile(u, wformat, natom1, title1, znums1(maplist(:, i)), &
+            open(newunit=u, file='aligned_'//str(i)//'.'//trim(format_w), action='write', status='replace')
+            call writefile(u, format_w, natom0, title0, znums0, coords0)
+            call writefile(u, format_w, natom1, title1, znums1(maplist(:, i)), &
                 translated(natom1, rotated(natom1, coords1(:, maplist(:, i)), rotmat), travec))
             close(u)
 
@@ -159,13 +162,13 @@ program ralign
         call rotate(natom1, coords1, rotmat)
         call translate(natom1, coords1, travec)
 
-        write (output_unit, '(a,x,f0.4,x,a)') 'RMSD:', &
+        write (output_unit, '(a,1x,f0.4,1x,a)') 'RMSD:', &
             squaredist(natom0, weights0, coords0, coords1, identitymap(natom0)), &
             '(only alignment performed)'
 
-        open(newunit=u, file='aligned_1.'//trim(wformat), action='write', status='replace')
-        call writefile(u, wformat, natom0, title0, znums0, coords0)
-        call writefile(u, wformat, natom1, title1, znums1, coords1) 
+        open(newunit=u, file='aligned_1.'//trim(format_w), action='write', status='replace')
+        call writefile(u, format_w, natom0, title0, znums0, coords0)
+        call writefile(u, format_w, natom1, title1, znums1, coords1) 
         close(u)
 
     end if

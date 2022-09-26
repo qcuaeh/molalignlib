@@ -59,7 +59,7 @@ subroutine remap(natom0, natom1, znums0, znums1, types0, types1, &
 
     ! Associate abortion test
 
-    if (complete) then
+    if (terminate) then
         complete_test => lower_than
     else
         complete_test => dummy_test
