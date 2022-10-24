@@ -47,7 +47,7 @@ subroutine remap(natom0, natom1, znums0, znums1, types0, types1, &
     ! Check number of atoms
 
     if (natom0 /= natom1) then
-        write (error_unit, '(a)') 'Error: The number of atoms does not match'
+        write (error_unit, '(a)') 'Error: These clusters do not have the same number of atoms'
         stop
     end if
 
@@ -75,7 +75,7 @@ subroutine remap(natom0, natom1, znums0, znums1, types0, types1, &
 
     if (associated(converge_test, dummy_test) .and. &
         associated(complete_test, dummy_test)) then
-        write (error_unit, '(a)') 'Error: No stopping test is used'
+        write (error_unit, '(a)') 'Error: A condition to stop the procedure must be enabled'
         stop
     end if
 
@@ -87,14 +87,14 @@ subroutine remap(natom0, natom1, znums0, znums1, types0, types1, &
     ! Abort if there are incompatible atoms
 
     if (any(znums0(order0) /= znums1(order1))) then
-        write (error_unit, '(a)') 'Error: Clusters are not isomers'
+        write (error_unit, '(a)') 'Error: These clusters are not isomers'
         stop
     end if
 
     ! Abort if there are incompatible types
 
     if (any(types0(order0) /= types1(order1))) then
-        write (error_unit, '(a)') 'Error: There are conflicting atomic types'
+        write (error_unit, '(a)') 'Error: There are conflicting atom types'
         stop
     end if
 
@@ -104,7 +104,7 @@ subroutine remap(natom0, natom1, znums0, znums1, types0, types1, &
     do h = 1, nblock0
         do i = 2, blocksize0(h)
             if (weights0(order0(offset+i)) /= weights0(order0(offset+1))) then
-                write (error_unit, '(a)') 'Error: All atoms within a block must have the same weight'
+                write (error_unit, '(a)') 'Error: All atoms within a block must weight the same'
                 stop
             end if
         end do
@@ -164,21 +164,21 @@ subroutine align(natom0, natom1, znums0, znums1, types0, types1, &
     ! Check number of atoms
 
     if (natom0 /= natom1) then
-        write (error_unit, '(a)') 'Error: The number of atoms does not match'
+        write (error_unit, '(a)') 'Error: These clusters do not have the same number of atoms'
         stop
     end if
 
     ! Abort if there are incompatible atomic symbols
 
     if (any(znums0 /= znums1)) then
-        write (error_unit, '(a)') 'Error: Clusters are not isomers or atoms are not properly ordered'
+        write (error_unit, '(a)') 'Error: These clusters are not isomers or their atoms are not in the same order'
         stop
     end if
 
     ! Abort if there are incompatible atomic types
 
     if (any(types0 /= types1)) then
-        write (error_unit, '(a)') 'Error: There are conflicting atomic types or atoms are not properly ordered'
+        write (error_unit, '(a)') 'Error: There are conflicting atom types or their atoms are not in the same order'
         stop
     end if
 
