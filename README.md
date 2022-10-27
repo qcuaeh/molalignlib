@@ -24,34 +24,111 @@ After runnig the script the program will be created in the *bin* directory and t
 Usage
 -----
 
-### Program options
+### Options
 
--live: Print live stats.  
--iter: Perform iterated trials.  
--tol *ϵ*: Set biasing tolerance to *ϵ*.  
--count *N*: Set the count convergence threshold to *N*.  
+-sort: Reorder atoms.  
+-iter: Use iteration.  
+-noiter: Do not use iteration.  
+-bias: Use biasing and iteration.  
+-tol *ϵ*: Set biasing tolerance to *ϵ* (defaults to 0.2 Å).  
+-count *N*: Set the count convergence threshold to *N* (defaults to 10).  
 -trials *MAX*: Set the maximum number of trials to *MAX*.  
--bias: Use biased distances (must be used together with -tol).  
--rec *N*: Set the number of recorded solutions to *N* (defaullt is *N* = 1).  
--out xyz|mol2: Set the output format to XYZ or Mol2 (default is XYZ).  
--scale *α*: Set biasing scale to *α* (default is *α* = 1000).  
+-out xyz|mol2: Set the output format to XYZ or Mol2 (defaults to XYZ).  
+-rec *N*: Set the number of recorded solutions to *N* (defaults to 1).  
 -test: Use the same pseudo random numbers on every run.  
+-scale *α*: Set biasing scale to *α* (defaults to 1000).  
 -stdin: Read coordinates from standard input.  
 -weight: Use mass weighted distances.  
+-live: Show progress in real time.  
  
+### Basic usage
+
+To align two molecules without reordering just run:
+
+    ./bin/molalign tests/r005/Co100.xyz
+
+To align two molecules with reordering you can run:
+
+    ./bin/molalign tests/r005/Co100.xyz -sort
+
+by default a convergence threshold of 10 counts is used but a lower threshold
+can be used to reduce the computation time at the expense of less reliable
+results:
+
+    ./bin/molalign tests/r005/Co100.xyz -sort -count 3
+
+When reordering is requested performance can be improved by two to four orders
+of magnitude by enabling biasing. For example to reorder and align two molecules
+applying biasing run:
+
+    ./bin/molalign tests/r005/Co100.xyz -sort -bias
+
+A tolerance of 0.2 Å is used by default, which is enough to account for numerical
+errors, however if the clusters are only approximately congruent then a larger
+tolerance is required, for example to apply biasing with a tolerance of 0.1 Å run:
+
+    ./bin/molalign tests/r01/Co100.xyz -sort -bias -tol 0.35
+
+Tolerance must be carefully determined because a too small value will lead to
+wrong results while a too large value will not improve performance.
+
+### Advanced usage
+
+Most of the options not covered in the basic usage are intended for testing purposes.
+
+Iteration is enabled by default when biasing is used but it can be disabled with
+the `-noiter` option:
+
+    ./bin/molalign tests/r005/Co100.xyz -sort -bias -noiter
+
+The option `-test` forces the generation of the same stream of random numbers on
+every run in order to have reproducible results:
+
+    ./bin/molalign tests/r005/Co100.xyz 10 -sort -bias -test
+
+The algorithm by default generates several possible reorderings, but only one is
+printed by default. To print more than one solution use the `-rec` option:
+
+    ./bin/molalign tests/r005/Co100.xyz 10 -sort -bias -rec 10
+
+By default the biasing weight is much larger than the euclidean cost but
+in can be reduced with the `-scale` option:
+
+    ./bin/molalign tests/r005/Co100.xyz 10 -sort -bias -scale 10
+
+however it is rarely useful for clusters.
+
+To avoid too long computations the option `-trials` can be used:
+
+    ./bin/molalign tests/r005/Co100.xyz -sort -bias -trials 1000
+
+which will halt the computation if the number of trials exceeds 1000.
+
+To use mass weighted coordinates instead of unweighted coordinates use the
+`-weight` option:
+
+    ./bin/molalign tests/r005/Co100.xyz -sort -bias -weight
+
+Finally the options `-stdin`, `-out` and `-live` just control the source and the
+destination of the input and results, and the way that progress is displayed.
+
 ### Examples
 
-#### Example 1
+To run the program limited up to 1000 trials (recording up to 10 mappings) run:
 
-The following command will run the program with
-up to 10 recorded mappings,
-a convergence threshold of 10 counts,
-biasing with a tolerance of 0.17 Å,
-iteration,
-mass weighted distances
-and repeatable pseudo random numbers:
+    ./bin/molalign tests/r005/Au161Pd40.xyz -test -rec 10 -sort -trials 1000 -bias
 
-    ./bin/molalign tests/r005/Co100.xyz -rec 10 -count 10 -bias -tol 0.17 -iter -test
+The output should look as follows:
+
+     Map   Trial   Count   Cycles   Meanrot   Totalrot      RMSD
+    ------------------------------------------------------------
+       1      14      17      1.0      21.9      21.9     0.1010
+    ------------------------------------------------------------
+    Found more than 1 mapping(s) in 2000 random trial(s)
+
+To run the program using mass weighted coordinates (recording up to 10 mappings) run:
+
+    ./bin/molalign tests/r005/Co100.xyz -test -rec 10 -sort -bias -weight
  
 The ouput should look as follows:
 
@@ -61,24 +138,4 @@ The ouput should look as follows:
        2       1       4      1.5      78.0     110.0     2.1060
     ------------------------------------------------------------
     Found 2 mapping(s) in 14 random trial(s)
-
-
-#### Example 2
-
-The following command will run the program with
-a maximum of 2000 trials,
-biasing with a tolerance of 0.17 Å,
-iteration,
-mass weighted distances
-and repeatable pseudo random numbers:
-
-    ./bin/molalign tests/r005/Au161Pd40.xyz -trials 2000 -bias -tol 0.17 -iter -weight -test
-
-The output should look as follows:
-
-     Map   Trial   Count   Cycles   Meanrot   Totalrot      RMSD
-    ------------------------------------------------------------
-       1      14      17      1.0      21.9      21.9     0.1010
-    ------------------------------------------------------------
-    Found more than 1 mapping(s) in 2000 random trial(s)
 
