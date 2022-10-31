@@ -26,10 +26,8 @@ Usage
 
 ### Options
 
--sort: Reorder atoms.  
--iter: Use iteration.  
--noiter: Do not use iteration.  
--bias: Use biasing and iteration.  
+-sort: Sort atoms.  
+-bias: Enable biasing and iterative convergence.  
 -tol *ϵ*: Set biasing tolerance to *ϵ* (defaults to 0.2 Å).  
 -count *N*: Set the count convergence threshold to *N* (defaults to 10).  
 -trials *MAX*: Set the maximum number of trials to *MAX*.  
@@ -75,11 +73,6 @@ wrong results while a too large value will not improve performance.
 ### Advanced usage
 
 Most of the options not covered in the basic usage are intended for testing purposes.
-
-Iteration is enabled by default when biasing is used but it can be disabled with
-the `-noiter` option:
-
-    ./bin/molalign tests/r005/Co100.xyz -sort -bias -noiter
 
 The option `-test` forces the generation of the same stream of random numbers on
 every run in order to have reproducible results:

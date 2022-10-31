@@ -41,7 +41,7 @@ subroutine setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
     offset = 0
     bias(:, :) = 0.
 
-    if (biased) then
+    if (bias_flag) then
         do h = 1, nblock
             do i = offset + 1, offset + blocksize(h)
                 do j = offset + 1, offset + blocksize(h)

@@ -27,23 +27,26 @@ program ralign
     character(label_len), dimension(:), allocatable :: labels0, labels1
     real, dimension(:, :), allocatable :: coords0, coords1
     real, allocatable :: weights0(:), mindist(:)
-    real travec(3), rotmat(3, 3), property(nelem)
-    logical stdin, bias_tol_flag
+    real travec(3), rotmat(3, 3), weighting(nelem)
+    logical stdin_flag, bias_tol_flag
 
     ! Set default options
 
-    live = .false.
-    stdin = .false.
-    biased = .false.
-    iterated = .false.
-    terminate = .false.
-    converge = .false.
-    testing = .false.
-    debug = .false.
-    bias_tol_flag = .false.
+    bias_flag = .false.
+    bias_tol_flag = .true.
+    conv_flag = .false.
+    sort_flag = .false.
+    halt_flag = .false.
+    test_flag = .false.
+    live_flag = .false.
+    debug_flag = .false.
+    stdin_flag = .false.
+
     records = 1
+    maxcount = 10
+    bias_tol = 0.2
     bias_scale = 1000.0
-    property = [(1.0, i=1, nelem)]
+    weighting = [(1.0, i=1, nelem)]
     format_w = 'xyz'
 
     ! Get user options
@@ -54,22 +57,22 @@ program ralign
 
         select case (arg)
         case ('-live')
-            live = .true.
+            live_flag = .true.
         case ('-test')
-            testing = .true.
+            test_flag = .true.
+        case ('-sort')
+            sort_flag = .true.
         case ('-debug')
-            debug = .true.
-        case ('-iter')
-            iterated = .true.
+            debug_flag = .true.
         case ('-bias')
-            biased = .true.
+            bias_flag = .true.
+            conv_flag = .true.
         case ('-weight')
-            property = stdmatom
+            weighting = stdmatom
         case ('-count')
-            converge = .true.
-            call readoptarg(arg, convcount)
+            call readoptarg(arg, maxcount)
         case ('-trials')
-            terminate = .true.
+            halt_flag = .true.
             call readoptarg(arg, maxtrials)
         case ('-tol')
             bias_tol_flag = .true.
@@ -81,14 +84,14 @@ program ralign
         case ('-out')
             call readoptarg(arg, format_w)
         case ('-stdin')
-            stdin = .true.
+            stdin_flag = .true.
         case default
             call openfile(arg, file_unit)
         end select
 
     end do
 
-    if (stdin) then
+    if (stdin_flag) then
         file_unit(1) = input_unit
         file_unit(2) = input_unit
     else
@@ -100,8 +103,8 @@ program ralign
         end if
     end if
 
-    if (biased .and. .not. bias_tol_flag) then
-        write (error_unit, '(a)') 'Error: "biased" is True but "bias_tol" is not set'
+    if (bias_flag .and. .not. bias_tol_flag) then
+        write (error_unit, '(a)') 'Error: "bias_flag" is True but "bias_tol" is not set'
         stop
     end if
 
@@ -129,11 +132,11 @@ program ralign
 
     ! Get normalized weights
 
-    weights0 = property(znums0)/sum(property(znums0))
+    weights0 = weighting(znums0)/sum(weighting(znums0))
 
     ! Superpose atoms
 
-    if (terminate .or. converge) then
+    if (sort_flag) then
 
         call remap(natom0, natom1, znums0, znums1, types0, types1, &
             coords0, coords1, weights0, records, nrec, maplist, mapcount, mindist)

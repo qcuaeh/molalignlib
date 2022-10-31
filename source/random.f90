@@ -2,16 +2,40 @@ module random
 
 use iso_fortran_env, only: output_unit
 
+use rnglib
 use options
 
 implicit none
 
+integer, parameter :: sp = 4, dp = 8
+
+private
+public shuffle
+public random_real
+public random_init
+
+interface random_real
+    module procedure random_real_sp
+    module procedure random_real_dp
+end interface
+
 contains
 
-function randvec3() result(x)
-    real x(3)
-    call random_number(x)
-end function
+subroutine random_real_sp(x)
+    real(sp) x(:)
+    integer i
+    do i = 1, size(x)
+        x(i) = r4_uni_01()
+    end do
+end subroutine
+
+subroutine random_real_dp(x)
+    real(dp) x(:)
+    integer i
+    do i = 1, size(x)
+        x(i) = r4_uni_01()
+    end do
+end subroutine
 
 subroutine shuffle(array, n)
 
@@ -22,7 +46,7 @@ subroutine shuffle(array, n)
 
    do k = 1, 2
       do i = 1, n
-         call random_number(u)
+         u = r8_uni_01()
          j = floor(n*u) + 1
          ! switch values
          temp = array(j)
@@ -33,32 +57,62 @@ subroutine shuffle(array, n)
 
 end subroutine
 
-subroutine init_random_seed(seed)
+subroutine random_init()
+  use iso_fortran_env, only: int64
+  implicit none
+  integer :: seed(2)
+  integer :: i, un, istat, dt(8)
+  integer(int64) :: t
+!  integer pid
 
-    integer n, u
-    integer, allocatable :: seed(:)
+  call initialize()
 
-    call random_seed(size=n)
-    allocate(seed(n))
+  if (test_flag) return
 
-    if (.not. testing) then
-        ! Read /dev/urandom to seed the random number generator
-        open(newunit=u, file="/dev/urandom", access="stream", &
-            form="unformatted", action="read", status="old")
-        read (u) seed
-        close(u)
-        call random_seed(put=seed)
+  ! First try if the OS provides a random number generator
+  open(newunit=un, file="/dev/urandom", access="stream", &
+       form="unformatted", action="read", status="old", iostat=istat)
+  if (istat == 0) then
+     read(un) seed
+     close(un)
+  else
+     ! Fallback to XOR:ing the current time and pid. The PID is
+     ! useful in case one launches multiple instances of the same
+     ! program in parallel.
+     call system_clock(t)
+     if (t == 0) then
+        call date_and_time(values=dt)
+        t = (dt(1) - 1970) * 365_int64 * 24 * 60 * 60 * 1000 &
+             + dt(2) * 31_int64 * 24 * 60 * 60 * 1000 &
+             + dt(3) * 24_int64 * 60 * 60 * 1000 &
+             + dt(5) * 60 * 60 * 1000 &
+             + dt(6) * 60 * 1000 + dt(7) * 1000 &
+             + dt(8)
+     end if
+!     pid = getpid()
+!     t = ieor(t, int(pid, kind(t)))
+     do i = 1, 2
+        seed(i) = lcg(t)
+     end do
+  end if
+  seed(1) = modulo(seed(1), 2147483563) + 1
+  seed(2) = modulo(seed(2), 2147483399) + 1
+  call set_initial_seed(seed(1), seed(2))
+contains
+  ! This simple PRNG might not be good enough for real work, but is
+  ! sufficient for seeding a better PRNG.
+  function lcg(s)
+    integer :: lcg
+    integer(int64) :: s
+    if (s == 0) then
+       s = 104729
+    else
+       s = mod(s, 4294967296_int64)
     end if
-
-    if (debug) then
-        call random_seed(get=seed)
-        write (output_unit, '(a)') 'Random seed:'
-        write (output_unit, *) n
-        write (output_unit, *) seed
-        write (output_unit, *)
-    end if
-
-end subroutine
+    s = mod(s * 279470273_int64, 4294967291_int64)
+    lcg = int(mod(s, int(huge(0), int64)), kind(0))
+  end function lcg
+end subroutine random_init
 
 end module
 

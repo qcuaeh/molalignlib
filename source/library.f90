@@ -35,14 +35,12 @@ subroutine remap(natom0, natom1, znums0, znums1, types0, types1, &
 
     integer i, h, offset
     integer nblock0, nblock1
-    integer, dimension(:), allocatable :: seed
-    integer, dimension(:), allocatable :: order0, order1
+    integer, dimension(:), allocatable :: atomorder0, atomorder1
     integer, dimension(:), allocatable :: blockidx0, blockidx1
     integer, dimension(:), allocatable :: blocksize0, blocksize1
     real, dimension(3) :: center0, center1
 
-    procedure(abstract_test), pointer :: complete_test => null()
-    procedure(abstract_test), pointer :: converge_test => null()
+    procedure(abstract_test), pointer :: halting => null()
 
     ! Check number of atoms
 
@@ -53,47 +51,33 @@ subroutine remap(natom0, natom1, znums0, znums1, types0, types1, &
 
     ! Allocate arrays
 
-    allocate(order0(natom0), order1(natom1))
+    allocate(atomorder0(natom0), atomorder1(natom1))
     allocate(blockidx0(natom0), blockidx1(natom1))
     allocate(blocksize0(natom0), blocksize1(natom1))
 
-    ! Associate abortion test
+    ! Associate halting test
 
-    if (terminate) then
-        complete_test => lower_than
+    if (halt_flag) then
+        halting => lessthan
     else
-        complete_test => dummy_test
-    end if
-
-    ! Associate convergence test
-
-    if (converge) then
-        converge_test => lower_than
-    else
-        converge_test => dummy_test
-    end if
-
-    if (associated(converge_test, dummy_test) .and. &
-        associated(complete_test, dummy_test)) then
-        write (error_unit, '(a)') 'Error: A condition to stop the procedure must be enabled'
-        stop
+        halting => truethan
     end if
 
     ! Group atoms by label
 
-    call getblocks(natom0, znums0, types0, nblock0, blocksize0, blockidx0, order0)
-    call getblocks(natom1, znums1, types1, nblock1, blocksize1, blockidx1, order1)
+    call getblocks(natom0, znums0, types0, nblock0, blocksize0, blockidx0, atomorder0)
+    call getblocks(natom1, znums1, types1, nblock1, blocksize1, blockidx1, atomorder1)
 
     ! Abort if there are incompatible atoms
 
-    if (any(znums0(order0) /= znums1(order1))) then
+    if (any(znums0(atomorder0) /= znums1(atomorder1))) then
         write (error_unit, '(a)') 'Error: These clusters are not isomers'
         stop
     end if
 
     ! Abort if there are incompatible types
 
-    if (any(types0(order0) /= types1(order1))) then
+    if (any(types0(atomorder0) /= types1(atomorder1))) then
         write (error_unit, '(a)') 'Error: There are conflicting atom types'
         stop
     end if
@@ -103,7 +87,7 @@ subroutine remap(natom0, natom1, znums0, znums1, types0, types1, &
     offset = 0
     do h = 1, nblock0
         do i = 2, blocksize0(h)
-            if (weights0(order0(offset+i)) /= weights0(order0(offset+1))) then
+            if (weights0(atomorder0(offset+i)) /= weights0(atomorder0(offset+1))) then
                 write (error_unit, '(a)') 'Error: All atoms within a block must weight the same'
                 stop
             end if
@@ -118,19 +102,19 @@ subroutine remap(natom0, natom1, znums0, znums1, types0, types1, &
 
     ! Initialize random number generator
 
-    call init_random_seed(seed)
+    call random_init()
 
     ! Remap atoms to minimize distance and difference
 
-    call optimize_mapping(natom0, nblock0, blocksize0, weights0(order0), &
-        centered(natom0, coords0(:, order0), center0), &
-        centered(natom1, coords1(:, order1), center1), &
-        records, nrec, maplist, mapcount, mindist, complete_test, converge_test)
+    call optimize_mapping(natom0, nblock0, blocksize0, weights0(atomorder0), &
+        centered(natom0, coords0(:, atomorder0), center0), &
+        centered(natom1, coords1(:, atomorder1), center1), &
+        records, nrec, maplist, mapcount, mindist, halting)
 
     ! Reorder back to original atom ordering
 
     do i = 1, nrec
-        maplist(:, i) = order1(maplist(inversemap(order0), i))
+        maplist(:, i) = atomorder1(maplist(inversemap(atomorder0), i))
     end do
 
 end subroutine

@@ -9,8 +9,8 @@ from ase import Atoms
 #print(molalign.library.align.__doc__)
 
 class Aligner(Atoms):
-    def __init__(self, atoms, records=1, count=None, trials=None, biased=False, \
-                 bias_scale=1000., bias_tol=None, iterated=False, weighted=False, testing=False):
+    def __init__(self, atoms, records=1, count=None, trials=None, biasing=False, \
+                 bias_scale=1000., bias_tol=None, weighted=False, testing=False):
         if not isinstance(atoms, Atoms):
             raise TypeError('An Atoms object was expected as argument')
         if type(records) is not int:
@@ -21,10 +21,8 @@ class Aligner(Atoms):
             raise TypeError('"weighted" must be boolean')
         if type(testing) is not bool:
             raise TypeError('"testing" must be boolean')
-        if type(biased) is not bool:
-            raise TypeError('"biased" must be boolean')
-        if type(iterated) is not bool:
-            raise TypeError('"iterated" must be boolean')
+        if type(biasing) is not bool:
+            raise TypeError('"biasing" must be boolean')
         if count is not None and type(count) is not int:
             raise TypeError('"count" must be integer')
         if trials is not None and type(trials) is not int:
@@ -33,25 +31,24 @@ class Aligner(Atoms):
             raise TypeError('"bias_tol" must be real')
         self.__dict__.update(atoms.__dict__)
         self.records = records
-        molalign.options.biased = biased
+        molalign.options.test_flag = testing
+        molalign.options.bias_flag = biasing
         molalign.options.bias_scale = bias_scale
-        molalign.options.iterated = iterated
-        molalign.options.testing = testing
         if count is None and trials is None:
             raise ValueError('either "count" or "trials" must be set')
         if count is None:
             molalign.options.converge = False
         else:
             molalign.options.converge = True
-            molalign.options.convcount = count
+            molalign.options.maxcount = count
         if trials is None:
-            molalign.options.terminate = False
+            molalign.options.halt_flag = False
         else:
-            molalign.options.terminate = True
+            molalign.options.halt_flag = True
             molalign.options.maxtrials = trials
-        if biased:
+        if biasing:
             if bias_tol is None:
-                raise ValueError('"biased" is True but "bias_tol" is not set')
+                raise ValueError('"biasing" is True but "bias_tol" is not set')
             else:
                 molalign.options.bias_tol = bias_tol
         if weighted:

@@ -9,43 +9,21 @@ implicit none
 
 private
 public sort
-public sorted
-public sortorder
+public order
 
 interface sort
     module procedure intquicksort
     module procedure realquicksort
 end interface
 
-interface sorted
-    module procedure intsorted
-    module procedure realsorted
-end interface
-
-interface sortorder
-    module procedure intsortorder
-    module procedure charsortorder
+interface order
+    module procedure intorder
+    module procedure charorder
 end interface
 
 contains
 
-function intsorted(x, n) result(y)
-    integer, intent(in) :: n
-    integer, dimension(:), intent(in) :: x
-    integer y(n)
-    y(1:n) = x(1:n)
-    call intquicksort(y, 1, n)
-end function
-
-function realsorted(x, n) result(y)
-    integer, intent(in) :: n
-    real, dimension(:), intent(in) :: x
-    real y(n)
-    y(1:n) = x(1:n)
-    call realquicksort(y, 1, n)
-end function
-
-function intsortorder(x, n) result(o)
+function intorder(x, n) result(o)
     integer, intent(in) :: n
     integer, dimension(:), intent(in) :: x
     integer o(n), t((n+1)/2)
@@ -53,7 +31,7 @@ function intsortorder(x, n) result(o)
     call intmergesort(x, o, n, t)
 end function
 
-function charsortorder(x, n) result(o)
+function charorder(x, n) result(o)
     integer, intent(in) :: n
     character(*), dimension(:), intent(in) :: x
     integer o(n), t((n+1)/2)

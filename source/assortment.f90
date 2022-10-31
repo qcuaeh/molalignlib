@@ -14,13 +14,13 @@ public getblocks
 
 contains
 
-subroutine getblocks(natom, znums, types, nblock, blocksize, blockindex, order)
+subroutine getblocks(natom, znums, types, nblock, blocksize, blockindex, atomorder)
 ! Purpose: Group atoms by atomic numbers and types
 
     integer, intent(in) :: natom
     integer, dimension(:), intent(in) :: znums, types
     integer, intent(out) :: nblock
-    integer, intent(out) :: order(:)
+    integer, intent(out) :: atomorder(:)
     integer, dimension(:), intent(out) :: blocksize, blockindex
 
     integer i, j
@@ -57,28 +57,28 @@ subroutine getblocks(natom, znums, types, nblock, blocksize, blockindex, order)
 
 ! Order blocks by atomic type
 
-    blockorder(:nblock) = sortorder(blocktype, nblock)
+    blockorder(:nblock) = order(blocktype, nblock)
     blocksize(:nblock) = blocksize(blockorder(:nblock))
     blockorder(:nblock) = inversemap(blockorder(:nblock))
     blockindex = blockorder(blockindex)
 
 ! Order blocks by atomic number
 
-    blockorder(:nblock) = sortorder(blockznum, nblock)
+    blockorder(:nblock) = order(blockznum, nblock)
     blocksize(:nblock) = blocksize(blockorder(:nblock))
     blockorder(:nblock) = inversemap(blockorder(:nblock))
     blockindex = blockorder(blockindex)
 
 ! Order blocks by block size
 
-!    blockorder(:nblock) = sortorder(blocksize, nblock)
+!    blockorder(:nblock) = order(blocksize, nblock)
 !    blocksize(:nblock) = blocksize(blockorder(:nblock))
 !    blockorder(:nblock) = inversemap(blockorder(:nblock))
 !    blockindex = blockorder(blockindex)
 
-! Get contiguous label order
+! Save atom order
 
-    order = sortorder(blockindex, natom)
+    atomorder = order(blockindex, natom)
 
 end subroutine
 

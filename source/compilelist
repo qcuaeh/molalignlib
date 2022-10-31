@@ -1,4 +1,5 @@
 options.f90 f2py
+rnglib.f90
 strutils.f90
 maputils.f90
 eigen.f90

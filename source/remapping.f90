@@ -24,26 +24,26 @@ end interface
 
 contains
 
-logical function dummy_test(counter, threshold)
+logical function truethan(counter, threshold)
     integer, intent(in) :: counter, threshold
-    dummy_test = .true.
+    truethan = .true.
 end function
 
-logical function lower_than(counter, threshold)
+logical function lessthan(counter, threshold)
     integer, intent(in) :: counter, threshold
-    lower_than = counter < threshold
+    lessthan = counter < threshold
 end function
 
 subroutine optimize_mapping( &
     natom, nblock, blocksize, weights, coords0, coords1, records, nrec, &
-    maplist, mapcount, mindist, complete_test, converge_test &
+    maplist, mapcount, mindist, halting &
 )
 
     integer, intent(in) :: natom, nblock, records
     integer, dimension(:), intent(in) :: blocksize
     real, dimension(:, :), intent(in) :: coords0, coords1
     real, dimension(:), intent(in) :: weights
-    procedure (abstract_test), pointer, intent(in) :: complete_test, converge_test
+    procedure (abstract_test), pointer, intent(in) :: halting
     integer, intent(out) :: nrec
     integer, intent(out) :: maplist(:, :), mapcount(:)
     real, intent(out) :: mindist(:)
@@ -57,6 +57,7 @@ subroutine optimize_mapping( &
     real, dimension(records) :: avgiter, avgmeanrot, avgtotrot
     real bias(natom, natom)
     real auxcoords(3, natom)
+    real randvec(3)
 
 ! Set bias for non equivalent atoms 
 
@@ -64,7 +65,7 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
 
 ! Print header and initial stats
 
-    if (live) then
+    if (live_flag) then
         write (output_unit, '(a)', advance='no') achar(27)//'[1H'//achar(27)//'[J'
         call print_header()
     end if
@@ -78,7 +79,7 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
 
 ! Loop for map searching
 
-    do while (complete_test(ntrial, maxtrials) .and. converge_test(nmatch, convcount))
+    do while (nmatch < maxcount .and. halting(ntrial, maxtrials))
 
         ntrial = ntrial + 1
 
@@ -88,7 +89,8 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
 
 ! Apply random rotation
 
-        call rotate(natom, auxcoords, getrotquat(randvec3()))
+        call random_real(randvec)
+        call rotate(natom, auxcoords, getrotquat(randvec))
 
 ! Minimize euclidean distance
 
@@ -99,7 +101,7 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
         call rotate(natom, auxcoords, rotquat)
         cycles = 1
 
-        do while (iterated)
+        do while (conv_flag)
             biased_dist = squaredist(natom, weights, coords0, auxcoords, atomap) &
                     + totalbias(natom, weights, bias, atomap)
             call assignatoms(natom, coords0, auxcoords, nblock, blocksize, bias, auxmap)
@@ -107,7 +109,7 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
             new_biased_dist = squaredist(natom, weights, coords0, auxcoords, auxmap) &
                     + totalbias(natom, weights, bias, auxmap)
             if (new_biased_dist > biased_dist) then
-                write (error_unit, '(a)') 'New biased distance is larger than previous biased distance!'
+                write (error_unit, '(a)') 'new_biased_dist is larger than biased_dist!'
 !                print *, biased_dist, new_biased_dist
             end if
             rotquat = leastrotquat(natom, weights, coords0, auxcoords, auxmap)
@@ -131,7 +133,7 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
                 avgiter(imap) = avgiter(imap) + (cycles - avgiter(imap))/mapcount(imap)
                 avgtotrot(imap) = avgtotrot(imap) + (rotangle(prodquat) - avgtotrot(imap))/mapcount(imap)
                 avgmeanrot(imap) = avgmeanrot(imap) + (meanrot - avgmeanrot(imap))/mapcount(imap)
-                if (live) then
+                if (live_flag) then
                     write (output_unit, '(a)', advance='no') achar(27)//'['//str(imap + 2)//'H'
                     call print_stats(imap, earliest(imap), mapcount(imap), avgiter(imap), avgmeanrot(imap), &
                         avgtotrot(imap), mindist(imap))
@@ -157,7 +159,7 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
                         maplist(:, jmap) = maplist(:, jmap - 1)
                         mindist(jmap) = mindist(jmap - 1)
                         earliest(jmap) = earliest(jmap - 1)
-                        if (live) then
+                        if (live_flag) then
                             write (output_unit, '(a)', advance='no') achar(27)//'['//str(jmap + 2)//'H'
                             call print_stats(jmap, earliest(jmap), mapcount(jmap), avgiter(jmap), avgmeanrot(jmap), &
                                 avgtotrot(jmap), mindist(jmap))
@@ -170,7 +172,7 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
                     maplist(:, imap) = atomap
                     mindist(imap) = dist
                     earliest(imap) = ntrial
-                    if (live) then
+                    if (live_flag) then
                         write (output_unit, '(a)', advance='no') achar(27)//'['//str(imap + 2)//'H'
                         call print_stats(imap, earliest(imap), mapcount(imap), avgiter(imap), avgmeanrot(imap), &
                             avgtotrot(imap), mindist(imap))
@@ -180,14 +182,14 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
             end do
         end if
 
-        if (live) then
+        if (live_flag) then
             write (output_unit, '(a)', advance='no') achar(27)//'['//str(nrec + 3)//'H'
             call print_footer(overflow, nrec, ntrial)
         end if
 
     end do
 
-    if (.not. live) then
+    if (.not. live_flag) then
         call print_header()
         do imap = 1, nrec
             call print_stats(imap, earliest(imap), mapcount(imap), avgiter(imap), avgmeanrot(imap), &
