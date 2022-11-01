@@ -26,7 +26,7 @@ Usage
 
 ### Options
 
--sort: Remap atom assignments for optimal RMSD calculation. 
+-sort: Remap atom assignments for optimal RMSD calculation.  
 -bias: Enable biasing and iterative convergence.  
 -tol *ϵ*: Set biasing tolerance to *ϵ* (defaults to 0.2 Å).  
 -count *N*: Set the count convergence threshold to *N* (defaults to 10).  
