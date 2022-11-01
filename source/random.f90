@@ -1,13 +1,10 @@
 module random
-
 use iso_fortran_env, only: output_unit
-
 use rnglib
 use options
 
 implicit none
-
-integer, parameter :: sp = 4, dp = 8
+integer, parameter :: sp=4, dp=8
 
 private
 public shuffle

@@ -2,8 +2,7 @@ options.f90 f2py
 rnglib.f90
 strutils.f90
 maputils.f90
-eigen.f90
-math.f90
+linear.f90
 random.f90
 sorting.f90
 hungarian.f90

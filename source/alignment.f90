@@ -1,8 +1,8 @@
 module alignment
 
-use options
-use eigen
+use linear
 use rotation
+use options
 
 implicit none
 

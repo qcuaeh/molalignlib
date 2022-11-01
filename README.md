@@ -107,9 +107,13 @@ destination of the input and results, and the way that progress is displayed.
 
 ### Examples
 
-To run the program using mass weighted coordinates (recording up to 10 mappings) run:
+Notice that because the random number generator is initialized with a different
+seed each time the output will not be exactly the same as in the examples (to
+reproduce exactly the same output use the option `-test`):
 
-    ./bin/molalign tests/r005/Co100.xyz -test -sort -bias
+To run the program with biased costs run:
+
+    ./bin/molalign tests/r005/Co100.xyz -sort -bias
  
 The ouput should look as follows:
 
@@ -119,9 +123,9 @@ The ouput should look as follows:
     ----------------------------------------------------
     Found 1 mapping(s) in 10 random trial(s)
 
-To run the program limited up to 1000 trials (recording up to 10 mappings) run:
+To run the program with biased costs (recording up to 10 mappings) run:
 
-    ./bin/molalign tests/r005/Au161Pd40.xyz -test -rec 10 -sort -bias
+    ./bin/molalign tests/r005/Au161Pd40.xyz -rec 10 -sort -bias
 
 The output should look as follows:
 
@@ -139,4 +143,25 @@ The output should look as follows:
       10       1      2.0       5.5       7.6     5.0285
     ----------------------------------------------------
     Found more than 10 mapping(s) in 97 random trial(s)
+
+To run the program with biased costs and mass weighted coordinates (recording up to 10 mappings) run:
+
+    ./bin/molalign tests/r005/Au161Pd40.xyz -rec 10 -sort -bias -weight
+
+The output should look as follows:
+
+     Map   Count   Cycles   Meanrot   Totalrot      RMSD
+    ----------------------------------------------------
+       1      10      4.1      17.7      39.4     0.1010
+       2       7      4.4      17.8      39.7     0.1010
+       3       7      5.3      17.7      52.6     0.1010
+       4       6      4.3      17.8      38.3     0.1010
+       5       7      2.4      21.0      24.5     0.1010
+       6      11      3.1      20.4      26.4     0.1010
+       7       5      3.0      21.3      38.1     0.1010
+       8       9      3.7      19.8      38.8     0.1010
+       9       1      1.0       4.7       4.7     5.1384
+      10       1      2.0      12.1       9.1     5.2497
+    ----------------------------------------------------
+    Found more than 10 mapping(s) in 67 random trial(s)
 
