@@ -26,18 +26,18 @@ Usage
 
 ### Options
 
--sort: Remap atom assignments for optimal RMSD calculation.  
+-live: Show progress in real time.  
+-weight: Use mass weighted distances.  
+-sort: Sort atoms by optimal assignment.  
+-stdin: Read coordinates from standard input.  
 -bias: Enable biasing and iterative convergence.  
 -tol *ϵ*: Set biasing tolerance to *ϵ* (defaults to 0.2 Å).  
+-test: Use the same pseudo random numbers on every run.  
 -count *N*: Set the count convergence threshold to *N* (defaults to 10).  
--trials *MAX*: Set the maximum number of trials to *MAX*.  
 -out xyz|mol2: Set the output format to XYZ or Mol2 (defaults to XYZ).  
 -rec *N*: Set the number of recorded solutions to *N* (defaults to 1).  
--test: Use the same pseudo random numbers on every run.  
+-trials *MAX*: Set the maximum number of trials to *MAX*.  
 -scale *α*: Set biasing scale to *α* (defaults to 1000).  
--stdin: Read coordinates from standard input.  
--weight: Use mass weighted distances.  
--live: Show progress in real time.  
  
 ### Basic usage
 
@@ -61,14 +61,14 @@ applying biasing run:
 
     ./bin/molalign tests/r005/Co100.xyz -sort -bias
 
-A tolerance of 0.2 Å is used by default, which is enough to account for numerical
-errors, however if the clusters are only approximately congruent then a larger
-tolerance is required, for example to apply biasing with a tolerance of 0.35 Å run:
+A biasing tolerance of 0.2 Å is used by default, which is enough to account for
+small distortions on the geometry, however if the distortion is too large then the
+tolerance must be increased, for example to increase the tolerance to 0.35 Å run:
 
     ./bin/molalign tests/r01/Co100.xyz -sort -bias -tol 0.35
 
-Tolerance must be carefully determined because a too small value will lead to
-wrong results while a too large value will not improve performance.
+Tolerance must be chosen carefully because a value too small will lead to wrong
+results while a value too large will not improve performance.
 
 ### Advanced usage
 
