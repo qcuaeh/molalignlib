@@ -19,14 +19,14 @@ following options to change the default behaviour:
 -r single|double: Set the real precision to single or double (default).  
 -l static|shared|python: Build the selected library instead of the program.  
 
-After runnig the script the program will be created in the *bin* directory and the libraries in the *lib* directory.
+After runnig the script the program will be created in the *bin* directory.
 
 Usage
 -----
 
 ### Options
 
--sort: Sort atoms.  
+-sort: Remap atom assignments for optimal RMSD calculation. 
 -bias: Enable biasing and iterative convergence.  
 -tol *ϵ*: Set biasing tolerance to *ϵ* (defaults to 0.2 Å).  
 -count *N*: Set the count convergence threshold to *N* (defaults to 10).  
@@ -63,7 +63,7 @@ applying biasing run:
 
 A tolerance of 0.2 Å is used by default, which is enough to account for numerical
 errors, however if the clusters are only approximately congruent then a larger
-tolerance is required, for example to apply biasing with a tolerance of 0.1 Å run:
+tolerance is required, for example to apply biasing with a tolerance of 0.35 Å run:
 
     ./bin/molalign tests/r01/Co100.xyz -sort -bias -tol 0.35
 
