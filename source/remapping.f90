@@ -24,14 +24,22 @@ end interface
 
 contains
 
-logical function truethan(counter, threshold)
-    integer, intent(in) :: counter, threshold
-    truethan = .true.
+logical function lessthan(a, b) result(res)
+    integer, intent(in) :: a, b
+    if (a < b) then
+        res = .true.
+    else
+        res = .false.
+    end if
 end function
 
-logical function lessthan(counter, threshold)
-    integer, intent(in) :: counter, threshold
-    lessthan = counter < threshold
+logical function dummythan(a, b) result(res)
+    integer, intent(in) :: a, b
+    if (a < b) then
+        res = .true.
+    else
+        res = .true.
+    end if
 end function
 
 subroutine optimize_mapping( &
@@ -56,7 +64,7 @@ subroutine optimize_mapping( &
     real, dimension(records) :: avgiter, avgmeanrot, avgtotrot
     real bias(natom, natom)
     real auxcoords(3, natom)
-    real randvec(3)
+    real randpos(3)
 
 ! Set bias for non equivalent atoms 
 
@@ -88,8 +96,8 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
 
 ! Apply random rotation
 
-        call random_real(randvec)
-        call rotate(natom, auxcoords, getrotquat(randvec))
+        call getrandnum(randpos)
+        call rotate(natom, auxcoords, getrotquat(randpos))
 
 ! Minimize euclidean distance
 

@@ -1,4 +1,15 @@
 module rnglib
+
+implicit none
+
+integer, parameter :: sp = 4
+integer, parameter :: dp = 8
+
+interface real_uni01
+    module procedure real_uni01_sp
+    module procedure real_uni01_dp
+end interface
+
 contains
 
 subroutine advance_state ( k )
@@ -91,7 +102,7 @@ subroutine advance_state ( k )
   call cg_set ( g, cg1, cg2 )
 
   return
-end
+end subroutine
 
 function antithetic_get ( )
 
@@ -129,7 +140,7 @@ function antithetic_get ( )
   antithetic_get = value
 
   return
-end
+end function
 
 subroutine antithetic_memory ( i, value )
 
@@ -186,7 +197,7 @@ subroutine antithetic_memory ( i, value )
   end if
 
   return
-end
+end subroutine
 
 subroutine antithetic_set ( value )
 
@@ -221,7 +232,7 @@ subroutine antithetic_set ( value )
   call antithetic_memory ( i, value )
 
   return
-end
+end subroutine
 
 subroutine cg_get ( g, cg1, cg2 )
 
@@ -261,7 +272,7 @@ subroutine cg_get ( g, cg1, cg2 )
   call cg_memory ( i, g, cg1, cg2 )
 
   return
-end
+end subroutine
 
 subroutine cg_memory ( i, g, cg1, cg2 )
 
@@ -334,7 +345,7 @@ subroutine cg_memory ( i, g, cg1, cg2 )
   end if
 
   return
-end
+end subroutine
 
 subroutine cg_set ( g, cg1, cg2 )
 
@@ -374,7 +385,7 @@ subroutine cg_set ( g, cg1, cg2 )
   call cg_memory ( i, g, cg1, cg2 )
 
   return
-end
+end subroutine
 
 function cgn_get ( )
 
@@ -413,7 +424,7 @@ function cgn_get ( )
   cgn_get = g
 
   return
-end
+end function
 
 subroutine cgn_memory ( i, g )
 
@@ -480,7 +491,7 @@ subroutine cgn_memory ( i, g )
   end if
 
   return
-end
+end subroutine
 
 subroutine cgn_set ( g )
 
@@ -516,7 +527,7 @@ subroutine cgn_set ( g )
   call cgn_memory ( i, g )
 
   return
-end
+end subroutine
 
 subroutine get_state ( cg1, cg2 )
 
@@ -577,7 +588,7 @@ subroutine get_state ( cg1, cg2 )
   call cg_get ( g, cg1, cg2 )
 
   return
-end
+end subroutine
 
 function i4_uni ( )
 
@@ -692,7 +703,7 @@ function i4_uni ( )
   i4_uni = z
 
   return
-end
+end function
 
 subroutine ig_get ( g, ig1, ig2 )
 
@@ -732,7 +743,7 @@ subroutine ig_get ( g, ig1, ig2 )
   call ig_memory ( i, g, ig1, ig2 )
 
   return
-end
+end subroutine
 
 subroutine ig_memory ( i, g, ig1, ig2 )
 
@@ -805,7 +816,7 @@ subroutine ig_memory ( i, g, ig1, ig2 )
   end if
 
   return
-end
+end subroutine
 
 subroutine ig_set ( g, ig1, ig2 )
 
@@ -845,7 +856,7 @@ subroutine ig_set ( g, ig1, ig2 )
   call ig_memory ( i, g, ig1, ig2 )
 
   return
-end
+end subroutine
 
 subroutine init_generator ( t )
 
@@ -953,7 +964,7 @@ subroutine init_generator ( t )
   call cg_set ( g, cg1, cg2 )
 
   return
-end
+end subroutine
 
 subroutine initialize ( )
 
@@ -1023,7 +1034,7 @@ subroutine initialize ( )
 !  write ( *, '(a)' ) '  The RNGLIB package has been initialized.'
 
   return
-end
+end subroutine
 
 function initialized_get ( )
 
@@ -1062,7 +1073,7 @@ function initialized_get ( )
   initialized_get = initialized
 
   return
-end
+end function
 
 subroutine initialized_memory ( i, initialized )
 
@@ -1114,7 +1125,7 @@ subroutine initialized_memory ( i, initialized )
   end if
 
   return
-end
+end subroutine
 
 subroutine initialized_set ( )
 
@@ -1150,7 +1161,7 @@ subroutine initialized_set ( )
   call initialized_memory ( i, initialized )
 
   return
-end
+end subroutine
 
 subroutine lg_get ( g, lg1, lg2 )
 
@@ -1190,7 +1201,7 @@ subroutine lg_get ( g, lg1, lg2 )
   call lg_memory ( i, g, lg1, lg2 )
 
   return
-end
+end subroutine
 
 subroutine lg_memory ( i, g, lg1, lg2 )
 
@@ -1263,7 +1274,7 @@ subroutine lg_memory ( i, g, lg1, lg2 )
   end if
 
   return
-end
+end subroutine
 
 subroutine lg_set ( g, lg1, lg2 )
 
@@ -1303,7 +1314,7 @@ subroutine lg_set ( g, lg1, lg2 )
   call lg_memory ( i, g, lg1, lg2 )
 
   return
-end
+end subroutine
 
 function multmod ( a, s, m )
 
@@ -1465,9 +1476,9 @@ function multmod ( a, s, m )
   multmod = p
 
   return
-end
+end function
 
-function r4_uni_01 ( )
+subroutine real_uni01_sp ( num )
 
 !*****************************************************************************80
 !
@@ -1505,12 +1516,10 @@ function r4_uni_01 ( )
 !
   implicit none
 
-  integer, parameter :: rk = kind ( 1.0D+00 )
-
   integer i
 !  integer i4_uni
 !  logical initialized_get
-  real ( kind = 4 ) r4_uni_01
+  real ( kind = sp ) num
 !
 !  Check whether the package must be initialized.
 !
@@ -1527,12 +1536,12 @@ function r4_uni_01 ( )
 !
 !  Scale it to a random real in [0,1].
 !
-  r4_uni_01 = real ( i, kind = 4 ) * 4.656613057E-10
+  num = real ( i, kind = sp ) * 4.656613057E-10_sp
 
   return
-end
+end subroutine
 
-function r8_uni_01 ( )
+subroutine real_uni01_dp ( num )
 
 !*****************************************************************************80
 !
@@ -1570,12 +1579,10 @@ function r8_uni_01 ( )
 !
   implicit none
 
-  integer, parameter :: rk = kind ( 1.0D+00 )
-
   integer i
 !  integer i4_uni
 !  logical initialized_get
-  real ( kind = rk ) r8_uni_01
+  real ( kind = dp ) num
 !
 !  Check whether the package must be initialized.
 !
@@ -1592,10 +1599,10 @@ function r8_uni_01 ( )
 !
 !  Scale it to a random real in [0,1].
 !
-  r8_uni_01 = real ( i, kind = rk ) * 4.656613057D-10
+  num = real ( i, kind = dp ) * 4.656613057E-10_dp
 
   return
-end
+end subroutine
 
 subroutine set_initial_seed ( ig1, ig2 )
 
@@ -1699,7 +1706,7 @@ subroutine set_initial_seed ( ig1, ig2 )
   call cgn_set ( g )
 
   return
-end
+end subroutine
 
 subroutine set_seed ( cg1, cg2 )
 
@@ -1783,7 +1790,7 @@ subroutine set_seed ( cg1, cg2 )
   call init_generator ( t )
 
   return
-end
+end subroutine
 
 subroutine timestamp ( )
 
@@ -1864,6 +1871,6 @@ subroutine timestamp ( )
     d, trim ( month(m) ), y, h, ':', n, ':', s, '.', mm, trim ( ampm )
 
   return
-end
+end subroutine
 
 end module

@@ -1,7 +1,12 @@
 module linear
 
 implicit none
-integer, parameter :: sp=4, dp=8
+
+integer, parameter :: sp = 4
+integer, parameter :: dp = 8
+
+external ssyev
+external dsyev
 
 private
 public trace
@@ -11,13 +16,13 @@ public syeval4
 public syevec4
 
 interface syeval4
-    module procedure ssyeval4
-    module procedure dsyeval4
+    module procedure syeval4sp
+    module procedure syeval4dp
 end interface
 
 interface syevec4
-    module procedure ssyevec4
-    module procedure dsyevec4
+    module procedure syevec4sp
+    module procedure syevec4dp
 end interface
 
 contains
@@ -58,7 +63,7 @@ function matmul2(a, b, m, o, n) result(ab)
     end do
 end function
 
-subroutine ssyeval4(a, w)
+subroutine syeval4sp(a, w)
     real(sp), dimension(:, :), intent(in) :: a
     real(sp), dimension(:), intent(out) :: w
     integer info
@@ -66,7 +71,7 @@ subroutine ssyeval4(a, w)
     call ssyev('N', 'U', 4, a, size(a, dim=1), w, work, 20, info)
 end subroutine
 
-subroutine dsyeval4(a, w)
+subroutine syeval4dp(a, w)
     real(dp), dimension(:, :), intent(in) :: a
     real(dp), dimension(:), intent(out) :: w
     integer info
@@ -74,7 +79,7 @@ subroutine dsyeval4(a, w)
     call dsyev('N', 'U', 4, a, size(a, dim=1), w, work, 20, info)
 end subroutine
 
-subroutine ssyevec4(a, w)
+subroutine syevec4sp(a, w)
     real(sp), dimension(:, :), intent(inout) :: a
     real(sp), dimension(:), intent(out) :: w
     integer info
@@ -82,7 +87,7 @@ subroutine ssyevec4(a, w)
     call ssyev('V', 'U', 4, a, size(a, dim=1), w, work, 20, info)
 end subroutine
 
-subroutine dsyevec4(a, w)
+subroutine syevec4dp(a, w)
     real(dp), dimension(:, :), intent(inout) :: a
     real(dp), dimension(:), intent(out) :: w
     integer info

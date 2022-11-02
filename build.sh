@@ -3,6 +3,7 @@ shopt -s nullglob
 
 # Compile source file
 compile () {
+   cd "$buildir"
    sourcefile=$sourcedir/$1
    buildfile=$buildir/$1
    objectfile=$buildir/${1%.*}.o
@@ -11,7 +12,7 @@ compile () {
       rm -f "$objectfile"
       cp -p "$sourcefile" "$buildfile"
       echo Compiling "$1"
-      "$F90" "${flags[@]}" -c "$sourcefile" -o "$objectfile" -I "$buildir" -J "$buildir" || exit
+      "$F90" "${flags[@]}" -c "$sourcefile" -o "$objectfile" -I "$buildir" || exit
    fi
 }
 
@@ -25,16 +26,16 @@ set -a
 . "$parentdir/build.env"
 set +a
 
-if [[ -n $LAPACK ]]; then
-    if [[ -d $LAPACK ]]; then
-        libpathlist+=("-L$LAPACK")
+if [[ -n $LAPACK_PATH ]]; then
+    if [[ -d $LAPACK_PATH ]]; then
+        libpathlist+=("-L$LAPACK_PATH")
     else
-        echo Error: Path $LAPACK does not exist or is not a directory
+        echo Error: Path $LAPACK_PATH does not exist or is not a directory
     fi
 fi
 
+realprec=8
 libtype=none
-realprec=double
 comptype=fast
 recompile=true
 
@@ -52,23 +53,33 @@ while true; do
    esac
 done
 
-flags=(-std=f2008)
+flags=("${STAND_FLAGS[@]}")
 
 case "$realprec" in
-   single) f2cmap=$sourcedir/f2cmap_single; shift;;
-   double) flags+=(-fdefault-real-8); f2cmap=$sourcedir/f2cmap_double; shift;;
-   *) echo Invalid precision type: $realprec; exit;
+4)
+   f2cmap=$sourcedir/f2cmap_single
+   shift
+   ;;
+8)
+   f2cmap=$sourcedir/f2cmap_double
+   flags+=("${REAL8_FLAGS[@]}")
+   shift
+   ;;
+*)
+   echo Invalid precision type: $realprec
+   exit
+   ;;
 esac
 
 case "$comptype" in
-   fast) flags+=(-O3 -ffast-math); shift;;
-   debug) flags+=(-O0 -g -fbounds-check -fbacktrace -Wall -ffpe-trap=zero,invalid,overflow); shift;;
-   *) echo Invalid optimization level: $comptype; exit;
+   fast) flags+=(-Ofast); shift;;
+   debug) flags+=(-O0 "${DEBUG_FLAGS[@]}"); shift;;
+   *) echo Invalid optimization level: $comptype; exit;;
 esac
 
 case $libtype in
 none)
-   buildir=$buildroot/static/$realprec/$comptype
+   buildir=$buildroot/static/real$realprec/$comptype
    if [[ -d $bindir ]]; then
       rm -f "$bindir"/molalign
    else
@@ -76,7 +87,7 @@ none)
    fi
    ;;
 static)
-   buildir=$buildroot/static/$realprec/$comptype
+   buildir=$buildroot/static/real$realprec/$comptype
    if [[ -d $libdir ]]; then
       rm -f "$libdir"/molalign.a
    else
@@ -85,7 +96,7 @@ static)
    ;;
 shared)
    flags+=(-fPIC)
-   buildir=$buildroot/dynamic/$realprec/$comptype
+   buildir=$buildroot/dynamic/real$realprec/$comptype
    if [[ -d $libdir ]]; then
       rm -f "$libdir"/molalign.so
    else
@@ -94,7 +105,7 @@ shared)
    ;;
 python)
    flags+=(-fPIC)
-   buildir=$buildroot/dynamic/$realprec/$comptype
+   buildir=$buildroot/dynamic/real$realprec/$comptype
    if [[ -d $libdir ]]; then
       "$PYTHON" \
 <<HEREDOC

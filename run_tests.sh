@@ -8,7 +8,7 @@ opts="-sort -bias -tol 0.35 -test -rec 10"
 echo
 echo "Inputs are in directory $indir"
 echo "Reference outputs are in directory $outdir"
-echo "molalign will be run with options $opts"
+echo "Tests will be run with options $opts"
 echo
 
 for file in $( ls $outdir/*.out ); do
@@ -17,12 +17,11 @@ for file in $( ls $outdir/*.out ); do
     if diff -bB $file <(bin/molalign tests/r01/${name%.out}.xyz $opts) > /dev/null; then
         echo "ok"
     else
-        echo "Wrong result!"
+        echo "Failed"
     fi
 done
 
 rm aligned_*.xyz
-echo
 echo "Done"
 echo
 

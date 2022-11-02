@@ -60,7 +60,7 @@ subroutine remap(natom0, natom1, znums0, znums1, types0, types1, &
     if (halt_flag) then
         halting => lessthan
     else
-        halting => truethan
+        halting => dummythan
     end if
 
     ! Group atoms by label

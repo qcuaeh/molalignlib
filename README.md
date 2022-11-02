@@ -10,9 +10,12 @@ molalign
 Building
 --------
 
-Run `./build.sh` without arguments to build the program in double
-precision with all optimizations enabled. The script accepts the
-following options to change the default behaviour:
+First make a copy or symbolic link of the file *gnu.env* or *intel.env*
+(depending on your platform) as *build.env*.
+
+Then run `./build.sh` without arguments to build the program in double
+precision with all compiler optimizations enabled or use the following
+options to change the default behaviour:
 
 -q: Recompile only modified source files.  
 -d: Compile non optimized code with debug info.  

@@ -4,33 +4,19 @@ use rnglib
 use options
 
 implicit none
-integer, parameter :: sp=4, dp=8
 
 private
 public shuffle
-public random_real
+public getrandnum
 public random_init
-
-interface random_real
-    module procedure random_real_sp
-    module procedure random_real_dp
-end interface
 
 contains
 
-subroutine random_real_sp(x)
-    real(sp) x(:)
+subroutine getrandnum(x)
+    real x(:)
     integer i
     do i = 1, size(x)
-        x(i) = r4_uni_01()
-    end do
-end subroutine
-
-subroutine random_real_dp(x)
-    real(dp) x(:)
-    integer i
-    do i = 1, size(x)
-        x(i) = r4_uni_01()
+        call real_uni01(x(i))
     end do
 end subroutine
 
@@ -43,7 +29,7 @@ subroutine shuffle(array, n)
 
    do k = 1, 2
       do i = 1, n
-         u = r8_uni_01()
+         call real_uni01(u)
          j = floor(n*u) + 1
          ! switch values
          temp = array(j)
