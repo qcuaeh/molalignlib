@@ -59,9 +59,9 @@ subroutine optimize_mapping( &
     logical found, overflow
     integer imap, jmap, ntrial, nmatch, cycles
     integer, dimension(natom) :: atomap, auxmap
-    real :: dist, biased_dist, new_biased_dist, meanrot
+    real :: dist, biased_dist, new_biased_dist, totalrot
     real, dimension(4) :: rotquat, prodquat
-    real, dimension(records) :: avgiter, avgmeanrot, avgtotrot
+    real, dimension(records) :: avgiter, avgtotalrot, avgrealrot
     real bias(natom, natom)
     real auxcoords(3, natom)
     real randpos(3)
@@ -104,7 +104,7 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
         call assignatoms(natom, coords0, auxcoords, nblock, blocksize, bias, atomap)
         rotquat = leastrotquat(natom, weights, coords0, auxcoords, atomap)
         prodquat = rotquat
-        meanrot = rotangle(rotquat)
+        totalrot = rotangle(rotquat)
         call rotate(natom, auxcoords, rotquat)
         cycles = 1
 
@@ -123,7 +123,7 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
             prodquat = quatmul(rotquat, prodquat)
             call rotate(natom, auxcoords, rotquat)
             cycles = cycles + 1
-            meanrot = meanrot + (rotangle(rotquat) - meanrot)/cycles
+            totalrot = totalrot + rotangle(rotquat)
             atomap = auxmap
         end do
 
@@ -138,12 +138,12 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
                 if (imap == 1) nmatch = nmatch + 1
                 mapcount(imap) = mapcount(imap) + 1
                 avgiter(imap) = avgiter(imap) + (cycles - avgiter(imap))/mapcount(imap)
-                avgtotrot(imap) = avgtotrot(imap) + (rotangle(prodquat) - avgtotrot(imap))/mapcount(imap)
-                avgmeanrot(imap) = avgmeanrot(imap) + (meanrot - avgmeanrot(imap))/mapcount(imap)
+                avgrealrot(imap) = avgrealrot(imap) + (rotangle(prodquat) - avgrealrot(imap))/mapcount(imap)
+                avgtotalrot(imap) = avgtotalrot(imap) + (totalrot - avgtotalrot(imap))/mapcount(imap)
                 if (live_flag) then
                     write (output_unit, '(a)', advance='no') achar(27)//'['//str(imap + 2)//'H'
-                    call print_stats(imap, mapcount(imap), avgiter(imap), avgmeanrot(imap), &
-                        avgtotrot(imap), mindist(imap))
+                    call print_stats(imap, mapcount(imap), avgiter(imap), avgtotalrot(imap), &
+                        avgrealrot(imap), mindist(imap))
                 end if
                 found = .true.
                 exit
@@ -161,26 +161,26 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
                     do jmap = nrec, imap + 1, -1
                         mapcount(jmap) = mapcount(jmap - 1)
                         avgiter(jmap) = avgiter(jmap - 1)
-                        avgtotrot(jmap) = avgtotrot(jmap - 1)
-                        avgmeanrot(jmap) = avgmeanrot(jmap - 1)
+                        avgrealrot(jmap) = avgrealrot(jmap - 1)
+                        avgtotalrot(jmap) = avgtotalrot(jmap - 1)
                         maplist(:, jmap) = maplist(:, jmap - 1)
                         mindist(jmap) = mindist(jmap - 1)
                         if (live_flag) then
                             write (output_unit, '(a)', advance='no') achar(27)//'['//str(jmap + 2)//'H'
-                            call print_stats(jmap, mapcount(jmap), avgiter(jmap), avgmeanrot(jmap), &
-                                avgtotrot(jmap), mindist(jmap))
+                            call print_stats(jmap, mapcount(jmap), avgiter(jmap), avgtotalrot(jmap), &
+                                avgrealrot(jmap), mindist(jmap))
                         end if
                     end do
                     mapcount(imap) = 1
                     avgiter(imap) = cycles
-                    avgtotrot(imap) = rotangle(prodquat)
-                    avgmeanrot(imap) = meanrot
+                    avgrealrot(imap) = rotangle(prodquat)
+                    avgtotalrot(imap) = totalrot
                     maplist(:, imap) = atomap
                     mindist(imap) = dist
                     if (live_flag) then
                         write (output_unit, '(a)', advance='no') achar(27)//'['//str(imap + 2)//'H'
-                        call print_stats(imap, mapcount(imap), avgiter(imap), avgmeanrot(imap), &
-                            avgtotrot(imap), mindist(imap))
+                        call print_stats(imap, mapcount(imap), avgiter(imap), avgtotalrot(imap), &
+                            avgrealrot(imap), mindist(imap))
                     end if
                     exit
                 end if
@@ -197,8 +197,8 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
     if (.not. live_flag) then
         call print_header()
         do imap = 1, nrec
-            call print_stats(imap, mapcount(imap), avgiter(imap), avgmeanrot(imap), &
-                avgtotrot(imap), mindist(imap))
+            call print_stats(imap, mapcount(imap), avgiter(imap), avgtotalrot(imap), &
+                avgrealrot(imap), mindist(imap))
         end do
         call print_footer(overflow, nrec, ntrial)
     end if
