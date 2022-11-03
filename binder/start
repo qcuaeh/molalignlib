@@ -1,3 +1,3 @@
 #!/bin/bash
-export PYTHONPATH=$HOME/lib
+export PYTHONPATH=$HOME/bin
 exec "$@"

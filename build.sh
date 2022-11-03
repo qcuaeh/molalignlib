@@ -3,7 +3,6 @@ shopt -s nullglob
 
 # Compile source file
 compile () {
-   cd "$buildir"
    sourcefile=$sourcedir/$1
    buildfile=$buildir/$1
    objectfile=$buildir/${1%.*}.o
@@ -34,20 +33,20 @@ if [[ -n $LAPACK_PATH ]]; then
     fi
 fi
 
-realprec=8
-libtype=none
-comptype=fast
-recompile=true
+quick=false
+debug=false
+sharedlibs=false
+realkind=8
 
-options=$(getopt -o l:r:dq -- "$@") || exit
+options=$(getopt -o qdlr: -- "$@") || exit
 eval set -- "$options"
 
 while true; do
    case "$1" in
-   -l) libtype=$2; shift 2;;
-   -r) realprec=$2; shift 2;;
-   -d) comptype=debug; shift;;
-   -q) recompile=false; shift;;
+   -q) quick=true; shift;;
+   -d) debug=true; shift;;
+   -l) sharedlibs=true; shift;;
+   -r) realkind=$2; shift 2;;
    --) shift; break;;
    *) exit
    esac
@@ -55,7 +54,7 @@ done
 
 flags=("${STAND_FLAGS[@]}")
 
-case "$realprec" in
+case "$realkind" in
 4)
    f2cmap=$sourcedir/f2cmap_single
    shift
@@ -66,73 +65,53 @@ case "$realprec" in
    shift
    ;;
 *)
-   echo Invalid precision type: $realprec
+   echo Invalid precision type: $realkind
    exit
    ;;
 esac
 
-case "$comptype" in
-   fast) flags+=(-Ofast); shift;;
-   debug) flags+=(-O0 "${DEBUG_FLAGS[@]}"); shift;;
-   *) echo Invalid optimization level: $comptype; exit;;
-esac
+if $debug; then
+   comptype=debug
+   flags+=(-O0 "${DEBUG_FLAGS[@]}")
+else
+   comptype=standard
+   flags+=(-Ofast)
+fi
 
-case $libtype in
-none)
-   buildir=$buildroot/static/real$realprec/$comptype
-   if [[ -d $bindir ]]; then
-      rm -f "$bindir"/molalign
-   else
-      mkdir "$bindir"
-   fi
-   ;;
-static)
-   buildir=$buildroot/static/real$realprec/$comptype
-   if [[ -d $libdir ]]; then
-      rm -f "$libdir"/molalign.a
-   else
-      mkdir "$libdir"
-   fi
-   ;;
-shared)
+if $sharedlibs; then
    flags+=(-fPIC)
-   buildir=$buildroot/dynamic/real$realprec/$comptype
-   if [[ -d $libdir ]]; then
-      rm -f "$libdir"/molalign.so
-   else
-      mkdir "$libdir"
-   fi
-   ;;
-python)
-   flags+=(-fPIC)
-   buildir=$buildroot/dynamic/real$realprec/$comptype
-   if [[ -d $libdir ]]; then
-      "$PYTHON" \
-<<HEREDOC
-import os, sys, sysconfig
-name = 'OS' if sys.version_info < (3, 4) else 'EXT_SUFFIX'
-file = 'molalign.' + sysconfig.get_config_var(name)
-if os.path.exists(file): os.remove(file)
-HEREDOC
-   else
-      mkdir "$libdir"
-   fi
-   ;;
-*)
-   echo Invalid library type: $libtype
-   exit
-esac
+fi
 
+buildir=$buildroot/static/real$realkind/$comptype
 if [[ -d $buildir ]]; then
-  if $recompile; then
+  if ! $quick; then
      rm -f "$buildir"/*
   fi
 else
   mkdir -p "$buildir"
 fi
 
-objectlist=()
+if [[ -d $bindir ]]; then
+   cd "$bindir"
+   rm -f molalign
+   rm -f molalignlib.a
+   rm -f molalignlib.so
+   if [[ -x $PYTHON ]]; then
+      "$PYTHON" \
+<<HEREDOC
+import os, sys, sysconfig
+name = 'OS' if sys.version_info < (3, 4) else 'EXT_SUFFIX'
+file = 'molalignlib.' + sysconfig.get_config_var(name)
+if os.path.exists(file): os.remove(file)
+HEREDOC
+   fi
+else
+   mkdir "$bindir"
+fi
+
 f2pylist=()
+objectlist=()
+cd "$buildir"
 
 while IFS= read -r line; do
   eval set -- "$line"
@@ -142,29 +121,29 @@ while IFS= read -r line; do
   fi
 done < <(grep -v '^#' "$sourcedir"/compilelist)
 
-case $libtype in
-none)
-   cd "$bindir"
+cd "$bindir"
+
+if $sharedlibs; then
+   echo Linking shared library...
+   "$F90" -shared "${libpathlist[@]}" -llapack -o molalignlib.so "${objectlist[@]}"
+   if [[ -n $F2PY ]]; then
+      if ! type "$F2PY" &> /dev/null; then
+         echo Error: F2PY is set but it was not found 
+         exit
+      fi
+      if ! type "$PYTHON" &> /dev/null; then
+         echo Error: F2PY is set but PYTHON was not found
+         exit
+      fi
+      echo Linking shared python library...
+      export PYTHONWARNINGS=ignore::Warning:setuptools.command.install
+      "$F2PY" -h "$buildir"/molalignlib.pyf --overwrite-signature -m molalignlib "${f2pylist[@]}" --f2cmap "$f2cmap" --quiet
+      "$F2PY" -c "$buildir"/molalignlib.pyf -I"$buildir" "${libpathlist[@]}" -llapack "${objectlist[@]}" --f2cmap "$f2cmap" \
+         --fcompiler=gnu95 --quiet
+   fi
+else
    echo Linking program...
    "$F90" "${libpathlist[@]}" -llapack -o molalign "${objectlist[@]}"
-   ;;
-static)
-   cd "$libdir"
    echo Linking static library...
-   ar r molalign.a "${objectlist[@]}"
-   ;;
-shared)
-   cd "$libdir"
-   echo Linking shared library...
-   "$F90" -shared "${libpathlist[@]}" -llapack -o molalign.so "${objectlist[@]}"
-   ;;
-python)
-   cd "$libdir"
-   echo Linking python library...
-   export PYTHONWARNINGS=ignore::Warning:setuptools.command.install
-   "$F2PY" -h "$buildir"/molalign.pyf --overwrite-signature -m molalign "${f2pylist[@]}" --f2cmap "$f2cmap" --quiet
-   "$F2PY" -c "$buildir"/molalign.pyf -I"$buildir" "${libpathlist[@]}" -llapack "${objectlist[@]}" --f2cmap "$f2cmap" \
-      --fcompiler=gnu95 --quiet
-   cp "$sourcedir"/wrapper.py "$libdir"
-   ;;
-esac
+   ar r molalignlib.a "${objectlist[@]}" &> /dev/null
+fi

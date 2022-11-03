@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import molalign
 import numpy as np
 from ase import Atoms
+from molalignlib import library, options
 
-#print(molalign.library.remap.__doc__)
-#print(molalign.library.align.__doc__)
+#print(library.remap.__doc__)
+#print(library.align.__doc__)
 
-class Aligner(Atoms):
+class Alignment(Atoms):
     def __init__(self, atoms, biased=False, weighted=False, testing=False, records=1,
                  count=10, trials=None, bias_scale=1000., bias_tol=0.2):
         if isinstance(atoms, Atoms):
@@ -30,10 +30,10 @@ class Aligner(Atoms):
         if type(bias_scale) is not float:
             raise TypeError('"bias_scale" must be real')
         if trials is None:
-            molalign.options.halt_flag = False
+            options.halt_flag = False
         elif type(trials) is int:
-            molalign.options.halt_flag = True
-            molalign.options.maxtrials = trials
+            options.halt_flag = True
+            options.maxtrials = trials
         else:
             raise TypeError('"trials" must be integer')
         if weighted:
@@ -41,12 +41,12 @@ class Aligner(Atoms):
         else:
             self.weights = np.ones(len(atoms), dtype=float)/len(atoms)
         self.records = records
-        molalign.options.test_flag = testing
-        molalign.options.bias_flag = biased
-        molalign.options.bias_scale = bias_scale
-        molalign.options.bias_tol = bias_tol
-        molalign.options.maxcount = count
-    def remapping(self, other):
+        options.test_flag = testing
+        options.bias_flag = biased
+        options.bias_scale = bias_scale
+        options.bias_tol = bias_tol
+        options.maxcount = count
+    def sort(self, other):
         if not isinstance(other, Atoms):
             raise TypeError('An Atoms object was expected as argument')
         if len(other) != len(self):
@@ -57,7 +57,7 @@ class Aligner(Atoms):
         types1 = np.ones(len(other), dtype=int)
         coords0 = self.get_positions().transpose()
         coords1 = other.get_positions().transpose()
-        n, maplist, mapcount, mindist = molalign.library.remap(znums0, znums1, types0, \
+        n, maplist, mapcount, mindist = library.remap(znums0, znums1, types0, \
             types1, coords0, coords1, self.weights, self.records)
         return [i - 1 for i in maplist.transpose()[:n]], mapcount[:n], mindist[:n]
     def aligned(self, other, mapping):
@@ -75,7 +75,7 @@ class Aligner(Atoms):
         types1 = np.ones(len(other), dtype=int)
         coords0 = self.get_positions().transpose()
         coords1 = other.get_positions().transpose()[:, mapping]
-        travec, rotmat = molalign.library.align(znums0, znums1, types0, types1, coords0, \
+        travec, rotmat = library.align(znums0, znums1, types0, types1, coords0, \
              coords1, self.weights)
         coords1 = np.matmul(rotmat, coords1).transpose() + travec
         return Atoms(numbers=znums1, positions=coords1)

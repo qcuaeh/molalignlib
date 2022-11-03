@@ -5,7 +5,7 @@
 
 
 from ase import io
-from wrapper import Aligner
+from molalign import Alignment
 
 
 # In[ ]:
@@ -13,13 +13,13 @@ from wrapper import Aligner
 
 atoms0 = io.read('r005/Co100.xyz', index=0)
 atoms1 = io.read('r005/Co100.xyz', index=1)
+alignment0 = Alignment(atoms0, biased=True)
 
 
 # In[ ]:
 
 
-aligner = Aligner(atoms0, biased=True)
-maplist, mapcount, mindist = aligner.remapping(atoms1)
+maplist, mapcount, mindist = alignment0.sort(atoms1)
 
 
 # In[ ]:
@@ -27,5 +27,5 @@ maplist, mapcount, mindist = aligner.remapping(atoms1)
 
 for i, mapping in enumerate(maplist, start=1):
     io.write('aligned_{}.xyz'.format(i), atoms0)
-    io.write('aligned_{}.xyz'.format(i), aligner.aligned(atoms1, mapping), append=True)
+    io.write('aligned_{}.xyz'.format(i), alignment0.aligned(atoms1, mapping), append=True)
 

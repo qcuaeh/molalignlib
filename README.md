@@ -10,37 +10,40 @@ molalign
 Building
 --------
 
-First make a copy or symbolic link of the file *gnu.env* or *intel.env*
-(depending on your platform) as *build.env*.
+To build the program you will need a machine with Bash, a Fortran
+2008 compiler, LAPACK, and optionally, with Python 3.
 
-Then run `./build.sh` without arguments to build the program in double
-precision with all compiler optimizations enabled or use the following
-options to change the default behaviour:
+Clone the repository and enter the main directory, then create a
+symbolic link named *build.env* pointing to either *gnu.env* or
+*intel.env*, depending on your platform, and run `./build.sh` to 
+build the executable/static library. You may use the following
+options to customize the building:
 
--q: Recompile only modified source files.  
--d: Compile non optimized code with debug info.  
--r single|double: Set the real precision to single or double (default).  
--l static|shared|python: Build the selected library instead of the program.  
+-q : Quick compile (compile only modified source files).  
+-d : Compile the debug version of the executable or libraries.  
+-l : Build shared libraries instead of the executable/static library.  
+-r[4|8] : Use 4-byte or 8-byte (default) floating point numbers.  
 
-After runnig the script the program will be created in the *bin* directory.
+After runnig the script the executable and/or libraries will be created
+in the *bin* directory.
 
 Usage
 -----
 
 ### Options
 
--live: Show progress in real time.  
--weight: Use mass weighted distances.  
--sort: Sort atoms by optimal assignment.  
--stdin: Read coordinates from standard input.  
--bias: Enable biasing and iterative convergence.  
--tol *ϵ*: Set biasing tolerance to *ϵ* (defaults to 0.2 Å).  
--test: Use the same pseudo random numbers on every run.  
--count *N*: Set the count convergence threshold to *N* (defaults to 10).  
--out xyz|mol2: Set the output format to XYZ or Mol2 (defaults to XYZ).  
--rec *N*: Set the number of recorded solutions to *N* (defaults to 1).  
--trials *MAX*: Set the maximum number of trials to *MAX*.  
--scale *α*: Set biasing scale to *α* (defaults to 1000).  
+-live : Show progress in real time.  
+-weight : Use mass weighted distances.  
+-sort : Sort atoms by optimal assignment.  
+-stdin : Read coordinates from standard input.  
+-bias : Enable biasing and iterative convergence.  
+-tol *ϵ* : Set biasing tolerance to *ϵ* (defaults to 0.2 Å).  
+-test : Use the same pseudo random numbers on every run.  
+-count *N* : Set the count convergence threshold to *N* (defaults to 10).  
+-out xyz|mol2 : Set the output format to XYZ or Mol2 (defaults to XYZ).  
+-rec *N* : Set the number of recorded solutions to *N* (defaults to 1).  
+-trials *MAX* : Set the maximum number of trials to *MAX*.  
+-scale *α* : Set biasing scale to *α* (defaults to 1000).  
  
 ### Basic usage
 
@@ -70,7 +73,7 @@ tolerance must be increased, for example to increase the tolerance to 0.35 Å ru
 
     ./bin/molalign tests/r01/Co100.xyz -sort -bias -tol 0.35
 
-Tolerance must be chosen carefully because a value too small will lead to wrong
+Tolerance must be chosen carefully because a value too small can lead to wrong
 results while a value too large will not improve performance.
 
 ### Advanced usage
@@ -120,11 +123,11 @@ To run the program with biased costs run:
  
 The ouput should look as follows:
 
-     Map   Count   Cycles   Meanrot   Totalrot      RMSD
-    ----------------------------------------------------
-       1      10      2.0      58.5     104.2     0.0482
-    ----------------------------------------------------
-    Found 1 mapping(s) in 10 random trial(s)
+     Map    Count    Steps     Total      Real       RMSD
+    -----------------------------------------------------
+       1       10      2.0     124.7     119.4     0.0482
+    -----------------------------------------------------
+    Found more than 1 mapping(s) in 12 random trial(s)
 
 To run the program with biased costs (recording up to 10 mappings) run:
 
@@ -132,19 +135,19 @@ To run the program with biased costs (recording up to 10 mappings) run:
 
 The output should look as follows:
 
-     Map   Count   Cycles   Meanrot   Totalrot      RMSD
-    ----------------------------------------------------
-       1      10      3.4      19.4      35.0     0.0497
-       2      12      3.7      19.2      40.7     0.0497
-       3       8      3.9      19.1      43.3     0.0497
-       4       8      4.0      19.2      41.9     0.0497
-       5      13      2.9      21.5      31.6     0.0497
-       6      15      3.0      21.9      30.3     0.0497
-       7       7      2.3      23.9      30.8     0.0497
-       8      10      3.9      19.4      41.4     0.0497
-       9       1      1.0       4.3       4.3     5.0285
-      10       1      2.0       5.5       7.6     5.0285
-    ----------------------------------------------------
+     Map    Count    Steps     Total      Real       RMSD
+    -----------------------------------------------------
+       1       10      3.4      62.5      35.0     0.0497
+       2       12      3.7      70.9      40.7     0.0497
+       3        8      3.9      69.2      43.3     0.0497
+       4        8      4.0      75.6      41.9     0.0497
+       5       13      2.9      56.6      31.6     0.0497
+       6       15      3.0      63.1      30.3     0.0497
+       7        7      2.3      51.3      30.8     0.0497
+       8       10      3.9      71.6      41.4     0.0497
+       9        1      1.0       4.3       4.3     5.0285
+      10        1      2.0      10.9       7.6     5.0285
+    -----------------------------------------------------
     Found more than 10 mapping(s) in 97 random trial(s)
 
 To run the program with biased costs and mass weighted coordinates (recording up to 10 mappings) run:
@@ -153,18 +156,18 @@ To run the program with biased costs and mass weighted coordinates (recording up
 
 The output should look as follows:
 
-     Map   Count   Cycles   Meanrot   Totalrot      RMSD
-    ----------------------------------------------------
-       1      10      4.1      17.7      39.4     0.1010
-       2       7      4.4      17.8      39.7     0.1010
-       3       7      5.3      17.7      52.6     0.1010
-       4       6      4.3      17.8      38.3     0.1010
-       5       7      2.4      21.0      24.5     0.1010
-       6      11      3.1      20.4      26.4     0.1010
-       7       5      3.0      21.3      38.1     0.1010
-       8       9      3.7      19.8      38.8     0.1010
-       9       1      1.0       4.7       4.7     5.1384
-      10       1      2.0      12.1       9.1     5.2497
-    ----------------------------------------------------
-    Found more than 10 mapping(s) in 67 random trial(s)
+     Map    Count    Steps     Total      Real       RMSD
+    -----------------------------------------------------
+       1       10      2.9      64.8      33.6     0.1010
+       2       16      3.1      61.1      32.5     0.1010
+       3       15      3.5      69.0      38.2     0.1010
+       4       14      4.3      75.3      44.4     0.1010
+       5       11      2.8      53.2      31.6     0.1010
+       6       17      3.8      68.9      38.0     0.1010
+       7       14      3.4      62.6      38.2     0.1010
+       8       14      2.6      52.9      33.8     0.1010
+       9        1      3.0      29.5      14.9     5.1384
+      10        1      1.0       6.5       6.5     5.1384
+    -----------------------------------------------------
+    Found more than 10 mapping(s) in 125 random trial(s)
 
