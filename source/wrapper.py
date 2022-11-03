@@ -9,52 +9,43 @@ from ase import Atoms
 #print(molalign.library.align.__doc__)
 
 class Aligner(Atoms):
-    def __init__(self, atoms, records=1, count=None, trials=None, biasing=False, \
-                 bias_scale=1000., bias_tol=None, weighted=False, testing=False):
-        if not isinstance(atoms, Atoms):
+    def __init__(self, atoms, biased=False, weighted=False, testing=False, records=1,
+                 count=10, trials=None, bias_scale=1000., bias_tol=0.2):
+        if isinstance(atoms, Atoms):
+            self.__dict__.update(atoms.__dict__)
+        else:
             raise TypeError('An Atoms object was expected as argument')
-        if type(records) is not int:
-            raise TypeError('"records" must be integer')
-        if type(bias_scale) is not float:
-            raise TypeError('"bias_scale" must be real')
+        if type(biased) is not bool:
+            raise TypeError('"biased" must be boolean')
         if type(weighted) is not bool:
             raise TypeError('"weighted" must be boolean')
         if type(testing) is not bool:
             raise TypeError('"testing" must be boolean')
-        if type(biasing) is not bool:
-            raise TypeError('"biasing" must be boolean')
-        if count is not None and type(count) is not int:
+        if type(records) is not int:
+            raise TypeError('"records" must be integer')
+        if type(count) is not int:
             raise TypeError('"count" must be integer')
-        if trials is not None and type(trials) is not int:
-            raise TypeError('"trials" must be integer')
-        if bias_tol is not None and type(bias_tol) is not float:
+        if type(bias_tol) is not float:
             raise TypeError('"bias_tol" must be real')
-        self.__dict__.update(atoms.__dict__)
-        self.records = records
-        molalign.options.test_flag = testing
-        molalign.options.bias_flag = biasing
-        molalign.options.bias_scale = bias_scale
-        if count is None and trials is None:
-            raise ValueError('either "count" or "trials" must be set')
-        if count is None:
-            molalign.options.converge = False
-        else:
-            molalign.options.converge = True
-            molalign.options.maxcount = count
+        if type(bias_scale) is not float:
+            raise TypeError('"bias_scale" must be real')
         if trials is None:
             molalign.options.halt_flag = False
-        else:
+        elif type(trials) is int:
             molalign.options.halt_flag = True
             molalign.options.maxtrials = trials
-        if biasing:
-            if bias_tol is None:
-                raise ValueError('"biasing" is True but "bias_tol" is not set')
-            else:
-                molalign.options.bias_tol = bias_tol
+        else:
+            raise TypeError('"trials" must be integer')
         if weighted:
             self.weights = atoms.get_masses()/sum(atoms.get_masses())
         else:
             self.weights = np.ones(len(atoms), dtype=float)/len(atoms)
+        self.records = records
+        molalign.options.test_flag = testing
+        molalign.options.bias_flag = biased
+        molalign.options.bias_scale = bias_scale
+        molalign.options.bias_tol = bias_tol
+        molalign.options.maxcount = count
     def remapping(self, other):
         if not isinstance(other, Atoms):
             raise TypeError('An Atoms object was expected as argument')

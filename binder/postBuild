@@ -1,3 +1,4 @@
 #!/bin/bash
+ln -s $HOME/gnu.env $HOME/build.env
 $HOME/build.sh -lpython
 rm -r $HOME/__build__

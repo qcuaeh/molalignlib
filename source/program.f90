@@ -28,13 +28,11 @@ program ralign
     real, dimension(:, :), allocatable :: coords0, coords1
     real, allocatable :: weights0(:), mindist(:)
     real travec(3), rotmat(3, 3), weighting(nelem)
-    logical stdin_flag, bias_tol_flag
+    logical sort_flag, stdin_flag
 
     ! Set default options
 
     bias_flag = .false.
-    bias_tol_flag = .true.
-    conv_flag = .false.
     sort_flag = .false.
     halt_flag = .false.
     test_flag = .false.
@@ -66,7 +64,6 @@ program ralign
             debug_flag = .true.
         case ('-bias')
             bias_flag = .true.
-            conv_flag = .true.
         case ('-weight')
             weighting = stdmatom
         case ('-count')
@@ -75,7 +72,6 @@ program ralign
             halt_flag = .true.
             call readoptarg(arg, maxtrials)
         case ('-tol')
-            bias_tol_flag = .true.
             call readoptarg(arg, bias_tol)
         case ('-scale')
             call readoptarg(arg, bias_scale)
@@ -101,11 +97,6 @@ program ralign
         else if (ifile == 1) then
             file_unit(2) = file_unit(1)
         end if
-    end if
-
-    if (bias_flag .and. .not. bias_tol_flag) then
-        write (error_unit, '(a)') 'Error: "bias_flag" is True but "bias_tol" is not set'
-        stop
     end if
 
     ! Read coordinates
