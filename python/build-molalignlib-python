@@ -1,0 +1,6 @@
+#!/bin/bash
+tmpdir=$(mktemp -d -t molalign-XXXXXXXXXX)
+git clone https://github.com/qcuaeh/molalign.git "$tmpdir"
+cd "$tmpdir"
+ln -s gnu.env build.env
+./build.sh -ld

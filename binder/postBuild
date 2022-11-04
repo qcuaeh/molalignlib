@@ -1,4 +1,4 @@
 #!/bin/bash
 ln -s $HOME/gnu.env $HOME/build.env
-$HOME/build.sh -l
+$HOME/build.sh -ld
 rm -r $HOME/__build__

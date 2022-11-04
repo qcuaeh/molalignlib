@@ -2,15 +2,15 @@
 # running and comparing tests with outputs stored in tests/outputs/*/*.out
 
 run_test() {
-    echo "Inputs are in directory $indir"
-    echo "Reference outputs are in directory $outdir"
-    echo "Tests will be run with options ${opts[@]}"
+    echo "Inputs are in directory $inputdir"
+    echo "Reference outputs are in directory $outputdir"
+    echo "Tests will be run with options ${options[@]}"
     echo
 
-    for file in $( ls $outdir/*.out ); do
+    for file in $( ls $outputdir/*.out ); do
         name=$( basename $file )
         echo -n "Running test ${name%.out}.xyz... "
-        if diff -bB $file <(bin/molalign "$indir/${name%.out}.xyz" "${opts[@]}") > /dev/null; then
+        if diff -bB $file <(bin/molalign "$inputdir/${name%.out}.xyz" "${options[@]}") > /dev/null; then
             echo "ok"
         else
             echo "Failed"
@@ -22,18 +22,18 @@ run_test() {
     echo
 }
 
-indir=tests/r005
-outdir=tests/outputs/r005
-opts=(-test -rec 10 -sort -bias -tol 0.17)
+inputdir=tests/r005
+outputdir=tests/outputs/r005
+options=(-test -rec 10 -sort -bias -tol 0.17)
 run_test
 
-indir=tests/r01
-outdir=tests/outputs/r01
-opts=(-test -rec 10 -sort -bias -tol 0.35)
+inputdir=tests/r01
+outputdir=tests/outputs/r01
+options=(-test -rec 10 -sort -bias -tol 0.35)
 run_test
 
-indir=tests/r02
-outdir=tests/outputs/r02
-opts=(-test -rec 10 -sort -bias -tol 0.69)
+inputdir=tests/r02
+outputdir=tests/outputs/r02
+options=(-test -rec 10 -sort -bias -tol 0.69)
 #run_test
 

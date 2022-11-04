@@ -3,7 +3,9 @@ molalign
 [![License: LGPL v3](https://img.shields.io/badge/License-LGPL_v3-blue.svg)](https://www.gnu.org/licenses/lgpl-3.0)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qcuaeh/molalign.git/HEAD?labpath=tests)
 
-**molalign** is a fortran program based on random rotations and the Hungarian algorithm to solve the approximate congruence problem for atomic systems.
+**molalign** is a fortran code which applies random rotations and pseudo
+local minimizations of RMSD to find reliable solutions to the near-congruence
+problem for atom clusters.
 
 ![graphic1](assets/graphic1.png)
 
@@ -16,12 +18,12 @@ To build the program you will need a machine with Bash, a Fortran
 Clone the repository and enter the main directory, then create a
 symbolic link named *build.env* pointing to either *gnu.env* or
 *intel.env*, depending on your platform, and run `./build.sh` to 
-build the executable/static library. You may use the following
-options to customize the building:
+build the executable. You may use the following options to customize
+the building:
 
+-d : Compile the debug version of the executable.  
 -q : Quick compile (compile only modified source files).  
--d : Compile the debug version of the executable or libraries.  
--l : Build shared libraries instead of the executable/static library.  
+-l[s|d] : Build a static/dynamic library instead of the executable.  
 -r[4|8] : Use 4-byte or 8-byte (default) floating point numbers.  
 
 After runnig the script the executable and/or libraries will be created
@@ -32,10 +34,7 @@ Usage
 
 ### Options
 
--live : Show progress in real time.  
--weight : Use mass weighted distances.  
 -sort : Sort atoms by optimal assignment.  
--stdin : Read coordinates from standard input.  
 -bias : Enable biasing and iterative convergence.  
 -tol *ϵ* : Set biasing tolerance to *ϵ* (defaults to 0.2 Å).  
 -test : Use the same pseudo random numbers on every run.  
@@ -44,6 +43,9 @@ Usage
 -rec *N* : Set the number of recorded solutions to *N* (defaults to 1).  
 -trials *MAX* : Set the maximum number of trials to *MAX*.  
 -scale *α* : Set biasing scale to *α* (defaults to 1000).  
+-stdin : Read coordinates from standard input.  
+-weight : Use mass weighted RMSD.  
+-live : Show progress in real time.  
  
 ### Basic usage
 
