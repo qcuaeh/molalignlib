@@ -12,22 +12,21 @@ problem for atom clusters.
 Building
 --------
 
-To build the program you will need a machine with Bash, a Fortran
-2008 compiler, LAPACK, and optionally, with Python 3.
+To build the program you will need a machine with Bash, GNU or Intel
+Fortran compiler, LAPACK, and optionally, with Python 3 and F2PY.
 
-Clone the repository and enter the main directory, then create a
-symbolic link named *build.env* pointing to either *gnu.env* or
-*intel.env*, depending on your platform, and run `./build.sh` to 
-build the executable. You may use the following options to customize
-the building:
+Clone the repository and enter in the directory, then create a symbolic
+link named *build.env* pointing to either *gnu.env* or *intel.env*,
+depending on your platform, and run `./build.sh` to  build the executable.
+You may use the following options to customize the building:
 
 -d : Compile the debug version of the executable.  
 -q : Quick compile (compile only modified source files).  
--l[s|d] : Build a static/dynamic library instead of the executable.  
 -r[4|8] : Use 4-byte or 8-byte (default) floating point numbers.  
+-l[s|d|py] : Build a static/dynamic/python library instead of an executable.  
 
 After runnig the script the executable and/or libraries will be created
-in the *bin* directory.
+in the same directory.
 
 Usage
 -----
@@ -51,29 +50,29 @@ Usage
 
 To align two molecules without reordering just run:
 
-    ./bin/molalign tests/r005/Co100.xyz
+    ./molalign tests/r005/Co100.xyz
 
 To align two molecules with reordering you can run:
 
-    ./bin/molalign tests/r005/Co100.xyz -sort
+    ./molalign tests/r005/Co100.xyz -sort
 
 by default a convergence threshold of 10 counts is used but a lower threshold
 can be used to reduce the computation time at the expense of less reliable
 results:
 
-    ./bin/molalign tests/r005/Co100.xyz -sort -count 3
+    ./molalign tests/r005/Co100.xyz -sort -count 3
 
 When reordering is requested performance can be improved by two to four orders
 of magnitude by enabling biasing. For example to reorder and align two molecules
 applying biasing run:
 
-    ./bin/molalign tests/r005/Co100.xyz -sort -bias
+    ./molalign tests/r005/Co100.xyz -sort -bias
 
 A biasing tolerance of 0.2 Å is used by default, which is enough to account for
 small distortions on the geometry, however if the distortion is too large then the
 tolerance must be increased, for example to increase the tolerance to 0.35 Å run:
 
-    ./bin/molalign tests/r01/Co100.xyz -sort -bias -tol 0.35
+    ./molalign tests/r01/Co100.xyz -sort -bias -tol 0.35
 
 Tolerance must be chosen carefully because a value too small can lead to wrong
 results while a value too large will not improve performance.
@@ -85,30 +84,30 @@ Most of the options not covered in the basic usage are intended for testing purp
 The option `-test` forces the generation of the same stream of random numbers on
 every run in order to have reproducible results:
 
-    ./bin/molalign tests/r005/Co100.xyz 10 -sort -bias -test
+    ./molalign tests/r005/Co100.xyz 10 -sort -bias -test
 
 The algorithm by default generates several possible reorderings, but only one is
 printed by default. To print more than one solution use the `-rec` option:
 
-    ./bin/molalign tests/r005/Co100.xyz 10 -sort -bias -rec 10
+    ./molalign tests/r005/Co100.xyz 10 -sort -bias -rec 10
 
 By default the biasing weight is much larger than the euclidean cost but
 in can be reduced with the `-scale` option:
 
-    ./bin/molalign tests/r005/Co100.xyz 10 -sort -bias -scale 10
+    ./molalign tests/r005/Co100.xyz 10 -sort -bias -scale 10
 
 however it is rarely useful for clusters.
 
 To avoid too long computations the option `-trials` can be used:
 
-    ./bin/molalign tests/r005/Co100.xyz -sort -bias -trials 1000
+    ./molalign tests/r005/Co100.xyz -sort -bias -trials 1000
 
 which will halt the computation if the number of trials exceeds 1000.
 
 To use mass weighted coordinates instead of unweighted coordinates use the
 `-weight` option:
 
-    ./bin/molalign tests/r005/Co100.xyz -sort -bias -weight
+    ./molalign tests/r005/Co100.xyz -sort -bias -weight
 
 Finally the options `-stdin`, `-out` and `-live` just control the source and the
 destination of the input and results, and the way that progress is displayed.
@@ -121,7 +120,7 @@ reproduce exactly the same output use the option `-test`):
 
 To run the program with biased costs run:
 
-    ./bin/molalign tests/r005/Co100.xyz -sort -bias
+    ./molalign tests/r005/Co100.xyz -sort -bias
  
 The ouput should look as follows:
 
@@ -133,7 +132,7 @@ The ouput should look as follows:
 
 To run the program with biased costs (recording up to 10 mappings) run:
 
-    ./bin/molalign tests/r005/Au161Pd40.xyz -rec 10 -sort -bias
+    ./molalign tests/r005/Au161Pd40.xyz -rec 10 -sort -bias
 
 The output should look as follows:
 
@@ -154,7 +153,7 @@ The output should look as follows:
 
 To run the program with biased costs and mass weighted coordinates (recording up to 10 mappings) run:
 
-    ./bin/molalign tests/r005/Au161Pd40.xyz -rec 10 -sort -bias -weight
+    ./molalign tests/r005/Au161Pd40.xyz -rec 10 -sort -bias -weight
 
 The output should look as follows:
 

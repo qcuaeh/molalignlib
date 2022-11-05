@@ -1,4 +1,3 @@
 #!/bin/bash
-ln -s $HOME/gnu.env $HOME/build.env
-$HOME/build.sh -ld
-rm -r $HOME/__build__
+ln -s gnu.env $HOME/build.env
+INSTALL_DIR=python $HOME/build.sh -lpy

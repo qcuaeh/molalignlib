@@ -3,33 +3,33 @@ shopt -s nullglob
 
 # Compile source file
 compile () {
-   sourcefile=$sourcedir/$1
-   buildfile=$build_subdir/$1
-   objectfile=$build_subdir/${1%.*}.o
-   objectlist+=("$objectfile")
-   if ! test -e "$objectfile" || ! test -e "$buildfile" || ! diff -q "$sourcefile" "$buildfile" > /dev/null; then
-      rm -f "$objectfile"
-      cp -p "$sourcefile" "$buildfile"
+   pushd "$buildir" > /dev/null
+   objfile=${1%.*}.o
+   objlist+=("$objfile")
+   srcfile=$srcdir/$1
+   if ! test -e "$objfile" || ! test -e "$1" || ! diff -q "$srcfile" "$1" > /dev/null; then
+      rm -f "$objfile"
+      cp -p "$srcfile" "$1"
       echo Compiling "$1"
-      "$F90" "${flags[@]}" -c "$sourcefile" -o "$objectfile" -I "$build_subdir" || exit
+      "$F90" "${flags[@]}" -c "$srcfile" -o "$objfile" || exit
    fi
+   popd > /dev/null
 }
 
-repodir=$(readlink -e "$(dirname "$0")")
-sourcedir=$repodir/fortran
-build_dir=$repodir/__build__
-bindir=$repodir/bin
+cd "$(dirname "$0")"
 
-set -a
-. "$repodir/build.env"
-set +a
+if [[ -f build.env ]]; then
+   . build.env
+else
+   echo Error: build.env does not exist or is not a file
+fi
 
 if [[ -n $LAPACK_PATH ]]; then
-    if [[ -d $LAPACK_PATH ]]; then
-        libpathlist+=("-L$LAPACK_PATH")
-    else
-        echo Error: Path $LAPACK_PATH does not exist or is not a directory
-    fi
+   if [[ -d $LAPACK_PATH ]]; then
+      libpathlist+=("-L$LAPACK_PATH")
+   else
+      echo Error: $LAPACK_PATH does not exist or is not a directory
+   fi
 fi
 
 quick=false
@@ -42,11 +42,11 @@ eval set -- "$options"
 
 while true; do
    case "$1" in
-   -q) quick=true; shift;;
-   -d) debug=true; shift;;
-   -l) library=true; libtype=$2; shift 2;;
-   -r) realkind=$2; shift 2;;
-   --) shift; break;;
+   -q) quick=true; shift ;;
+   -d) debug=true; shift ;;
+   -l) library=true; libtype=$2; shift 2 ;;
+   -r) realkind=$2; shift 2 ;;
+   --) shift; break ;;
    *) exit
    esac
 done
@@ -56,15 +56,32 @@ if [[ $# -ne 0 ]]; then
    exit
 fi
 
-flags=("${STAND_FLAGS[@]}")
+flags=("${BASE_FLAGS[@]}")
+
+if $debug; then
+   comptype=debug
+   flags+=(-O0 "${DEBUG_FLAGS[@]}")
+else
+   comptype=optimized
+   flags+=(-Ofast)
+fi
+
+if $library; then
+   case "$libtype" in
+      s) ;;
+      d) flags+=(-fPIC) ;;
+      py) flags+=(-fPIC) ;;
+      *) echo Invalid library type: $libtype; exit
+   esac
+fi
 
 case "$realkind" in
 4)
-   f2cmap=$sourcedir/f2cmap_single
+   f2cmap='{"real":{"":"float"}}'
    shift
    ;;
 8)
-   f2cmap=$sourcedir/f2cmap_double
+   f2cmap='{"real":{"":"double"}}'
    flags+=("${REAL8_FLAGS[@]}")
    shift
    ;;
@@ -74,98 +91,85 @@ case "$realkind" in
    ;;
 esac
 
-if $debug; then
-   comptype=debug
-   flags+=(-O0 "${DEBUG_FLAGS[@]}")
-else
-   comptype=standard
-   flags+=(-Ofast)
-fi
+srcdir=$PWD/fortran
+buildir=$PWD/_build/static/real$realkind/$comptype
 
-if $library; then
-   case "$libtype" in
-   s)
-      :
-      ;;
-   d)
-      flags+=(-fPIC)
-      ;;
-   *)
-      echo Invalid library type: $libtype
-      exit
-      ;;
-   esac
-fi
-
-build_subdir=$build_dir/static/real$realkind/$comptype
-so_suffix=$(grep -o '\.[a-zA-Z0-9_]*\.[a-zA-Z0-9_]*$' <<< "$(uname -r)").so
-
-if [[ -d $build_subdir ]]; then
-  if ! $quick; then
-     rm -f "$build_subdir"/*
-  fi
-else
-  mkdir -p "$build_subdir"
-fi
-
-if [[ -d $bindir ]]; then
-   cd "$bindir"
-   rm -f molalign
-   rm -f molalignlib.a
-   rm -f molalignlib${so_suffix}
-   if type "$PYTHON" &> /dev/null; then
-      "$PYTHON" \
-<<HEREDOC
-import os, sys, sysconfig
-name = 'OS' if sys.version_info < (3, 4) else 'EXT_SUFFIX'
-file = 'molalignlib' + sysconfig.get_config_var(name)
-if os.path.exists(file): os.remove(file)
-HEREDOC
+if [[ -n $INSTALL_DIR ]]; then
+   if ! [[ -d $INSTALL_DIR ]]; then
+      echo Error: $INSTALL_DIR does not exist or is not a directory
    fi
 else
-   mkdir "$bindir"
+   INSTALL_DIR=$PWD
+fi
+
+if [[ -d $buildir ]]; then
+   if ! $quick; then
+      rm -f "$buildir"/*
+   fi
+else
+   mkdir -p "$buildir"
+fi
+
+read -r -d '' python_suffix_script <<HEREDOC
+import sys, sysconfig
+name = 'OS' if sys.version_info < (3, 4) else 'EXT_SUFFIX'
+print(sysconfig.get_config_var(name))
+HEREDOC
+if type "$PYTHON" &> /dev/null; then
+   python_suffix=$("$PYTHON" <<< "$python_suffix_script")
 fi
 
 f2pylist=()
-objectlist=()
-cd "$build_subdir"
+objlist=()
 
 while IFS= read -r line; do
    eval set -- "$line"
    compile "$1"
    if [[ $2 == f2py ]]; then
-      f2pylist+=("$build_subdir"/"$1")
+      f2pylist+=("$1")
    fi
-done < <(grep -v '^#' "$sourcedir"/compilelist)
-
-cd "$bindir"
+done < <(grep -v '^#' compilelist)
 
 if $library; then
    case $libtype in
    s)
       echo Linking static library...
-      ar r molalignlib.a "${objectlist[@]}" &> /dev/null
+      pushd "$buildir" > /dev/null
+      ar r molalignlib.a "${objlist[@]}" &> /dev/null
+      popd > /dev/null
+      mv "$buildir/molalignlib.a" "$INSTALL_DIR"
       ;;
    d)
       echo Linking shared library...
-      "$F90" -shared "${libpathlist[@]}" -llapack -o molalignlib${so_suffix} "${objectlist[@]}"
-      if [[ -n $F2PY ]]; then
-         if ! type "$F2PY" &> /dev/null; then
-            echo Error: F2PY is set but it was not found 
-            exit
-         fi
-         if ! type "$PYTHON" &> /dev/null; then
-            echo Error: F2PY is set but PYTHON was not found
-            exit
-         fi
-         echo Linking shared python library...
-         export PYTHONWARNINGS=ignore::Warning:setuptools.command.install
-         "$F2PY" -h "$build_subdir"/molalignlib.pyf --overwrite-signature -m molalignlib "${f2pylist[@]}" --f2cmap "$f2cmap" --quiet
-         "$F2PY" -c "$build_subdir"/molalignlib.pyf -I"$build_subdir" "${libpathlist[@]}" -llapack "${objectlist[@]}" --f2cmap "$f2cmap" --fcompiler=gnu95 --quiet
+      pushd "$buildir" > /dev/null
+      "$F90" -shared "${libpathlist[@]}" -llapack -o molalignlib.so "${objlist[@]}"
+      popd > /dev/null
+      mv "$buildir/molalignlib.so" "$INSTALL_DIR"
+      ;;
+   py)
+      if ! type "$PYTHON" &> /dev/null; then
+         echo Error: Python executable not found
+         exit
       fi
+      if ! type "$F2PY" &> /dev/null; then
+         echo Error: F2PY executable not found 
+         exit
+      fi
+      echo Linking shared python library...
+      pushd "$buildir" > /dev/null
+      echo "$f2cmap" > .f2py_f2cmap
+      export PYTHONWARNINGS=ignore::Warning:setuptools.command.install
+      "$F2PY" -h signature.pyf --overwrite-signature -m molalignlib "${f2pylist[@]}" --quiet
+      "$F2PY" -c signature.pyf "${libpathlist[@]}" -llapack "${objlist[@]}" --fcompiler=gnu95 --quiet
+      popd > /dev/null
+      mv "$buildir/molalignlib$python_suffix" "$INSTALL_DIR"
       ;;
    esac
 else
    echo Linking program...
-   "$F90" "${libpathlist[@]}" -llapack -o molalign "${objectlist[@]}"
+   pushd "$buildir" > /dev/null
+   "$F90" "${libpathlist[@]}" -llapack -o molalign "${objlist[@]}"
+   popd > /dev/null
+   mv "$buildir/molalign" "$INSTALL_DIR"
 fi
+

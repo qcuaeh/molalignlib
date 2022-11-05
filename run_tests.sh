@@ -1,19 +1,19 @@
 #!/bin/bash
-# running and comparing tests with outputs stored in tests/outputs/*/*.out
+# running and comparing tests with outputs stored in tests/outputs
 
 run_test() {
-    echo "Inputs are in directory $inputdir"
-    echo "Reference outputs are in directory $outputdir"
-    echo "Tests will be run with options ${options[@]}"
+    echo Inputs are in directory $inputdir
+    echo Reference outputs are in directory $outputdir
+    echo Tests will be run with options ${options[@]}
     echo
 
-    for file in $( ls $outputdir/*.out ); do
-        name=$( basename $file )
+    for file in "$outputdir"/*.out; do
+        name=$(basename "$file")
         echo -n "Running test ${name%.out}.xyz... "
-        if diff -bB $file <(bin/molalign "$inputdir/${name%.out}.xyz" "${options[@]}") > /dev/null; then
-            echo "ok"
+        if diff -bB "$file" <(./molalign "$inputdir/${name%.out}.xyz" "${options[@]}") > /dev/null; then
+            echo ok
         else
-            echo "Failed"
+            echo Failed
         fi
     done
 
@@ -21,6 +21,15 @@ run_test() {
     echo "Done"
     echo
 }
+
+
+cd "$(dirname "$0")"
+
+if [[ -f build.env ]]; then
+   . build.env
+else
+   echo Error: build.env does not exist or is not a file
+fi
 
 inputdir=tests/r005
 outputdir=tests/outputs/r005
