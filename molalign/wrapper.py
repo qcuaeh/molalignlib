@@ -3,7 +3,7 @@
 
 import numpy as np
 from ase import Atoms
-from molalignlib import library, options
+from .molalignlib import library, options
 
 #print(library.remap.__doc__)
 #print(library.align.__doc__)
@@ -79,4 +79,3 @@ class Alignment(Atoms):
              coords1, self.weights)
         coords1 = np.matmul(rotmat, coords1).transpose() + travec
         return Atoms(numbers=znums1, positions=coords1)
-

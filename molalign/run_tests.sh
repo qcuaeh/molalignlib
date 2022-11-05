@@ -22,14 +22,7 @@ run_test() {
     echo
 }
 
-
 cd "$(dirname "$0")"
-
-if [[ -f build.env ]]; then
-   . build.env
-else
-   echo Error: build.env does not exist or is not a file
-fi
 
 inputdir=tests/r005
 outputdir=tests/outputs/r005
@@ -45,4 +38,3 @@ inputdir=tests/r02
 outputdir=tests/outputs/r02
 options=(-test -rec 10 -sort -bias -tol 0.69)
 #run_test
-

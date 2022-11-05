@@ -1,3 +1,3 @@
 #!/bin/bash
-ln -s gnu.env $HOME/build.env
-INSTALL_DIR=python $HOME/build.sh -lpy
+cp $HOME/molalign/config/gnu.cfg $HOME/molalign/build.cfg
+$HOME/molalign/build.sh -lpy

@@ -18,10 +18,11 @@ compile () {
 
 cd "$(dirname "$0")"
 
-if [[ -f build.env ]]; then
-   . build.env
+if [[ -f build.cfg ]]; then
+   . build.cfg
 else
    echo Error: build.env does not exist or is not a file
+   exit
 fi
 
 if [[ -n $LAPACK_PATH ]]; then
@@ -29,6 +30,7 @@ if [[ -n $LAPACK_PATH ]]; then
       libpathlist+=("-L$LAPACK_PATH")
    else
       echo Error: $LAPACK_PATH does not exist or is not a directory
+      exit
    fi
 fi
 
@@ -92,11 +94,12 @@ case "$realkind" in
 esac
 
 srcdir=$PWD/fortran
-buildir=$PWD/_build/static/real$realkind/$comptype
+buildir=$PWD/build/static/real$realkind/$comptype
 
 if [[ -n $INSTALL_DIR ]]; then
    if ! [[ -d $INSTALL_DIR ]]; then
       echo Error: $INSTALL_DIR does not exist or is not a directory
+      exit
    fi
 else
    INSTALL_DIR=$PWD
@@ -128,7 +131,7 @@ while IFS= read -r line; do
    if [[ $2 == f2py ]]; then
       f2pylist+=("$1")
    fi
-done < <(grep -v '^#' compilelist)
+done < <(grep -v '^#' build.lst)
 
 if $library; then
    case $libtype in
@@ -172,4 +175,3 @@ else
    popd > /dev/null
    mv "$buildir/molalign" "$INSTALL_DIR"
 fi
-
