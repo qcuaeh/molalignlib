@@ -1,5 +1,4 @@
-<!-- vim:filetype=Markdown
--->
+<!-- -*- mode: markdown -*- -->
 
 molalign
 ========
@@ -53,11 +52,11 @@ Usage
  
 ### Basic usage
 
-To align two molecules without reordering just run:
+To align two molecules just run:
 
     ./molalign/molalign tests/r005/Co100.xyz
 
-To align two molecules with reordering you can run:
+To align two molecules with optimal assigment run:
 
     ./molalign/molalign tests/r005/Co100.xyz -sort
 
