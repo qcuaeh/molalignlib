@@ -4,7 +4,6 @@ program ralign
     use iso_fortran_env, only: output_unit
 
     use options
-    use chemdata
     use strutils
     use optparse
     use chemutils
@@ -20,6 +19,7 @@ program ralign
     integer file_unit(2)
     integer nrec, records
     integer natom0, natom1
+    logical sort_flag, stdin_flag
     character(arg_len) arg, format_w
     character(title_len) title0, title1
     integer, allocatable :: mapcount(:), maplist(:, :)
@@ -27,8 +27,9 @@ program ralign
     character(label_len), dimension(:), allocatable :: labels0, labels1
     real, dimension(:, :), allocatable :: coords0, coords1
     real, allocatable :: weights0(:), mindist(:)
-    real travec(3), rotmat(3, 3), weighting(nelem)
-    logical sort_flag, stdin_flag
+    real travec(3), rotmat(3, 3)
+
+    procedure(f_realint), pointer :: weight_function => unity
 
     ! Set default options
 
@@ -42,9 +43,8 @@ program ralign
 
     records = 1
     maxcount = 10
-    bias_tol = 0.2
-    bias_scale = 1000.0
-    weighting = [(1.0, i=1, nelem)]
+    bias_tol = 0.35
+    bias_scale = 1.e3
     format_w = 'xyz'
 
     ! Get user options
@@ -64,8 +64,8 @@ program ralign
             debug_flag = .true.
         case ('-bias')
             bias_flag = .true.
-        case ('-weight')
-            weighting = stdmatom
+        case ('-mass')
+            weight_function => stdmass
         case ('-count')
             call readoptarg(arg, maxcount)
         case ('-trials')
@@ -114,16 +114,20 @@ program ralign
     ! Get atomic numbers and types
 
     do i = 1, natom0
-        call getznum(labels0(i), znums0(i), types0(i))
+        call readlabel(labels0(i), znums0(i), types0(i))
     end do
 
     do i = 1, natom1
-        call getznum(labels1(i), znums1(i), types1(i))
+        call readlabel(labels1(i), znums1(i), types1(i))
     end do
 
     ! Get normalized weights
 
-    weights0 = weighting(znums0)/sum(weighting(znums0))
+    do i = 1, natom0
+        weights0(i) = weight_function(znums0(i))
+    end do
+
+    weights0 = weights0/sum(weights0)
 
     ! Superpose atoms
 

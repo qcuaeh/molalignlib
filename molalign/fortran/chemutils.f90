@@ -6,12 +6,36 @@ use chemdata
 use strutils
 
 private
+public f_realint
+public unity
+public stdmass
+public valency
+public readlabel
 
-public getznum
+abstract interface
+    real function f_realint(z)
+        integer, intent(in) :: z
+    end function
+end interface
 
 contains
 
-subroutine getznum(label, znum, type)
+real function unity(z) result(res)
+    integer, intent(in) :: z
+    res = 1.
+end function
+
+real function stdmass(z) result(res)
+    integer, intent(in) :: z
+    res = stdmasses(z)
+end function
+
+real function valency(z) result(res)
+    integer, intent(in) :: z
+    res = real(valencies(z))
+end function
+
+subroutine readlabel(label, znum, type)
 
     character(*), intent(in) :: label
     integer, intent(out) :: znum, type

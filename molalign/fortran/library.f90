@@ -40,7 +40,7 @@ subroutine remap(natom0, natom1, znums0, znums1, types0, types1, &
     integer, dimension(:), allocatable :: blocksize0, blocksize1
     real, dimension(3) :: center0, center1
 
-    procedure(abstract_test), pointer :: halting => null()
+    procedure(f_logintint), pointer :: trialtest => everless
 
     ! Check number of atoms
 
@@ -55,12 +55,10 @@ subroutine remap(natom0, natom1, znums0, znums1, types0, types1, &
     allocate(blockidx0(natom0), blockidx1(natom1))
     allocate(blocksize0(natom0), blocksize1(natom1))
 
-    ! Associate halting test
+    ! Associate trialtest test
 
     if (halt_flag) then
-        halting => lessthan
-    else
-        halting => dummythan
+        trialtest => lessthan
     end if
 
     ! Group atoms by label
@@ -106,10 +104,10 @@ subroutine remap(natom0, natom1, znums0, znums1, types0, types1, &
 
     ! Remap atoms to minimize distance and difference
 
-    call optimize_mapping(natom0, nblock0, blocksize0, weights0(atomorder0), &
+    call optimize(natom0, nblock0, blocksize0, weights0(atomorder0), &
         centered(natom0, coords0(:, atomorder0), center0), &
         centered(natom1, coords1(:, atomorder1), center1), &
-        records, nrec, maplist, mapcount, mindist, halting)
+        records, nrec, maplist, mapcount, mindist, trialtest)
 
     ! Reorder back to original atom ordering
 

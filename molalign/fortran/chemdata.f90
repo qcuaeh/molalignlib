@@ -4,16 +4,16 @@ module chemdata
 use options
 
 ! elsym: Element symbols
-! valency: Element valenc
-! stdmatom: Standard atomic masses
-! covrad: Atomic covalent radii (Angstrom)
-! vdwrad: Atomic van der Waals radii (Angstrom)
+! covradii: Atomic covalent radii (Angstrom)
+! vdwradii: Atomic van der Waals radii (Angstrom)
+! stdmasses: Standard atomic masses
+! valencies: Element valenc
 
 implicit none
 
 integer, parameter :: nelem = 103
 
-character(2), dimension(nelem), parameter :: elsym = [ &
+character(2), parameter :: elsym(nelem) = [ &
 'H ',                                                                                                 'He', &
 'Li', 'Be',                                                             'B ', 'C ', 'N ', 'O ', 'F ', 'Ne', &
 'Na', 'Mg',                                                             'Al', 'Si', 'P ', 'S ', 'Cl', 'Ar', &
@@ -24,20 +24,8 @@ character(2), dimension(nelem), parameter :: elsym = [ &
 'Fr', 'Ra', 'Ac', 'Th', 'Pa', 'U ', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr'        &
 ]
 
-! Lit.: CRC Handbook of Chemistry and Physics, 1989
-real, dimension(nelem), parameter :: stdmatom(nelem) = [ &
-1.0,                                                                                                                     4.0, &
-6.9,     9.0,                                                                        10.8,  12.0,  14.0,  16.0,  19.0,  20.2, &
-23.0,   24.3,                                                                        27.0,  28.1,  31.0,  32.1,  35.5,  39.9, &
-39.1,   40.1,  45.0,  47.9,  50.9,  52.0,  54.9,  55.8,  58.9,  58.7,  63.5,  65.4,  69.7,  72.6,  74.9,  79.0,  79.9,  83.8, &
-85.5,   87.6,  88.9,  91.2,  92.9,  95.9,  98.0, 101.1, 102.9, 106.4, 107.9, 112.4, 114.8, 118.7, 121.8, 127.6, 126.9, 131.3, &
-132.9, 137.3, 138.9, 140.1, 140.9, 144.2, 145.0, 150.4, 152.0, 157.2, 158.9, 162.5, 164.9, 167.3, 168.9, 173.0, 175.0,        &
-                     178.5, 180.9, 183.8, 186.2, 190.2, 192.2, 195.1, 197.0, 200.6, 204.4, 207.2, 209.0, 209.0, 210.0, 222.0, &
-223.0, 226.0, 227.0, 232.0, 231.0, 238.0, 237.0, 244.0, 243.0, 247.0, 247.0, 251.0, 252.0, 257.0, 258.0, 259.0, 262.0         &
-]
-
 ! Lit.: R.T. Sanderson, Inorganic Chemistry, Reinhold 1967
-real, dimension(nelem), parameter :: covrad(nelem) = [ &
+real, parameter :: covradii(nelem) = [ &
 0.31,                                                                                                 0.28, &
 1.28, 0.96,                                                             0.84, 0.76, 0.71, 0.66, 0.57, 0.58, &
 1.66, 1.41,                                                             1.21, 1.11, 1.07, 1.05, 1.02, 1.06, &
@@ -49,7 +37,7 @@ real, dimension(nelem), parameter :: covrad(nelem) = [ &
 ]
 
 ! Lit.: A. Bondi, J. Phys. Chem. 68, 441 (1964)         
-real, dimension(nelem), parameter :: vdwrad(nelem) = [ &
+real, parameter :: vdwradii(nelem) = [ &
 1.20,                                                                                                 1.40, &
 1.82, 2.00,                                                             2.00, 1.70, 1.55, 1.52, 1.47, 1.54, &
 2.27, 1.73,                                                             2.00, 2.10, 1.80, 1.80, 1.75, 1.88, &
@@ -60,8 +48,20 @@ real, dimension(nelem), parameter :: vdwrad(nelem) = [ &
 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00        &
 ]
 
+! Lit.: CRC Handbook of Chemistry and Physics, 1989
+real, parameter :: stdmasses(nelem) = [ &
+1.0,                                                                                                                     4.0, &
+6.9,     9.0,                                                                        10.8,  12.0,  14.0,  16.0,  19.0,  20.2, &
+23.0,   24.3,                                                                        27.0,  28.1,  31.0,  32.1,  35.5,  39.9, &
+39.1,   40.1,  45.0,  47.9,  50.9,  52.0,  54.9,  55.8,  58.9,  58.7,  63.5,  65.4,  69.7,  72.6,  74.9,  79.0,  79.9,  83.8, &
+85.5,   87.6,  88.9,  91.2,  92.9,  95.9,  98.0, 101.1, 102.9, 106.4, 107.9, 112.4, 114.8, 118.7, 121.8, 127.6, 126.9, 131.3, &
+132.9, 137.3, 138.9, 140.1, 140.9, 144.2, 145.0, 150.4, 152.0, 157.2, 158.9, 162.5, 164.9, 167.3, 168.9, 173.0, 175.0,        &
+                     178.5, 180.9, 183.8, 186.2, 190.2, 192.2, 195.1, 197.0, 200.6, 204.4, 207.2, 209.0, 209.0, 210.0, 222.0, &
+223.0, 226.0, 227.0, 232.0, 231.0, 238.0, 237.0, 244.0, 243.0, 247.0, 247.0, 251.0, 252.0, 257.0, 258.0, 259.0, 262.0         &
+]
+
 ! s-block: min(v, 2 - v), p-block: min(v, 8 - v), d,f-block: 5
-integer, dimension(nelem), parameter :: valency(nelem) = [ &
+integer, parameter :: valencies(nelem) = [ &
 1,                                                 0, &
 1, 2,                               3, 4, 3, 2, 1, 0, &
 1, 2,                               3, 4, 3, 2, 1, 0, &

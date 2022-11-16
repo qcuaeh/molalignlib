@@ -16,8 +16,14 @@ use printing
 
 implicit none
 
+private
+public f_logintint
+public lessthan
+public everless
+public optimize
+
 abstract interface
-    logical function abstract_test(x, y)
+    logical function f_logintint(x, y)
         integer, intent(in) :: x, y
     end function
 end interface
@@ -26,32 +32,24 @@ contains
 
 logical function lessthan(a, b) result(res)
     integer, intent(in) :: a, b
-    if (a < b) then
-        res = .true.
-    else
-        res = .false.
-    end if
+    res = a < b
 end function
 
-logical function dummythan(a, b) result(res)
+logical function everless(a, b) result(res)
     integer, intent(in) :: a, b
-    if (a < b) then
-        res = .true.
-    else
-        res = .true.
-    end if
+    res = .true.
 end function
 
-subroutine optimize_mapping( &
+subroutine optimize( &
     natom, nblock, blocksize, weights, coords0, coords1, records, nrec, &
-    maplist, mapcount, mindist, halting &
+    maplist, mapcount, mindist, trialtest &
 )
 
     integer, intent(in) :: natom, nblock, records
     integer, dimension(:), intent(in) :: blocksize
     real, dimension(:, :), intent(in) :: coords0, coords1
     real, dimension(:), intent(in) :: weights
-    procedure (abstract_test), pointer, intent(in) :: halting
+    procedure (f_logintint), pointer, intent(in) :: trialtest
     integer, intent(out) :: nrec
     integer, intent(out) :: maplist(:, :), mapcount(:)
     real, intent(out) :: mindist(:)
@@ -68,7 +66,7 @@ subroutine optimize_mapping( &
 
 ! Set bias for non equivalent atoms 
 
-call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
+    call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
 
 ! Print header and initial stats
 
@@ -86,7 +84,7 @@ call setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
 
 ! Loop for map searching
 
-    do while (nmatch < maxcount .and. halting(ntrial, maxtrials))
+    do while (nmatch < maxcount .and. trialtest(ntrial, maxtrials))
 
         ntrial = ntrial + 1
 
