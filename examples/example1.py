@@ -6,15 +6,15 @@
 
 # Import modules
 from ase import io
-from molalign import Alignment
+from molalignlib import Alignment
 
 
 # In[ ]:
 
 
 # Read clusters coordinates
-atoms0 = io.read('r005/Co100.xyz', index=0)
-atoms1 = io.read('r005/Co100.xyz', index=1)
+atoms0 = io.read('tests/r005/Co100.xyz', index=0)
+atoms1 = io.read('tests/r005/Co100.xyz', index=1)
 
 
 # In[ ]:
@@ -28,7 +28,7 @@ alignment0 = Alignment(atoms0, biased=True)
 
 
 # Sort atoms1 to minimize the RMSD respect to atoms0
-maplist, mapcount, mindist = alignment0.sort(atoms1)
+maplist, mapcount, mindist = alignment0.sorted(atoms1)
 
 
 # In[ ]:
@@ -37,5 +37,5 @@ maplist, mapcount, mindist = alignment0.sort(atoms1)
 # Align atoms1 to atoms0 for each calculated mapping and write coordinates to file
 for i, mapping in enumerate(maplist, start=1):
     io.write('aligned_{}.xyz'.format(i), atoms0)
-    io.write('aligned_{}.xyz'.format(i), alignment0.aligned(atoms1, mapping), append=True)
+    io.write('aligned_{}.xyz'.format(i), alignment0.aligned(atoms1[mapping]), append=True)
 

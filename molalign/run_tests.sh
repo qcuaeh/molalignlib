@@ -10,7 +10,7 @@ run_test() {
     for file in "$outputdir"/*.out; do
         name=$(basename "$file")
         echo -n "Running test ${name%.out}.xyz... "
-        if diff -bB "$file" <(./molalign "$inputdir/${name%.out}.xyz" "${options[@]}") > /dev/null; then
+        if diff -bB "$file" <(./molaligncmd "$inputdir/${name%.out}.xyz" "${options[@]}") > /dev/null; then
             echo ok
         else
             echo Failed

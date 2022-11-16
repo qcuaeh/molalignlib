@@ -18,9 +18,23 @@ implicit none
 
 contains
 
-subroutine remap(natom0, natom1, znums0, znums1, types0, types1, &
-    coords0, coords1, weights0, records, nrec, maplist, mapcount, mindist)
 ! Purpose: Check and optimize mapping
+subroutine sort_atoms( &
+    natom0, &
+    natom1, &
+    znums0,  &
+    znums1, &
+    types0, &
+    types1, &
+    coords0, &
+    coords1, &
+    weights0, &
+    records, &
+    nrec, &
+    maplist, &
+    mapcount, &
+    mindist &
+)
 
     integer, intent(in) :: natom0, natom1, records
     integer, dimension(natom0), intent(in) :: znums0, types0
@@ -36,9 +50,11 @@ subroutine remap(natom0, natom1, znums0, znums1, types0, types1, &
     integer i, h, offset
     integer nblock0, nblock1
     integer, dimension(:), allocatable :: atomorder0, atomorder1
+    integer, dimension(:), allocatable :: atomunorder0, atomunorder1
     integer, dimension(:), allocatable :: blockidx0, blockidx1
     integer, dimension(:), allocatable :: blocksize0, blocksize1
     real, dimension(3) :: center0, center1
+    real weights1(natom1)
 
     procedure(f_logintint), pointer :: trialtest => everless
 
@@ -52,12 +68,13 @@ subroutine remap(natom0, natom1, znums0, znums1, types0, types1, &
     ! Allocate arrays
 
     allocate(atomorder0(natom0), atomorder1(natom1))
+    allocate(atomunorder0(natom0), atomunorder1(natom1))
     allocate(blockidx0(natom0), blockidx1(natom1))
     allocate(blocksize0(natom0), blocksize1(natom1))
 
-    ! Associate trialtest test
+    ! Associate trial test
 
-    if (halt_flag) then
+    if (abort_flag) then
         trialtest => lessthan
     end if
 
@@ -66,27 +83,41 @@ subroutine remap(natom0, natom1, znums0, znums1, types0, types1, &
     call getblocks(natom0, znums0, types0, nblock0, blocksize0, blockidx0, atomorder0)
     call getblocks(natom1, znums1, types1, nblock1, blocksize1, blockidx1, atomorder1)
 
-    ! Abort if there are incompatible atoms
+    ! Get inverse atom ordering
+
+    atomunorder0 = inversemap(atomorder0)
+    atomunorder1 = inversemap(atomorder1)
+
+    ! Abort if there are conflicting atoms
 
     if (any(znums0(atomorder0) /= znums1(atomorder1))) then
         write (error_unit, '(a)') 'Error: These clusters are not isomers'
         stop
     end if
 
-    ! Abort if there are incompatible types
+    ! Abort if there are conflicting types
 
     if (any(types0(atomorder0) /= types1(atomorder1))) then
         write (error_unit, '(a)') 'Error: There are conflicting atom types'
         stop
     end if
 
-    ! Abort if weights differ within a block
+    ! Assign weights for atoms1
+
+    weights1 = weights0(atomunorder1(atomorder0))
+
+    ! Abort if there are conflicting weights
+
+    if (any(weights0(atomorder0) /= weights1(atomorder1))) then
+        write (error_unit, '(a)') 'Error: There are conflicting weights'
+        stop
+    end if
 
     offset = 0
     do h = 1, nblock0
         do i = 2, blocksize0(h)
             if (weights0(atomorder0(offset+i)) /= weights0(atomorder0(offset+1))) then
-                write (error_unit, '(a)') 'Error: All atoms within a block must weight the same'
+                write (error_unit, '(a)') 'Error: Atoms of the same type must weight the same'
                 stop
             end if
         end do
@@ -96,7 +127,7 @@ subroutine remap(natom0, natom1, znums0, znums1, types0, types1, &
     ! Calculate centroids
 
     center0 = centroid(natom0, weights0, coords0)
-    center1 = centroid(natom1, weights0, coords1)
+    center1 = centroid(natom1, weights1, coords1)
 
     ! Initialize random number generator
 
@@ -104,7 +135,8 @@ subroutine remap(natom0, natom1, znums0, znums1, types0, types1, &
 
     ! Remap atoms to minimize distance and difference
 
-    call optimize(natom0, nblock0, blocksize0, weights0(atomorder0), &
+    call optimize(natom0, nblock0, blocksize0, &
+        weights0(atomorder0)/sum(weights0), &
         centered(natom0, coords0(:, atomorder0), center0), &
         centered(natom1, coords1(:, atomorder1), center1), &
         records, nrec, maplist, mapcount, mindist, trialtest)
@@ -112,14 +144,25 @@ subroutine remap(natom0, natom1, znums0, znums1, types0, types1, &
     ! Reorder back to original atom ordering
 
     do i = 1, nrec
-        maplist(:, i) = atomorder1(maplist(inversemap(atomorder0), i))
+        maplist(:, i) = atomorder1(maplist(atomunorder0, i))
     end do
 
 end subroutine
 
-subroutine align(natom0, natom1, znums0, znums1, types0, types1, &
-    coords0, coords1, weights0, travec, rotmat)
 ! Purpose: Superimpose coordinates of atom sets coords0 and coords1
+subroutine align_atoms( &
+    natom0, &
+    natom1, &
+    znums0, &
+    znums1, &
+    types0, &
+    types1, &
+    coords0, &
+    coords1, &
+    weights0, &
+    travec, &
+    rotmat &
+)
 
     use iso_fortran_env, only: output_unit
     use iso_fortran_env, only: error_unit
@@ -143,6 +186,8 @@ subroutine align(natom0, natom1, znums0, znums1, types0, types1, &
     real, intent(out) :: rotmat(3, 3)
 
     real, dimension(3) :: center0, center1
+    real weights1(natom1)
+
     ! Check number of atoms
 
     if (natom0 /= natom1) then
@@ -150,24 +195,28 @@ subroutine align(natom0, natom1, znums0, znums1, types0, types1, &
         stop
     end if
 
-    ! Abort if there are incompatible atomic symbols
+    ! Abort if there are conflicting atomic symbols
 
     if (any(znums0 /= znums1)) then
         write (error_unit, '(a)') 'Error: These clusters are not isomers or their atoms are not in the same order'
         stop
     end if
 
-    ! Abort if there are incompatible atomic types
+    ! Abort if there are conflicting atomic types
 
     if (any(types0 /= types1)) then
         write (error_unit, '(a)') 'Error: There are conflicting atom types or their atoms are not in the same order'
         stop
     end if
 
+    ! Assign weights for atoms1
+
+    weights1 = weights0
+
     ! Calculate centroids
 
     center0 = centroid(natom0, weights0, coords0)
-    center1 = centroid(natom1, weights0, coords1)
+    center1 = centroid(natom1, weights1, coords1)
 
     ! Calculate optimal rotation matrix
 

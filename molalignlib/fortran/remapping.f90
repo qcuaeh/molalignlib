@@ -49,10 +49,10 @@ subroutine optimize( &
     integer, dimension(:), intent(in) :: blocksize
     real, dimension(:, :), intent(in) :: coords0, coords1
     real, dimension(:), intent(in) :: weights
-    procedure (f_logintint), pointer, intent(in) :: trialtest
     integer, intent(out) :: nrec
     integer, intent(out) :: maplist(:, :), mapcount(:)
     real, intent(out) :: mindist(:)
+    procedure (f_logintint), pointer, intent(in) :: trialtest
 
     logical found, overflow
     integer imap, jmap, ntrial, nmatch, cycles

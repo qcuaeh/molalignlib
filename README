@@ -38,7 +38,7 @@ Usage
 ### Options
 
 -sort : Sort atoms by optimal assignment.  
--bias : Enable biasing and iterative convergence.  
+-fast : Enable biasing and iterative convergence.  
 -tol *ϵ* : Set biasing tolerance to *ϵ* (defaults to 0.35 Å).  
 -test : Use the same pseudo random numbers on every run.  
 -count *N* : Set the count convergence threshold to *N* (defaults to 10).  

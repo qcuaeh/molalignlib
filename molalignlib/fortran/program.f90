@@ -26,7 +26,8 @@ program ralign
     integer, dimension(:), allocatable :: znums0, znums1, types0, types1
     character(label_len), dimension(:), allocatable :: labels0, labels1
     real, dimension(:, :), allocatable :: coords0, coords1
-    real, allocatable :: weights0(:), mindist(:)
+    real, allocatable, dimension(:) :: weights0
+    real, allocatable :: mindist(:)
     real travec(3), rotmat(3, 3)
 
     procedure(f_realint), pointer :: weight_function => unity
@@ -34,8 +35,9 @@ program ralign
     ! Set default options
 
     bias_flag = .false.
+    conv_flag = .false.
     sort_flag = .false.
-    halt_flag = .false.
+    abort_flag = .false.
     test_flag = .false.
     live_flag = .false.
     debug_flag = .false.
@@ -62,14 +64,15 @@ program ralign
             sort_flag = .true.
         case ('-debug')
             debug_flag = .true.
-        case ('-bias')
+        case ('-fast')
             bias_flag = .true.
+            conv_flag = .true.
         case ('-mass')
             weight_function => stdmass
         case ('-count')
             call readoptarg(arg, maxcount)
         case ('-trials')
-            halt_flag = .true.
+            abort_flag = .true.
             call readoptarg(arg, maxtrials)
         case ('-tol')
             call readoptarg(arg, bias_tol)
@@ -108,8 +111,9 @@ program ralign
 
     allocate(znums0(natom0), znums1(natom1))
     allocate(types0(natom0), types1(natom1))
-    allocate(maplist(natom0, records), mapcount(records), mindist(records))
     allocate(weights0(natom0))
+    allocate(maplist(natom0, records))
+    allocate(mapcount(records), mindist(records))
 
     ! Get atomic numbers and types
 
@@ -121,27 +125,25 @@ program ralign
         call readlabel(labels1(i), znums1(i), types1(i))
     end do
 
-    ! Get normalized weights
+    ! Set weights
 
     do i = 1, natom0
         weights0(i) = weight_function(znums0(i))
     end do
 
-    weights0 = weights0/sum(weights0)
-
-    ! Superpose atoms
+    ! Sort atoms to minimize MSD
 
     if (sort_flag) then
 
-        call remap(natom0, natom1, znums0, znums1, types0, types1, &
-            coords0, coords1, weights0, records, nrec, maplist, mapcount, mindist)
+        call sort_atoms(natom0, natom1, znums0, znums1, types0, types1, coords0, coords1, &
+            weights0, records, nrec, maplist, mapcount, mindist)
 
         ! Write aligned coordinates
 
         do i = 1, nrec
 
-            call align(natom0, natom1, znums0, znums1(maplist(:, i)), types0, &
-                types1(maplist(:, i)), coords0, coords1(:, maplist(:, i)), &
+            call align_atoms(natom0, natom1, znums0, znums1(maplist(:, i)), &
+                types0, types1(maplist(:, i)), coords0, coords1(:, maplist(:, i)), &
                 weights0, travec, rotmat)
 
             open(newunit=u, file='aligned_'//str(i)//'.'//trim(format_w), action='write', status='replace')
@@ -154,17 +156,21 @@ program ralign
 
     else
 
-        call align(natom0, natom1, znums0, znums1, types0, types1, &
-            coords0, coords1, weights0, travec, rotmat)
+        ! Align atoms to minimize RMSD
+
+        call align_atoms(natom0, natom1, znums0, znums1, types0, types1, coords0, coords1, &
+            weights0, travec, rotmat)
 
         call rotate(natom1, coords1, rotmat)
         call translate(natom1, coords1, travec)
+
+        ! Write aligned coordinates
 
         write (output_unit, '(a,1x,f0.4,1x,a)') 'RMSD:', &
             squaredist(natom0, weights0, coords0, coords1, identitymap(natom0)), &
             '(only alignment performed)'
 
-        open(newunit=u, file='aligned_1.'//trim(format_w), action='write', status='replace')
+        open(newunit=u, file='aligned_0.'//trim(format_w), action='write', status='replace')
         call writefile(u, format_w, natom0, title0, znums0, coords0)
         call writefile(u, format_w, natom1, title1, znums1, coords1) 
         close(u)

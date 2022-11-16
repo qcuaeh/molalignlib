@@ -16,6 +16,15 @@ compile () {
    popd > /dev/null
 }
 
+if [[ -n $DESTDIR ]]; then
+   if ! [[ -d $DESTDIR ]]; then
+      echo Error: $DESTDIR does not exist or is not a directory
+      exit
+   fi
+else
+   DESTDIR=$PWD
+fi
+
 cd "$(dirname "$0")"
 
 if [[ -f build.cfg ]]; then
@@ -33,6 +42,9 @@ if [[ -n $LAPACK_PATH ]]; then
       exit
    fi
 fi
+
+libname=molalignlib
+progname=molaligncmd
 
 quick=false
 debug=false
@@ -94,16 +106,7 @@ case "$realkind" in
 esac
 
 srcdir=$PWD/fortran
-buildir=$PWD/build/static/real$realkind/$comptype
-
-if [[ -n $INSTALL_DIR ]]; then
-   if ! [[ -d $INSTALL_DIR ]]; then
-      echo Error: $INSTALL_DIR does not exist or is not a directory
-      exit
-   fi
-else
-   INSTALL_DIR=$PWD
-fi
+buildir=$DESTDIR/build/static/real$realkind/$comptype
 
 if [[ -d $buildir ]]; then
    if ! $quick; then
@@ -138,16 +141,16 @@ if $library; then
    s)
       echo Linking static library...
       pushd "$buildir" > /dev/null
-      ar r molalignlib.a "${objlist[@]}" &> /dev/null
+      ar r $libname.a "${objlist[@]}" &> /dev/null
       popd > /dev/null
-      mv "$buildir/molalignlib.a" "$INSTALL_DIR"
+      mv "$buildir/$libname.a" "$DESTDIR"
       ;;
    d)
       echo Linking shared library...
       pushd "$buildir" > /dev/null
-      "$F90" -shared "${libpathlist[@]}" -llapack -o molalignlib.so "${objlist[@]}"
+      "$F90" -shared "${libpathlist[@]}" -llapack -o $libname.so "${objlist[@]}"
       popd > /dev/null
-      mv "$buildir/molalignlib.so" "$INSTALL_DIR"
+      mv "$buildir/$libname.so" "$DESTDIR"
       ;;
    py)
       if ! type "$PYTHON" &> /dev/null; then
@@ -162,16 +165,16 @@ if $library; then
       pushd "$buildir" > /dev/null
       echo "$f2cmap" > .f2py_f2cmap
       export PYTHONWARNINGS=ignore::Warning:setuptools.command.install
-      "$F2PY" -h signature.pyf --overwrite-signature -m molalignlib "${f2pylist[@]}" --quiet
+      "$F2PY" -h signature.pyf --overwrite-signature -m _$libname "${f2pylist[@]}" --quiet
       "$F2PY" -c signature.pyf "${libpathlist[@]}" -llapack "${objlist[@]}" --fcompiler=gnu95 --quiet
       popd > /dev/null
-      mv "$buildir/molalignlib$python_suffix" "$INSTALL_DIR"
+      mv "$buildir/_$libname$python_suffix" "$DESTDIR"
       ;;
    esac
 else
    echo Linking program...
    pushd "$buildir" > /dev/null
-   "$F90" "${libpathlist[@]}" -llapack -o molalign "${objlist[@]}"
+   "$F90" "${libpathlist[@]}" -llapack -o $progname "${objlist[@]}"
    popd > /dev/null
-   mv "$buildir/molalign" "$INSTALL_DIR"
+   mv "$buildir/$progname" "$DESTDIR"
 fi
