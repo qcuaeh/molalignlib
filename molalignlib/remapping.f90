@@ -84,7 +84,7 @@ subroutine optimize( &
 
 ! Loop for map searching
 
-    do while (nmatch < maxcount .and. trialtest(ntrial, maxtrials))
+    do while (nmatch < max_count .and. trialtest(ntrial, max_trials))
 
         ntrial = ntrial + 1
 
@@ -106,7 +106,7 @@ subroutine optimize( &
         call rotate(natom, auxcoords, rotquat)
         cycles = 1
 
-        do while (conv_flag)
+        do while (iter_flag)
             biased_dist = squaredist(natom, weights, coords0, auxcoords, atomap) &
                     + totalbias(natom, weights, bias, atomap)
             call assignatoms(natom, coords0, auxcoords, nblock, blocksize, bias, auxmap)

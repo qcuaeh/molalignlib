@@ -1,4 +1,4 @@
-options.f90 f2py
+options.f90
 rnglib.f90
 strutils.f90
 maputils.f90
@@ -14,9 +14,6 @@ assortment.f90
 translation.f90
 rotation.f90
 alignment.f90
-readwrite.f90
 biasing.f90
 remapping.f90
-library.f90 f2py
-optparse.f90
-program.f90
+molalignlib.f90

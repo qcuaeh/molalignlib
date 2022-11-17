@@ -1,4 +1,4 @@
-program ralign
+program molalign
 
     use iso_fortran_env, only: input_unit
     use iso_fortran_env, only: output_unit
@@ -7,11 +7,12 @@ program ralign
     use strutils
     use optparse
     use chemutils
-    use readwrite
+    use readmol
+    use writemol
     use translation
     use rotation
     use alignment
-    use library
+    use molalignlib
 
     implicit none
 
@@ -35,7 +36,7 @@ program ralign
     ! Set default options
 
     bias_flag = .false.
-    conv_flag = .false.
+    iter_flag = .false.
     sort_flag = .false.
     abort_flag = .false.
     test_flag = .false.
@@ -44,7 +45,7 @@ program ralign
     stdin_flag = .false.
 
     records = 1
-    maxcount = 10
+    max_count = 10
     bias_tol = 0.35
     bias_scale = 1.e3
     format_w = 'xyz'
@@ -66,14 +67,14 @@ program ralign
             debug_flag = .true.
         case ('-fast')
             bias_flag = .true.
-            conv_flag = .true.
+            iter_flag = .true.
         case ('-mass')
             weight_function => stdmass
         case ('-count')
-            call readoptarg(arg, maxcount)
+            call readoptarg(arg, max_count)
         case ('-trials')
             abort_flag = .true.
-            call readoptarg(arg, maxtrials)
+            call readoptarg(arg, max_trials)
         case ('-tol')
             call readoptarg(arg, bias_tol)
         case ('-scale')

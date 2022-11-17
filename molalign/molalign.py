@@ -32,11 +32,11 @@ def main():
         print('Error: Too many files')
 
     if args.fast:
-        biased = True
-        converged = True
+        biasing = True
+        iteration = True
     else:
-        biased = False
-        converged = False
+        biasing = False
+        iteration = False
 
     if args.mass:
         weights0 = atoms0.get_masses()
@@ -48,8 +48,8 @@ def main():
         atoms = atoms0,
         weights = weights0,
         testing = args.test,
-        biased = biased,
-        converged = converged,
+        biasing = biasing,
+        iteration = iteration,
         records = args.rec,
         count = args.count,
         trials = args.trials,
@@ -62,9 +62,12 @@ def main():
         maplist, mapcount, mindist = alignment0.sorted(atoms1)
         # Align atoms1 to atoms0 for each calculated mapping and write coordinates to file
         for i, mapping in enumerate(maplist, start=1):
+            alignedatoms1 = alignment0.aligned(atoms1[mapping])
             io.write('aligned_{}.xyz'.format(i), atoms0)
-            io.write('aligned_{}.xyz'.format(i), alignment0.aligned(atoms1[mapping]), append=True)
+            io.write('aligned_{}.xyz'.format(i), alignedatoms1, append=True)
     else:
-        print('Only alignment performed')
+        alignedatoms1 = alignment0.aligned(atoms1)
+        #rmsd = np.sqrt((weights0*((alignedatoms1 - atoms0)**2).sum(axis=0)).mean())
+        #print('RMSD: {} (only alignment performed)'.format(rmsd))
         io.write('aligned_0.xyz', atoms0)
-        io.write('aligned_0.xyz', alignment0.aligned(atoms1), append=True)
+        io.write('aligned_0.xyz', alignedatoms1, append=True)

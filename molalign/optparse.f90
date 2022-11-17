@@ -49,19 +49,23 @@ end function
 subroutine openfile(arg, file_unit)
 
     character(arg_len) arg
-    integer file_unit(2)
+    integer file_unit(2), stat
 
     if (arg(1:1) == '-') then
-        write (error_unit, '(a,1x,a)') 'Unknown option:', trim(arg)
+        write (error_unit, '(a,1x,a)') 'Error: Unknown option', trim(arg)
         stop
     end if
 
     ifile = ifile + 1
 
     if (ifile <= 2) then
-        open(newunit=file_unit(ifile), file=arg, action='read')
+        open(newunit=file_unit(ifile), file=arg, action='read', iostat=stat)
+        if (stat /= 0) then
+            write (error_unit, '(a,1x,a,1x,a)') 'Error:', trim(arg), 'does not exist'
+            stop
+        end if
     else
-        write (error_unit, '(a)') 'Too many paths'
+        write (error_unit, '(a)') 'Error: Too many files'
         stop
     end if
 

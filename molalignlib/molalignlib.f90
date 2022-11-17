@@ -1,22 +1,63 @@
-module library
+module molalignlib
 
 use iso_fortran_env, only: output_unit
 use iso_fortran_env, only: error_unit
 
 use options
-use random
-use sorting
-use chemdata
-use maputils
-use rotation
-use translation
-use remapping
-use assortment
-use alignment
 
 implicit none
 
 contains
+
+subroutine set_bias_flag(boolval)
+    logical, intent(in) :: boolval
+    bias_flag = boolval
+end subroutine
+
+subroutine set_conv_flag(boolval)
+    logical, intent(in) :: boolval
+    iter_flag = boolval
+end subroutine
+
+subroutine set_test_flag(boolval)
+    logical, intent(in) :: boolval
+    test_flag = boolval
+end subroutine
+
+subroutine set_live_flag(boolval)
+    logical, intent(in) :: boolval
+    live_flag = boolval
+end subroutine
+
+subroutine set_abort_flag(boolval)
+    logical, intent(in) :: boolval
+    abort_flag = boolval
+end subroutine
+
+subroutine set_debug_flag(boolval)
+    logical, intent(in) :: boolval
+    debug_flag = boolval
+end subroutine
+
+subroutine set_max_count(intval)
+    integer, intent(in) :: intval
+    max_count = intval
+end subroutine
+
+subroutine set_max_trials(intval)
+    integer, intent(in) :: intval
+    max_trials = intval
+end subroutine
+
+subroutine set_bias_tol(realval)
+    real, intent(in) :: realval
+    bias_tol = realval
+end subroutine
+
+subroutine set_bias_scale(realval)
+    real, intent(in) :: realval
+    bias_scale = realval
+end subroutine
 
 ! Purpose: Check and optimize mapping
 subroutine sort_atoms( &
@@ -35,6 +76,12 @@ subroutine sort_atoms( &
     mapcount, &
     mindist &
 )
+
+    use random
+    use maputils
+    use translation
+    use assortment
+    use remapping
 
     integer, intent(in) :: natom0, natom1, records
     integer, dimension(natom0), intent(in) :: znums0, types0
@@ -164,11 +211,6 @@ subroutine align_atoms( &
     rotmat &
 )
 
-    use iso_fortran_env, only: output_unit
-    use iso_fortran_env, only: error_unit
-
-    use options
-    use chemdata
     use maputils
     use rotation
     use translation

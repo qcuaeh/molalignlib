@@ -21,7 +21,7 @@ atoms1 = io.read('tests/r005/Co100.xyz', index=1)
 
 
 # Create an alignment object with atoms0 as reference
-alignment0 = Alignment(atoms0, biased=True)
+alignment0 = Alignment(atoms0, biasing=True, iteration=True)
 
 
 # In[ ]:
