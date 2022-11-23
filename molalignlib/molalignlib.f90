@@ -31,7 +31,7 @@ end subroutine
 
 subroutine set_abort_flag(boolval)
     logical, intent(in) :: boolval
-    abort_flag = boolval
+    stop_flag = boolval
 end subroutine
 
 subroutine set_debug_flag(boolval)
@@ -60,7 +60,7 @@ subroutine set_bias_scale(realval)
 end subroutine
 
 ! Purpose: Check and optimize mapping
-subroutine sort_atoms( &
+subroutine assign_atoms( &
     natom0, &
     natom1, &
     znums0,  &
@@ -70,29 +70,29 @@ subroutine sort_atoms( &
     coords0, &
     coords1, &
     weights0, &
-    records, &
     nrec, &
+    nmap, &
     maplist, &
-    mapcount, &
-    mindist &
+    countlist, &
+    rmsdlist &
 )
 
     use random
     use maputils
     use translation
     use assortment
-    use remapping
+    use assignment
 
-    integer, intent(in) :: natom0, natom1, records
+    integer, intent(in) :: natom0, natom1, nrec
     integer, dimension(natom0), intent(in) :: znums0, types0
     integer, dimension(natom1), intent(in) :: znums1, types1
     real, intent(in) :: coords0(3, natom0)
     real, intent(in) :: coords1(3, natom1)
     real, intent(in) :: weights0(natom0)
-    integer, intent(out) :: nrec
-    integer, intent(out) :: maplist(natom0, records)
-    integer, intent(out) :: mapcount(records)
-    real, intent(out) :: mindist(records)
+    integer, intent(out) :: nmap
+    integer, intent(out) :: maplist(natom0, nrec)
+    integer, intent(out) :: countlist(nrec)
+    real, intent(out) :: rmsdlist(nrec)
 
     integer i, h, offset
     integer nblock0, nblock1
@@ -103,12 +103,12 @@ subroutine sort_atoms( &
     real, dimension(3) :: center0, center1
     real weights1(natom1)
 
-    procedure(f_logintint), pointer :: trialtest => everless
+    procedure(f_logintint), pointer :: stoptest
 
-    ! Check number of atoms
+    ! Abort if clusters have different number of atoms
 
     if (natom0 /= natom1) then
-        write (error_unit, '(a)') 'Error: These clusters do not have the same number of atoms'
+        write (error_unit, '(a)') 'Error: The clusters have different number of atoms'
         stop
     end if
 
@@ -118,12 +118,6 @@ subroutine sort_atoms( &
     allocate(atomunorder0(natom0), atomunorder1(natom1))
     allocate(blockidx0(natom0), blockidx1(natom1))
     allocate(blocksize0(natom0), blocksize1(natom1))
-
-    ! Associate trial test
-
-    if (abort_flag) then
-        trialtest => lessthan
-    end if
 
     ! Group atoms by label
 
@@ -135,10 +129,10 @@ subroutine sort_atoms( &
     atomunorder0 = inversemap(atomorder0)
     atomunorder1 = inversemap(atomorder1)
 
-    ! Abort if there are conflicting atoms
+    ! Abort if clusters are not isomers
 
     if (any(znums0(atomorder0) /= znums1(atomorder1))) then
-        write (error_unit, '(a)') 'Error: These clusters are not isomers'
+        write (error_unit, '(a)') 'Error: The clusters are not isomers'
         stop
     end if
 
@@ -180,17 +174,27 @@ subroutine sort_atoms( &
 
     call random_init()
 
+    ! Associate an stop test
+
+    if (stop_flag) then
+        stoptest => lessthan
+    else
+        stoptest => everless
+    end if
+
     ! Remap atoms to minimize distance and difference
 
-    call optimize(natom0, nblock0, blocksize0, &
-        weights0(atomorder0)/sum(weights0), &
+    call optimize_assignment( &
+        natom0, nblock0, blocksize0, &
+        weights0(atomorder0), &
         centered(natom0, coords0(:, atomorder0), center0), &
         centered(natom1, coords1(:, atomorder1), center1), &
-        records, nrec, maplist, mapcount, mindist, trialtest)
+        nrec, nmap, maplist, countlist, rmsdlist, stoptest &
+    )
 
     ! Reorder back to original atom ordering
 
-    do i = 1, nrec
+    do i = 1, nmap
         maplist(:, i) = atomorder1(maplist(atomunorder0, i))
     end do
 
@@ -207,10 +211,11 @@ subroutine align_atoms( &
     coords0, &
     coords1, &
     weights0, &
-    travec, &
-    rotmat &
+    rmsd, &
+    aligned1 &
 )
 
+    use sorting
     use maputils
     use rotation
     use translation
@@ -221,33 +226,48 @@ subroutine align_atoms( &
     integer, intent(in) :: natom0, natom1
     integer, dimension(natom0), intent(in) :: znums0, types0
     integer, dimension(natom1), intent(in) :: znums1, types1
+    real, intent(in) :: weights0(natom0)
     real, intent(in) :: coords0(3, natom0)
     real, intent(in) :: coords1(3, natom1)
-    real, intent(in) :: weights0(natom0)
-    real, intent(out) :: travec(3)
-    real, intent(out) :: rotmat(3, 3)
+    real, intent(out) :: aligned1(3, natom1)
+    real, intent(out) :: rmsd
 
-    real, dimension(3) :: center0, center1
     real weights1(natom1)
+    real center0(3), center1(3)
+    real travec(3), rotmat(3, 3)
 
-    ! Check number of atoms
+    ! Abort if clusters have different number of atoms
 
     if (natom0 /= natom1) then
-        write (error_unit, '(a)') 'Error: These clusters do not have the same number of atoms'
+        write (error_unit, '(a)') 'Error: The clusters have different number of atoms'
         stop
     end if
 
-    ! Abort if there are conflicting atomic symbols
+    ! Abort if clusters are not isomers
+
+    if (any(sorted(znums0, natom0) /= sorted(znums1, natom1))) then
+        write (error_unit, '(a)') 'Error: The clusters are not isomers'
+        stop
+    end if
+
+    ! Abort if atoms are not ordered
 
     if (any(znums0 /= znums1)) then
-        write (error_unit, '(a)') 'Error: These clusters are not isomers or their atoms are not in the same order'
+        write (error_unit, '(a)') 'Error: The atoms are not in the same order'
         stop
     end if
 
-    ! Abort if there are conflicting atomic types
+    ! Abort if there are conflicting types
+
+    if (any(sorted(types0, natom0) /= sorted(types1, natom1))) then
+        write (error_unit, '(a)') 'Error: There are conflicting atom types'
+        stop
+    end if
+
+    ! Abort if types are not ordered
 
     if (any(types0 /= types1)) then
-        write (error_unit, '(a)') 'Error: There are conflicting atom types or their atoms are not in the same order'
+        write (error_unit, '(a)') 'Error: The atom types are not in the same order'
         stop
     end if
 
@@ -270,6 +290,9 @@ subroutine align_atoms( &
     ! Calculate optimal translation vector
 
     travec = center0 - matmul(rotmat, center1)
+
+    aligned1 = translated(natom1, rotated(natom1, coords1, rotmat), travec)
+    rmsd = sqrt(squaredist(natom0, weights0, coords0, aligned1, identitymap(natom0)))
 
 end subroutine
 

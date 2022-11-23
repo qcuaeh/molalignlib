@@ -18,37 +18,40 @@ program molalign
 
     integer i, u
     integer file_unit(2)
-    integer nrec, records
+    integer nmap, nrec
     integer natom0, natom1
-    logical sort_flag, stdin_flag
+    integer, allocatable :: maplist(:, :)
+    integer, allocatable :: countlist(:)
+    integer, allocatable, dimension(:) :: znums0, znums1, types0, types1
     character(arg_len) arg, format_w
     character(title_len) title0, title1
-    integer, allocatable :: mapcount(:), maplist(:, :)
-    integer, dimension(:), allocatable :: znums0, znums1, types0, types1
-    character(label_len), dimension(:), allocatable :: labels0, labels1
-    real, dimension(:, :), allocatable :: coords0, coords1
-    real, allocatable, dimension(:) :: weights0
-    real, allocatable :: mindist(:)
-    real travec(3), rotmat(3, 3)
+    character(label_len), allocatable, dimension(:) :: labels0, labels1
+    real rmsd
+    real, allocatable :: rmsdlist(:)
+    real, allocatable :: weights0(:)
+    real, dimension(:, :), allocatable :: coords0, coords1, aligned1
+    logical sort_flag, stdin_flag
 
-    procedure(f_realint), pointer :: weight_function => unity
+    procedure(f_realint), pointer :: weight_function
 
     ! Set default options
 
     bias_flag = .false.
     iter_flag = .false.
     sort_flag = .false.
-    abort_flag = .false.
+    stop_flag = .false.
     test_flag = .false.
     live_flag = .false.
     debug_flag = .false.
     stdin_flag = .false.
 
-    records = 1
+    nrec = 1
     max_count = 10
     bias_tol = 0.35
     bias_scale = 1.e3
     format_w = 'xyz'
+
+    weight_function => unity
 
     ! Get user options
 
@@ -73,14 +76,14 @@ program molalign
         case ('-count')
             call readoptarg(arg, max_count)
         case ('-trials')
-            abort_flag = .true.
+            stop_flag = .true.
             call readoptarg(arg, max_trials)
         case ('-tol')
             call readoptarg(arg, bias_tol)
         case ('-scale')
             call readoptarg(arg, bias_scale)
         case ('-rec')
-            call readoptarg(arg, records)
+            call readoptarg(arg, nrec)
         case ('-out')
             call readoptarg(arg, format_w)
         case ('-stdin')
@@ -113,8 +116,10 @@ program molalign
     allocate(znums0(natom0), znums1(natom1))
     allocate(types0(natom0), types1(natom1))
     allocate(weights0(natom0))
-    allocate(maplist(natom0, records))
-    allocate(mapcount(records), mindist(records))
+    allocate(aligned1(3, natom1))
+    allocate(maplist(natom0, nrec))
+    allocate(countlist(nrec))
+    allocate(rmsdlist(nrec))
 
     ! Get atomic numbers and types
 
@@ -132,25 +137,28 @@ program molalign
         weights0(i) = weight_function(znums0(i))
     end do
 
+    ! Normalize weights
+
+    weights0 = weights0/sum(weights0)
+
     ! Sort atoms to minimize MSD
 
     if (sort_flag) then
 
-        call sort_atoms(natom0, natom1, znums0, znums1, types0, types1, coords0, coords1, &
-            weights0, records, nrec, maplist, mapcount, mindist)
+        call assign_atoms(natom0, natom1, znums0, znums1, types0, types1, coords0, coords1, &
+            weights0, nrec, nmap, maplist, countlist, rmsdlist)
 
         ! Write aligned coordinates
 
-        do i = 1, nrec
+        do i = 1, nmap
 
             call align_atoms(natom0, natom1, znums0, znums1(maplist(:, i)), &
                 types0, types1(maplist(:, i)), coords0, coords1(:, maplist(:, i)), &
-                weights0, travec, rotmat)
+                weights0, rmsd, aligned1)
 
             open(newunit=u, file='aligned_'//str(i)//'.'//trim(format_w), action='write', status='replace')
             call writefile(u, format_w, natom0, title0, znums0, coords0)
-            call writefile(u, format_w, natom1, title1, znums1(maplist(:, i)), &
-                translated(natom1, rotated(natom1, coords1(:, maplist(:, i)), rotmat), travec))
+            call writefile(u, format_w, natom1, title1, znums1(maplist(:, i)), aligned1)
             close(u)
 
         end do
@@ -160,20 +168,15 @@ program molalign
         ! Align atoms to minimize RMSD
 
         call align_atoms(natom0, natom1, znums0, znums1, types0, types1, coords0, coords1, &
-            weights0, travec, rotmat)
-
-        call rotate(natom1, coords1, rotmat)
-        call translate(natom1, coords1, travec)
+            weights0, rmsd, aligned1)
 
         ! Write aligned coordinates
 
-        write (output_unit, '(a,1x,f0.4,1x,a)') 'RMSD:', &
-            squaredist(natom0, weights0, coords0, coords1, identitymap(natom0)), &
-            '(only alignment performed)'
+        write (output_unit, '(a,1x,f0.4,1x,a)') 'RMSD:', rmsd, '(only alignment performed)'
 
         open(newunit=u, file='aligned_0.'//trim(format_w), action='write', status='replace')
         call writefile(u, format_w, natom0, title0, znums0, coords0)
-        call writefile(u, format_w, natom1, title1, znums1, coords1) 
+        call writefile(u, format_w, natom1, title1, znums1, aligned1) 
         close(u)
 
     end if

@@ -9,11 +9,10 @@ hungarian.f90
 printing.f90
 chemdata.f90
 chemutils.f90
-assignment.f90
 assortment.f90
 translation.f90
 rotation.f90
 alignment.f90
 biasing.f90
-remapping.f90
+assignment.f90
 molalignlib.f90

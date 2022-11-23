@@ -31,6 +31,6 @@ export PYTHONWARNINGS
 
 pushd "$1" >/dev/null
 echo Linking dynamic python library...
-"$F2PY" -h signature.pyf -m "$2" --quiet *.f2py
+"$F2PY" -h signature.pyf -m "$2" --overwrite-signature --quiet *.f2py
 "$F2PY" -c signature.pyf --fcompiler=gnu95 -llapack --quiet *.o
 popd >/dev/null

@@ -1,6 +1,6 @@
 from ase import io
 from argparse import ArgumentParser
-from molalignlib import Alignment
+from molalignlib import Align, Assign
 
 def main():
 
@@ -43,31 +43,31 @@ def main():
     else:
         weights0 = None
 
-    # Create an alignment object with atoms0 as reference
-    alignment0 = Alignment(
+    align0 = Align(
         atoms = atoms0,
         weights = weights0,
-        testing = args.test,
-        biasing = biasing,
-        iteration = iteration,
-        records = args.rec,
-        count = args.count,
-        trials = args.trials,
-        bias_tol = args.tol,
-        bias_scale = args.scale,
     )
 
     if args.sort:
-        # Sort atoms1 to minimize the RMSD respect to atoms0
-        maplist, mapcount, mindist = alignment0.sorted(atoms1)
+        assign0 = Assign(
+            atoms = atoms0,
+            weights = weights0,
+            testing = args.test,
+            biasing = biasing,
+            iteration = iteration,
+            records = args.rec,
+            count = args.count,
+            trials = args.trials,
+            bias_tol = args.tol,
+            bias_scale = args.scale,
+        )
+        assignments = assign0(atoms1)
         # Align atoms1 to atoms0 for each calculated mapping and write coordinates to file
-        for i, mapping in enumerate(maplist, start=1):
-            alignedatoms1 = alignment0.aligned(atoms1[mapping])
+        for i, a in enumerate(assignments, start=1):
             io.write('aligned_{}.xyz'.format(i), atoms0)
-            io.write('aligned_{}.xyz'.format(i), alignedatoms1, append=True)
+            io.write('aligned_{}.xyz'.format(i), align0(atoms1[a.map]).atoms, append=True)
     else:
-        alignedatoms1 = alignment0.aligned(atoms1)
-        #rmsd = np.sqrt((weights0*((alignedatoms1 - atoms0)**2).sum(axis=0)).mean())
-        #print('RMSD: {} (only alignment performed)'.format(rmsd))
+        alignment = align0(atoms1)
+        print('RMSD: {:.4f} (only alignment performed)'.format(alignment.rmsd))
         io.write('aligned_0.xyz', atoms0)
-        io.write('aligned_0.xyz', alignedatoms1, append=True)
+        io.write('aligned_0.xyz', alignment.atoms, append=True)

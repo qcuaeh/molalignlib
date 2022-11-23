@@ -9,11 +9,16 @@ implicit none
 
 private
 public sort
+public sorted
 public order
 
 interface sort
     module procedure intquicksort
     module procedure realquicksort
+end interface
+
+interface sorted
+    module procedure intsorted
 end interface
 
 interface order
@@ -22,6 +27,14 @@ interface order
 end interface
 
 contains
+
+function intsorted(x, n) result(y)
+   integer, intent(in) :: n
+   integer, dimension(:), intent(in) :: x
+   integer y(n)
+   y(1:n) = x(1:n)
+   call intquicksort(y, 1, n)
+end function
 
 function intorder(x, n) result(o)
     integer, intent(in) :: n

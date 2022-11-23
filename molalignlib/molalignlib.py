@@ -14,7 +14,51 @@ except ModuleNotFoundError:
         for line in p.stdout:
             print(line.decode('utf-8').rstrip())
 
-class Alignment(Atoms):
+class Alignment:
+    def __init__(self, rmsd, atoms):
+        self.rmsd = rmsd
+        self.atoms = atoms
+
+class Assignment:
+    def __init__(self, map, count, rmsd):
+        self.map = map
+        self.count = count
+        self.rmsd = rmsd
+
+class Align(Atoms):
+    def __init__(
+        self,
+        atoms,
+        weights = None,
+    ):
+        if isinstance(atoms, Atoms):
+            self.__dict__.update(atoms.__dict__)
+        else:
+            raise TypeError('An Atoms object was expected as argument')
+        if weights is None:
+            self.weights = np.ones(len(atoms), dtype=float)/len(atoms)
+        elif type(weights) is np.ndarray and weights.dtype is float:
+            self.weights = weights/sum(weights)
+        else:
+            raise TypeError('"weights" must be a real numpy array')
+    def __call__(self, other):
+        if not isinstance(other, Atoms):
+            raise TypeError('An Atoms object was expected as first argument')
+        if len(other) != len(self):
+            raise ValueError('First argument does no have the right length')
+        znums0 = self.get_atomic_numbers()
+        znums1 = other.get_atomic_numbers()
+        types0 = np.ones(len(self), dtype=int)
+        types1 = np.ones(len(other), dtype=int)
+        coords0 = self.get_positions().transpose() # Convert to column-major order
+        coords1 = other.get_positions().transpose() # Convert to column-major order
+        rmsd, coords1 = molalignlib.align_atoms(znums0, znums1, types0, types1, \
+            coords0, coords1, self.weights)
+        # Convert back to row-major order
+        atoms1 = Atoms(numbers=znums1, positions=coords1.transpose())
+        return Alignment(rmsd, atoms1)
+
+class Assign(Atoms):
     def __init__(
         self,
         atoms,
@@ -54,11 +98,11 @@ class Alignment(Atoms):
         else:
             raise TypeError('"trials" must be an integer')
         if weights is None:
-            self.weights = np.ones(len(atoms), dtype=float),
-        elif type(weights) is not np.ndarray:
-            self.weights = weights
+            self.weights = np.ones(len(atoms), dtype=float)/len(atoms)
+        elif type(weights) is np.ndarray and weights.dtype is float:
+            self.weights = weights/sum(weights)
         else:
-            raise TypeError('"weights" must be a numpy array')
+            raise TypeError('"weights" must be a real numpy array')
         self.records = records
         molalignlib.set_bias_flag(biasing)
         molalignlib.set_bias_scale(bias_scale)
@@ -66,7 +110,7 @@ class Alignment(Atoms):
         molalignlib.set_conv_flag(iteration)
         molalignlib.set_test_flag(testing)
         molalignlib.set_max_count(count)
-    def sorted(self, other):
+    def __call__(self, other):
         if not isinstance(other, Atoms):
             raise TypeError('An Atoms object was expected as argument')
         if len(other) != len(self):
@@ -75,23 +119,9 @@ class Alignment(Atoms):
         znums1 = other.get_atomic_numbers()
         types0 = np.ones(len(self), dtype=int)
         types1 = np.ones(len(other), dtype=int)
-        coords0 = self.get_positions().transpose()
-        coords1 = other.get_positions().transpose()
-        n, maplist, mapcount, mindist = molalignlib.sort_atoms(znums0, znums1, \
+        coords0 = self.get_positions().transpose() # Convert to column-major order
+        coords1 = other.get_positions().transpose() # Convert to column-major order
+        nmap, maplist, countlist, rmsdlist = molalignlib.assign_atoms(znums0, znums1, \
             types0, types1, coords0, coords1, self.weights, self.records)
-        return [i - 1 for i in maplist.transpose()[:n]], mapcount[:n], mindist[:n]
-    def aligned(self, other):
-        if not isinstance(other, Atoms):
-            raise TypeError('An Atoms object was expected as first argument')
-        if len(other) != len(self):
-            raise ValueError('First argument does no have the right length')
-        znums0 = self.get_atomic_numbers()
-        znums1 = other.get_atomic_numbers()
-        types0 = np.ones(len(self), dtype=int)
-        types1 = np.ones(len(other), dtype=int)
-        coords0 = self.get_positions().transpose()
-        coords1 = other.get_positions().transpose()
-        travec, rotmat = molalignlib.align_atoms(znums0, znums1, types0, types1, \
-             coords0, coords1, self.weights)
-        coords1 = np.matmul(rotmat, coords1).transpose() + travec
-        return Atoms(numbers=znums1, positions=coords1)
+        maplist = maplist - 1 # Convert to 0-based indexing
+        return [Assignment(maplist[:, i], countlist[i], rmsdlist[i]) for i in range(nmap)]
