@@ -2,7 +2,7 @@ module writemol
 
 use iso_fortran_env, only: error_unit
 
-use options
+use settings
 use strutils
 use maputils
 use chemdata

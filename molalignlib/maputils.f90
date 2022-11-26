@@ -1,6 +1,6 @@
 module maputils
 
-use options
+use settings
 
 implicit none
 

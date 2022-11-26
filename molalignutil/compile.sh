@@ -1,20 +1,19 @@
 #!/bin/bash -e
 shopt -s nullglob
 
-if test ! -e build.env; then
-   echo Error: build.env does not exist
-   exit
-elif test ! -f build.env; then
-   echo Error: build.env does exist but is not a file
-   exit
-fi
-
-. build.env
+split() {
+   IFS=$2 read -r -a "$1" <<< "${!1}"
+}
 
 all=false
 pic=false
 debug=false
 real=8
+
+split base_flags \ 
+split optim_flags \ 
+split debug_flags \ 
+split double_flags \ 
 
 options=$(getopt -o '' -al all,pic,debug,r4,r8 -- "$@") || exit
 eval set -- "$options"
@@ -33,12 +32,12 @@ done
 
 if test $# -ne 2; then
    echo Error: two arguments are required
-   exit
+   exit 1
 fi
 
 if test ! -d "$1"; then
    echo Error: $1 does not exist
-   exit
+   exit 1
 fi
 
 srcdir=$(cd "$1"; pwd)
@@ -47,20 +46,21 @@ if test ! -e "$2"; then
    mkdir "$2"
 elif test ! -d "$2"; then
    echo Error: $2 does exist but is not a directory
+   exit 1
 fi
 
 pushd "$2" >/dev/null
 
-flags=("${BASE_FLAGS[@]}")
+flags=("${base_flags[@]}")
 
 if $pic; then
    flags+=(-fPIC)
 fi
 
 if $debug; then
-   flags+=(-O0 "${DEBUG_FLAGS[@]}")
+   flags+=("${debug_flags[@]}")
 else
-   flags+=(-Ofast)
+   flags+=("${optim_flags[@]}")
 fi
 
 case "$real" in
@@ -69,13 +69,13 @@ case "$real" in
    shift
    ;;
 8)
-   flags+=("${REAL8_FLAGS[@]}")
+   flags+=("${double_flags[@]}")
    echo '{"real":{"":"double"}}' > .f2py_f2cmap
    shift
    ;;
 *)
    echo Invalid precision type: $real
-   exit
+   exit 1
    ;;
 esac
 

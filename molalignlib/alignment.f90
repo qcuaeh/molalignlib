@@ -2,7 +2,7 @@ module alignment
 
 use linear
 use rotation
-use options
+use settings
 
 implicit none
 

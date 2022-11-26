@@ -4,20 +4,28 @@ from ase import Atoms
 try:
     from .f2py_molalignlib import molalignlib
 except ModuleNotFoundError:
-    from os import path, symlink
+    from os import path, environ
     from subprocess import Popen, PIPE, STDOUT
     import molalignutil
-    moduledir = path.dirname(path.abspath(__file__))
-    scriptdir = path.dirname(path.abspath(molalignutil.__file__))
-    symlink(path.join(scriptdir, 'gnu.env'), path.join(moduledir, 'build.env'))
-    command = [path.join(scriptdir, 'compile.sh'), '-all', '-pic', '.', '.']
-    with Popen(command, cwd=moduledir, stdout=PIPE, stderr=STDOUT, bufsize=0) as p:
+    libdir = path.dirname(path.abspath(__file__))
+    utildir = path.dirname(path.abspath(molalignutil.__file__))
+    buildenv = environ.copy()
+    with open(path.join(utildir, 'gnu.env'), 'r') as file:
+        for line in file.readlines():
+            var, _, value = line.rstrip('\n').partition('=')
+            buildenv[var] = value
+    command = [path.join(utildir, 'compile.sh'), '-all', '-pic', '.', '.']
+    with Popen(command, cwd=libdir, env=buildenv, stdout=PIPE, stderr=STDOUT, bufsize=0) as p:
         for line in p.stdout:
             print(line.decode('utf-8').rstrip())
-    command = [path.join(scriptdir, 'link-pylib.sh'), '.', 'f2py_molalignlib']
-    with Popen(command, cwd=moduledir, stdout=PIPE, stderr=STDOUT, bufsize=0) as p:
+    command = [path.join(utildir, 'link-pyext.sh'), '.', 'f2py_molalignlib']
+    with Popen(command, cwd=libdir, env=buildenv, stdout=PIPE, stderr=STDOUT, bufsize=0) as p:
         for line in p.stdout:
             print(line.decode('utf-8').rstrip())
+    try:
+        from .f2py_molalignlib import molalignlib
+    except ModuleNotFoundError:
+        raise ImportError('molalignlib extension not found')
 
 class Alignment:
     def __init__(self, rmsd, atoms):

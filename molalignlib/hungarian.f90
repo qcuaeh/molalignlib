@@ -11,7 +11,7 @@ module hungarian
 ! Mathlib gen/H (H301)
 ! Author: F. Bourgeois, 15 February 1994
 
-use options
+use settings
 
 implicit none
 

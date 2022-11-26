@@ -2,7 +2,7 @@ module sorting
 
 use iso_fortran_env, only: error_unit
 
-use options
+use settings
 use maputils
 
 implicit none

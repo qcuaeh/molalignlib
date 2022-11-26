@@ -1,7 +1,7 @@
 module chemdata
 ! Purpose: Definition of physical constants
 
-use options
+use settings
 
 ! elsym: Element symbols
 ! covradii: Atomic covalent radii (Angstrom)

@@ -3,7 +3,7 @@ program molalign
     use iso_fortran_env, only: input_unit
     use iso_fortran_env, only: output_unit
 
-    use options
+    use settings
     use strutils
     use optparse
     use chemutils

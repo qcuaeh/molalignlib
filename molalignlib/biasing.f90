@@ -1,6 +1,6 @@
 module biasing
 
-use options
+use settings
 use sorting
 
 implicit none

@@ -1,6 +1,6 @@
 module translation
 
-use options
+use settings
 
 implicit none
 

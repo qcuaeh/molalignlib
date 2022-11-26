@@ -1,7 +1,7 @@
 module random
 use iso_fortran_env, only: output_unit
 use rnglib
-use options
+use settings
 
 implicit none
 

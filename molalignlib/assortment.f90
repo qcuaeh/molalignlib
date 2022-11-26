@@ -2,7 +2,7 @@ module assortment
 
 use iso_fortran_env, only: error_unit
 
-use options
+use settings
 use sorting
 use maputils
 use chemdata

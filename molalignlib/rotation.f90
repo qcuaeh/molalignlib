@@ -1,6 +1,6 @@
 module rotation
 
-use options
+use settings
 
 implicit none
 

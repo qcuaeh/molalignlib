@@ -1,3 +1,0 @@
-#!/bin/bash
-cp $HOME/molalign/config/gnu.cfg $HOME/molalign/build.cfg
-$HOME/molalign/build.sh -lpy
