@@ -4,13 +4,18 @@ from ase import Atoms
 try:
     from .f2py_molalignlib import molalignlib
 except ModuleNotFoundError:
-    from os import path
+    from os import path, symlink
     from subprocess import Popen, PIPE, STDOUT
+    import molalignutil
     moduledir = path.dirname(path.abspath(__file__))
-    with Popen(['./compile.sh', '-all', '-pic', '.', '.'], cwd=moduledir, stdout=PIPE, stderr=STDOUT, bufsize=0) as p:
+    scriptdir = path.dirname(path.abspath(molalignutil.__file__))
+    symlink(path.join(scriptdir, 'gnu.env'), path.join(moduledir, 'build.env'))
+    command = [path.join(scriptdir, 'compile.sh'), '-all', '-pic', '.', '.']
+    with Popen(command, cwd=moduledir, stdout=PIPE, stderr=STDOUT, bufsize=0) as p:
         for line in p.stdout:
             print(line.decode('utf-8').rstrip())
-    with Popen(['./link_pythonlib.sh', '.', 'f2py_molalignlib'], cwd=moduledir, stdout=PIPE, stderr=STDOUT, bufsize=0) as p:
+    command = [path.join(scriptdir, 'link-pylib.sh'), '.', 'f2py_molalignlib']
+    with Popen(command, cwd=moduledir, stdout=PIPE, stderr=STDOUT, bufsize=0) as p:
         for line in p.stdout:
             print(line.decode('utf-8').rstrip())
 

@@ -17,9 +17,10 @@ Building
 To build the program you will need a Linux computer with the GNU or Intel Fortran
 compilers, LAPACK, and optionally, with Python 3 and F2PY.
 
-1. Clone the repository and enter the *molalign* directory.
-2. Make a copy of either *scripts/gnu.env* or *scripts/intel.env* as *build.env*, depending on your system.
-3. Run `./scripts/build.sh` to build the executable.
+1. Clone the repository and enter its directory.
+2. Make a copy of either *gnu.env* or *intel.env*, which are inside the molalignutil
+   directory, as *build.env*.
+3. Run the *build.sh* script to build the executable.
 
 After runnig the script the executable will be created inside the *build* directory.
 
