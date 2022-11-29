@@ -13,8 +13,8 @@ problem for atom clusters.
 ![graphical abstract](abstract.png)
 
 
-Before compiling
-----------------
+Before installing
+-----------------
 
 You will need a modern Fortran compiler and LAPACK to build molalign from
 source but also to compile the extension modules installed with pip.
@@ -26,7 +26,6 @@ In RHEL or Fedora use *yum* to install them
 In Debian, Ubuntu, etc. use *apt*
 
     apt install gfortran liblapack-dev
-
 
 Build molalign from source 
 --------------------------
@@ -49,12 +48,11 @@ symbolic link *build.env* to *intel.env* instead of *gnu.env*.
 Install molalign with pip
 -------------------------
 
-*molalign* is also available as a python package, to install it just run
+The python library only supports Python 3 so make sure that you are using the right version of *python* and *pip*. To install the package just run
 
     pip install molalign
 
-It only supports Python 3 so make sure that you are using the right versions
-of *python* and *pip*. The command will install the python modules and a python
+The command will install the python modules and a python
 version of the molalign executable but will not compile the extension modules.
 
 The extension modules will be automatically compiled the first time they are used,
@@ -98,10 +96,6 @@ To align two molecules with optimal assigment run
 
     ./build/molalign tests/r05/Co100.xyz -sort
 
-by default a threshold of 10 counts is used but a lower threshold
-can be used to reduce the computation time at the expense of less reliable
-results.
-
 When reordering is requested performance can be improved by two to four orders of
 magnitude by enabling biasing and iteration with the `-fast` option, for example
 
@@ -116,20 +110,14 @@ increased from the default of 0.35 Å to an appropiate value with the `-tol X` o
 Advanced usage
 --------------
 
-To use mass weighted coordinates include the `-mass` option
+By default a threshold of 10 counts is used to stop the computation, but it
+can be changed with the `-count N` option. Reducing this threshold will proportionally reduce the computation time but the probability of suboptimal assignmnets will increase.
 
-To have reproducible results use the option `-test`, which will force the generation
-of the same stream of random numbers on every run.
+The algorithm always explores multiple possible assignments, but only the best one is stored by default. For symmetric clusters it can be useful to store and print more than one assignment using the `-rec N` option.
 
-The algorithm by default generates several possible reorderings, but only one is
-printed by default. To print *N* solution use the `-rec N` option
+To avoid too long computations the `-trials N` option can be used to stop the computation if the number of trials exceeds *N*.
 
-To avoid too long computations the `-trials N` option which will stop the computation
-if the number of trials exceeds *N*.
-
-The options `-stdin` and `-out` control the source of the input and the destination of the output.
-
-The option `-live` will show the progress of the computation in real time.
+To have reproducible results use the option `-test`, which will force the generation of the same stream of random numbers on every run.
 
 
 Examples
