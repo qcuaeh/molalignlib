@@ -14,7 +14,9 @@ subroutine setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
     real, dimension(:, :), intent(out) :: bias
 
     integer h, i, j, offset
-    real d0(natom, natom), d1(natom, natom)
+!    real d0(natom, natom), d1(natom, natom)
+    real, allocatable :: d0(:, :), d1(:, :)
+    allocate(d0(natom, natom), d1(natom, natom))
 
     do i = 1, natom
         offset = 0

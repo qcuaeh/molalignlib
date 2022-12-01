@@ -6,7 +6,7 @@ linear.f90
 random.f90
 sorting.f90
 biasing.f90
-hungarian.f90
+eap_jv.f90
 printing.f90
 chemdata.f90
 chemutils.f90

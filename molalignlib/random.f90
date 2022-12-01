@@ -16,6 +16,7 @@ subroutine getrandnum(x)
     real x(:)
     integer i
     do i = 1, size(x)
+!        call random_number(x(i))
         call real_uni01(x(i))
     end do
 end subroutine
@@ -29,6 +30,7 @@ subroutine shuffle(array, n)
 
    do k = 1, 2
       do i = 1, n
+!         call random_number(u)
          call real_uni01(u)
          j = floor(n*u) + 1
          ! switch values
@@ -43,25 +45,29 @@ end subroutine
 subroutine random_init()
   use iso_fortran_env, only: int64
   implicit none
-  integer :: seed(2)
-  integer :: i, un, istat, dt(8)
-  integer(int64) :: t
-!  integer pid
+!  integer i, n
+!  integer, allocatable :: seed(:)
+  integer seed1, seed2
+  integer u, stat, dt(8)
+  integer(int64) t
 
   call initialize()
 
   if (test_flag) return
 
+!  call random_seed(size=n)
+!  allocate(seed(n))
+
   ! First try if the OS provides a random number generator
-  open(newunit=un, file="/dev/urandom", access="stream", &
-       form="unformatted", action="read", status="old", iostat=istat)
-  if (istat == 0) then
-     read(un) seed
-     close(un)
+  open(newunit=u, file="/dev/urandom", access="stream", &
+       form="unformatted", action="read", status="old", iostat=stat)
+  if (stat == 0) then
+!     read(u) seed
+     read(u) seed1
+     read(u) seed2
+     close(u)
   else
-     ! Fallback to XOR:ing the current time and pid. The PID is
-     ! useful in case one launches multiple instances of the same
-     ! program in parallel.
+     ! Fallback to XORing the current time
      call system_clock(t)
      if (t == 0) then
         call date_and_time(values=dt)
@@ -72,15 +78,14 @@ subroutine random_init()
              + dt(6) * 60 * 1000 + dt(7) * 1000 &
              + dt(8)
      end if
-!     pid = getpid()
-!     t = ieor(t, int(pid, kind(t)))
-     do i = 1, 2
-        seed(i) = lcg(t)
-     end do
+!     do i = 1, n
+!        seed(i) = lcg(t)
+!     end do
+     seed1 = lcg(t)
+     seed2 = lcg(t)
   end if
-  seed(1) = modulo(seed(1), 2147483563) + 1
-  seed(2) = modulo(seed(2), 2147483399) + 1
-  call set_initial_seed(seed(1), seed(2))
+!  call random_seed(put=seed)
+  call set_initial_seed(seed1, seed2)
 contains
   ! This simple PRNG might not be good enough for real work, but is
   ! sufficient for seeding a better PRNG.

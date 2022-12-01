@@ -1,4 +1,34 @@
-module hungarian
+module eap
+
+implicit none
+
+contains
+
+subroutine eapsolve(n, o, p, q, bias, perm, dist)
+
+    integer, intent(in) :: n, o
+    real, intent(in) :: p(:, :), q(:, :)
+    real, intent(in) :: bias(:, :)
+    integer, intent(out) :: perm(:)
+    real, intent(out) :: dist
+
+    integer i, j
+!    real c(n, n)
+    real, allocatable :: c(:, :)
+    allocate(c(n, n))
+
+    do i = 1, n
+        do j = 1, n
+            c(i, j) = sum((q(:, o + j) - p(:, o + i))**2) + bias(o + i, o + j)
+        end do
+    end do
+
+    call assndx(1, c, n, n, perm, dist)
+
+end subroutine
+
+
+subroutine assndx(mode, a, n, m, k, sum)
 !https://wp.csiro.au/alanmiller/assndx.f90
 ! Code converted using TO_F90 by Alan Miller
 ! Date: 2002-03-06  Time: 08:36:31
@@ -11,13 +41,6 @@ module hungarian
 ! Mathlib gen/H (H301)
 ! Author: F. Bourgeois, 15 February 1994
 
-use settings
-
-implicit none
-
-contains
-
-subroutine assndx(mode, a, n, m, k, sum)
 ! N.B. Arguments IDA, IW & IDW have been removed.
 
 ! If MODE = 1, then it finds k(1), k(2), ..., k(n) to minimize

@@ -1653,19 +1653,22 @@ subroutine set_initial_seed ( ig1, ig2 )
 !  integer multmod
   integer t
 
-  if ( ig1 < 1 .or. m1 <= ig1 ) then
-    write ( *, '(a)' ) ' '
-    write ( *, '(a)' ) 'SET_INITIAL_SEED - Fatal error!'
-    write ( *, '(a)' ) '  Input parameter IG1 out of bounds.'
-    stop 1
-  end if
+  ig1 = modulo(ig1 - 1, m1 - 1) + 1
+  ig2 = modulo(ig2 - 1, m2 - 1) + 1
 
-  if ( ig2 < 1 .or. m2 <= ig2 ) then
-    write ( *, '(a)' ) ' '
-    write ( *, '(a)' ) 'SET_INITIAL_SEED - Fatal error!'
-    write ( *, '(a)' ) '  Input parameter IG2 out of bounds.'
-    stop 1
-  end if
+!  if ( ig1 < 1 .or. m1 <= ig1 ) then
+!    write ( *, '(a)' ) ' '
+!    write ( *, '(a)' ) 'SET_INITIAL_SEED - Fatal error!'
+!    write ( *, '(a)' ) '  Input parameter IG1 out of bounds.'
+!    stop 1
+!  end if
+!
+!  if ( ig2 < 1 .or. m2 <= ig2 ) then
+!    write ( *, '(a)' ) ' '
+!    write ( *, '(a)' ) 'SET_INITIAL_SEED - Fatal error!'
+!    write ( *, '(a)' ) '  Input parameter IG2 out of bounds.'
+!    stop 1
+!  end if
 !
 !  Because INITIALIZE calls SET_INITIAL_SEED, it's not easy to correct
 !  the error that arises if SET_INITIAL_SEED is called before INITIALIZE.
