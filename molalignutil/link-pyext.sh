@@ -16,13 +16,10 @@ if test ! -d "$1"; then
    exit 1
 fi
 
-PYTHONWARNINGS=ignore::Warning:setuptools.command.install
-export PYTHONWARNINGS
-
 echo Linking extension module...
 pushd "$1" >/dev/null
 "$F2PY" -h signature.pyf -m "$2" --overwrite-signature --quiet *.f2py
-"$F2PY" -c signature.pyf --fcompiler=gnu95 -llapack --quiet *.o
+"$F2PY" -c signature.pyf --fcompiler=gnu95 --link-lapack --quiet *.o
 popd >/dev/null
 
 echo Done

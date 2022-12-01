@@ -8,6 +8,7 @@ elif test ! -f build.env; then
    exit 1
 fi
 
+# Export environment
 while IFS= read -r line; do
    var=${line%%=*}
    value=${line#*=}
@@ -21,12 +22,14 @@ done < build.env
 ./molalignutil/link-prog.sh build molalign
 
 # Run tests
-#./molalignutil/run-tests.sh build tests/r05 -test -rec 10 -sort -fast -tol 0.17
-./molalignutil/run-tests.sh build tests/r10 -test -rec 10 -sort -fast -tol 0.35
+./molalignutil/run-tests.sh build tests/r05 -test -rec 10 -sort -fast -tol 0.17
+#./molalignutil/run-tests.sh build tests/r10 -test -rec 10 -sort -fast -tol 0.35
 #./molalignutil/run-tests.sh build tests/r20 -test -rec 10 -sort -fast -tol 0.69
 
 # Build dynamic library
 #./molalignutil/compile.sh -all -pic molalignlib build
-#./molalignutil/compile.sh -all -pic molalign build
 #./molalignutil/link-lib.sh build molalignlib.so
+
+# Build extension module (python)
+#./molalignutil/compile.sh -all -pic molalignlib build
 #./molalignutil/link-pyext.sh build f2py_molalignlib
