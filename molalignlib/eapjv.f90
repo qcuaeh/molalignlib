@@ -1,5 +1,5 @@
 module eap
-use iso_fortran_env, only: int64
+use parameters
 implicit none
 
 contains
@@ -48,9 +48,9 @@ contains
 !       s  : Box lengths (or dummy if open B.C.)
 !       pbc: Periodic boundary conditions?
       integer n, o
-      real p(:, :), q(:, :)
-      real bias(:, :)
-!      real s(3), sx, sy, sz, worstdist, worstradius
+      real(wp) p(:, :), q(:, :)
+      real(wp) bias(:, :)
+!      real(wp) s(3), sx, sy, sz, worstdist, worstradius
 !      logical pbc
 
 !     Output
@@ -58,13 +58,13 @@ contains
 !       dist: Minimum attainable distance
 !     We have
       integer perm(:)
-      real dist
+      real(wp) dist
       
 !     Parameters
 !       scale : Precision
 !       maxnei: Maximum number of closest neighbours
-      real, parameter :: scale = 1.0d6 
-      integer, parameter :: maxnei = 60 
+      real(wp), parameter :: scale = 1.0e6_wp
+      integer, parameter :: maxnei = 60
 
 !     Internal variables
 !     cc, kk, first:
@@ -85,7 +85,7 @@ contains
       allocate(kk(n*maxnei), cc(n*maxnei))
 
 !     Distance function
-!      real permdist
+!      real(wp) permdist
 
 !      s(1)=sx
 !      s(2)=sy
@@ -237,7 +237,7 @@ contains
          if (perm(i).lt.1) perm(i)=1
       end do
 
-      dist = real(h) / scale
+      dist = real(h, wp) / scale
 
 !      WORSTDIST=-1.0D0
 !      DO I=1,N
@@ -261,11 +261,11 @@ contains
 !       pbc: Periodic boundary conditions?
 
 !   function permdist(p, q, s, pbc)
-!      real permdist
-!      real p(3), q(3), s(3)
+!      real(wp) permdist
+!      real(wp) p(3), q(3), s(3)
 !      logical pbc
 !
-!      real t, d
+!      real(wp) t, d
 !      integer i
 !
 !      d = 0.0d0
@@ -292,14 +292,14 @@ contains
 !     
 
    subroutine jovosap(n,sz,cc,kk,first,x,y,u,v,h)
-      integer(kind=int64) n, sz
+      integer(int64) n, sz
       integer first(n+1)
-      integer(kind=int64) cc(sz),kk(sz),x(n),y(n),u(n),v(n)
-      integer(kind=int64) h,cnt,l0,t,t0,td,v0,vj,dj
-      integer(kind=int64) lab(n),d(n),free(n),todo(n)
+      integer(int64) cc(sz),kk(sz),x(n),y(n),u(n),v(n)
+      integer(int64) h,cnt,l0,t,t0,td,v0,vj,dj
+      integer(int64) lab(n),d(n),free(n),todo(n)
       logical ok(n)
-      integer(kind=int64) j, i, j0, l, j1, min, k, i0
-      integer(kind=int64) bigint
+      integer(int64) j, i, j0, l, j1, min, k, i0
+      integer(int64) bigint
 
 !     I don't know how to make g77 read integer*8 constants/parameters.
 !       PARAMETER (BIGINT = 10**12) does not work(!)

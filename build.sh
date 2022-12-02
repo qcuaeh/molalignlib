@@ -1,4 +1,15 @@
 #!/bin/bash -e
+shopt -s nullglob
+
+clean_build() {
+   if test -d build; then
+      pushd build >/dev/null
+      for file in *.f* *.mod *.o; do
+         rm "$file"
+      done
+      popd >/dev/null
+   fi
+}
 
 if test ! -e build.env; then
    echo Error: build.env does not exist
@@ -17,19 +28,22 @@ while IFS= read -r line; do
 done < build.env
 
 # Build program
-./molalignutil/compile.sh -all molalignlib build
-./molalignutil/compile.sh -all molalign build
-./molalignutil/link-prog.sh build molalign
+./molalignbld/compile.sh molalignlib build
+./molalignbld/compile.sh molalign build
+./molalignbld/makeprog.sh build molalign
+clean_build
 
 # Run tests
-./molalignutil/run-tests.sh build tests/r05 -test -rec 10 -sort -fast -tol 0.17
-#./molalignutil/run-tests.sh build tests/r10 -test -rec 10 -sort -fast -tol 0.35
-#./molalignutil/run-tests.sh build tests/r20 -test -rec 10 -sort -fast -tol 0.69
+./molalignbld/runtests.sh build tests/r05 -test -rec 10 -sort -fast -tol 0.17
+#./molalignbld/runtests.sh build tests/r10 -test -rec 10 -sort -fast -tol 0.35
+#./molalignbld/runtests.sh build tests/r20 -test -rec 10 -sort -fast -tol 0.69
 
 # Build dynamic library
-#./molalignutil/compile.sh -all -pic molalignlib build
-#./molalignutil/link-lib.sh build molalignlib.so
+#./molalignbld/compile.sh -pic molalignlib build
+#./molalignbld/makelib.sh build molalignlib.so
+#clean_build
 
 # Build extension module (python)
-#./molalignutil/compile.sh -all -pic molalignlib build
-#./molalignutil/link-pyext.sh build f2py_molalignlib
+#./molalignbld/compile.sh -pic molalignlib build
+#./molalignbld/makepyext.sh build f2py_molalignlib
+#clean_build

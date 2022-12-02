@@ -1,8 +1,6 @@
 program molalign
 
-    use iso_fortran_env, only: input_unit
-    use iso_fortran_env, only: output_unit
-
+    use parameters
     use settings
     use strutils
     use optparse
@@ -26,10 +24,10 @@ program molalign
     character(arg_len) arg, format_w
     character(title_len) title0, title1
     character(label_len), allocatable, dimension(:) :: labels0, labels1
-    real rmsd
-    real, allocatable :: rmsdlist(:)
-    real, allocatable :: weights0(:)
-    real, dimension(:, :), allocatable :: coords0, coords1, aligned1
+    real(wp) rmsd
+    real(wp), allocatable :: rmsdlist(:)
+    real(wp), allocatable :: weights0(:)
+    real(wp), dimension(:, :), allocatable :: coords0, coords1, aligned1
     logical sort_flag, stdin_flag
 
     procedure(f_realint), pointer :: weight_function

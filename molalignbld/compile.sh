@@ -5,26 +5,21 @@ split() {
    IFS=$2 read -r -a "$1" <<< "${!1}"
 }
 
-all=false
 pic=false
 debug=false
-real=8
 
 split base_flags \ 
 split optim_flags \ 
 split debug_flags \ 
 split double_flags \ 
 
-options=$(getopt -o '' -al all,pic,debug,r4,r8 -- "$@") || exit
+options=$(getopt -o '' -al pic,debug -- "$@") || exit
 eval set -- "$options"
 
 while true; do
    case "$1" in
-   --all) all=true; shift ;;
    --pic) pic=true; shift ;;
    --debug) debug=true; shift ;;
-   --r4) real=4; shift ;;
-   --r8) real=8; shift ;;
    --) shift; break ;;
    *) exit
    esac
@@ -63,28 +58,11 @@ else
    flags+=("${optim_flags[@]}")
 fi
 
-case "$real" in
-4)
-   echo '{"real":{"":"float"}}' > .f2py_f2cmap
-   shift
-   ;;
-8)
-   flags+=("${double_flags[@]}")
-   echo '{"real":{"":"double"}}' > .f2py_f2cmap
-   shift
-   ;;
-*)
-   echo Invalid precision type: $real
-   exit 1
-   ;;
-esac
-
 while IFS= read -r srcfile; do
    objfile=${srcfile%.f*}.o
-   if $all \
-      || ! test -e "$objfile" \
-      || ! test -e "$srcfile" \
-      || ! diff -q "$srcfile" "$srcdir/$srcfile" >/dev/null
+   if ! test -e "$objfile" \
+   || ! test -e "$srcfile" \
+   || ! diff -q "$srcfile" "$srcdir/$srcfile" >/dev/null
    then
       echo Compiling ${srcfile%.f*}...
       if test "$srcdir" != "$PWD"; then
@@ -92,7 +70,7 @@ while IFS= read -r srcfile; do
       fi
       "$F90" "${flags[@]}" -c "$srcfile" -o "$objfile"
    fi
-done < <(grep -v '^#' "$srcdir/f90_files")
+done < <(grep -v '^#' "$srcdir/fortran_files")
 
 if test -f "$srcdir/f2py_files"; then
    while IFS= read -r srcfile; do

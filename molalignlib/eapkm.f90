@@ -1,4 +1,5 @@
 module eap
+use parameters
 
 implicit none
 
@@ -7,14 +8,14 @@ contains
 subroutine eapsolve(n, o, p, q, bias, perm, dist)
 
     integer, intent(in) :: n, o
-    real, intent(in) :: p(:, :), q(:, :)
-    real, intent(in) :: bias(:, :)
+    real(wp), intent(in) :: p(:, :), q(:, :)
+    real(wp), intent(in) :: bias(:, :)
     integer, intent(out) :: perm(:)
-    real, intent(out) :: dist
+    real(wp), intent(out) :: dist
 
     integer i, j
-!    real c(n, n)
-    real, allocatable :: c(:, :)
+!    real(wp) c(n, n)
+    real(wp), allocatable :: c(:, :)
     allocate(c(n, n))
 
     do i = 1, n
@@ -56,16 +57,16 @@ subroutine assndx(mode, a, n, m, k, sum)
 !                   605-606.   The algorithm (CACM 27) is in Algol.
 
 integer, intent(in)   :: mode
-real, intent(in out)  :: a(:,:)
+real(wp), intent(in out)  :: a(:,:)
 integer, intent(in)   :: n
 integer, intent(in)   :: m
 integer, intent(out)  :: k(:)
-real, intent(out)     :: sum
+real(wp), intent(out)     :: sum
 
 logical  :: lsw
 integer  :: i, icbl, icl, icl0, iflag, imax, imin, ipp, irl, irs, &
             j, j1, jsv, new
-real     :: rmin
+real(wp) :: rmin
 integer, allocatable  :: iw(:,:)
 
 if (n < 1 .or. m < 1) then

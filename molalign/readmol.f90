@@ -1,10 +1,6 @@
 module readmol
-
-use iso_fortran_env, only: error_unit
-
-use settings
+use parameters
 use strutils
-use maputils
 use chemdata
 
 implicit none
@@ -15,7 +11,7 @@ subroutine readxyzfile(file_unit, natom, title, labels, coords)
 
     integer, intent(in) :: file_unit
     integer, intent(out) :: natom
-    real, dimension(:, :), allocatable, intent(out) :: coords
+    real(wp), dimension(:, :), allocatable, intent(out) :: coords
     character(*), dimension(:), allocatable, intent(out) :: labels
     character(*), intent(out) :: title
     integer i, stat

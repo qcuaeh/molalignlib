@@ -1,8 +1,5 @@
 module molalignlib
-
-use iso_fortran_env, only: output_unit
-use iso_fortran_env, only: error_unit
-
+use parameters
 use settings
 
 implicit none
@@ -50,12 +47,12 @@ subroutine set_max_trials(intval)
 end subroutine
 
 subroutine set_bias_tol(realval)
-    real, intent(in) :: realval
+    real(wp), intent(in) :: realval
     bias_tol = realval
 end subroutine
 
 subroutine set_bias_scale(realval)
-    real, intent(in) :: realval
+    real(wp), intent(in) :: realval
     bias_scale = realval
 end subroutine
 
@@ -78,7 +75,7 @@ subroutine assign_atoms( &
 )
 
     use random
-    use maputils
+    use sorting
     use translation
     use assortment
     use assignment
@@ -86,13 +83,13 @@ subroutine assign_atoms( &
     integer, intent(in) :: natom0, natom1, nrec
     integer, dimension(natom0), intent(in) :: znums0, types0
     integer, dimension(natom1), intent(in) :: znums1, types1
-    real, intent(in) :: coords0(3, natom0)
-    real, intent(in) :: coords1(3, natom1)
-    real, intent(in) :: weights0(natom0)
+    real(wp), intent(in) :: coords0(3, natom0)
+    real(wp), intent(in) :: coords1(3, natom1)
+    real(wp), intent(in) :: weights0(natom0)
     integer, intent(out) :: nmap
     integer, intent(out) :: maplist(natom0, nrec)
     integer, intent(out) :: countlist(nrec)
-    real, intent(out) :: rmsdlist(nrec)
+    real(wp), intent(out) :: rmsdlist(nrec)
 
     integer i, h, offset
     integer nblock0, nblock1
@@ -100,8 +97,8 @@ subroutine assign_atoms( &
     integer, dimension(:), allocatable :: atomunorder0, atomunorder1
     integer, dimension(:), allocatable :: blockidx0, blockidx1
     integer, dimension(:), allocatable :: blocksize0, blocksize1
-    real, dimension(3) :: center0, center1
-    real weights1(natom1)
+    real(wp), dimension(3) :: center0, center1
+    real(wp) weights1(natom1)
 
     procedure(f_logintint), pointer :: stoptest
 
@@ -172,7 +169,7 @@ subroutine assign_atoms( &
 
     ! Initialize random number generator
 
-    call random_init()
+    call initialize_random()
 
     ! Associate an stop test
 
@@ -216,7 +213,6 @@ subroutine align_atoms( &
 )
 
     use sorting
-    use maputils
     use rotation
     use translation
     use alignment
@@ -226,15 +222,15 @@ subroutine align_atoms( &
     integer, intent(in) :: natom0, natom1
     integer, dimension(natom0), intent(in) :: znums0, types0
     integer, dimension(natom1), intent(in) :: znums1, types1
-    real, intent(in) :: weights0(natom0)
-    real, intent(in) :: coords0(3, natom0)
-    real, intent(in) :: coords1(3, natom1)
-    real, intent(out) :: aligned1(3, natom1)
-    real, intent(out) :: rmsd
+    real(wp), intent(in) :: weights0(natom0)
+    real(wp), intent(in) :: coords0(3, natom0)
+    real(wp), intent(in) :: coords1(3, natom1)
+    real(wp), intent(out) :: aligned1(3, natom1)
+    real(wp), intent(out) :: rmsd
 
-    real weights1(natom1)
-    real center0(3), center1(3)
-    real travec(3), rotmat(3, 3)
+    real(wp) weights1(natom1)
+    real(wp) center0(3), center1(3)
+    real(wp) travec(3), rotmat(3, 3)
 
     ! Abort if clusters have different number of atoms
 

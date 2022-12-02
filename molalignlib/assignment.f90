@@ -1,10 +1,7 @@
 module assignment
-
-use iso_fortran_env, only: output_unit
-use iso_fortran_env, only: error_unit
-
+use parameters
 use settings
-use linear
+use math
 use random
 use strutils
 use translation
@@ -57,23 +54,22 @@ subroutine optimize_assignment( &
 
     integer, intent(in) :: natom, nblock, nrec
     integer, dimension(:), intent(in) :: blocksize
-    real, dimension(:, :), intent(in) :: coords0, coords1
-    real, dimension(:), intent(in) :: weights
+    real(wp), dimension(:, :), intent(in) :: coords0, coords1
+    real(wp), dimension(:), intent(in) :: weights
     integer, intent(out) :: nmap
     integer, intent(out) :: maplist(:, :)
     integer, intent(out) :: countlist(:)
-    real, intent(out) :: rmsdlist(:)
+    real(wp), intent(out) :: rmsdlist(:)
     procedure (f_logintint), pointer, intent(in) :: stoptest
 
     logical found, overflow
     integer imap, jmap, ntrial, nmatch, cycles
     integer, dimension(natom) :: atomap, auxmap
-    real :: sqdist, biased_dist, new_biased_dist, totalrot
-    real, dimension(4) :: rotquat, prodquat
-    real, dimension(nrec) :: avgiter, avgtotalrot, avgrealrot
-    real bias(natom, natom)
-    real auxcoords(3, natom)
-    real randpos(3)
+    real(wp) :: sqdist, biased_dist, new_biased_dist, totalrot
+    real(wp), dimension(4) :: rotquat, prodquat
+    real(wp), dimension(nrec) :: avgiter, avgtotalrot, avgrealrot
+    real(wp) bias(natom, natom)
+    real(wp) auxcoords1(3, natom)
 
 ! Set bias for non equivalent atoms 
 
@@ -101,42 +97,41 @@ subroutine optimize_assignment( &
 
 ! Work with a copy of coords1
 
-        auxcoords = coords1
+        auxcoords1 = coords1
 
-! Apply random rotation
+! Aply a random rotation to auxcoords1
 
-        call getrandnum(randpos)
-        call rotate(natom, auxcoords, getrotquat(randpos))
+        call rotate(natom, auxcoords1, torotquat(rand3()))
 
-! Minimize euclidean distance
+! Minimize the euclidean distance
 
-        call localassign(natom, coords0, auxcoords, nblock, blocksize, bias, atomap)
-        rotquat = leastrotquat(natom, weights, coords0, auxcoords, atomap)
+        call eapsolveall(natom, coords0, auxcoords1, nblock, blocksize, bias, atomap)
+        rotquat = leastrotquat(natom, weights, coords0, auxcoords1, atomap)
         prodquat = rotquat
         totalrot = rotangle(rotquat)
-        call rotate(natom, auxcoords, rotquat)
+        call rotate(natom, auxcoords1, rotquat)
         cycles = 1
 
         do while (iter_flag)
-            biased_dist = squaredist(natom, weights, coords0, auxcoords, atomap) &
+            biased_dist = squaredist(natom, weights, coords0, auxcoords1, atomap) &
                     + totalbias(natom, weights, bias, atomap)
-            call localassign(natom, coords0, auxcoords, nblock, blocksize, bias, auxmap)
+            call eapsolveall(natom, coords0, auxcoords1, nblock, blocksize, bias, auxmap)
             if (all(auxmap == atomap)) exit
-            new_biased_dist = squaredist(natom, weights, coords0, auxcoords, auxmap) &
+            new_biased_dist = squaredist(natom, weights, coords0, auxcoords1, auxmap) &
                     + totalbias(natom, weights, bias, auxmap)
             if (new_biased_dist > biased_dist) then
                 write (error_unit, '(a)') 'new_biased_dist is larger than biased_dist!'
 !                print *, biased_dist, new_biased_dist
             end if
-            rotquat = leastrotquat(natom, weights, coords0, auxcoords, auxmap)
+            rotquat = leastrotquat(natom, weights, coords0, auxcoords1, auxmap)
             prodquat = quatmul(rotquat, prodquat)
-            call rotate(natom, auxcoords, rotquat)
+            call rotate(natom, auxcoords1, rotquat)
             cycles = cycles + 1
             totalrot = totalrot + rotangle(rotquat)
             atomap = auxmap
         end do
 
-        sqdist = squaredist(natom, weights, coords0, auxcoords, atomap)
+        sqdist = squaredist(natom, weights, coords0, auxcoords1, atomap)
 
 ! Check for new best mapping
 
@@ -215,7 +210,7 @@ subroutine optimize_assignment( &
 end subroutine
 
 ! Find best correspondence between points sets with fixed orientation
-subroutine localassign(natom, coords0, coords1, nblock, blocksize, bias, atomap)
+subroutine eapsolveall(natom, coords0, coords1, nblock, blocksize, bias, atomap)
 
 ! nblock: Number of block atoms
 ! blocksize: Number of atoms in each block
@@ -224,15 +219,15 @@ subroutine localassign(natom, coords0, coords1, nblock, blocksize, bias, atomap)
 
     integer, intent(in) :: natom, nblock
     integer, dimension(:), intent(in) :: blocksize
-    real, dimension(:, :), intent(in) :: coords0
-    real, dimension(:, :), intent(in) :: bias
-    real, dimension(:, :), intent(inout) :: coords1
+    real(wp), dimension(:, :), intent(in) :: coords0
+    real(wp), dimension(:, :), intent(in) :: bias
+    real(wp), dimension(:, :), intent(inout) :: coords1
     integer, dimension(:), intent(out) :: atomap
 
     integer h, offset
-!    real, dimension(natom, natom) :: costs
+!    real(wp), dimension(natom, natom) :: costs
     integer, dimension(natom) :: perm
-    real dist
+    real(wp) dist
 
 ! Fill distance matrix for each block
 
@@ -247,12 +242,12 @@ subroutine localassign(natom, coords0, coords1, nblock, blocksize, bias, atomap)
 end subroutine
 
 ! Calculate total bias
-real function totalbias(natom, weights, bias, mapping) result(total)
+real(wp) function totalbias(natom, weights, bias, mapping) result(total)
 
     integer, intent(in) :: natom
-    real, dimension(:), intent(in) :: weights
+    real(wp), dimension(:), intent(in) :: weights
     integer, dimension(:), intent(in) :: mapping
-    real, dimension(:, :), intent(in) :: bias
+    real(wp), dimension(:, :), intent(in) :: bias
     integer i
 
     total = 0.

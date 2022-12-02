@@ -1,7 +1,5 @@
 module printing
-
-use iso_fortran_env, only: output_unit
-
+use parameters
 use settings
 
 implicit none
@@ -17,7 +15,7 @@ end subroutine
 
 subroutine print_stats(imap, matches, avgiter, avgtotalrot, avgrealrot, rmsd)
     integer, intent(in) :: imap, matches
-    real, intent(in) :: avgiter, avgtotalrot, avgrealrot, rmsd
+    real(wp), intent(in) :: avgiter, avgtotalrot, avgrealrot, rmsd
     if (live_flag) write (output_unit, '(a)', advance='no') achar(27)//'[K'
     write (output_unit, '(i4,3x,i6,5x,f4.1,5x,f5.1,5x,f5.1,3x,f8.4)') &
         imap, matches, avgiter, 90./asin(1.)*avgtotalrot, 90./asin(1.)*avgrealrot, rmsd

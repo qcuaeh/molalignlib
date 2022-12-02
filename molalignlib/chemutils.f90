@@ -1,9 +1,9 @@
 module chemutils
-
-use iso_fortran_env, only: error_unit
-
+use parameters
 use chemdata
 use strutils
+
+implicit none
 
 private
 public f_realint
@@ -13,26 +13,27 @@ public valency
 public readlabel
 
 abstract interface
-    real function f_realint(z)
+    real(wp) function f_realint(z)
+        use parameters
         integer, intent(in) :: z
     end function
 end interface
 
 contains
 
-real function unity(z) result(res)
+real(wp) function unity(z) result(res)
     integer, intent(in) :: z
     res = 1.
 end function
 
-real function stdmass(z) result(res)
+real(wp) function stdmass(z) result(res)
     integer, intent(in) :: z
     res = stdmasses(z)
 end function
 
-real function valency(z) result(res)
+real(wp) function valency(z) result(res)
     integer, intent(in) :: z
-    res = real(valencies(z))
+    res = real(valencies(z), wp)
 end function
 
 subroutine readlabel(label, znum, type)

@@ -1,16 +1,36 @@
 module rnglib
-
+use parameters
 implicit none
 
-integer, parameter :: sp = 4
-integer, parameter :: dp = 8
+private
+public rnglib_init
+public rnglib_seed
+public rnglib_number
 
-interface real_uni01
-    module procedure real_uni01_sp
-    module procedure real_uni01_dp
+interface rnglib_number
+   module procedure real_uni01_sp
+   module procedure real_uni01_dp
+   module procedure realarray_uni01_sp
+   module procedure realarray_uni01_dp
 end interface
 
 contains
+
+subroutine realarray_uni01_sp(x)
+   real(sp) x(:)
+   integer i
+   do i = 1, size(x)
+      call real_uni01_sp(x(i))
+   end do
+end subroutine
+
+subroutine realarray_uni01_dp(x)
+   real(dp) x(:)
+   integer i
+   do i = 1, size(x)
+      call real_uni01_dp(x(i))
+   end do
+end subroutine
 
 subroutine advance_state ( k )
 
@@ -81,7 +101,7 @@ subroutine advance_state ( k )
     write ( *, '(a)' ) ' '
     write ( *, '(a)' ) 'ADVANCE_STATE - Note:'
     write ( *, '(a)' ) '  Initializing RNGLIB package.'
-    call initialize ( )
+    call rnglib_init ( )
   end if
 !
 !  Get the current generator index.
@@ -576,7 +596,7 @@ subroutine get_state ( cg1, cg2 )
     write ( *, '(a)' ) ' '
     write ( *, '(a)' ) 'GET_STATE - Note:'
     write ( *, '(a)' ) '  Initializing RNGLIB package.'
-    call initialize ( )
+    call rnglib_init ( )
   end if
 !
 !  Get the current generator index.
@@ -653,7 +673,7 @@ function i4_uni ( )
     write ( *, '(a)' ) ' '
     write ( *, '(a)' ) 'I4_UNI - Note:'
     write ( *, '(a)' ) '  Initializing RNGLIB package.'
-    call initialize ( )
+    call rnglib_init ( )
   end if
 !
 !  Get the current generator index.
@@ -917,7 +937,7 @@ subroutine init_generator ( t )
     write ( *, '(a)' ) ' '
     write ( *, '(a)' ) 'INIT_GENERATOR - Note:'
     write ( *, '(a)' ) '  Initializing RNGLIB package.'
-    call initialize ( )
+    call rnglib_init ( )
   end if
 !
 !  Get the current generator index.
@@ -966,7 +986,7 @@ subroutine init_generator ( t )
   return
 end subroutine
 
-subroutine initialize ( )
+subroutine rnglib_init ( )
 
 !*****************************************************************************80
 !
@@ -1022,7 +1042,7 @@ subroutine initialize ( )
 !
   ig1 = 1234567890
   ig2 = 123456789
-  call set_initial_seed ( ig1, ig2 )
+  call rnglib_seed ( ig1, ig2 )
 !
 !  Initialize the current generator index to the first one.
 !
@@ -1527,7 +1547,7 @@ subroutine real_uni01_sp ( num )
     write ( *, '(a)' ) ' '
     write ( *, '(a)' ) 'R4_UNI_01 - Note:'
     write ( *, '(a)' ) '  Initializing RNGLIB package.'
-    call initialize ( )
+    call rnglib_init ( )
   end if
 !
 !  Get a random positive integer.
@@ -1590,7 +1610,7 @@ subroutine real_uni01_dp ( num )
     write ( *, '(a)' ) ' '
     write ( *, '(a)' ) 'R8_UNI_01 - Note:'
     write ( *, '(a)' ) '  Initializing RNGLIB package.'
-    call initialize ( )
+    call rnglib_init ( )
   end if
 !
 !  Get a random positive integer.
@@ -1604,7 +1624,7 @@ subroutine real_uni01_dp ( num )
   return
 end subroutine
 
-subroutine set_initial_seed ( ig1, ig2 )
+subroutine rnglib_seed ( ig1, ig2 )
 
 !*****************************************************************************80
 !
@@ -1776,7 +1796,7 @@ subroutine set_seed ( cg1, cg2 )
     write ( *, '(a)' ) ' '
     write ( *, '(a)' ) 'SET_SEED - Note:'
     write ( *, '(a)' ) '  Initializing RNGLIB package.'
-    call initialize ( )
+    call rnglib_init ( )
   end if
 !
 !  Retrieve the current generator index.

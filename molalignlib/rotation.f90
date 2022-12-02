@@ -11,8 +11,8 @@ public rotated
 public rotquat2rotmat
 public quatmul
 public rotangle
-public getrotmat
-public getrotquat
+public torotmat
+public torotquat
 
 interface rotate
     module procedure matrotate
@@ -32,8 +32,8 @@ function rotquat2rotmat(rotquat) result(rotmat)
 ! rotquat: Rotation quaternion
 ! rotmat: Rotation matrix
 
-    real, intent(in) :: rotquat(4)
-    real rotmat(3, 3)
+    real(wp), intent(in) :: rotquat(4)
+    real(wp) rotmat(3, 3)
 
 ! Calculate the rotation matrix
 
@@ -53,8 +53,8 @@ subroutine matrotate(natom, coords, rotmat)
 ! Purpose: Apply rotation matrix to atomic coordinates
 
     integer, intent(in) :: natom
-    real, intent (in) :: rotmat(3, 3)
-    real, intent (inout) :: coords(3, natom)
+    real(wp), intent (in) :: rotmat(3, 3)
+    real(wp), intent (inout) :: coords(3, natom)
 
     coords = matmul(rotmat, coords)
 
@@ -64,9 +64,9 @@ function matrotated(natom, coords, rotmat)
 ! Purpose: Apply rotation matrix to atomic coordinates
 
     integer, intent(in) :: natom
-    real, intent (in) :: rotmat(3, 3)
-    real, intent (in) :: coords(3, natom)
-    real matrotated(3, natom)
+    real(wp), intent (in) :: rotmat(3, 3)
+    real(wp), intent (in) :: coords(3, natom)
+    real(wp) matrotated(3, natom)
 
     matrotated = matmul(rotmat, coords)
 
@@ -76,8 +76,8 @@ subroutine quatrotate(natom, coords, rotquat)
 ! Purpose: Apply rotation quaternion to atomic coordinates
 
     integer, intent(in) :: natom
-    real, intent(in) :: rotquat(4)
-    real, intent(inout) :: coords(3, natom)
+    real(wp), intent(in) :: rotquat(4)
+    real(wp), intent(inout) :: coords(3, natom)
 
 ! Rotate atomic coordinates
 
@@ -90,9 +90,9 @@ function quatrotated(natom, coords, rotquat)
 ! Purpose: Apply rotation quaternion to atomic coordinates
 
     integer, intent(in) :: natom
-    real, intent(in) :: rotquat(4)
-    real, intent(in) :: coords(3, natom)
-    real quatrotated(3, natom)
+    real(wp), intent(in) :: rotquat(4)
+    real(wp), intent(in) :: coords(3, natom)
+    real(wp) quatrotated(3, natom)
 
     quatrotated = matmul(rotquat2rotmat(rotquat), coords)
 
@@ -100,10 +100,10 @@ end function
 
 function quatmul(p, q)
 
-    real, dimension(4), intent(in) :: p, q
-    real quatmul(4)
+    real(wp), dimension(4), intent(in) :: p, q
+    real(wp) quatmul(4)
 
-    real left(4, 4)
+    real(wp) left(4, 4)
 
     left(:, 1) = [ p(1), -p(2), -p(3), -p(4) ]
     left(:, 2) = [ p(2),  p(1), -p(4),  p(3) ]
@@ -116,8 +116,8 @@ end function
 
 function rotangle(q)
 
-    real, dimension(4), intent(in) :: q
-    real rotangle
+    real(wp), dimension(4), intent(in) :: q
+    real(wp) rotangle
 
 !    rotangle = 2*acos(q(1))
 !    rotangle = 2*asin(sqrt(sum(q(2:4)**2)))
@@ -131,15 +131,15 @@ function rotangle(q)
 !        90./asin(1.)*2*atan2(sqrt(sum(q(2:4)**2)), q(1))
 end function
 
-function getrotquat(x) result(rotquat)
+function torotquat(x) result(rotquat)
 ! Purpose: Generate a random rotation quaternion.
 ! Reference: Academic Press Graphics Gems Series archive Graphics
 !            Gems III archive. Pages: 129 - 132.
 
-    real, intent(in) :: x(3)
-    real rotquat(4)
+    real(wp), intent(in) :: x(3)
+    real(wp) rotquat(4)
 
-    real pi, a1, a2, r1, r2, s1, s2, c1, c2
+    real(wp) pi, a1, a2, r1, r2, s1, s2, c1, c2
 
 ! Calculate auxiliar vectors and constants
 
@@ -161,17 +161,17 @@ function getrotquat(x) result(rotquat)
 
 end function
 
-function getrotmat(x) result(rotmat)
+function torotmat(x) result(rotmat)
 ! Purpose: Generate a random rotation matrix.
 ! Reference: Academic Press Graphics Gems Series archive Graphics
 !            Gems III archive. Pages: 117 - 120.
 
-    real, intent(in) :: x(3)
-    real rotmat(3, 3)
+    real(wp), intent(in) :: x(3)
+    real(wp) rotmat(3, 3)
 
     integer i
-    real pi, a1, a2, r1, r2, s1, c1, s2, c2
-    real v(3), right(3, 3), left(3, 3)
+    real(wp) pi, a1, a2, r1, r2, s1, c1, s2, c2
+    real(wp) v(3), right(3, 3), left(3, 3)
 
 ! Calculate auxiliar vectors and constants
 
@@ -186,9 +186,9 @@ function getrotmat(x) result(rotmat)
     s2 = sin(a2)
     c2 = cos(a2)
 
-    right(1, :) = [ c1, s1, 0.0 ]
-    right(2, :) = [ -s1, c1, 0.0 ]
-    right(3, :) = [ 0.0, 0.0, 1.0 ]
+    right(1, :) = [ c1, s1, 0.0_wp ]
+    right(2, :) = [ -s1, c1, 0.0_wp ]
+    right(3, :) = [ 0.0_wp, 0.0_wp, 1.0_wp ]
 
     v = [ c2*r2, s2*r2, r1 ]
 
@@ -197,7 +197,7 @@ function getrotmat(x) result(rotmat)
     end do
 
     do i = 1, 3
-        left(i, i) = left(i, i) - 1.0
+        left(i, i) = left(i, i) - 1.0_wp
     end do
 
 ! Calculate the rotation matrix

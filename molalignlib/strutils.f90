@@ -1,13 +1,10 @@
 module strutils
-
-use iso_fortran_env, only: error_unit
-
+use parameters
 use settings
 
 implicit none
 
 private
-
 public str
 public lower
 public upper
@@ -54,12 +51,12 @@ end function
 
 function int2str(x) result(strx)
     integer, intent(in) :: x
-    character(floor(log10(real(x))) + 1) strx
+    character(floor(log10(real(x, wp))) + 1) strx
     write (strx, '(i0)') x
 end function
 
 function real2str(x) result(strx)
-    real, intent(in) :: x
+    real(wp), intent(in) :: x
     character(floor(log10(x)) + 6) strx
     write (strx, '(f0.4)') x
 end function

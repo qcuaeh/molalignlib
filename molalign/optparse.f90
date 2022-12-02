@@ -1,8 +1,5 @@
 module optparse
-
-use iso_fortran_env, only: error_unit
-
-use settings
+use parameters
 
 implicit none
 
@@ -118,7 +115,7 @@ end subroutine
 subroutine readrealoptarg(option, optval)
 
     character(arg_len), intent(in) :: option
-    real, intent(out) :: optval
+    real(wp), intent(out) :: optval
     character(arg_len) optarg
     integer stat
 

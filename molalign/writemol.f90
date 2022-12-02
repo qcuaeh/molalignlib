@@ -1,10 +1,6 @@
 module writemol
-
-use iso_fortran_env, only: error_unit
-
-use settings
+use parameters
 use strutils
-use maputils
 use chemdata
 
 implicit none
@@ -17,7 +13,7 @@ subroutine writefile(file_unit, format_w, natom, title, znums, coords, opt_nbond
     integer, dimension(:), intent(in) :: znums
     integer, optional, intent(in) :: opt_nbond
     integer, target, optional, intent(in) :: opt_bonds(:, :)
-    real, dimension(:, :), intent(in) :: coords
+    real(wp), dimension(:, :), intent(in) :: coords
     character(*), intent(in) :: title, format_w
 
     integer nbond
@@ -51,7 +47,7 @@ subroutine writexyzfile(file_unit, natom, title, znums, coords)
     character(*), intent(in) :: title
     integer, intent(in) :: file_unit, natom
     integer, dimension(:), intent(in) :: znums
-    real, dimension(:, :), intent(in) :: coords
+    real(wp), dimension(:, :), intent(in) :: coords
 
     integer i
 
@@ -68,7 +64,7 @@ subroutine writemol2file(file_unit, natom, title, znums, coords, nbond, bonds)
     character(*), intent(in) :: title
     integer, intent(in) :: file_unit, natom
     integer, dimension(:), intent(in) :: znums
-    real, dimension(:, :), intent(in) :: coords
+    real(wp), dimension(:, :), intent(in) :: coords
     integer, intent(in) :: nbond
     integer, target, intent(in) :: bonds(:, :)
 
