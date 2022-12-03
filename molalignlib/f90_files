@@ -3,7 +3,7 @@ settings.f90
 strutils.f90
 lapack.f90
 rnglib.f90
-eapjv.f90
+lapjv.f90
 math.f90
 random.f90
 sorting.f90

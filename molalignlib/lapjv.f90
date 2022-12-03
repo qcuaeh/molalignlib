@@ -1,4 +1,4 @@
-module eap
+module lap
 use parameters
 implicit none
 
@@ -40,7 +40,7 @@ contains
 !     i.e.
 !       sum(i=1,n) permdist(p(i), q(perm(i))) == dist
 
-   subroutine eapsolve(n, o, p, q, bias, perm, dist)
+   subroutine minperm(n, o, p, q, bias, perm, dist)
 
 !     Input
 !       n  : System size
@@ -75,13 +75,11 @@ contains
 !       Column indexes of existing elements in row i
 !     cc(first(i)..first(i+1)-1):
 !       Matrix elements of row i
-      integer first(n+1)
-      integer m, i, j, k, l, l2, a, j1
-      integer(int64) x(n), y(n)
-      integer(int64) u(n), v(n), h
-      integer(int64) n8, sz8, d, t
-!      integer(int64) kk(n*maxnei), cc(n*maxnei)
-      integer(int64), allocatable :: kk(:), cc(:)
+      integer first(n+1), x(n), y(n)
+      integer m, i, j, k, l, l2, a, j1, n8, sz8, t
+      integer(int64) u(n), v(n), d, h
+      integer, allocatable :: kk(:)
+      integer(int64), allocatable :: cc(:)
       allocate(kk(n*maxnei), cc(n*maxnei))
 
 !     Distance function
@@ -105,77 +103,79 @@ contains
          do i=1,n
             k = first(i)-1
             do j=1,n
-               cc(k+j) = int((sum((q(:,o+j) - p(:,o+i))**2) + bias(o+i,o+j))*scale, int64)
+               cc(k+j) = int((sum((p(:,o+i) - q(:,o+j))**2) + bias(o+i,o+j))*scale, int64)
                kk(k+j) = j
 !              write(*,*) i, j, '-->', cc(k+j)
             end do
          end do
+
       else
+
 !     We need to store the distances of the maxnei closeest neighbors
 !     of each particle. The following builds a heap to keep track of
 !     the maxnei closest neighbours seen so far. It might be more
 !     efficient to use quick-select instead... (This is definately
 !     true in the limit of infinite systems.)
-        do i=1,n
-           k = first(i)-1
-           do j=1,m
-              cc(k+j) = int((sum((q(:,o+j) - p(:,o+i))**2) + bias(o+i,o+j))*scale, int64)
-              kk(k+j) = j
-              l = j
-10            if(l .le. 1) goto 11
-              l2 = l/2
-              if(cc(k+l2) .lt. cc(k+l)) then
-                 h = cc(k+l2)
-                 cc(k+l2) = cc(k+l)
-                 cc(k+l) = h
-                 t = kk(k+l2)
-                 kk(k+l2) = kk(k+l)
-                 kk(k+l) = t
-                 l = l2
-                 goto 10
-              end if
-11         end do
-           
-           do j=m+1,n
-              d = int((sum((q(:,o+j) - p(:,o+i))**2) + bias(o+i,o+j))*scale, int64)
-              if(d .lt. cc(k+1)) then
-                 cc(k+1) = d
-                 kk(k+1) = j
-                 l = 1
-20               l2 = 2*l
-                 if(l2+1 .gt. m) goto 21
-                 if(cc(k+l2+1) .gt. cc(k+l2)) then
-                    a = k+l2+1
-                 else
-                    a = k+l2
-                 end if
-                 if(cc(a) .gt. cc(k+l)) then
-                    h = cc(a)
-                    cc(a) = cc(k+l)
-                    cc(k+l) = h
-                    t = kk(a)
-                    kk(a) = kk(k+l)
-                    kk(k+l) = t
-                    l = a-k
-                    goto 20
-                 end if
-21               if (l2 .le. m) then ! split if statements to avoid a segmentation fault
-                    if (cc(k+l2) .gt. cc(k+l)) then
-                       h = cc(k+l2)
-                       cc(k+l2) = cc(k+l)
-                       cc(k+l) = h
-                       t = kk(k+l2)
-                       kk(k+l2) = kk(k+l)
-                       kk(k+l) = t
-                    end if
-                 end if
-              end if
-           end do
-!       PRINT '(A,I6,A)','atom ',i,' nearest neighbours and distances:'
-!       PRINT '(20I6)',kk(m*(i-1)+1:m*i)
-!       PRINT '(12I15)',cc(m*(i-1)+1:m*i)
-           
-        end do    
+         do i=1,n
+            k = first(i)-1
+            do j=1,m
+               cc(k+j) = int((sum((p(:,o+i) - q(:,o+j))**2) + bias(o+i,o+j))*scale, int64)
+               kk(k+j) = j
+               l = j
+10             if(l .le. 1) goto 11
+               l2 = l/2
+               if(cc(k+l2) .lt. cc(k+l)) then
+                  h = cc(k+l2)
+                  cc(k+l2) = cc(k+l)
+                  cc(k+l) = h
+                  t = kk(k+l2)
+                  kk(k+l2) = kk(k+l)
+                  kk(k+l) = t
+                  l = l2
+                  goto 10
+               end if
+11          end do
+            
+            do j=m+1,n
+               d = int((sum((p(:,o+i) - q(:,o+j))**2) + bias(o+i,o+j))*scale, int64)
+               if(d .lt. cc(k+1)) then
+                  cc(k+1) = d
+                  kk(k+1) = j
+                  l = 1
+20                l2 = 2*l
+                  if(l2+1 .gt. m) goto 21
+                  if(cc(k+l2+1) .gt. cc(k+l2)) then
+                     a = k+l2+1
+                  else
+                     a = k+l2
+                  end if
+                  if(cc(a) .gt. cc(k+l)) then
+                     h = cc(a)
+                     cc(a) = cc(k+l)
+                     cc(k+l) = h
+                     t = kk(a)
+                     kk(a) = kk(k+l)
+                     kk(k+l) = t
+                     l = a-k
+                     goto 20
+                  end if
+21                if (l2 .le. m) then ! split if statements to avoid a segmentation fault
+                     if (cc(k+l2) .gt. cc(k+l)) then
+                        h = cc(k+l2)
+                        cc(k+l2) = cc(k+l)
+                        cc(k+l) = h
+                        t = kk(k+l2)
+                        kk(k+l2) = kk(k+l)
+                        kk(k+l) = t
+                     end if
+                  end if
+               end if
+            end do
+!        PRINT '(A,I6,A)','atom ',i,' nearest neighbours and distances:'
+!        PRINT '(20I6)',kk(m*(i-1)+1:m*i)
+!        PRINT '(12I15)',cc(m*(i-1)+1:m*i)
+            
+         end do
 !
 ! Create and maintain an ordered list, smallest to largest from kk(m*(i-1)+1:m*i) for atom i.
 ! NOTE that there is no symmetry with respect to exchange of I and J!
@@ -205,7 +205,8 @@ contains
 ! 112             CONTINUE
 !              ENDDO
 !           ENDDO
-      ENDIF
+
+      end if
 
 !     Call bipartite matching routine
       call jovosap(n8, sz8, cc, kk, first, x, y, u, v, h)
@@ -250,39 +251,8 @@ contains
 !      WORSTDIST=SQRT(WORSTDIST)
 !      WORSTRADIUS=MAX(SQRT(WORSTRADIUS),1.0D0)
 !      RETURN
-   end
+   end subroutine
       
-!     permdist is the distance or weight function. It is coded
-!     separately for clarity. Just hope that the compiler
-!     knows how to to do proper inlining!
-!     Input
-!       p,q: Coordinates
-!       s  : Boxlengths (or dummy if open B.C.)
-!       pbc: Periodic boundary conditions?
-
-!   function permdist(p, q, s, pbc)
-!      real(wp) permdist
-!      real(wp) p(3), q(3), s(3)
-!      logical pbc
-!
-!      real(wp) t, d
-!      integer i
-!
-!      d = 0.0d0
-!      IF (PBC) THEN
-!         do i=1,3
-!            IF (S(I).NE.0.0D0) THEN
-!               t = q(i) - p(i)
-!               t = t - s(i)*anint(t/s(i))
-!               d = d + t*t
-!            ENDIF
-!         end do
-!      ELSE
-!         d= (q(1) - p(1))**2+(q(2) - p(2))**2+(q(3) - p(3))**2
-!      ENDIF
-!      permdist = d
-!   end
-
 !     The following routine performs weighted bipartite matching for
 !     for a sparse non-negative integer weight matrix.
 !     The original source is
@@ -292,14 +262,13 @@ contains
 !     
 
    subroutine jovosap(n,sz,cc,kk,first,x,y,u,v,h)
-      integer(int64) n, sz
-      integer first(n+1)
-      integer(int64) cc(sz),kk(sz),x(n),y(n),u(n),v(n)
-      integer(int64) h,cnt,l0,t,t0,td,v0,vj,dj
-      integer(int64) lab(n),d(n),free(n),todo(n)
+      integer n,sz
+      integer kk(sz),first(n+1),x(n),y(n)
+      integer i,i0,j,j0,j1,k,l,l0,t,t0,td,cnt
+      integer lab(n),free(n),todo(n)
+      integer(int64) cc(sz),u(n),v(n),d(n)
+      integer(int64) h,v0,vj,dj,min,bigint
       logical ok(n)
-      integer(int64) j, i, j0, l, j1, min, k, i0
-      integer(int64) bigint
 
 !     I don't know how to make g77 read integer*8 constants/parameters.
 !       PARAMETER (BIGINT = 10**12) does not work(!)
@@ -465,8 +434,8 @@ contains
               end if
             end if
          end do
-         do h=1,k
-            j=todo(h)
+         do j0=1,k
+            j=todo(j0)
             if (j.eq.0) then
 !              print '(a,i6,a)','minperm> warning c - matching failed'
                return
@@ -555,6 +524,6 @@ contains
       end do
 
  1000 return
-   end
+   end subroutine
 
 end module

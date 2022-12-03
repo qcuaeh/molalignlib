@@ -40,20 +40,19 @@ subroutine readlabel(label, znum, type)
 
     character(*), intent(in) :: label
     integer, intent(out) :: znum, type
-    integer m, n, stat
+    integer :: m, n
 
     n = len_trim(label)
     m = verify(upper(trim(label)), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ')
 
     if (m == 0) then
-        type = 1
+        type = 0
         znum = atomic_number(label)
+    else if (verify(label(m:n), '1234567890') == 0) then
+        read (label(m:n), *) type
+        znum = atomic_number(label(1:m-1))
     else
-        read (label(m:n), *, iostat=stat) type
-        if (stat /= 0) then
-            write (error_unit, '(2a)') 'Invalid label: ', trim(label)
-            stop
-        end if
+        type = -1
         znum = atomic_number(label(1:m-1))
     end if
 
@@ -62,7 +61,7 @@ end subroutine
 function atomic_number(symbol) result(z)
 
     character(*), intent(in) :: symbol
-    integer z
+    integer :: z
 
     do z = 1, nelem
         if (upper(symbol) == upper(elsym(z))) then
@@ -70,7 +69,12 @@ function atomic_number(symbol) result(z)
         end if
     end do
 
-    write (error_unit, '(a)') 'Unknown atomic symbol: ', trim(symbol)
+    select case (upper(symbol))
+    case ('LJ')
+        z = 1001
+    case default
+        z = -1
+    end select
 
 end function
 

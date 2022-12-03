@@ -3,14 +3,13 @@ use parameters
 
 implicit none
 
-integer iarg, ifile
+integer :: iarg, ipos
 
 private
-
-public ifile
+public ipos
 public initarg
 public getarg
-public openfile
+public readarg
 public readoptarg
 
 interface readoptarg
@@ -24,13 +23,34 @@ contains
 subroutine initarg()
 
     iarg = 0
-    ifile = 0
+    ipos = 0
+
+end subroutine
+
+subroutine readarg(arg, files)
+
+    character(arg_len), intent(in) :: arg
+    character(arg_len), intent(out) :: files(:)
+
+    if (arg(1:1) == '-') then
+        write (error_unit, '(a,1x,a)') 'Error: Unknown option', trim(arg)
+        stop
+    end if
+
+    ipos = ipos + 1
+
+    if (ipos > size(files)) then
+        write (error_unit, '(a)') 'Error: Too many files'
+        stop
+    end if
+
+    files(ipos) = arg
 
 end subroutine
 
 logical function getarg(arg)
 
-    character(arg_len) arg
+    character(arg_len), intent(out) :: arg
 
     iarg = iarg + 1
 
@@ -42,31 +62,6 @@ logical function getarg(arg)
     end if
 
 end function
-
-subroutine openfile(arg, file_unit)
-
-    character(arg_len) arg
-    integer file_unit(2), stat
-
-    if (arg(1:1) == '-') then
-        write (error_unit, '(a,1x,a)') 'Error: Unknown option', trim(arg)
-        stop
-    end if
-
-    ifile = ifile + 1
-
-    if (ifile <= 2) then
-        open(newunit=file_unit(ifile), file=arg, action='read', iostat=stat)
-        if (stat /= 0) then
-            write (error_unit, '(a,1x,a,1x,a)') 'Error:', trim(arg), 'does not exist'
-            stop
-        end if
-    else
-        write (error_unit, '(a)') 'Error: Too many files'
-        stop
-    end if
-
-end subroutine
 
 subroutine getoptarg(option, optarg)
 
@@ -100,8 +95,8 @@ subroutine readintoptarg(option, optval)
 
     character(arg_len), intent(in) :: option
     integer, intent(out) :: optval
-    character(arg_len) optarg
-    integer stat
+    character(arg_len) :: optarg
+    integer :: stat
 
     call getoptarg(option, optarg)
     read (optarg, *, iostat=stat) optval
@@ -116,8 +111,8 @@ subroutine readrealoptarg(option, optval)
 
     character(arg_len), intent(in) :: option
     real(wp), intent(out) :: optval
-    character(arg_len) optarg
-    integer stat
+    character(arg_len) :: optarg
+    integer :: stat
 
     call getoptarg(option, optarg)
     read (optarg, *, iostat=stat) optval

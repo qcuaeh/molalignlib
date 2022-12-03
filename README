@@ -4,166 +4,146 @@ molalign
 ========
 
 [![License: LGPL v3](https://img.shields.io/badge/License-LGPL_v3-blue.svg)](https://www.gnu.org/licenses/lgpl-3.0)
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qcuaeh/molalign.git/HEAD?labpath=tests)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qcuaeh/molalign.git/HEAD?labpath=examples)
 
-**molalign** is a fortran code based on random rotations and pseudo local
-minimizations of RMSD to reliably find solutions to the near-congruence
-problem for atom clusters.
+**molalign** is a fortran code based on random rotations and pseudo local minimizations of RMSD to reliably find solutions to the
+near-congruence problem for atom clusters.
 
 ![graphical abstract](abstract.png)
-
 
 Before installing
 -----------------
 
-You will need a modern Fortran compiler and LAPACK to build molalign from
-source but also to compile the extension modules installed with pip.
+You will need a modern Fortran compiler and LAPACK to build the program from source or to install the python package with pip. It is
+recommended to use your package manager to install them:
 
-In RHEL or Fedora use *yum* to install them
+in RHEL or Fedora use *yum*
 
     yum install gcc-gfortran lapack-devel
 
-In Debian, Ubuntu, etc. use *apt*
+and in Debian, Ubuntu, etc. use *apt*
 
     apt install gfortran liblapack-dev
+
+Install molalignlib with pip
+----------------------------
+
+The python library only supports Python 3 so make sure that you are using the right version of *python*. To install the *molalignlib*
+library and the *molalign* script just run
+
+    pip3 install molalign
 
 Build molalign from source 
 --------------------------
 
-Clone this repository with
+Clone this repository
 
     git clone https://github.com/qcuaeh/molalign.git
 
-then enter its directory and run
+then enter its directory, rename *gnu.env* (or *intel.env* if you have the Intel fortran compiler and MKL installed) as *build.env*
+and run
 
     ./build.sh
 
-It will create the *molalign* executable inside the *build* directory.
-
-By default the program is compiled using the GNU toolchain, but if you have
-the Intel Fortran compiler and MKL installed you can use them by pointing the
-symbolic link *build.env* to *intel.env* instead of *gnu.env*.
-
-
-Install molalign with pip
--------------------------
-
-The python library only supports Python 3 so make sure that you are using the right version of *python* and *pip*. To install the package just run
-
-    pip install molalign
-
-The command will install the python modules and a python
-version of the molalign executable but will not compile the extension modules.
-
-The extension modules will be automatically compiled the first time they are used,
-however in order to check for compilation errors you can trigger the compilation
-manually by running the following in your python interpreter:
-
-    >>> import molalignlib
-
-
+It will create the executable inside the *build* directory.
 
 Program options
 ---------------
 
-The following options are accepted by both the native *molalign* executable and
-the *molalign* executable installed by pip:
+These options are supported by both, the native executable and the python script:
 
 `-sort` Sort atoms by optimal assignment.  
 `-fast` Enable biasing and iterative convergence.  
-`-tol X` Set biasing tolerance to *X* (defaults to 0.35 Å).  
-`-count N` Set the count threshold to *N* (defaults to 10).  
-`-trials N` Set the maximum number of trials to *N*.  
-`-rec N` Set the number of recorded solutions to *N* (defaults to 1).  
-`-test` Use the same pseudo random numbers on every run.  
+`-tol TOL` Set biasing tolerance to *TOL* (defaults to 0.35 Å).  
+`-count N` Set count threshold to *N* (defaults to 10).  
+`-trials N` Set maximum number of trials to *N*.  
+`-rec N` Set number of recorded solutions to *N* (defaults to 1).  
+`-out EXT` Set output format to *EXT* (defaults to *xyz*).  
+`-test` Generate the same sequence of random numbers on every run.  
 `-mass` Use mass weighted RMSD.  
 
-While these options are only supported by the native executable:
+These options are only supported by the native executable:
 
 `-live` Show progress in real time.  
-`-stdin` Read coordinates from standard input.  
-`-out xyz|mol2` Set the output format to XYZ or Mol2 (defaults to XYZ).  
+`-stdin EXT` Read coordinates from standard input as format *EXT*.  
  
+The input format is determined from the file extensions of the arguments and bear in mind that the native executable only supports
+*xyz* as input format and *xyz* and *mol2* as output formats, while the python script supports many more formats.
 
 Basic usage
 -----------
 
-To align two molecules just run
+The syntax of the command is
 
-    ./build/molalign tests/r05/Co100.xyz
+    molalign [option[s]] file [file]
 
-To align two molecules with optimal assigment run
+If only a file is specified then two sets of coordinates will be read from the file, otherwise a single set of coordinates will be
+read from each file.
 
-    ./build/molalign tests/r05/Co100.xyz -sort
-
-When reordering is requested performance can be improved by two to four orders of
-magnitude by enabling biasing and iteration with the `-fast` option, for example
-
-    ./build/molalign tests/r05/Co100.xyz -sort -fast
-
-However, if the distortion is too large then this option can lead to suboptimal results. In these cases the tolerance must be
-increased from the default of 0.35 Å to an appropiate value with the `-tol X` option
-
-    ./build/molalign tests/r20/Co100.xyz -sort -fast -tol 0.7
-
+To align the atoms without reordering run the command without options and to align with optimal assigment add the `-sort` option.
 
 Advanced usage
 --------------
 
-By default a threshold of 10 counts is used to stop the computation, but it
-can be changed with the `-count N` option. Reducing this threshold will proportionally reduce the computation time but the probability of suboptimal assignmnets will increase.
+The performance of the optimal assignment algorithm can be improved by around three orders of magnitude by enabling biasing and
+iteration with the `-fast` option, however, this option can potentially lead to suboptimal results when the difference between the
+coordinates is too large.
 
-The algorithm always explores multiple possible assignments, but only the best one is stored by default. For symmetric clusters it can be useful to store and print more than one assignment using the `-rec N` option.
+If the RMSD increases when the `-fast` option is used then the tolerance must be increased from the default of 0.35 Å to a larger
+value with the `-tol TOL` option.
+
+By default a threshold of 10 counts is used to stop the computation, but it can be changed with the `-count N` option. Reducing
+this threshold will proportionally reduce the computation time but the probability of suboptimal assignmnets will increase.
+
+The algorithm always explores multiple possible assignments, but only the best one is stored by default. For symmetric clusters it
+can be useful to store and print more than one assignment using the `-rec N` option.
 
 To avoid too long computations the `-trials N` option can be used to stop the computation if the number of trials exceeds *N*.
 
 To have reproducible results use the option `-test`, which will force the generation of the same stream of random numbers on every run.
 
-
 Examples
 --------
 
-Notice that because the random number generator is initialized with a different
-seed each time the output will not be exactly the same as in the examples (to
-reproduce exactly the same output use the option `-test`).
+To reproduce exactly the same output as in these examples include the option `-test`.
 
 For small distortions the default tolerance is enough
 
-    ./build/molalign tests/r05/Co100.xyz -sort -fast
+    ./build/molalign examples/Co138_0.xyz examples/Co138_1.xyz -sort -fast
      Map    Count    Steps     Total      Real       RMSD
     -----------------------------------------------------
-       1       10      5.5      91.5      51.9     0.0482
+       1       10     10.0      74.4      54.5     0.0506
     -----------------------------------------------------
-    Found more than 1 mapping(s) in 42 random trial(s)
+    Found more than 1 mapping(s) in 81 random trial(s)
     
-    ./build/molalign tests/r10/Co100.xyz -sort -fast
+    ./build/molalign examples/Co138_0.xyz examples/Co138_2.xyz -sort -fast
      Map    Count    Steps     Total      Real       RMSD
     -----------------------------------------------------
-       1       10      7.7     118.2      78.6     0.0966
+       1       10     14.4      84.9      65.7     0.0977
     -----------------------------------------------------
-    Found more than 1 mapping(s) in 31 random trial(s)
+    Found more than 1 mapping(s) in 70 random trial(s)
 
-but if the maximum distortion is larger than the tolerance then a wrong alignmnet is obtained
+but if the maximum distortion is larger than the tolerance then a wrong alignmnet can be obtained
 
-    ./build/molalign tests/r20/Co100.xyz -sort -fast
+    ./build/molalign examples/Co138_0.xyz examples/Co138_3.xyz -sort -fast
      Map    Count    Steps     Total      Real       RMSD
     -----------------------------------------------------
-       1       10      6.7      96.5      58.1     0.6970
+       1       10      1.0     133.3     133.3     2.9315
     -----------------------------------------------------
-    Found more than 1 mapping(s) in 147 random trial(s)
+    Found 1 mapping(s) in 10 random trial(s)
 
 Increasing the tolerance will fix the problem but will significatively slow the calculation
 
-    ./build/molalign tests/r20/Co100.xyz -sort -fast -tol 0.69
+    ./build/molalign examples/Co138_0.xyz examples/Co138_3.xyz -sort -fast -tol 0.69
      Map    Count    Steps     Total      Real       RMSD
     -----------------------------------------------------
-       1       10      3.4      22.4      12.6     0.2043
+       1       10      2.4      15.1       8.2     0.1973
     -----------------------------------------------------
-    Found more than 1 mapping(s) in 2961 random trial(s)
+    Found more than 1 mapping(s) in 6315 random trial(s)
 
 Sometimes it is necessary to record more than one alignment due to the cluster symmetry, for example
 
-    ./build/molalign tests/r05/Co138.xyz -sort -fast -rec 5
+    ./build/molalign examples/Co138_0.xyz examples/Co138_1.xyz -sort -fast -rec 5
      Map    Count    Steps     Total      Real       RMSD
     -----------------------------------------------------
        1       10     10.0      74.4      54.5     0.0506
@@ -174,5 +154,4 @@ Sometimes it is necessary to record more than one alignment due to the cluster s
     -----------------------------------------------------
     Found more than 5 mapping(s) in 81 random trial(s)
 
-The ouput shows that there are 3 degenerated solutions due to the symmetry of
-the cluster.
+The ouput shows that there are 3 degenerated solutions due to the symmetry of the cluster.

@@ -20,11 +20,11 @@ subroutine getblocks(natom, znums, types, nblock, blocksize, blockindex, atomord
     integer, intent(out) :: atomorder(:)
     integer, dimension(:), intent(out) :: blocksize, blockindex
 
-    integer i, j
-    logical remaining(natom)
-    integer blockznum(natom)
-    integer blocktype(natom)
-    integer blockorder(natom)
+    integer :: i, j
+    logical :: remaining(natom)
+    integer :: blockznum(natom)
+    integer :: blocktype(natom)
+    integer :: blockorder(natom)
 
 ! Initialization
 

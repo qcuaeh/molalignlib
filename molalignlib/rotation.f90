@@ -33,7 +33,7 @@ function rotquat2rotmat(rotquat) result(rotmat)
 ! rotmat: Rotation matrix
 
     real(wp), intent(in) :: rotquat(4)
-    real(wp) rotmat(3, 3)
+    real(wp) :: rotmat(3, 3)
 
 ! Calculate the rotation matrix
 
@@ -66,7 +66,7 @@ function matrotated(natom, coords, rotmat)
     integer, intent(in) :: natom
     real(wp), intent (in) :: rotmat(3, 3)
     real(wp), intent (in) :: coords(3, natom)
-    real(wp) matrotated(3, natom)
+    real(wp) :: matrotated(3, natom)
 
     matrotated = matmul(rotmat, coords)
 
@@ -92,7 +92,7 @@ function quatrotated(natom, coords, rotquat)
     integer, intent(in) :: natom
     real(wp), intent(in) :: rotquat(4)
     real(wp), intent(in) :: coords(3, natom)
-    real(wp) quatrotated(3, natom)
+    real(wp) :: quatrotated(3, natom)
 
     quatrotated = matmul(rotquat2rotmat(rotquat), coords)
 
@@ -101,9 +101,8 @@ end function
 function quatmul(p, q)
 
     real(wp), dimension(4), intent(in) :: p, q
-    real(wp) quatmul(4)
-
-    real(wp) left(4, 4)
+    real(wp) :: quatmul(4)
+    real(wp) :: left(4, 4)
 
     left(:, 1) = [ p(1), -p(2), -p(3), -p(4) ]
     left(:, 2) = [ p(2),  p(1), -p(4),  p(3) ]
@@ -117,7 +116,7 @@ end function
 function rotangle(q)
 
     real(wp), dimension(4), intent(in) :: q
-    real(wp) rotangle
+    real(wp) :: rotangle
 
 !    rotangle = 2*acos(q(1))
 !    rotangle = 2*asin(sqrt(sum(q(2:4)**2)))
@@ -137,9 +136,8 @@ function torotquat(x) result(rotquat)
 !            Gems III archive. Pages: 129 - 132.
 
     real(wp), intent(in) :: x(3)
-    real(wp) rotquat(4)
-
-    real(wp) pi, a1, a2, r1, r2, s1, s2, c1, c2
+    real(wp) :: rotquat(4)
+    real(wp) :: pi, a1, a2, r1, r2, s1, s2, c1, c2
 
 ! Calculate auxiliar vectors and constants
 
@@ -167,11 +165,11 @@ function torotmat(x) result(rotmat)
 !            Gems III archive. Pages: 117 - 120.
 
     real(wp), intent(in) :: x(3)
-    real(wp) rotmat(3, 3)
+    real(wp) :: rotmat(3, 3)
 
-    integer i
-    real(wp) pi, a1, a2, r1, r2, s1, c1, s2, c2
-    real(wp) v(3), right(3, 3), left(3, 3)
+    integer :: i
+    real(wp) :: pi, a1, a2, r1, r2, s1, c1, s2, c2
+    real(wp) :: v(3), right(3, 3), left(3, 3)
 
 ! Calculate auxiliar vectors and constants
 

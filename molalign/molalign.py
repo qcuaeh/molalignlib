@@ -15,9 +15,9 @@ def main():
     parser.add_argument('-count', type=int, default=10)
     parser.add_argument('-rec', type=int, default=1)
     parser.add_argument('-scale', type=float, default=1.e3)
+    parser.add_argument('-out', type=str, default='xyz')
     #parser.add_argument('-live', action='store_true')
     #parser.add_argument('-stdin', action='store_true')
-    #parser.add_argument('-out', type=str, choices=['xyz', 'mol2'], default='xyz')
     parser.add_argument('filelist', nargs='+')
     args = parser.parse_args()
 
@@ -64,8 +64,8 @@ def main():
         assignments = assign0(atoms1)
         # Align atoms1 to atoms0 for each calculated mapping and write coordinates to file
         for i, a in enumerate(assignments, start=1):
-            io.write('aligned_{}.xyz'.format(i), atoms0)
-            io.write('aligned_{}.xyz'.format(i), align0(atoms1[a.map]).atoms, append=True)
+            io.write('aligned_{}.{ext}'.format(i, ext=args.out), atoms0)
+            io.write('aligned_{}.{ext}'.format(i, ext=args.out), align0(atoms1[a.map]).atoms, append=True)
     else:
         alignment = align0(atoms1)
         print('RMSD: {:.4f} (only alignment performed)'.format(alignment.rmsd))

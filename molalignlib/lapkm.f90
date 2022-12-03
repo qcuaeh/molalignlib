@@ -1,11 +1,11 @@
-module eap
+module lap
 use parameters
 
 implicit none
 
 contains
 
-subroutine eapsolve(n, o, p, q, bias, perm, dist)
+subroutine minperm(n, o, p, q, bias, perm, dist)
 
     integer, intent(in) :: n, o
     real(wp), intent(in) :: p(:, :), q(:, :)
@@ -13,7 +13,7 @@ subroutine eapsolve(n, o, p, q, bias, perm, dist)
     integer, intent(out) :: perm(:)
     real(wp), intent(out) :: dist
 
-    integer i, j
+    integer :: i, j
 !    real(wp) c(n, n)
     real(wp), allocatable :: c(:, :)
     allocate(c(n, n))

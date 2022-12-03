@@ -9,33 +9,14 @@ use alignment
 use rotation
 use biasing
 use printing
-use eap
+use lap
 
 implicit none
 
 private
-public f_logintint
-public lessthan
-public everless
 public optimize_assignment
 
-abstract interface
-    logical function f_logintint(x, y)
-        integer, intent(in) :: x, y
-    end function
-end interface
-
 contains
-
-logical function lessthan(a, b) result(res)
-    integer, intent(in) :: a, b
-    res = a < b
-end function
-
-logical function everless(a, b) result(res)
-    integer, intent(in) :: a, b
-    res = .true.
-end function
 
 subroutine optimize_assignment( &
     natom, &
@@ -48,8 +29,7 @@ subroutine optimize_assignment( &
     nmap, &
     maplist, &
     countlist, &
-    rmsdlist, &
-    stoptest &
+    rmsdlist &
 )
 
     integer, intent(in) :: natom, nblock, nrec
@@ -60,7 +40,6 @@ subroutine optimize_assignment( &
     integer, intent(out) :: maplist(:, :)
     integer, intent(out) :: countlist(:)
     real(wp), intent(out) :: rmsdlist(:)
-    procedure (f_logintint), pointer, intent(in) :: stoptest
 
     logical found, overflow
     integer imap, jmap, ntrial, nmatch, cycles
@@ -68,8 +47,8 @@ subroutine optimize_assignment( &
     real(wp) :: sqdist, biased_dist, new_biased_dist, totalrot
     real(wp), dimension(4) :: rotquat, prodquat
     real(wp), dimension(nrec) :: avgiter, avgtotalrot, avgrealrot
-    real(wp) bias(natom, natom)
-    real(wp) auxcoords1(3, natom)
+    real(wp) :: bias(natom, natom)
+    real(wp) :: auxcoords1(3, natom)
 
 ! Set bias for non equivalent atoms 
 
@@ -91,7 +70,7 @@ subroutine optimize_assignment( &
 
 ! Loop for map searching
 
-    do while (nmatch < max_count .and. stoptest(ntrial, max_trials))
+    do while (nmatch < max_count .and. (free_flag .or. ntrial < max_trials))
 
         ntrial = ntrial + 1
 
@@ -224,17 +203,16 @@ subroutine eapsolveall(natom, coords0, coords1, nblock, blocksize, bias, atomap)
     real(wp), dimension(:, :), intent(inout) :: coords1
     integer, dimension(:), intent(out) :: atomap
 
-    integer h, offset
-!    real(wp), dimension(natom, natom) :: costs
+    integer :: h, offset
     integer, dimension(natom) :: perm
-    real(wp) dist
+    real(wp) :: dist
 
 ! Fill distance matrix for each block
 
     offset = 0
 
     do h = 1, nblock
-        call eapsolve(blocksize(h), offset, coords0, coords1, bias, perm, dist)
+        call minperm(blocksize(h), offset, coords0, coords1, bias, perm, dist)
         atomap(offset+1:offset+blocksize(h)) = perm(:blocksize(h)) + offset
         offset = offset + blocksize(h)
     end do
@@ -248,7 +226,7 @@ real(wp) function totalbias(natom, weights, bias, mapping) result(total)
     real(wp), dimension(:), intent(in) :: weights
     integer, dimension(:), intent(in) :: mapping
     real(wp), dimension(:, :), intent(in) :: bias
-    integer i
+    integer :: i
 
     total = 0.
 

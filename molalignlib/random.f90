@@ -7,6 +7,7 @@ implicit none
 
 private
 public rand3
+public shuffle
 public initialize_random
 
 contains
@@ -20,9 +21,9 @@ end function
 subroutine initialize_random()
 !   integer i, n
 !   integer, allocatable :: seed(:)
-   integer u, stat, dt(8)
-   integer(int64) t
-   integer seed1, seed2
+   integer :: u, stat, dt(8)
+   integer :: seed1, seed2
+   integer(int64) :: t
 
    call rnglib_init()
    if (.not. test_flag) then
@@ -75,8 +76,8 @@ end function lcg
 subroutine shuffle(array, n)
    integer, intent(in) :: n
    integer, dimension(:), intent(inout) :: array(:)
-   integer i, j, k, temp
-   real(wp) u
+   integer :: i, j, k, temp
+   real(wp) :: u
 
    do k = 1, 2
       do i = 1, n

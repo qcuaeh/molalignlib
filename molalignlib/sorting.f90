@@ -30,8 +30,8 @@ contains
 function identitymap(n)
 ! Get an identity map of size n
     integer, intent(in) :: n
-    integer identitymap(n)
-    integer i
+    integer :: identitymap(n)
+    integer :: i
     do i = 1, n
         identitymap(i) = i
     end do
@@ -41,7 +41,7 @@ function inversemap(mapping)
 ! Get the inverse map of mapping
     integer, intent(in), dimension(:) :: mapping
     integer, dimension(size(mapping)) :: inversemap
-    integer i
+    integer :: i
     do i = 1, size(mapping)
         inversemap(mapping(i)) = i
     end do
@@ -50,7 +50,7 @@ end function
 function intsorted(x, n) result(y)
    integer, intent(in) :: n
    integer, dimension(:), intent(in) :: x
-   integer y(n)
+   integer :: y(n)
    y(1:n) = x(1:n)
    call intquicksort(y, 1, n)
 end function
@@ -58,7 +58,7 @@ end function
 function intorder(x, n) result(o)
     integer, intent(in) :: n
     integer, dimension(:), intent(in) :: x
-    integer o(n), t((n+1)/2)
+    integer :: o(n), t((n+1)/2)
     o = identitymap(n)
     call intmergesort(x, o, n, t)
 end function
@@ -66,7 +66,7 @@ end function
 function charorder(x, n) result(o)
     integer, intent(in) :: n
     character(*), dimension(:), intent(in) :: x
-    integer o(n), t((n+1)/2)
+    integer :: o(n), t((n+1)/2)
     o = identitymap(n)
     call charmergesort(x, o, n, t)
 end function
@@ -75,8 +75,8 @@ recursive subroutine intquicksort(x, m, n)
     integer, intent(in) :: m, n
     integer, dimension(:), intent(inout) :: x
 
-    integer i, j
-    integer xi, xp
+    integer :: i, j
+    integer :: xi, xp
 
     xp = x((m+n)/2)
     i = m
@@ -103,8 +103,8 @@ recursive subroutine realquicksort(x, m, n)
     integer, intent(in) :: m, n
     real(wp), dimension(:), intent(inout) :: x
 
-    integer i, j
-    real(wp) xi, xp
+    integer :: i, j
+    real(wp) :: xi, xp
 
     xp = x((m+n)/2)
     i = m

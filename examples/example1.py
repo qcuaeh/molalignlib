@@ -13,8 +13,8 @@ from molalignlib import Align, Assign
 
 
 # Read clusters coordinates
-atoms0 = io.read('r05/Co100.xyz', index=0)
-atoms1 = io.read('r05/Co100.xyz', index=1)
+atoms0 = io.read('Co138_0.xyz', index=0)
+atoms1 = io.read('Co138_1.xyz', index=0)
 
 
 # In[ ]:

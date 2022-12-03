@@ -28,7 +28,7 @@ end subroutine
 
 subroutine set_abort_flag(boolval)
     logical, intent(in) :: boolval
-    stop_flag = boolval
+    free_flag = boolval
 end subroutine
 
 subroutine set_debug_flag(boolval)
@@ -91,16 +91,14 @@ subroutine assign_atoms( &
     integer, intent(out) :: countlist(nrec)
     real(wp), intent(out) :: rmsdlist(nrec)
 
-    integer i, h, offset
-    integer nblock0, nblock1
+    integer :: i, h, offset
+    integer :: nblock0, nblock1
     integer, dimension(:), allocatable :: atomorder0, atomorder1
     integer, dimension(:), allocatable :: atomunorder0, atomunorder1
     integer, dimension(:), allocatable :: blockidx0, blockidx1
     integer, dimension(:), allocatable :: blocksize0, blocksize1
     real(wp), dimension(3) :: center0, center1
-    real(wp) weights1(natom1)
-
-    procedure(f_logintint), pointer :: stoptest
+    real(wp) :: weights1(natom1)
 
     ! Abort if clusters have different number of atoms
 
@@ -171,14 +169,6 @@ subroutine assign_atoms( &
 
     call initialize_random()
 
-    ! Associate an stop test
-
-    if (stop_flag) then
-        stoptest => lessthan
-    else
-        stoptest => everless
-    end if
-
     ! Remap atoms to minimize distance and difference
 
     call optimize_assignment( &
@@ -186,7 +176,7 @@ subroutine assign_atoms( &
         weights0(atomorder0), &
         centered(natom0, coords0(:, atomorder0), center0), &
         centered(natom1, coords1(:, atomorder1), center1), &
-        nrec, nmap, maplist, countlist, rmsdlist, stoptest &
+        nrec, nmap, maplist, countlist, rmsdlist &
     )
 
     ! Reorder back to original atom ordering
@@ -228,9 +218,9 @@ subroutine align_atoms( &
     real(wp), intent(out) :: aligned1(3, natom1)
     real(wp), intent(out) :: rmsd
 
-    real(wp) weights1(natom1)
-    real(wp) center0(3), center1(3)
-    real(wp) travec(3), rotmat(3, 3)
+    real(wp) :: weights1(natom1)
+    real(wp) :: center0(3), center1(3)
+    real(wp) :: travec(3), rotmat(3, 3)
 
     ! Abort if clusters have different number of atoms
 

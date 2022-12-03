@@ -1,31 +1,6 @@
 import numpy as np
 from ase import Atoms
-
-try:
-    from .f2py_molalignlib import molalignlib
-except ModuleNotFoundError:
-    from os import path, environ
-    from subprocess import Popen, PIPE, STDOUT
-    import molalignbld
-    libdir = path.dirname(path.abspath(__file__))
-    utildir = path.dirname(path.abspath(molalignbld.__file__))
-    buildenv = environ.copy()
-    with open(path.join(utildir, 'gnu.env'), 'r') as file:
-        for line in file.readlines():
-            var, _, value = line.rstrip('\n').partition('=')
-            buildenv[var] = value
-    command = [path.join(utildir, 'compile.sh'), '-pic', '.', '.']
-    with Popen(command, cwd=libdir, env=buildenv, stdout=PIPE, stderr=STDOUT, bufsize=0) as p:
-        for line in p.stdout:
-            print(line.decode('utf-8').rstrip())
-    command = [path.join(utildir, 'makepyext.sh'), '.', 'f2py_molalignlib']
-    with Popen(command, cwd=libdir, env=buildenv, stdout=PIPE, stderr=STDOUT, bufsize=0) as p:
-        for line in p.stdout:
-            print(line.decode('utf-8').rstrip())
-    try:
-        from .f2py_molalignlib import molalignlib
-    except ModuleNotFoundError:
-        raise ImportError('molalignlib extension not found')
+from molalignlibext import molalignlib
 
 class Alignment:
     def __init__(self, rmsd, atoms):

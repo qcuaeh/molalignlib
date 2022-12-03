@@ -14,21 +14,20 @@ program molalign
 
     implicit none
 
-    integer i, u
-    integer file_unit(2)
-    integer nmap, nrec
-    integer natom0, natom1
+    integer :: i, nmap, nrec, stat
+    integer :: natom0, natom1
+    integer :: unit, unit0, unit1
     integer, allocatable :: maplist(:, :)
     integer, allocatable :: countlist(:)
     integer, allocatable, dimension(:) :: znums0, znums1, types0, types1
-    character(arg_len) arg, format_w
-    character(title_len) title0, title1
+    character(arg_len) :: arg, files(2), fmtstdin, fmtin0, fmtin1, fmtout
+    character(title_len) :: title0, title1
     character(label_len), allocatable, dimension(:) :: labels0, labels1
-    real(wp) rmsd
+    real(wp) :: rmsd
     real(wp), allocatable :: rmsdlist(:)
     real(wp), allocatable :: weights0(:)
     real(wp), dimension(:, :), allocatable :: coords0, coords1, aligned1
-    logical sort_flag, stdin_flag
+    logical :: sort_flag, stdin_flag
 
     procedure(f_realint), pointer :: weight_function
 
@@ -37,7 +36,7 @@ program molalign
     bias_flag = .false.
     iter_flag = .false.
     sort_flag = .false.
-    stop_flag = .false.
+    free_flag = .true.
     test_flag = .false.
     live_flag = .false.
     debug_flag = .false.
@@ -47,7 +46,8 @@ program molalign
     max_count = 10
     bias_tol = 0.35
     bias_scale = 1.e3
-    format_w = 'xyz'
+    fmtstdin = 'xyz'
+    fmtout = 'xyz'
 
     weight_function => unity
 
@@ -69,45 +69,60 @@ program molalign
         case ('-fast')
             bias_flag = .true.
             iter_flag = .true.
+!        case ('-biasonly')
+!            bias_flag = .true.
+!            iter_flag = .false.
+!        case ('-iteronly')
+!            bias_flag = .false.
+!            iter_flag = .true.
         case ('-mass')
             weight_function => stdmass
         case ('-count')
             call readoptarg(arg, max_count)
         case ('-trials')
-            stop_flag = .true.
+            free_flag = .false.
             call readoptarg(arg, max_trials)
         case ('-tol')
             call readoptarg(arg, bias_tol)
-        case ('-scale')
-            call readoptarg(arg, bias_scale)
+!        case ('-scale')
+!            call readoptarg(arg, bias_scale)
         case ('-rec')
             call readoptarg(arg, nrec)
         case ('-out')
-            call readoptarg(arg, format_w)
+            call readoptarg(arg, fmtout)
         case ('-stdin')
             stdin_flag = .true.
+            call readoptarg(arg, fmtstdin)
         case default
-            call openfile(arg, file_unit)
+            call readarg(arg, files)
         end select
 
     end do
 
     if (stdin_flag) then
-        file_unit(1) = input_unit
-        file_unit(2) = input_unit
+        unit0 = input_unit
+        unit1 = input_unit
+        fmtin0 = fmtstdin
+        fmtin1 = fmtstdin
     else
-        if (ifile == 0) then
+        select case (ipos)
+        case (0)
             write (error_unit, '(a)') 'Error: No file paths were specified'
             stop
-        else if (ifile == 1) then
-            file_unit(2) = file_unit(1)
-        end if
+        case (1)
+            call open2read(files(1), unit0, fmtin0)
+            unit1 = unit0
+            fmtin1 = fmtin0
+        case (2)
+            call open2read(files(1), unit0, fmtin0)
+            call open2read(files(2), unit1, fmtin1)
+        end select
     end if
 
     ! Read coordinates
 
-    call readxyzfile(file_unit(1), natom0, title0, labels0, coords0)
-    call readxyzfile(file_unit(2), natom1, title1, labels1, coords1)
+    call readfile(unit0, fmtin0, natom0, title0, labels0, coords0)
+    call readfile(unit1, fmtin1, natom1, title1, labels1, coords1)
 
     ! Allocate arrays
 
@@ -154,10 +169,10 @@ program molalign
                 types0, types1(maplist(:, i)), coords0, coords1(:, maplist(:, i)), &
                 weights0, rmsd, aligned1)
 
-            open(newunit=u, file='aligned_'//str(i)//'.'//trim(format_w), action='write', status='replace')
-            call writefile(u, format_w, natom0, title0, znums0, coords0)
-            call writefile(u, format_w, natom1, title1, znums1(maplist(:, i)), aligned1)
-            close(u)
+            call open2write('aligned_'//str(i)//'.'//trim(fmtout), unit)
+            call writefile(unit, fmtout, natom0, title0, znums0, coords0)
+            call writefile(unit, fmtout, natom1, title1, znums1(maplist(:, i)), aligned1)
+            close(unit)
 
         end do
 
@@ -172,10 +187,10 @@ program molalign
 
         write (output_unit, '(a,1x,f0.4,1x,a)') 'RMSD:', rmsd, '(only alignment performed)'
 
-        open(newunit=u, file='aligned_0.'//trim(format_w), action='write', status='replace')
-        call writefile(u, format_w, natom0, title0, znums0, coords0)
-        call writefile(u, format_w, natom1, title1, znums1, aligned1) 
-        close(u)
+        call open2write('aligned_0.'//trim(fmtout), unit)
+        call writefile(unit, fmtout, natom0, title0, znums0, coords0)
+        call writefile(unit, fmtout, natom1, title1, znums1, aligned1) 
+        close(unit)
 
     end if
 

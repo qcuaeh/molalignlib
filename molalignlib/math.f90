@@ -13,46 +13,50 @@ public intersection
 contains
 
 real(wp) function trace(natom, matrix)
-integer, intent(in) :: natom
-real(wp), dimension(:, :), intent(in) :: matrix
-integer i
-trace = 0
-do i = 1, natom
-    trace = trace + matrix(i, i)
-end do
+    integer, intent(in) :: natom
+    real(wp), dimension(:, :), intent(in) :: matrix
+    integer :: i
+
+    trace = 0
+    do i = 1, natom
+        trace = trace + matrix(i, i)
+    end do
+
 end function
 
 real(wp) function det33(a) result(det)
-real(wp), dimension(3,3), intent(in) :: a
-det = a(1,1)*a(2,2)*a(3,3)  &
-    - a(1,1)*a(2,3)*a(3,2)  &
-    - a(1,2)*a(2,1)*a(3,3)  &
-    + a(1,2)*a(2,3)*a(3,1)  &
-    + a(1,3)*a(2,1)*a(3,2)  &
-    - a(1,3)*a(2,2)*a(3,1)
+    real(wp), dimension(3,3), intent(in) :: a
+
+    det = a(1,1)*a(2,2)*a(3,3)  &
+        - a(1,1)*a(2,3)*a(3,2)  &
+        - a(1,2)*a(2,1)*a(3,3)  &
+        + a(1,2)*a(2,3)*a(3,1)  &
+        + a(1,3)*a(2,1)*a(3,2)  &
+        - a(1,3)*a(2,2)*a(3,1)
+
 end function
 
 function matmul2(a, b, m, o, n) result(ab)
     integer, intent(in) :: m, o ,n
     real(wp), intent (in) :: a(m, o)
     real(wp), intent (in) :: b(o, n)
-    real(wp) ab(m, n)
-    integer i, j
+    real(wp) :: ab(m, n)
+    integer :: i, j
+
     do i = 1, n
         ab(:, i) = 0.0
         do j = 1, o
             ab(:, i) = ab(:, i) + a(:, j)*b(j, i)
         end do
     end do
+
 end function
 
-subroutine union(n1, list1, n2, list2, n3, list3)
 ! Find the union of two sorted lists without repeated elements
-
+subroutine union(n1, list1, n2, list2, n3, list3)
     integer, intent(in) :: n1, n2, list1(:), list2(:)
     integer, intent(out) :: n3, list3(:)
-
-    integer i1, i2
+    integer :: i1, i2
 
     i1 = 1
     i2 = 1
@@ -87,13 +91,11 @@ subroutine union(n1, list1, n2, list2, n3, list3)
 
 end subroutine
 
-subroutine intersection(n1, list1, n2, list2, n3, list3)
 ! Find the intersection of two sorted lists without repeated elements
-
+subroutine intersection(n1, list1, n2, list2, n3, list3)
     integer, intent(in) :: n1, n2, list1(:), list2(:)
     integer, intent(out) :: n3, list3(:)
-
-    integer i1, i2
+    integer :: i1, i2
 
     i1 = 1
     i2 = 1

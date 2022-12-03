@@ -18,9 +18,9 @@ function centroid(natom, weights, coords)
 
     integer, intent(in) :: natom
     real(wp), intent(in) :: weights(natom), coords(3, natom)
-    real(wp) centroid(3)
+    real(wp) :: centroid(3)
 
-    integer i
+    integer :: i
 
 ! Calculate the coordinates of the center of mass
 
@@ -39,9 +39,9 @@ function translated(natom, coords, vector)
 
     integer, intent(in) :: natom
     real(wp), intent(in) :: coords(3, natom), vector(3)
-    real(wp) translated(3, natom)
+    real(wp) :: translated(3, natom)
 
-    integer i
+    integer :: i
 
     do i = 1, natom
         translated(:, i) = coords(:, i) + vector(:)
@@ -56,7 +56,7 @@ subroutine translate(natom, coords, vector)
     real(wp), intent(in) :: vector(3)
     real(wp), intent(inout) :: coords(3, natom)
 
-    integer i
+    integer :: i
 
     do i = 1, natom
         coords(:, i) = coords(:, i) + vector(:)
@@ -69,9 +69,9 @@ function centered(natom, coords, vector)
 
     integer, intent(in) :: natom
     real(wp), intent(in) :: coords(3, natom), vector(3)
-    real(wp) centered(3, natom)
+    real(wp) :: centered(3, natom)
 
-    integer i
+    integer :: i
 
     do i = 1, natom
         centered(:, i) = coords(:, i) - vector(:)
