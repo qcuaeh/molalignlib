@@ -76,6 +76,7 @@ end function lcg
 subroutine shuffle(array, n)
    integer, intent(in) :: n
    integer, dimension(:), intent(inout) :: array(:)
+
    integer :: i, j, k, temp
    real(wp) :: u
 

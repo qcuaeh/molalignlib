@@ -79,9 +79,9 @@ class Assign(Atoms):
         if type(bias_scale) is not float:
             raise TypeError('"bias_scale" must be a real')
         if trials is None:
-            molalignlib.set_abort_flag(False)
+            molalignlib.set_free_flag(True)
         elif type(trials) is int:
-            molalignlib.set_abort_flag(True)
+            molalignlib.set_free_flag(False)
             molalignlib.set_max_trials(trials)
         else:
             raise TypeError('"trials" must be an integer')
