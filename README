@@ -1,12 +1,12 @@
 <!-- -*- mode: markdown -*- -->
 
-molalign
+MolAlign
 ========
 
-[![License: LGPL v3](https://img.shields.io/badge/License-LGPL_v3-blue.svg)](https://www.gnu.org/licenses/lgpl-3.0)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qcuaeh/molalign.git/HEAD?labpath=examples)
 
-**molalign** is a fortran code based on random rotations and pseudo local minimizations of RMSD to reliably find solutions to the
+**MolAlign** is a fortran code based on random rotations and pseudo local minimizations to reliably find solutions to the
 near-congruence problem for atom clusters.
 
 ![graphical abstract](abstract.png)

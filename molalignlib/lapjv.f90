@@ -1,9 +1,3 @@
-module lap
-use parameters
-implicit none
-
-contains
-
 ! GMIN: A program for finding global minima
 ! Copyright (C) 1999-2006 David J. Wales
 ! This file is part of GMIN.
@@ -39,6 +33,12 @@ contains
 !     p(i) <--> q(perm(i))
 !   i.e.
 !     sum(i=1,n) permdist(p(i), q(perm(i))) == dist
+
+module lap
+use parameters
+implicit none
+
+contains
 
 subroutine minperm(n, o, p, q, bias, perm, dist)
 
