@@ -22,98 +22,76 @@ use settings
 implicit none
 
 private
-public aligned
-public squaredist
-public leastsquaredist
+public squadist
+public leastsquadist
 public leastrotquat
 
 contains
 
-function squaredist(natom, weights, coords0, coords1, atomap) result(dist)
+real(wp) function squadist(natom, weights, coords0, coords1, atomap) result(dist)
    integer, intent(in) :: natom
    integer, dimension(:), intent(in) :: atomap
    real(wp), dimension(:), intent(in) :: weights
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
 
-   integer :: i
-   real(wp) :: dist
-
-   dist = 0
-
-   do i = 1, natom
-      dist = dist + weights(i)*sum((coords1(:, atomap(i)) - coords0(:, i))**2)
-   end do
+   dist = sum(weights(:)*sum((coords1(:, atomap(:)) - coords0(:, :))**2, dim=1))
 
 end function
 
-!function leastsquaredist(natom, weights, coords0, coords1, atomap) result(dist)
-! Calculate least square distance from eigenvalues
-!    integer, intent(in) :: natom
-!    integer, dimension(:), intent(in) :: atomap
-!    real(wp), dimension(:), intent(in) :: weights
-!    real(wp), dimension(:, :), intent(in) :: coords0, coords1
+! Purpose: Calculate least square distance from eigenvalues
+real(wp) function leastsquadist(natom, weights, coords0, coords1, atomap) result(dist)
+    integer, intent(in) :: natom
+    integer, dimension(:), intent(in) :: atomap
+    real(wp), dimension(:), intent(in) :: weights
+    real(wp), dimension(:, :), intent(in) :: coords0, coords1
+    real(wp) eigmat(4, 4), eigval(4)
+
+    call kearsleymat(natom, weights, coords0, coords1, atomap, eigmat)
+    call syeval4(eigmat, eigval)
+    dist = max(eigval(1), 0._wp)
+
+end function
+
+!! Purpose: Calculate least square distance from aligned coordinates
+!real(wp) function leastsquadist(natom, weights, coords0, coords1, atomap) result(dist)
+!   integer, intent(in) :: natom
+!   integer, dimension(:), intent(in) :: atomap
+!   real(wp), dimension(:), intent(in) :: weights
+!   real(wp), dimension(:, :), intent(in) :: coords0, coords1
+!   real(wp) :: eigmat(4, 4), eigval(4)
 !
-!    real(wp) dist, kearsleymat(4, 4), eigval(4)
-!
-!    call buildkearsleymat(natom, weights, coords0, coords1, atomap, kearsleymat)
-!    call syeval4(kearsleymat, eigval)
-!    dist = eigval(1)
+!   call kearsleymat(natom, weights, coords0, coords1, atomap, eigmat)
+!   call syevec4(eigmat, eigval)
+!   dist = squadist(natom, weights, coords0, rotated(natom, coords1, eigmat(:, 1)), atomap)
 !
 !end function
 
-function leastsquaredist(natom, weights, coords0, coords1, atomap) result(dist)
-! Calculate least square distance from aligned coordinates
-   integer, intent(in) :: natom
-   integer, dimension(:), intent(in) :: atomap
-   real(wp), dimension(:), intent(in) :: weights
-   real(wp), dimension(:, :), intent(in) :: coords0, coords1
-
-   real(wp) :: dist
-
-   dist = squaredist(natom, weights, coords0, aligned(natom, weights, coords0, coords1, atomap), atomap)
-
-end function
-
+! Purpose: Calculate rotation quaternion which minimzes the square distance
 function leastrotquat(natom, weights, coords0, coords1, atomap) result(quat)
    integer, intent(in) :: natom
    integer, dimension(:), intent(in) :: atomap
    real(wp), dimension(:), intent(in) :: weights
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
+   real(wp) :: quat(4), eigmat(4, 4), eigval(4)
 
-   real(wp) :: quat(4), kearsleymat(4, 4), eigval(4)
-
-   call buildkearsleymat(natom, weights, coords0, coords1, atomap, kearsleymat)
-   call syevec4(kearsleymat, eigval)
-   quat = kearsleymat(:, 1)
-
-end function
-
-function aligned(natom, weights, coords0, coords1, atomap)
-   integer, intent(in) :: natom
-   integer, dimension(:), intent(in) :: atomap
-   real(wp), dimension(:), intent(in) :: weights
-   real(wp), dimension(:, :), intent(in) :: coords0, coords1
-
-   real(wp) aligned(3, natom), kearsleymat(4, 4), eigval(4)
-
-   call buildkearsleymat(natom, weights, coords0, coords1, atomap, kearsleymat)
-   call syevec4(kearsleymat, eigval)
-   aligned = rotated(natom, coords1, kearsleymat(:, 1))
+   call kearsleymat(natom, weights, coords0, coords1, atomap, eigmat)
+   call syevec4(eigmat, eigval)
+   quat = eigmat(:, 1)
 
 end function
 
-subroutine buildkearsleymat(natom, weights, coords0, coords1, atomap, kearsleymat)
 ! Purpose: Find the best orientation by least squares minimization
 ! Reference: Acta Cryst. (1989). A45, 208-210
+subroutine kearsleymat(natom, weights, coords0, coords1, atomap, eigmat)
    integer, intent(in) :: natom
    integer, dimension(:), intent(in) :: atomap
    real(wp), dimension(:), intent(in) :: weights
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
 
    integer :: i
-   real(wp) :: kearsleymat(4, 4), p(3, natom), q(3, natom), auxmat(4, 4)
+   real(wp) :: eigmat(4, 4), p(3, natom), q(3, natom), auxmat(4, 4)
 
-   kearsleymat = 0.0
+   eigmat = 0.0
 
    do i = 1, natom
       p(:, i) = coords0(:, i) + coords1(:, atomap(i))
@@ -133,7 +111,7 @@ subroutine buildkearsleymat(natom, weights, coords0, coords1, atomap, kearsleyma
       auxmat(3, 3) = p(1, i)**2 + p(3, i)**2 + q(2, i)**2
       auxmat(3, 4) = q(2, i)*q(3, i) - p(2, i)*p(3, i)
       auxmat(4, 4) = p(1, i)**2 + p(2, i)**2 + q(3, i)**2
-      kearsleymat = kearsleymat + weights(i)*auxmat
+      eigmat = eigmat + weights(i)*auxmat
    end do
 
 end subroutine

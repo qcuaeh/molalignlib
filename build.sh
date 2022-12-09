@@ -130,7 +130,7 @@ runtests() {
       name=$(basename "$file")
       echo -n Running test ${name%.out}.xyz...
       if diff -bB "$file" <("$executable" "$testdir/${name%.out}.xyz" "$@") > /dev/null; then
-          echo \ pass
+          echo \ passed
       else
           echo \ failed
       fi
@@ -173,8 +173,8 @@ makeprog molalign
 clean_build
 
 # Run tests
-runtests tests/r05 -test -rec 10 -sort -fast -tol 0.17
-#runtests tests/r10 -test -rec 10 -sort -fast -tol 0.35
+#runtests tests/r05 -test -rec 10 -sort -fast -tol 0.17
+runtests tests/r10 -test -rec 10 -sort -fast -tol 0.35
 #runtests tests/r20 -test -rec 10 -sort -fast -tol 0.69
 
 # Build dynamic library

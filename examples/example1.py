@@ -42,9 +42,12 @@ align0 = Align(atoms0)
 # In[ ]:
 
 
-# Align atoms in atoms1 and atoms0 for each calculated mapping and
-# write coordinates to a file
-for i, a in enumerate(assignments, start=1):
+# Align atoms1 to atoms0 for each assignment,
+# print count, RMSD from assignment, RMSD from alignment
+# and write aligned coordinates to file
+for i, assignment in enumerate(assignments, start=1):
+    aligned1 = align0(atoms1[assignment.map])
+    print(i, assignment.count, assignment.rmsd, aligned1.rmsd)
     io.write('aligned_{}.xyz'.format(i), atoms0)
-    io.write('aligned_{}.xyz'.format(i), align0(atoms1[a.map]).atoms, append=True)
+    io.write('aligned_{}.xyz'.format(i), aligned1.atoms, append=True)
 

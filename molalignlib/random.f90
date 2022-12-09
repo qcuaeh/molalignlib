@@ -61,10 +61,9 @@ subroutine random_number_dp(x)
 end subroutine
 
 subroutine initialize_random()
-   integer i, n
-   integer(int64) :: t
+   integer n
    integer, allocatable :: seed(:)
-   integer :: unit, stat, dt(8)
+   integer :: unit, stat
 
    if (test_flag) then
       randnum_sp => real_uni01_sp

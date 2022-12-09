@@ -43,9 +43,9 @@ subroutine optimize_assignment( &
    coords1, &
    nrec, &
    nmap, &
-   maplist, &
-   countlist, &
-   rmsdlist &
+   mapind, &
+   mapcount, &
+   mapdist &
 )
 
    integer, intent(in) :: natom, nblock, nrec
@@ -53,14 +53,14 @@ subroutine optimize_assignment( &
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
    real(wp), dimension(:), intent(in) :: weights
    integer, intent(out) :: nmap
-   integer, intent(out) :: maplist(:, :)
-   integer, intent(out) :: countlist(:)
-   real(wp), intent(out) :: rmsdlist(:)
+   integer, intent(out) :: mapind(:, :)
+   integer, intent(out) :: mapcount(:)
+   real(wp), intent(out) :: mapdist(:)
 
    logical found, overflow
    integer imap, jmap, ntrial, nmatch, cycles
    integer, dimension(natom) :: atomap, auxmap
-   real(wp) :: sqdist, biased_dist, new_biased_dist, totalrot
+   real(wp) :: dist, biased_dist, new_biased_dist, totalrot
    real(wp), dimension(4) :: rotquat, prodquat
    real(wp), dimension(nrec) :: avgiter, avgtotalrot, avgrealrot
    real(wp) :: bias(natom, natom)
@@ -100,7 +100,7 @@ subroutine optimize_assignment( &
 
 ! Minimize the euclidean distance
 
-      call eapsolveall(natom, coords0, auxcoords1, nblock, blocksize, bias, atomap)
+      call getatomap(natom, coords0, auxcoords1, nblock, blocksize, bias, atomap)
       rotquat = leastrotquat(natom, weights, coords0, auxcoords1, atomap)
       prodquat = rotquat
       totalrot = rotangle(rotquat)
@@ -108,14 +108,14 @@ subroutine optimize_assignment( &
       cycles = 1
 
       do while (iter_flag)
-         biased_dist = squaredist(natom, weights, coords0, auxcoords1, atomap) &
+         biased_dist = squadist(natom, weights, coords0, auxcoords1, atomap) &
                + totalbias(natom, weights, bias, atomap)
-         call eapsolveall(natom, coords0, auxcoords1, nblock, blocksize, bias, auxmap)
+         call getatomap(natom, coords0, auxcoords1, nblock, blocksize, bias, auxmap)
          if (all(auxmap == atomap)) exit
-         new_biased_dist = squaredist(natom, weights, coords0, auxcoords1, auxmap) &
+         new_biased_dist = squadist(natom, weights, coords0, auxcoords1, auxmap) &
                + totalbias(natom, weights, bias, auxmap)
          if (new_biased_dist > biased_dist) then
-            write (error_unit, '(a)') 'new_biased_dist is larger than biased_dist!'
+            write (output_unit, '(a)') 'new_biased_dist is larger than biased_dist!'
 !                print *, biased_dist, new_biased_dist
          end if
          rotquat = leastrotquat(natom, weights, coords0, auxcoords1, auxmap)
@@ -126,23 +126,23 @@ subroutine optimize_assignment( &
          atomap = auxmap
       end do
 
-      sqdist = squaredist(natom, weights, coords0, auxcoords1, atomap)
+      dist = squadist(natom, weights, coords0, auxcoords1, atomap)
 
 ! Check for new best mapping
 
       found = .false.
 
       do imap = 1, nmap
-         if (all(atomap == maplist(:, imap))) then
+         if (all(atomap == mapind(:, imap))) then
             if (imap == 1) nmatch = nmatch + 1
-            countlist(imap) = countlist(imap) + 1
-            avgiter(imap) = avgiter(imap) + (cycles - avgiter(imap))/countlist(imap)
-            avgrealrot(imap) = avgrealrot(imap) + (rotangle(prodquat) - avgrealrot(imap))/countlist(imap)
-            avgtotalrot(imap) = avgtotalrot(imap) + (totalrot - avgtotalrot(imap))/countlist(imap)
+            mapcount(imap) = mapcount(imap) + 1
+            avgiter(imap) = avgiter(imap) + (cycles - avgiter(imap))/mapcount(imap)
+            avgrealrot(imap) = avgrealrot(imap) + (rotangle(prodquat) - avgrealrot(imap))/mapcount(imap)
+            avgtotalrot(imap) = avgtotalrot(imap) + (totalrot - avgtotalrot(imap))/mapcount(imap)
             if (live_flag) then
                write (output_unit, '(a)', advance='no') achar(27)//'['//str(imap + 2)//'H'
-               call print_stats(imap, countlist(imap), avgiter(imap), avgtotalrot(imap), &
-                  avgrealrot(imap), rmsdlist(imap))
+               call print_stats(imap, mapcount(imap), avgiter(imap), avgtotalrot(imap), &
+                  avgrealrot(imap), mapdist(imap))
             end if
             found = .true.
             exit
@@ -154,32 +154,32 @@ subroutine optimize_assignment( &
             overflow = .true.
          end if
          do imap = 1, nrec
-            if (imap > nmap .or. sqrt(sqdist) < rmsdlist(imap)) then
+            if (imap > nmap .or. dist < mapdist(imap)) then
                if (imap == 1) nmatch = 1
                if (nmap < nrec) nmap = nmap + 1
                do jmap = nmap, imap + 1, -1
-                  countlist(jmap) = countlist(jmap - 1)
+                  mapind(:, jmap) = mapind(:, jmap - 1)
+                  mapcount(jmap) = mapcount(jmap - 1)
+                  mapdist(jmap) = mapdist(jmap - 1)
                   avgiter(jmap) = avgiter(jmap - 1)
                   avgrealrot(jmap) = avgrealrot(jmap - 1)
                   avgtotalrot(jmap) = avgtotalrot(jmap - 1)
-                  maplist(:, jmap) = maplist(:, jmap - 1)
-                  rmsdlist(jmap) = rmsdlist(jmap - 1)
                   if (live_flag) then
                      write (output_unit, '(a)', advance='no') achar(27)//'['//str(jmap + 2)//'H'
-                     call print_stats(jmap, countlist(jmap), avgiter(jmap), avgtotalrot(jmap), &
-                        avgrealrot(jmap), rmsdlist(jmap))
+                     call print_stats(jmap, mapcount(jmap), avgiter(jmap), avgtotalrot(jmap), &
+                        avgrealrot(jmap), mapdist(jmap))
                   end if
                end do
-               countlist(imap) = 1
+               mapind(:, imap) = atomap
+               mapcount(imap) = 1
+               mapdist(imap) = dist
                avgiter(imap) = cycles
                avgrealrot(imap) = rotangle(prodquat)
                avgtotalrot(imap) = totalrot
-               maplist(:, imap) = atomap
-               rmsdlist(imap) = sqrt(sqdist)
                if (live_flag) then
                   write (output_unit, '(a)', advance='no') achar(27)//'['//str(imap + 2)//'H'
-                  call print_stats(imap, countlist(imap), avgiter(imap), avgtotalrot(imap), &
-                     avgrealrot(imap), rmsdlist(imap))
+                  call print_stats(imap, mapcount(imap), avgiter(imap), avgtotalrot(imap), &
+                     avgrealrot(imap), mapdist(imap))
                end if
                exit
             end if
@@ -196,8 +196,8 @@ subroutine optimize_assignment( &
    if (.not. live_flag) then
       call print_header()
       do imap = 1, nmap
-         call print_stats(imap, countlist(imap), avgiter(imap), avgtotalrot(imap), &
-            avgrealrot(imap), rmsdlist(imap))
+         call print_stats(imap, mapcount(imap), avgiter(imap), avgtotalrot(imap), &
+            avgrealrot(imap), mapdist(imap))
       end do
       call print_footer(overflow, nmap, ntrial)
    end if
@@ -205,7 +205,7 @@ subroutine optimize_assignment( &
 end subroutine
 
 ! Find best correspondence between points sets with fixed orientation
-subroutine eapsolveall(natom, coords0, coords1, nblock, blocksize, bias, atomap)
+subroutine getatomap(natom, coords0, coords1, nblock, blocksize, bias, atomap)
 
 ! nblock: Number of block atoms
 ! blocksize: Number of atoms in each block
@@ -236,18 +236,18 @@ subroutine eapsolveall(natom, coords0, coords1, nblock, blocksize, bias, atomap)
 end subroutine
 
 ! Calculate total bias
-real(wp) function totalbias(natom, weights, bias, mapping) result(total)
+real(wp) function totalbias(natom, weights, bias, map) result(total)
 
    integer, intent(in) :: natom
    real(wp), dimension(:), intent(in) :: weights
-   integer, dimension(:), intent(in) :: mapping
+   integer, dimension(:), intent(in) :: map
    real(wp), dimension(:, :), intent(in) :: bias
    integer :: i
 
    total = 0.
 
    do i = 1, natom
-      total = total + weights(i)*bias(i, mapping(i))
+      total = total + weights(i)*bias(i, map(i))
    end do
 
 end function

@@ -34,6 +34,7 @@ end interface
 
 interface sorted
    module procedure intsorted
+   module procedure realsorted
 end interface
 
 interface order
@@ -43,8 +44,8 @@ end interface
 
 contains
 
+! Purpose: Get an identity map
 function identitymap(n)
-! Purpose: Get an identity map of size n
    integer, intent(in) :: n
    integer :: identitymap(n)
    integer :: i
@@ -53,27 +54,35 @@ function identitymap(n)
    end do
 end function
 
-function inversemap(mapping)
-! Purpose: Get the inverse map of mapping
-   integer, intent(in), dimension(:) :: mapping
-   integer, dimension(size(mapping)) :: inversemap
+! Purpose: Get the inverse of mapping
+function inversemap(map)
+   integer, intent(in) :: map(:)
+   integer :: inversemap(size(map))
    integer :: i
-   do i = 1, size(mapping)
-      inversemap(mapping(i)) = i
+   do i = 1, size(map)
+      inversemap(map(i)) = i
    end do
 end function
 
 function intsorted(x, n) result(y)
    integer, intent(in) :: n
-   integer, dimension(:), intent(in) :: x
+   integer, intent(in) :: x(:)
    integer :: y(n)
    y(1:n) = x(1:n)
    call intquicksort(y, 1, n)
 end function
 
+function realsorted(x, n) result(y)
+   integer, intent(in) :: n
+   real(wp), intent(in) :: x(:)
+   real(wp) :: y(n)
+   y(1:n) = x(1:n)
+   call realquicksort(y, 1, n)
+end function
+
 function intorder(x, n) result(o)
    integer, intent(in) :: n
-   integer, dimension(:), intent(in) :: x
+   integer, intent(in) :: x(:)
    integer :: o(n), t((n+1)/2)
    o = identitymap(n)
    call intmergesort(x, o, n, t)
@@ -81,7 +90,7 @@ end function
 
 function charorder(x, n) result(o)
    integer, intent(in) :: n
-   character(*), dimension(:), intent(in) :: x
+   character(*), intent(in) :: x(:)
    integer :: o(n), t((n+1)/2)
    o = identitymap(n)
    call charmergesort(x, o, n, t)
@@ -89,7 +98,7 @@ end function
 
 recursive subroutine intquicksort(x, m, n)
    integer, intent(in) :: m, n
-   integer, dimension(:), intent(inout) :: x
+   integer, intent(inout) :: x(:)
 
    integer :: i, j
    integer :: xi, xp
@@ -117,7 +126,7 @@ end subroutine
 
 recursive subroutine realquicksort(x, m, n)
    integer, intent(in) :: m, n
-   real(wp), dimension(:), intent(inout) :: x
+   real(wp), intent(inout) :: x(:)
 
    integer :: i, j
    real(wp) :: xi, xp
@@ -171,9 +180,9 @@ end subroutine
  
 recursive subroutine intmergesort(x, o, n, t)
    integer, intent(in) :: n
-   integer, dimension(:), intent(in) :: x
-   integer, dimension(n), intent(inout) :: o
-   integer, dimension((n+1)/2), intent(out) :: t
+   integer, intent(in) :: x(:)
+   integer, intent(inout) :: o(n)
+   integer, intent(out) :: t((n+1)/2)
     
    integer :: i, o1
     
@@ -223,9 +232,9 @@ end subroutine
  
 recursive subroutine charmergesort(x, o, n, t)
    integer, intent(in) :: n
-   character(*), dimension(:), intent(in) :: x
-   integer, dimension(n), intent(inout) :: o
-   integer, dimension((n+1)/2), intent(out) :: t
+   character(*), intent(in) :: x(:)
+   integer, intent(inout) :: o(n)
+   integer, intent(out) :: t((n+1)/2)
     
    integer :: i, o1
     

@@ -30,17 +30,18 @@ program molalign
 
    implicit none
 
-   integer :: i, nmap, nrec, stat
+   integer :: error
+   integer :: i, nmap, nrec
    integer :: natom0, natom1
    integer :: unit, unit0, unit1
-   integer, allocatable :: maplist(:, :)
-   integer, allocatable :: countlist(:)
+   integer, allocatable :: mapind(:, :)
+   integer, allocatable :: mapcount(:)
    integer, allocatable, dimension(:) :: znums0, znums1, types0, types1
    character(arg_len) :: arg, files(2), fmtstdin, fmtin0, fmtin1, fmtout
    character(title_len) :: title0, title1
    character(label_len), allocatable, dimension(:) :: labels0, labels1
-   real(wp) :: rmsd
-   real(wp), allocatable :: rmsdlist(:)
+   real(wp) :: dist
+   real(wp), allocatable :: mapdist(:)
    real(wp), allocatable :: weights0(:)
    real(wp), dimension(:, :), allocatable :: coords0, coords1, aligned1
    logical :: sort_flag, stdin_flag
@@ -85,12 +86,6 @@ program molalign
       case ('-fast')
          bias_flag = .true.
          iter_flag = .true.
-!        case ('-biasonly')
-!            bias_flag = .true.
-!            iter_flag = .false.
-!        case ('-iteronly')
-!            bias_flag = .false.
-!            iter_flag = .true.
       case ('-mass')
          weight_function => stdmass
       case ('-count')
@@ -100,8 +95,6 @@ program molalign
          call readoptarg(arg, max_trials)
       case ('-tol')
          call readoptarg(arg, bias_tol)
-!        case ('-scale')
-!            call readoptarg(arg, bias_scale)
       case ('-rec')
          call readoptarg(arg, nrec)
       case ('-out')
@@ -109,6 +102,17 @@ program molalign
       case ('-stdin')
          stdin_flag = .true.
          call readoptarg(arg, fmtstdin)
+!      case ('-bias')
+!         bias_flag = .true.
+!         iter_flag = .false.
+!      case ('-iter')
+!         bias_flag = .false.
+!         iter_flag = .true.
+!      case ('-none')
+!         bias_flag = .false.
+!         iter_flag = .false.
+!      case ('-scale')
+!         call readoptarg(arg, bias_scale)
       case default
          call readarg(arg, files)
       end select
@@ -146,9 +150,9 @@ program molalign
    allocate(types0(natom0), types1(natom1))
    allocate(weights0(natom0))
    allocate(aligned1(3, natom1))
-   allocate(maplist(natom0, nrec))
-   allocate(countlist(nrec))
-   allocate(rmsdlist(nrec))
+   allocate(mapind(natom0, nrec))
+   allocate(mapcount(nrec))
+   allocate(mapdist(nrec))
 
    ! Get atomic numbers and types
 
@@ -175,19 +179,23 @@ program molalign
    if (sort_flag) then
 
       call assign_atoms(natom0, natom1, znums0, znums1, types0, types1, coords0, coords1, &
-         weights0, nrec, nmap, maplist, countlist, rmsdlist)
+         weights0, nrec, nmap, mapind, mapcount, mapdist, error)
+
+      if (error /= 0) stop
 
       ! Write aligned coordinates
 
       do i = 1, nmap
 
-         call align_atoms(natom0, natom1, znums0, znums1(maplist(:, i)), &
-            types0, types1(maplist(:, i)), coords0, coords1(:, maplist(:, i)), &
-            weights0, rmsd, aligned1)
+         call align_atoms(natom0, natom1, znums0, znums1(mapind(:, i)), &
+            types0, types1(mapind(:, i)), coords0, coords1(:, mapind(:, i)), &
+            weights0, aligned1, dist, error)
+
+         if (error /= 0) stop
 
          call open2write('aligned_'//str(i)//'.'//trim(fmtout), unit)
          call writefile(unit, fmtout, natom0, title0, znums0, coords0)
-         call writefile(unit, fmtout, natom1, title1, znums1(maplist(:, i)), aligned1)
+         call writefile(unit, fmtout, natom1, title1, znums1(mapind(:, i)), aligned1)
          close(unit)
 
       end do
@@ -197,11 +205,13 @@ program molalign
       ! Align atoms to minimize RMSD
 
       call align_atoms(natom0, natom1, znums0, znums1, types0, types1, coords0, coords1, &
-         weights0, rmsd, aligned1)
+         weights0, aligned1, dist, error)
+
+      if (error /= 0) stop
 
       ! Write aligned coordinates
 
-      write (output_unit, '(a,1x,f0.4,1x,a)') 'RMSD:', rmsd, '(only alignment performed)'
+      write (output_unit, '(a,1x,f0.4,1x,a)') 'RMSD:', sqrt(dist), '(only alignment performed)'
 
       call open2write('aligned_0.'//trim(fmtout), unit)
       call writefile(unit, fmtout, natom0, title0, znums0, coords0)

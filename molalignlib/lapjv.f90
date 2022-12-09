@@ -64,7 +64,7 @@ subroutine minperm(n, o, p, q, bias, perm, dist)
 !     scale : Precision
 !     maxnei: Maximum number of closest neighbours
    real(wp), parameter :: scale = 1.0e6_wp
-   integer, parameter :: maxnei = 60
+   integer, parameter :: maxnei = 100
 
 !   Internal variables
 !   cc, kk, first:
@@ -98,6 +98,7 @@ subroutine minperm(n, o, p, q, bias, perm, dist)
    end do
 
    if(m .eq. n) then
+
 !   Compute the full matrix...
 
       do i=1,n
@@ -116,6 +117,7 @@ subroutine minperm(n, o, p, q, bias, perm, dist)
 !   the maxnei closest neighbours seen so far. It might be more
 !   efficient to use quick-select instead... (This is definately
 !   true in the limit of infinite systems.)
+
       do i=1,n
          k = first(i)-1
          do j=1,m
@@ -174,37 +176,7 @@ subroutine minperm(n, o, p, q, bias, perm, dist)
 !      PRINT '(A,I6,A)','atom ',i,' nearest neighbours and distances:'
 !      PRINT '(20I6)',kk(m*(i-1)+1:m*i)
 !      PRINT '(12I15)',cc(m*(i-1)+1:m*i)
-         
       end do
-!
-! Create and maintain an ordered list, smallest to largest from kk(m*(i-1)+1:m*i) for atom i.
-! NOTE that there is no symmetry with respect to exchange of I and J!
-! This runs slower than the above heap algorithm.
-!
-!        CC(1:N*M)=HUGE(1)
-!         DO I=1,N
-!            K=FIRST(I)-1
-!            DO J=1,N
-!               D=PERMDIST(P(3*I-2), Q(3*J-2), S, PBC)*SCALE
-!               IF (D.GT.CC(K+M)) CYCLE
-!               DO J1=M-1,1,-1
-!                  IF (D.LT.CC(K+J1)) THEN
-!                     CC(K+J1+1)=CC(K+J1)
-!                     KK(K+J1+1)=KK(K+J1)
-!                  ELSE
-!                     CC(K+J1+1)=D
-!                     KK(K+J1+1)=J
-!                     GOTO 112
-!                  ENDIF
-!               ENDDO
-! !
-! !  If we reach this point then we need to insert at the beginning.
-! !
-!               CC(K+1)=D
-!               KK(K+1)=J
-! 112             CONTINUE
-!            ENDDO
-!         ENDDO
 
    end if
 
@@ -251,6 +223,7 @@ subroutine minperm(n, o, p, q, bias, perm, dist)
 !    WORSTDIST=SQRT(WORSTDIST)
 !    WORSTRADIUS=MAX(SQRT(WORSTRADIUS),1.0D0)
 !    RETURN
+
 end subroutine
    
 !   The following routine performs weighted bipartite matching for
