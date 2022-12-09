@@ -1,9 +1,47 @@
+! MolAlign
+! Copyright (C) 2022 José M. Vásquez
+
+! This program is free software: you can redistribute it and/or modify
+! it under the terms of the GNU General Public License as published by
+! the Free Software Foundation, either version 3 of the License, or
+! (at your option) any later version.
+
+! This program is distributed in the hope that it will be useful,
+! but WITHOUT ANY WARRANTY; without even the implied warranty of
+! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+! GNU General Public License for more details.
+
+! You should have received a copy of the GNU General Public License
+! along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 module random
 use parameters
 use settings
 use rnglib
 
 implicit none
+
+abstract interface
+   subroutine f_sp(x)
+      use parameters
+      real(sp) :: x
+   end subroutine
+end interface
+
+abstract interface
+   subroutine f_dp(x)
+      use parameters
+      real(dp) :: x
+   end subroutine
+end interface
+
+interface randnum
+   procedure randnum_sp
+   procedure randnum_dp
+end interface
+
+procedure(f_sp), pointer :: randnum_sp
+procedure(f_dp), pointer :: randnum_dp
 
 private
 public rand3
@@ -12,86 +50,68 @@ public initialize_random
 
 contains
 
-function rand3() result(x)
-   real(wp) x(3)
-!   call random_number(x)
-   call rnglib_number(x)
-end function
+subroutine random_number_sp(x)
+   real(sp) :: x
+   call random_number(x)
+end subroutine
+
+subroutine random_number_dp(x)
+   real(dp) :: x
+   call random_number(x)
+end subroutine
 
 subroutine initialize_random()
-!   integer i, n
-!   integer, allocatable :: seed(:)
-   integer :: u, stat, dt(8)
-   integer :: seed1, seed2
+   integer i, n
    integer(int64) :: t
+   integer, allocatable :: seed(:)
+   integer :: unit, stat, dt(8)
 
-   call rnglib_init()
-   if (.not. test_flag) then
-!      call random_seed(size=n)
-!      allocate(seed(n))
+   if (test_flag) then
+      randnum_sp => real_uni01_sp
+      randnum_dp => real_uni01_dp
+      call rnglib_init()
+   else
+      randnum_sp => random_number_sp
+      randnum_dp => random_number_dp
+      call random_seed(size=n)
+      allocate(seed(n))
       ! First try if the OS provides a random number generator
-      open(newunit=u, file="/dev/urandom", access="stream", &
+      open(newunit=unit, file="/dev/urandom", access="stream", &
            form="unformatted", action="read", status="old", iostat=stat)
       if (stat == 0) then
-!         read(u) seed
-         read(u) seed1
-         read(u) seed2
-         close(u)
+         read(unit) seed
+         close(unit)
       else
-         ! Fallback to XORing the current time
-         call system_clock(t)
-         if (t == 0) then
-            call date_and_time(values=dt)
-            t = (dt(1) - 1970) * 365_int64 * 24 * 60 * 60 * 1000 &
-               + dt(2) * 31_int64 * 24 * 60 * 60 * 1000 &
-               + dt(3) * 24_int64 * 60 * 60 * 1000 &
-               + dt(5) * 60 * 60 * 1000 &
-               + dt(6) * 60 * 1000 + dt(7) * 1000 &
-               + dt(8)
-         end if
-!         do i = 1, n
-!            seed(i) = lcg(t)
-!         end do
-         seed1 = lcg(t)
-         seed2 = lcg(t)
+         write (error_unit, '(a)') 'Error: can not read from /dev/urandom'
+         stop
       end if
-!      call random_seed(put=seed)
-      call rnglib_seed(seed1, seed2)
+      call random_seed(put=seed)
    end if
+
 end subroutine initialize_random
 
-! This simple PRNG might not be good enough for real(wp) work, but is
-! sufficient for seeding a better PRNG.
-integer function lcg(s)
-   integer(int64) :: s
-   if (s == 0) then
-      s = 104729
-   else
-      s = mod(s, 4294967296_int64)
-   end if
-   s = mod(s * 279470273_int64, 4294967291_int64)
-   lcg = int(mod(s, int(huge(0), int64)), kind(0))
-end function lcg
+function rand3() result(x)
+   integer :: i
+   real(wp) :: x(3)
+   do i = 1, 3
+      call randnum(x(i))
+   end do
+end function
 
 subroutine shuffle(array, n)
    integer, intent(in) :: n
-   integer, dimension(:), intent(inout) :: array(:)
-
+   integer, intent(inout) :: array(:)
    integer :: i, j, k, temp
-   real(wp) :: u
-
+   real :: x
    do k = 1, 2
       do i = 1, n
-!         call random_number(u)
-         call rnglib_number(u)
-         j = floor(n*u) + 1
-         ! switch values
+         call randnum(x)
+         j = floor(n*x) + 1
          temp = array(j)
          array(j) = array(i)
          array(i) = temp
       end do
    end do
-
 end subroutine
 
 end module

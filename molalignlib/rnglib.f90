@@ -4,33 +4,10 @@ implicit none
 
 private
 public rnglib_init
-public rnglib_seed
-public rnglib_number
-
-interface rnglib_number
-   module procedure real_uni01_sp
-   module procedure real_uni01_dp
-   module procedure realarray_uni01_sp
-   module procedure realarray_uni01_dp
-end interface
+public real_uni01_sp
+public real_uni01_dp
 
 contains
-
-subroutine realarray_uni01_sp(x)
-   real(sp) x(:)
-   integer i
-   do i = 1, size(x)
-      call real_uni01_sp(x(i))
-   end do
-end subroutine
-
-subroutine realarray_uni01_dp(x)
-   real(dp) x(:)
-   integer i
-   do i = 1, size(x)
-      call real_uni01_dp(x(i))
-   end do
-end subroutine
 
 subroutine advance_state ( k )
 
@@ -1042,7 +1019,7 @@ subroutine rnglib_init ( )
 !
    ig1 = 1234567890
    ig2 = 123456789
-   call rnglib_seed ( ig1, ig2 )
+   call set_initial_seed ( ig1, ig2 )
 !
 !  Initialize the current generator index to the first one.
 !
@@ -1624,7 +1601,7 @@ subroutine real_uni01_dp ( num )
    return
 end subroutine
 
-subroutine rnglib_seed ( ig1, ig2 )
+subroutine set_initial_seed ( ig1, ig2 )
 
 !*****************************************************************************80
 !
