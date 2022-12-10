@@ -44,7 +44,7 @@ program molalign
    real(wp), allocatable :: mapdist(:)
    real(wp), allocatable :: weights0(:)
    real(wp), dimension(:, :), allocatable :: coords0, coords1, aligned1
-   logical :: sort_flag, stdin_flag
+   logical :: sort_flag, mirror_flag, stdin_flag
 
    procedure(f_realint), pointer :: weight_function
 
@@ -53,6 +53,7 @@ program molalign
    bias_flag = .false.
    iter_flag = .false.
    sort_flag = .false.
+   mirror_flag = .false.
    free_flag = .true.
    test_flag = .false.
    live_flag = .false.
@@ -88,6 +89,8 @@ program molalign
          iter_flag = .true.
       case ('-mass')
          weight_function => stdmass
+      case ('-mirror')
+         mirror_flag = .true.
       case ('-count')
          call readoptarg(arg, max_count)
       case ('-trials')
@@ -143,6 +146,10 @@ program molalign
 
    call readfile(unit0, fmtin0, natom0, title0, labels0, coords0)
    call readfile(unit1, fmtin1, natom1, title1, labels1, coords1)
+
+   if (mirror_flag) then
+      coords1(1, :) = -coords1(1, :)
+   end if
 
    ! Allocate arrays
 

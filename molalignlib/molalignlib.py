@@ -129,7 +129,7 @@ class Align(Atoms):
         aligned1, dist, error = molalignlib.align_atoms(znums0, znums1, types0, types1, \
             coords0, coords1, self.weights)
         if error:
-            raise RuntimeError('Assignment failed')
+            raise RuntimeError('Alignment failed')
         # Convert back to row-major order
         atoms1 = Atoms(numbers=znums1, positions=aligned1.transpose())
         return Alignment(atoms1, np.sqrt(dist))

@@ -26,6 +26,7 @@ def main():
     parser.add_argument('-fast', action='store_true')
     parser.add_argument('-test', action='store_true')
     parser.add_argument('-mass', action='store_true')
+    parser.add_argument('-mirror', action='store_true')
     parser.add_argument('-trials', type=int)
     parser.add_argument('-tol', type=float, default=0.35)
     parser.add_argument('-count', type=int, default=10)
@@ -46,6 +47,9 @@ def main():
         atoms1 = io.read(args.filelist[1], index=0)
     else:
         print('Error: Too many files')
+
+    if args.mirror:
+        atoms1.positions[:, 0] = -atoms1.positions[:, 0]
 
     if args.fast:
         biasing = True
