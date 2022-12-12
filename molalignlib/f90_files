@@ -3,7 +3,7 @@ settings.f90
 strutils.f90
 lapack.f90
 rnglib.f90
-lapjv.f90
+jonker.f90
 math.f90
 random.f90
 sorting.f90
@@ -11,7 +11,7 @@ biasing.f90
 printing.f90
 chemdata.f90
 chemutils.f90
-assortment.f90
+assorting.f90
 translation.f90
 rotation.f90
 alignment.f90

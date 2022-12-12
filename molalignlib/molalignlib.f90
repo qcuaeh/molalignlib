@@ -94,7 +94,7 @@ subroutine assign_atoms( &
    use random
    use sorting
    use translation
-   use assortment
+   use assorting
    use assignment
 
    integer, intent(in) :: natom0, natom1, nrec
