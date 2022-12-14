@@ -58,11 +58,11 @@ subroutine optimize_assignment( &
    real(wp), intent(out) :: mapdist(:)
 
    logical found, overflow
-   integer imap, jmap, ntrial, nmatch, cycles
+   integer imap, jmap, ntrial, nmatch, steps
    integer, dimension(natom) :: atomap, auxmap
    real(wp) :: dist, biased_dist, new_biased_dist, totalrot
    real(wp), dimension(4) :: rotquat, prodquat
-   real(wp), dimension(nrec) :: avgiter, avgtotalrot, avgrealrot
+   real(wp), dimension(nrec) :: avgsteps, avgtotalrot, avgrealrot
    real(wp) :: bias(natom, natom)
    real(wp) :: auxcoords1(3, natom)
 
@@ -105,7 +105,7 @@ subroutine optimize_assignment( &
       prodquat = rotquat
       totalrot = rotangle(rotquat)
       call rotate(natom, auxcoords1, rotquat)
-      cycles = 1
+      steps = 1
 
       do while (iter_flag)
          biased_dist = squadist(natom, weights, coords0, auxcoords1, atomap) &
@@ -121,7 +121,7 @@ subroutine optimize_assignment( &
          rotquat = leastrotquat(natom, weights, coords0, auxcoords1, auxmap)
          prodquat = quatmul(rotquat, prodquat)
          call rotate(natom, auxcoords1, rotquat)
-         cycles = cycles + 1
+         steps = steps + 1
          totalrot = totalrot + rotangle(rotquat)
          atomap = auxmap
       end do
@@ -136,12 +136,12 @@ subroutine optimize_assignment( &
          if (all(atomap == mapind(:, imap))) then
             if (imap == 1) nmatch = nmatch + 1
             mapcount(imap) = mapcount(imap) + 1
-            avgiter(imap) = avgiter(imap) + (cycles - avgiter(imap))/mapcount(imap)
+            avgsteps(imap) = avgsteps(imap) + (steps - avgsteps(imap))/mapcount(imap)
             avgrealrot(imap) = avgrealrot(imap) + (rotangle(prodquat) - avgrealrot(imap))/mapcount(imap)
             avgtotalrot(imap) = avgtotalrot(imap) + (totalrot - avgtotalrot(imap))/mapcount(imap)
             if (live_flag) then
                write (output_unit, '(a)', advance='no') achar(27)//'['//str(imap + 2)//'H'
-               call print_stats(imap, mapcount(imap), avgiter(imap), avgtotalrot(imap), &
+               call print_stats(imap, mapcount(imap), avgsteps(imap), avgtotalrot(imap), &
                   avgrealrot(imap), mapdist(imap))
             end if
             found = .true.
@@ -161,24 +161,24 @@ subroutine optimize_assignment( &
                   mapind(:, jmap) = mapind(:, jmap - 1)
                   mapcount(jmap) = mapcount(jmap - 1)
                   mapdist(jmap) = mapdist(jmap - 1)
-                  avgiter(jmap) = avgiter(jmap - 1)
+                  avgsteps(jmap) = avgsteps(jmap - 1)
                   avgrealrot(jmap) = avgrealrot(jmap - 1)
                   avgtotalrot(jmap) = avgtotalrot(jmap - 1)
                   if (live_flag) then
                      write (output_unit, '(a)', advance='no') achar(27)//'['//str(jmap + 2)//'H'
-                     call print_stats(jmap, mapcount(jmap), avgiter(jmap), avgtotalrot(jmap), &
+                     call print_stats(jmap, mapcount(jmap), avgsteps(jmap), avgtotalrot(jmap), &
                         avgrealrot(jmap), mapdist(jmap))
                   end if
                end do
                mapind(:, imap) = atomap
                mapcount(imap) = 1
                mapdist(imap) = dist
-               avgiter(imap) = cycles
+               avgsteps(imap) = steps
                avgrealrot(imap) = rotangle(prodquat)
                avgtotalrot(imap) = totalrot
                if (live_flag) then
                   write (output_unit, '(a)', advance='no') achar(27)//'['//str(imap + 2)//'H'
-                  call print_stats(imap, mapcount(imap), avgiter(imap), avgtotalrot(imap), &
+                  call print_stats(imap, mapcount(imap), avgsteps(imap), avgtotalrot(imap), &
                      avgrealrot(imap), mapdist(imap))
                end if
                exit
@@ -196,7 +196,7 @@ subroutine optimize_assignment( &
    if (.not. live_flag) then
       call print_header()
       do imap = 1, nmap
-         call print_stats(imap, mapcount(imap), avgiter(imap), avgtotalrot(imap), &
+         call print_stats(imap, mapcount(imap), avgsteps(imap), avgtotalrot(imap), &
             avgrealrot(imap), mapdist(imap))
       end do
       call print_footer(overflow, nmap, ntrial)

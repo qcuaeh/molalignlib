@@ -40,7 +40,7 @@ program molalign
    character(arg_len) :: arg, files(2), fmtstdin, fmtin0, fmtin1, fmtout
    character(title_len) :: title0, title1
    character(label_len), allocatable, dimension(:) :: labels0, labels1
-   real(wp) :: dist
+   real(wp) :: rmsd, travec(3), rotmat(3, 3)
    real(wp), allocatable :: mapdist(:)
    real(wp), allocatable :: weights0(:)
    real(wp), dimension(:, :), allocatable :: coords0, coords1, aligned1
@@ -190,19 +190,22 @@ program molalign
 
       if (error /= 0) stop
 
-      ! Write aligned coordinates
 
       do i = 1, nmap
 
          call align_atoms(natom0, natom1, znums0, znums1(mapind(:, i)), &
             types0, types1(mapind(:, i)), coords0, coords1(:, mapind(:, i)), &
-            weights0, aligned1, dist, error)
+            weights0, travec, rotmat, error)
 
          if (error /= 0) stop
 
+         aligned1 = translated(natom1, rotated(natom1, coords1, rotmat), travec)
+
+         ! Write aligned coordinates
+
          call open2write('aligned_'//str(i)//'.'//trim(fmtout), unit)
          call writefile(unit, fmtout, natom0, title0, znums0, coords0)
-         call writefile(unit, fmtout, natom1, title1, znums1(mapind(:, i)), aligned1)
+         call writefile(unit, fmtout, natom1, title1, znums1(mapind(:, i)), aligned1(:, mapind(:, i)))
          close(unit)
 
       end do
@@ -212,18 +215,23 @@ program molalign
       ! Align atoms to minimize RMSD
 
       call align_atoms(natom0, natom1, znums0, znums1, types0, types1, coords0, coords1, &
-         weights0, aligned1, dist, error)
+         weights0, travec, rotmat, error)
 
       if (error /= 0) stop
 
-      ! Write aligned coordinates
+      aligned1 = translated(natom1, rotated(natom1, coords1, rotmat), travec)
 
-      write (output_unit, '(a,1x,f0.4,1x,a)') 'RMSD:', sqrt(dist), '(only alignment performed)'
+      ! Write aligned coordinates
 
       call open2write('aligned_0.'//trim(fmtout), unit)
       call writefile(unit, fmtout, natom0, title0, znums0, coords0)
       call writefile(unit, fmtout, natom1, title1, znums1, aligned1) 
       close(unit)
+
+      ! Print RMSD
+
+      rmsd = sqrt(sum(weights0*sum((aligned1 - coords0)**2, dim=1)))
+      write (output_unit, '(a,1x,f0.4,1x,a)') 'RMSD:', rmsd, '(only alignment performed)'
 
    end if
 

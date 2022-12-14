@@ -34,7 +34,7 @@ real(wp) function squadist(natom, weights, coords0, coords1, atomap) result(dist
    real(wp), dimension(:), intent(in) :: weights
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
 
-   dist = sum(weights(:)*sum((coords1(:, atomap(:)) - coords0(:, :))**2, dim=1))
+   dist = sum(weights(1:natom)*sum((coords1(:, atomap(1:natom)) - coords0(:, 1:natom))**2, dim=1))
 
 end function
 

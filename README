@@ -28,10 +28,14 @@ and in Debian, Ubuntu, etc. use *apt*
 Install molalign with pip
 ----------------------------
 
-The python library only supports Python 3 so make sure that you are using the right version of *python*. To install *molalign*
-and *molalignlib* just run
+The python library only supports Python 3 so make sure that you are using the right version of *pip*:
 
     pip3 install molalign
+
+It will install the *molalign* executable in your path and the *molalignlib* python module which provides the classes *Align* and
+*Assign*:
+
+    >>> from molalignlib import Align, Assign
 
 Build molalign from source 
 --------------------------
@@ -41,7 +45,7 @@ Clone this repository
     git clone https://github.com/qcuaeh/molalign.git
 
 then enter its directory, rename *gnu.env* (or *intel.env* if you have the Intel fortran compiler and MKL installed) as *build.env*
-and run
+and run:
 
     ./build.sh
 
@@ -58,18 +62,19 @@ These options are supported by both, the native executable and the python script
 <code>-count *N*</code> Set count threshold to *N* (defaults to 10).  
 <code>-trials *N*</code> Set maximum number of trials to *N*.  
 <code>-rec *N*</code> Set number of recorded solutions to *N* (defaults to 1).  
-<code>-out *EXT*</code> Set output format to *EXT* (defaults to *xyz*).  
+<code>-out *EXT*</code> Set output file format to *EXT* (defaults to *xyz*).  
 <code>-test</code> Generate the same sequence of random numbers on every run.  
+<code>-mass</code> Use mass weighted coordinates.  
 <code>-mirror</code> Use mirrored coordinates.  
-<code>-mass</code> Use mass weighted RMSD.  
 
 These options are only supported by the native executable:
 
 <code>-live</code> Show progress in real time.  
-<code>-stdin *EXT*</code> Read coordinates from standard input in *EXT* format.  
+<code>-stdin *EXT*</code> Read coordinates from standard input as an *EXT* file.  
  
-The input format is determined from the file extensions of the arguments and bear in mind that the native executable only supports
-*xyz* as input format and *xyz* and *mol2* as output formats, while the python script supports many more formats.
+Notice that the input format is determined from the extensions of the input files. Also bear in mind that the format specifier
+*EXT* must be an standard three or four letter extension and that the native executable only supports *xyz* as input format and
+*xyz* and *mol2* as output formats, while the python script supports many more input and oputput formats.
 
 Basic usage
 -----------
@@ -108,7 +113,7 @@ Examples
 
 To reproduce exactly the same output as in these examples include the option `-test`.
 
-For small distortions the default tolerance is enough
+For small distortions the default tolerance is enough:
 
     ./build/molalign examples/Co138_0.xyz examples/Co138_1.xyz -sort -fast
      Map    Count    Steps     Total      Real       RMSD
@@ -124,7 +129,7 @@ For small distortions the default tolerance is enough
     -----------------------------------------------------
     Found more than 1 mapping(s) in 70 random trial(s)
 
-but if the maximum distortion is larger than the tolerance then a wrong alignmnet can be obtained
+but if the maximum distortion is larger than the tolerance then a wrong alignmnet can be obtained:
 
     ./build/molalign examples/Co138_0.xyz examples/Co138_3.xyz -sort -fast
      Map    Count    Steps     Total      Real       RMSD
@@ -133,7 +138,7 @@ but if the maximum distortion is larger than the tolerance then a wrong alignmne
     -----------------------------------------------------
     Found 1 mapping(s) in 10 random trial(s)
 
-Increasing the tolerance will fix the problem but will significatively slow the calculation
+Increasing the tolerance will fix the problem but will significatively slow the calculation:
 
     ./build/molalign examples/Co138_0.xyz examples/Co138_3.xyz -sort -fast -tol 0.69
      Map    Count    Steps     Total      Real       RMSD
@@ -142,7 +147,7 @@ Increasing the tolerance will fix the problem but will significatively slow the 
     -----------------------------------------------------
     Found more than 1 mapping(s) in 6315 random trial(s)
 
-Sometimes it is necessary to record more than one alignment due to the cluster symmetry, for example
+Sometimes it is necessary to record more than one alignment due to the cluster symmetry, for example:
 
     ./build/molalign examples/Co138_0.xyz examples/Co138_1.xyz -sort -fast -rec 5
      Map    Count    Steps     Total      Real       RMSD

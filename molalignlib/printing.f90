@@ -29,12 +29,12 @@ subroutine print_header()
    write (output_unit, '(a)') '-----------------------------------------------------'
 end subroutine
 
-subroutine print_stats(imap, matches, avgiter, avgtotalrot, avgrealrot, dist)
+subroutine print_stats(imap, matches, avgsteps, avgtotalrot, avgrealrot, dist)
    integer, intent(in) :: imap, matches
-   real(wp), intent(in) :: avgiter, avgtotalrot, avgrealrot, dist
+   real(wp), intent(in) :: avgsteps, avgtotalrot, avgrealrot, dist
    if (live_flag) write (output_unit, '(a)', advance='no') achar(27)//'[K'
    write (output_unit, '(i4,3x,i6,5x,f4.1,5x,f5.1,5x,f5.1,3x,f8.4)') &
-      imap, matches, avgiter, 90./asin(1.)*avgtotalrot, 90./asin(1.)*avgrealrot, sqrt(dist)
+      imap, matches, avgsteps, 90./asin(1.)*avgtotalrot, 90./asin(1.)*avgrealrot, sqrt(dist)
 end subroutine
 
 subroutine print_footer(overflow, nmap, itrial)

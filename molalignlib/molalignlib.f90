@@ -223,8 +223,8 @@ subroutine align_atoms( &
    coords0, &
    coords1, &
    weights0, &
-   aligned1, &
-   dist, &
+   travec, &
+   rotmat, &
    error &
 )
 
@@ -239,12 +239,10 @@ subroutine align_atoms( &
    real(wp), intent(in) :: weights0(natom0)
    real(wp), intent(in) :: coords0(3, natom0)
    real(wp), intent(in) :: coords1(3, natom1)
+   real(wp), intent(out) :: travec(3), rotmat(3, 3)
    integer, intent(out) :: error
-   real(wp), intent(out) :: aligned1(3, natom1)
-   real(wp), intent(out) :: dist
    real(wp) :: weights1(natom1)
    real(wp) :: center0(3), center1(3)
-   real(wp) :: travec(3), rotmat(3, 3)
 
    ! Set error code to 0 by default
 
@@ -311,9 +309,6 @@ subroutine align_atoms( &
    ! Calculate optimal translation vector
 
    travec = center0 - matmul(rotmat, center1)
-
-   aligned1 = translated(natom1, rotated(natom1, coords1, rotmat), travec)
-   dist = squadist(natom0, weights0, coords0, aligned1, identitymap(natom0))
 
 end subroutine
 

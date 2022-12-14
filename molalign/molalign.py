@@ -63,13 +63,13 @@ def main():
     else:
         weights0 = None
 
-    align0 = Align(
+    align_to_atoms0 = Align(
         atoms = atoms0,
         weights = weights0,
     )
 
     if args.sort:
-        assign0 = Assign(
+        assign_to_atoms0 = Assign(
             atoms = atoms0,
             weights = weights0,
             testing = args.test,
@@ -81,13 +81,15 @@ def main():
             bias_tol = args.tol,
             bias_scale = args.scale,
         )
-        assignments = assign0(atoms1)
+        assignments = assign_to_atoms0(atoms1)
         # Align atoms1 to atoms0 for each calculated mapping and write coordinates to file
-        for i, a in enumerate(assignments, start=1):
+        for i, (order, count, rmsd) in enumerate(assignments, start=1):
+            atoms1_aligned = align_to_atoms0(atoms1[order])
             io.write('aligned_{}.{ext}'.format(i, ext=args.out), atoms0)
-            io.write('aligned_{}.{ext}'.format(i, ext=args.out), align0(atoms1[a.map]).atoms, append=True)
+            io.write('aligned_{}.{ext}'.format(i, ext=args.out), atoms1_aligned, append=True)
     else:
-        alignment = align0(atoms1)
-        print('RMSD: {:.4f} (only alignment performed)'.format(alignment.rmsd))
+        atoms1 = align_to_atoms0(atoms1)
+        rmsd = ((weights0*((atoms1.positions - atoms0.positions)**2).sum(axis=1)).sum())**0.5
+        print('RMSD: {:.4f} (only alignment performed)'.format(rmsd))
         io.write('aligned_0.xyz', atoms0)
-        io.write('aligned_0.xyz', alignment.atoms, append=True)
+        io.write('aligned_0.xyz', atoms1, append=True)

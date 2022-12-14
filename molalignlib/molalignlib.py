@@ -18,17 +18,6 @@ import numpy as np
 from ase import Atoms
 from molalignlibext import molalignlib
 
-class Assignment:
-    def __init__(self, map, count, rmsd):
-        self.map = map
-        self.count = count
-        self.rmsd = rmsd
-
-class Alignment:
-    def __init__(self, atoms, rmsd):
-        self.atoms = atoms
-        self.rmsd = rmsd
-
 class Assign(Atoms):
     def __init__(
         self,
@@ -90,14 +79,14 @@ class Assign(Atoms):
         znums1 = other.get_atomic_numbers()
         types0 = np.ones(len(self), dtype=int)
         types1 = np.ones(len(other), dtype=int)
-        coords0 = self.get_positions().transpose() # Convert to column-major order
-        coords1 = other.get_positions().transpose() # Convert to column-major order
+        coords0 = self.positions.T # Convert to column-major order
+        coords1 = other.positions.T # Convert to column-major order
         nmap, mapind, mapcount, mapdist, error = molalignlib.assign_atoms(znums0, znums1, \
             types0, types1, coords0, coords1, self.weights, self.records)
         if error:
             raise RuntimeError('Assignment failed')
         mapind = mapind - 1 # Convert to 0-based indexing
-        return [Assignment(mapind[:, i], mapcount[i], np.sqrt(mapdist[i])) for i in range(nmap)]
+        return [(mapind[:, i], mapcount[i], np.sqrt(mapdist[i])) for i in range(nmap)]
 
 class Align(Atoms):
     def __init__(
@@ -124,12 +113,11 @@ class Align(Atoms):
         znums1 = other.get_atomic_numbers()
         types0 = np.ones(len(self), dtype=int)
         types1 = np.ones(len(other), dtype=int)
-        coords0 = self.get_positions().transpose() # Convert to column-major order
-        coords1 = other.get_positions().transpose() # Convert to column-major order
-        aligned1, dist, error = molalignlib.align_atoms(znums0, znums1, types0, types1, \
+        coords0 = self.positions.T # Convert to column-major order
+        coords1 = other.positions.T # Convert to column-major order
+        travec, rotmat, error = molalignlib.align_atoms(znums0, znums1, types0, types1, \
             coords0, coords1, self.weights)
         if error:
             raise RuntimeError('Alignment failed')
-        # Convert back to row-major order
-        atoms1 = Atoms(numbers=znums1, positions=aligned1.transpose())
-        return Alignment(atoms1, np.sqrt(dist))
+        other.positions = np.dot(other.positions, rotmat.T) + travec
+        return other
