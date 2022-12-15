@@ -1,5 +1,3 @@
-<!-- -*- mode: markdown -*- -->
-
 MolAlign
 ========
 
@@ -35,7 +33,7 @@ The python library only supports Python 3 so make sure that you are using the ri
 It will install the *molalign* executable in your path and the *molalignlib* python module which provides the classes *Align* and
 *Assign*:
 
-    >>> from molalignlib import Align, Assign
+    >>> from molalignlib import Alignable, Assignment
 
 Build molalign from source 
 --------------------------

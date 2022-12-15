@@ -15,10 +15,10 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from ase import io
+from molalignlib import Alignable, Assignment
 from argparse import ArgumentParser
-from molalignlib import Align, Assign
 
-def main():
+def molalign():
 
     # Parse arguments
     parser = ArgumentParser()
@@ -58,38 +58,32 @@ def main():
         biasing = False
         iteration = False
 
-    if args.mass:
-        weights0 = atoms0.get_masses()
-    else:
-        weights0 = None
-
-    align_to_atoms0 = Align(
-        atoms = atoms0,
-        weights = weights0,
-    )
-
     if args.sort:
-        assign_to_atoms0 = Assign(
-            atoms = atoms0,
-            weights = weights0,
-            testing = args.test,
+        assignments = Assignment(
+            atoms0,
+            atoms1,
             biasing = biasing,
+            bias_tol = args.tol,
+            bias_scale = args.scale,
             iteration = iteration,
+            testing = args.test,
             records = args.rec,
             count = args.count,
             trials = args.trials,
-            bias_tol = args.tol,
-            bias_scale = args.scale,
+            mass_weighted = args.mass,
         )
-        assignments = assign_to_atoms0(atoms1)
         # Align atoms1 to atoms0 for each calculated mapping and write coordinates to file
-        for i, (order, count, rmsd) in enumerate(assignments, start=1):
-            atoms1_aligned = align_to_atoms0(atoms1[order])
+        for i, order in enumerate(assignments.mapind, start=1):
+            alignable1 = Alignable(atoms1[order], mass_weighted=args.mass)
+            alignable1.alignto(atoms0)
             io.write('aligned_{}.{ext}'.format(i, ext=args.out), atoms0)
-            io.write('aligned_{}.{ext}'.format(i, ext=args.out), atoms1_aligned, append=True)
+            io.write('aligned_{}.{ext}'.format(i, ext=args.out), alignable1, append=True)
     else:
-        atoms1 = align_to_atoms0(atoms1)
-        rmsd = ((weights0*((atoms1.positions - atoms0.positions)**2).sum(axis=1)).sum())**0.5
-        print('RMSD: {:.4f} (only alignment performed)'.format(rmsd))
-        io.write('aligned_0.xyz', atoms0)
-        io.write('aligned_0.xyz', atoms1, append=True)
+        alignable1 = Alignable(atoms1, mass_weighted=args.mass)
+        alignable1.alignto(atoms0)
+        io.write('aligned.xyz', atoms0)
+        io.write('aligned.xyz', alignable1, append=True)
+        print('RMSD: {:.4f} (only alignment performed)'.format(alignable1.disto(atoms0)))
+
+if __name__ == '__main__':
+    molalign()

@@ -75,21 +75,21 @@ end subroutine
 ! Purpose: Check and optimize mapping
 subroutine assign_atoms( &
    natom0, &
-   natom1, &
    znums0,  &
-   znums1, &
    types0, &
-   types1, &
    coords0, &
-   coords1, &
    weights0, &
+   natom1, &
+   znums1, &
+   types1, &
+   coords1, &
+   weights1, &
    nrec, &
    nmap, &
    mapind, &
    mapcount, &
    mapdist, &
-   error &
-)
+   error)
 
    use random
    use sorting
@@ -103,6 +103,7 @@ subroutine assign_atoms( &
    real(wp), intent(in) :: coords0(3, natom0)
    real(wp), intent(in) :: coords1(3, natom1)
    real(wp), intent(in) :: weights0(natom0)
+   real(wp), intent(in) :: weights1(natom1)
    integer, intent(out) :: nmap, error
    integer, intent(out) :: mapind(natom0, nrec)
    integer, intent(out) :: mapcount(nrec)
@@ -113,8 +114,7 @@ subroutine assign_atoms( &
    integer, dimension(:), allocatable :: atomunorder0, atomunorder1
    integer, dimension(:), allocatable :: blockidx0, blockidx1
    integer, dimension(:), allocatable :: blocksize0, blocksize1
-   real(wp), dimension(3) :: center0, center1
-   real(wp) :: weights1(natom1)
+   real(wp) :: center0(3), center1(3), totalweight
 
    ! Set error code to 0 by default
 
@@ -161,10 +161,6 @@ subroutine assign_atoms( &
       return
    end if
 
-   ! Assign weights for atoms1
-
-   weights1 = weights0(atomunorder1(atomorder0))
-
    ! Abort if there are conflicting weights
 
    if (any(weights0(atomorder0) /= weights1(atomorder1))) then
@@ -172,6 +168,8 @@ subroutine assign_atoms( &
       error = 1
       return
    end if
+
+   ! Abort if there are inconsistent weights
 
    offset = 0
    do h = 1, nblock0
@@ -184,6 +182,10 @@ subroutine assign_atoms( &
       end do
       offset = offset + blocksize0(h)
    end do
+
+   ! Calculate total weight
+
+   totalweight = sum(weights0)
 
    ! Calculate centroids
 
@@ -198,7 +200,7 @@ subroutine assign_atoms( &
 
    call optimize_assignment( &
       natom0, nblock0, blocksize0, &
-      weights0(atomorder0), &
+      weights0(atomorder0)/totalweight, &
       centered(natom0, coords0(:, atomorder0), center0), &
       centered(natom1, coords1(:, atomorder1), center1), &
       nrec, nmap, mapind, mapcount, mapdist &
@@ -215,18 +217,18 @@ end subroutine
 ! Purpose: Superimpose coordinates of atom sets coords0 and coords1
 subroutine align_atoms( &
    natom0, &
-   natom1, &
    znums0, &
-   znums1, &
    types0, &
-   types1, &
    coords0, &
-   coords1, &
    weights0, &
+   natom1, &
+   znums1, &
+   types1, &
+   coords1, &
+   weights1, &
    travec, &
    rotmat, &
-   error &
-)
+   error)
 
    use sorting
    use rotation
@@ -237,12 +239,12 @@ subroutine align_atoms( &
    integer, dimension(natom0), intent(in) :: znums0, types0
    integer, dimension(natom1), intent(in) :: znums1, types1
    real(wp), intent(in) :: weights0(natom0)
+   real(wp), intent(in) :: weights1(natom1)
    real(wp), intent(in) :: coords0(3, natom0)
    real(wp), intent(in) :: coords1(3, natom1)
    real(wp), intent(out) :: travec(3), rotmat(3, 3)
    integer, intent(out) :: error
-   real(wp) :: weights1(natom1)
-   real(wp) :: center0(3), center1(3)
+   real(wp) :: center0(3), center1(3), totalweight
 
    ! Set error code to 0 by default
 
@@ -288,9 +290,9 @@ subroutine align_atoms( &
       return
    end if
 
-   ! Assign weights for atoms1
+   ! Calculate total weight
 
-   weights1 = weights0
+   totalweight = sum(weights0)
 
    ! Calculate centroids
 
@@ -300,7 +302,7 @@ subroutine align_atoms( &
    ! Calculate optimal rotation matrix
 
    rotmat = rotquat2rotmat(leastrotquat( &
-      natom0, weights0, &
+      natom0, weights0/totalweight, &
       centered(natom0, coords0, center0), &
       centered(natom1, coords1, center1), &
       identitymap(natom0) &

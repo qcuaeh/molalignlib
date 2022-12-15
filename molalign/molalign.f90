@@ -37,12 +37,12 @@ program molalign
    integer, allocatable :: mapind(:, :)
    integer, allocatable :: mapcount(:)
    integer, allocatable, dimension(:) :: znums0, znums1, types0, types1
-   character(arg_len) :: arg, files(2), fmtstdin, fmtin0, fmtin1, fmtout
    character(title_len) :: title0, title1
+   character(arg_len) :: arg, files(2), fmtstdin, fmtin0, fmtin1, fmtout
    character(label_len), allocatable, dimension(:) :: labels0, labels1
    real(wp) :: rmsd, travec(3), rotmat(3, 3)
    real(wp), allocatable :: mapdist(:)
-   real(wp), allocatable :: weights0(:)
+   real(wp), allocatable :: weights0(:), weights1(:)
    real(wp), dimension(:, :), allocatable :: coords0, coords1, aligned1
    logical :: sort_flag, mirror_flag, stdin_flag
 
@@ -155,47 +155,65 @@ program molalign
 
    allocate(znums0(natom0), znums1(natom1))
    allocate(types0(natom0), types1(natom1))
-   allocate(weights0(natom0))
+   allocate(weights0(natom0), weights1(natom1))
    allocate(aligned1(3, natom1))
    allocate(mapind(natom0, nrec))
    allocate(mapcount(nrec))
    allocate(mapdist(nrec))
 
-   ! Get atomic numbers and types
+   ! Get atomic numbers, types and weights
 
    do i = 1, natom0
       call readlabel(labels0(i), znums0(i), types0(i))
+      weights0(i) = weight_function(znums0(i))
    end do
 
    do i = 1, natom1
       call readlabel(labels1(i), znums1(i), types1(i))
+      weights1(i) = weight_function(znums1(i))
    end do
-
-   ! Set weights
-
-   do i = 1, natom0
-      weights0(i) = weight_function(znums0(i))
-   end do
-
-   ! Normalize weights
-
-   weights0 = weights0/sum(weights0)
 
    ! Sort atoms to minimize MSD
 
    if (sort_flag) then
 
-      call assign_atoms(natom0, natom1, znums0, znums1, types0, types1, coords0, coords1, &
-         weights0, nrec, nmap, mapind, mapcount, mapdist, error)
+      call assign_atoms( &
+         natom0, &
+         znums0, &
+         types0, &
+         coords0, &
+         weights0, &
+         natom1, &
+         znums1, &
+         types1, &
+         coords1, &
+         weights1, &
+         nrec, &
+         nmap, &
+         mapind, &
+         mapcount, &
+         mapdist, &
+         error)
 
       if (error /= 0) stop
 
 
       do i = 1, nmap
 
-         call align_atoms(natom0, natom1, znums0, znums1(mapind(:, i)), &
-            types0, types1(mapind(:, i)), coords0, coords1(:, mapind(:, i)), &
-            weights0, travec, rotmat, error)
+         call align_atoms( &
+            natom0, &
+            znums0, &
+            types0, &
+            coords0, &
+            weights0, &
+            natom1, &
+            znums1(mapind(:, i)), &
+            types1(mapind(:, i)), &
+            coords1(:, mapind(:, i)), &
+            weights1, &
+            travec, &
+            rotmat, &
+            error)
 
          if (error /= 0) stop
 
@@ -214,8 +232,20 @@ program molalign
 
       ! Align atoms to minimize RMSD
 
-      call align_atoms(natom0, natom1, znums0, znums1, types0, types1, coords0, coords1, &
-         weights0, travec, rotmat, error)
+      call align_atoms( &
+         natom0, &
+         znums0, &
+         types0, &
+         coords0, &
+         weights0, &
+         natom1, &
+         znums1, &
+         types1, &
+         coords1, &
+         weights1, &
+         travec, &
+         rotmat, &
+         error)
 
       if (error /= 0) stop
 
@@ -223,7 +253,7 @@ program molalign
 
       ! Write aligned coordinates
 
-      call open2write('aligned_0.'//trim(fmtout), unit)
+      call open2write('aligned.'//trim(fmtout), unit)
       call writefile(unit, fmtout, natom0, title0, znums0, coords0)
       call writefile(unit, fmtout, natom1, title1, znums1, aligned1) 
       close(unit)
