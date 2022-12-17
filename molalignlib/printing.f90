@@ -29,25 +29,28 @@ subroutine print_header()
    write (output_unit, '(a)') '-----------------------------------------------------'
 end subroutine
 
-subroutine print_stats(imap, matches, avgsteps, avgtotalrot, avgrealrot, dist)
+subroutine print_body(imap, matches, avgsteps, avgtotalrot, avgrealrot, dist2)
    integer, intent(in) :: imap, matches
-   real(wp), intent(in) :: avgsteps, avgtotalrot, avgrealrot, dist
+   real(wp), intent(in) :: avgsteps, avgtotalrot, avgrealrot, dist2
    if (live_flag) write (output_unit, '(a)', advance='no') achar(27)//'[K'
    write (output_unit, '(i4,3x,i6,5x,f4.1,5x,f5.1,5x,f5.1,3x,f8.4)') &
-      imap, matches, avgsteps, 90./asin(1.)*avgtotalrot, 90./asin(1.)*avgrealrot, sqrt(dist)
+      imap, matches, avgsteps, 90./asin(1.)*avgtotalrot, 90./asin(1.)*avgrealrot, sqrt(dist2)
 end subroutine
 
-subroutine print_footer(overflow, nmap, itrial)
-   logical, intent(in) :: overflow
-   integer, intent(in) :: nmap, itrial
+subroutine print_footer()
    if (live_flag) write (output_unit, '(a)', advance='no') achar(27)//'[K'
    write (output_unit, '(a)') '-----------------------------------------------------'
-   if (live_flag) write (output_unit, '(a)', advance='no') achar(27)//'[K'
+end subroutine
+
+subroutine print_stats(overflow, nrec, nmap, ntrial, nstep)
+   logical, intent(in) :: overflow
+   integer, intent(in) :: nrec, nmap, ntrial, nstep
+   write (output_unit, '(a,1x,i0)') 'Random trials =', ntrial
+   write (output_unit, '(a,1x,i0)') 'Optimization steps =', nstep
    if (overflow) then
-      write (output_unit, '(a,1x,i0,1x,a,1x,i0,1x,a)') 'Found more than', nmap, 'mapping(s) in', &
-         itrial, 'random trial(s)'
+      write (output_unit, '(a,1x,i0)') 'Local minima >', nrec
    else
-      write (output_unit, '(a,1x,i0,1x,a,1x,i0,1x,a)') 'Found', nmap, 'mapping(s) in', itrial, 'random trial(s)'
+      write (output_unit, '(a,1x,i0)') 'Local minima =', nmap
    end if
 end subroutine
 

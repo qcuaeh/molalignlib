@@ -14,63 +14,13 @@
 ! You should have received a copy of the GNU General Public License
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-module molalignlib
+module library
 use parameters
 use settings
 
 implicit none
 
 contains
-
-subroutine set_bias_flag(boolval)
-   logical, intent(in) :: boolval
-   bias_flag = boolval
-end subroutine
-
-subroutine set_conv_flag(boolval)
-   logical, intent(in) :: boolval
-   iter_flag = boolval
-end subroutine
-
-subroutine set_test_flag(boolval)
-   logical, intent(in) :: boolval
-   test_flag = boolval
-end subroutine
-
-subroutine set_live_flag(boolval)
-   logical, intent(in) :: boolval
-   live_flag = boolval
-end subroutine
-
-subroutine set_free_flag(boolval)
-   logical, intent(in) :: boolval
-   free_flag = boolval
-end subroutine
-
-subroutine set_debug_flag(boolval)
-   logical, intent(in) :: boolval
-   debug_flag = boolval
-end subroutine
-
-subroutine set_max_count(intval)
-   integer, intent(in) :: intval
-   max_count = intval
-end subroutine
-
-subroutine set_max_trials(intval)
-   integer, intent(in) :: intval
-   max_trials = intval
-end subroutine
-
-subroutine set_bias_tol(realval)
-   real(wp), intent(in) :: realval
-   bias_tol = realval
-end subroutine
-
-subroutine set_bias_scale(realval)
-   real(wp), intent(in) :: realval
-   bias_scale = realval
-end subroutine
 
 ! Purpose: Check and optimize mapping
 subroutine assign_atoms( &
@@ -86,15 +36,15 @@ subroutine assign_atoms( &
    weights1, &
    nrec, &
    nmap, &
-   mapind, &
+   mapping, &
    mapcount, &
-   mapdist, &
+   mapdist2, &
    error)
 
    use random
    use sorting
-   use translation
    use assorting
+   use translation
    use assignment
 
    integer, intent(in) :: natom0, natom1, nrec
@@ -105,9 +55,9 @@ subroutine assign_atoms( &
    real(wp), intent(in) :: weights0(natom0)
    real(wp), intent(in) :: weights1(natom1)
    integer, intent(out) :: nmap, error
-   integer, intent(out) :: mapind(natom0, nrec)
+   integer, intent(out) :: mapping(natom0, nrec)
    integer, intent(out) :: mapcount(nrec)
-   real(wp), intent(out) :: mapdist(nrec)
+   real(wp), intent(out) :: mapdist2(nrec)
    integer :: i, h, offset
    integer :: nblock0, nblock1
    integer, dimension(:), allocatable :: atomorder0, atomorder1
@@ -203,13 +153,13 @@ subroutine assign_atoms( &
       weights0(atomorder0)/totalweight, &
       centered(natom0, coords0(:, atomorder0), center0), &
       centered(natom1, coords1(:, atomorder1), center1), &
-      nrec, nmap, mapind, mapcount, mapdist &
+      nrec, nmap, mapping, mapcount, mapdist2 &
    )
 
    ! Reorder back to original atom ordering
 
    do i = 1, nmap
-      mapind(:, i) = atomorder1(mapind(atomunorder0, i))
+      mapping(:, i) = atomorder1(mapping(atomunorder0, i))
    end do
 
 end subroutine
@@ -228,11 +178,12 @@ subroutine align_atoms( &
    weights1, &
    travec, &
    rotmat, &
+   dist2, &
    error)
 
    use sorting
-   use rotation
    use translation
+   use rotation
    use alignment
 
    integer, intent(in) :: natom0, natom1
@@ -242,9 +193,11 @@ subroutine align_atoms( &
    real(wp), intent(in) :: weights1(natom1)
    real(wp), intent(in) :: coords0(3, natom0)
    real(wp), intent(in) :: coords1(3, natom1)
-   real(wp), intent(out) :: travec(3), rotmat(3, 3)
+   real(wp), intent(out) :: travec(3), rotmat(3, 3), dist2
    integer, intent(out) :: error
-   real(wp) :: center0(3), center1(3), totalweight
+   real(wp) :: totalweight
+   real(wp) :: center0(3), center1(3)
+   real(wp) :: aligned1(3, natom1)
 
    ! Set error code to 0 by default
 
@@ -311,6 +264,11 @@ subroutine align_atoms( &
    ! Calculate optimal translation vector
 
    travec = center0 - matmul(rotmat, center1)
+
+   ! Calculate RMSD
+
+   aligned1 = translated(natom1, rotated(natom1, coords1, rotmat), travec)
+   dist2 = sum(weights0/totalweight*sum((aligned1 - coords0)**2, dim=1))
 
 end subroutine
 

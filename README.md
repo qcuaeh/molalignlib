@@ -33,7 +33,7 @@ The python library only supports Python 3 so make sure that you are using the ri
 It will install the *molalign* executable in your path and the *molalignlib* python module which provides the classes *Align* and
 *Assign*:
 
-    >>> from molalignlib import Alignable, Assignment
+    >>> from molalignlib import Atoms, assign_atoms
 
 Build molalign from source 
 --------------------------
@@ -63,7 +63,7 @@ These options are supported by both, the native executable and the python script
 <code>-out *EXT*</code> Set output file format to *EXT* (defaults to *xyz*).  
 <code>-test</code> Generate the same sequence of random numbers on every run.  
 <code>-mass</code> Use mass weighted coordinates.  
-<code>-mirror</code> Use mirrored coordinates.  
+<code>-enan</code> Use mirrored coordinates.  
 
 These options are only supported by the native executable:
 
@@ -118,14 +118,12 @@ For small distortions the default tolerance is enough:
     -----------------------------------------------------
        1       10     10.0      74.4      54.5     0.0506
     -----------------------------------------------------
-    Found more than 1 mapping(s) in 81 random trial(s)
     
     ./build/molalign examples/Co138_0.xyz examples/Co138_2.xyz -sort -fast
      Map    Count    Steps     Total      Real       RMSD
     -----------------------------------------------------
        1       10     14.4      84.9      65.7     0.0977
     -----------------------------------------------------
-    Found more than 1 mapping(s) in 70 random trial(s)
 
 but if the maximum distortion is larger than the tolerance then a wrong alignmnet can be obtained:
 
@@ -134,7 +132,6 @@ but if the maximum distortion is larger than the tolerance then a wrong alignmne
     -----------------------------------------------------
        1       10      1.0     133.3     133.3     2.9315
     -----------------------------------------------------
-    Found 1 mapping(s) in 10 random trial(s)
 
 Increasing the tolerance will fix the problem but will significatively slow the calculation:
 
@@ -143,7 +140,6 @@ Increasing the tolerance will fix the problem but will significatively slow the 
     -----------------------------------------------------
        1       10      2.4      15.1       8.2     0.1973
     -----------------------------------------------------
-    Found more than 1 mapping(s) in 6315 random trial(s)
 
 Sometimes it is necessary to record more than one alignment due to the cluster symmetry, for example:
 
@@ -156,6 +152,5 @@ Sometimes it is necessary to record more than one alignment due to the cluster s
        4        1      2.0       8.4       7.1     0.6652
        5        1      7.0      30.5       9.8     0.6716
     -----------------------------------------------------
-    Found more than 5 mapping(s) in 81 random trial(s)
 
 The ouput shows that there are 3 degenerated solutions due to the symmetry of the cluster.

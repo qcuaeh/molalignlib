@@ -60,16 +60,19 @@ function upper(str)
    end do
 end function
 
-function int2str(x) result(strx)
+function int2str(x) result(str)
    integer, intent(in) :: x
-   character(floor(log10(real(x, wp))) + 1) strx
-   write (strx, '(i0)') x
+   character(floor(log10(real(x, wp))) + 1) str
+   write (str, '(i0)') x
 end function
 
-function real2str(x) result(strx)
+function real2str(x) result(str)
    real(wp), intent(in) :: x
-   character(floor(log10(x)) + 6) strx
-   write (strx, '(f0.4)') x
+   character(floor(log10(max(x, 1.0_wp))) + 6) str
+   character(10) longstr
+   write (longstr, '(f10.4)') x
+   str = trim(adjustl(longstr))
+   
 end function
 
 function basename(filepath)

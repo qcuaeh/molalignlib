@@ -129,14 +129,11 @@ runtests() {
    for file in "$testdir"/*.out; do
       name=$(basename "$file")
       echo -n Running test ${name%.out}.xyz...
-      if diff -bB "$file" <("$executable" "$testdir/${name%.out}.xyz" "$@") > /dev/null; then
+      if diff -bB <("$executable" "$testdir/${name%.out}.xyz" "$@") "$file" > /dev/null; then
           echo \ passed
       else
           echo \ failed
       fi
-   done
-   for file in aligned_*.xyz; do
-      rm "$file"
    done
    echo Done
 }
@@ -173,7 +170,7 @@ makeprog molalign
 clean_build
 
 # Run tests
-#runtests tests/r05 -test -rec 10 -sort -fast -tol 0.17
+#runtests tests/r5 -test -rec 10 -sort -fast -tol 0.17
 runtests tests/r10 -test -rec 10 -sort -fast -tol 0.35
 #runtests tests/r20 -test -rec 10 -sort -fast -tol 0.69
 

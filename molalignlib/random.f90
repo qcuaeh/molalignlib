@@ -65,7 +65,7 @@ subroutine initialize_random()
    integer, allocatable :: seed(:)
    integer :: unit, stat
 
-   if (test_flag) then
+   if (repro_flag) then
       randnum_sp => real_uni01_sp
       randnum_dp => real_uni01_dp
       call rnglib_init()

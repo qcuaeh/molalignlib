@@ -11,4 +11,6 @@
    9        3      1.0       7.9       7.9     0.3914
   10        1      1.0      11.2      11.2     0.3920
 -----------------------------------------------------
-Found more than 10 mapping(s) in 1483 random trial(s)
+Random trials = 1483
+Optimization steps = 2463
+Local minima > 10

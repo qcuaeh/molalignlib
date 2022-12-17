@@ -54,7 +54,7 @@ function identitymap(n)
    end do
 end function
 
-! Purpose: Get the inverse of mapping
+! Purpose: Get the inverse map
 function inversemap(map)
    integer, intent(in) :: map(:)
    integer :: inversemap(size(map))

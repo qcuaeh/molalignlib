@@ -15,8 +15,8 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from ase import io
-from molalignlib import Alignable, Assignment
 from argparse import ArgumentParser
+from molalignlib import Assignment, Alignment
 
 def molalign():
 
@@ -26,12 +26,11 @@ def molalign():
     parser.add_argument('-fast', action='store_true')
     parser.add_argument('-test', action='store_true')
     parser.add_argument('-mass', action='store_true')
-    parser.add_argument('-mirror', action='store_true')
+    parser.add_argument('-enan', action='store_true')
     parser.add_argument('-trials', type=int)
     parser.add_argument('-tol', type=float, default=0.35)
     parser.add_argument('-count', type=int, default=10)
     parser.add_argument('-rec', type=int, default=1)
-    parser.add_argument('-scale', type=float, default=1.e3)
     parser.add_argument('-out', type=str, default='xyz')
     #parser.add_argument('-live', action='store_true')
     #parser.add_argument('-stdin', action='store_true')
@@ -48,7 +47,7 @@ def molalign():
     else:
         print('Error: Too many files')
 
-    if args.mirror:
+    if args.enan:
         atoms1.positions[:, 0] = -atoms1.positions[:, 0]
 
     if args.fast:
@@ -58,32 +57,36 @@ def molalign():
         biasing = False
         iteration = False
 
+    if args.test:
+        reproducible = True
+    else:
+        reproducible = False
+
     if args.sort:
         assignments = Assignment(
             atoms0,
             atoms1,
             biasing = biasing,
-            bias_tol = args.tol,
-            bias_scale = args.scale,
             iteration = iteration,
-            testing = args.test,
+            reproducible = reproducible,
             records = args.rec,
-            count = args.count,
-            trials = args.trials,
-            mass_weighted = args.mass,
+            biastol = args.tol,
+            maxcount = args.count,
+            maxtrials = args.trials,
+            mw = args.mass,
         )
         # Align atoms1 to atoms0 for each calculated mapping and write coordinates to file
-        for i, order in enumerate(assignments.mapind, start=1):
-            alignable1 = Alignable(atoms1[order], mass_weighted=args.mass)
-            alignable1.alignto(atoms0)
-            io.write('aligned_{}.{ext}'.format(i, ext=args.out), atoms0)
-            io.write('aligned_{}.{ext}'.format(i, ext=args.out), alignable1, append=True)
+        for i, mapping in enumerate(assignments, start=1):
+            alignment = Alignment(atoms0, atoms1[mapping], mw=args.mass)
+            if not args.test:
+                io.write('aligned_{}.{ext}'.format(i, ext=args.out), atoms0)
+                io.write('aligned_{}.{ext}'.format(i, ext=args.out), alignment.align(atoms1[mapping]), append=True)
     else:
-        alignable1 = Alignable(atoms1, mass_weighted=args.mass)
-        alignable1.alignto(atoms0)
-        io.write('aligned.xyz', atoms0)
-        io.write('aligned.xyz', alignable1, append=True)
-        print('RMSD: {:.4f} (only alignment performed)'.format(alignable1.disto(atoms0)))
+        alignment = Alignment(atoms0, atoms1, mw=args.mass)
+        print('RMSD = {:.4f} (only alignment performed)'.format(alignment.rmsd))
+        if not args.test:
+            io.write('aligned.xyz', atoms0)
+            io.write('aligned.xyz', alignment.align(atoms1), append=True)
 
 if __name__ == '__main__':
     molalign()

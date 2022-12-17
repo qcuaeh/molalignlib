@@ -43,9 +43,9 @@ subroutine optimize_assignment( &
    coords1, &
    nrec, &
    nmap, &
-   mapind, &
+   mapping, &
    mapcount, &
-   mapdist &
+   mapdist2 &
 )
 
    integer, intent(in) :: natom, nblock, nrec
@@ -53,18 +53,18 @@ subroutine optimize_assignment( &
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
    real(wp), dimension(:), intent(in) :: weights
    integer, intent(out) :: nmap
-   integer, intent(out) :: mapind(:, :)
+   integer, intent(out) :: mapping(:, :)
    integer, intent(out) :: mapcount(:)
-   real(wp), intent(out) :: mapdist(:)
+   real(wp), intent(out) :: mapdist2(:)
 
    logical found, overflow
-   integer imap, jmap, ntrial, nmatch, steps
+   integer imap, jmap, ncount, ntrial, nstep, steps
    integer, dimension(natom) :: atomap, auxmap
-   real(wp) :: dist, biased_dist, new_biased_dist, totalrot
+   real(wp) :: dist2, olddist, newdist, totalrot
    real(wp), dimension(4) :: rotquat, prodquat
    real(wp), dimension(nrec) :: avgsteps, avgtotalrot, avgrealrot
    real(wp) :: bias(natom, natom)
-   real(wp) :: auxcoords1(3, natom)
+   real(wp) :: workcoords1(3, natom)
 
 ! Set bias for non equivalent atoms 
 
@@ -80,69 +80,70 @@ subroutine optimize_assignment( &
 ! Initialize loop variables
 
    nmap = 0
+   nstep = 0
    ntrial = 0
-   nmatch = 0
+   ncount = 0
    overflow = .false.
 
 ! Loop for map searching
 
-   do while (nmatch < max_count .and. (free_flag .or. ntrial < max_trials))
+   do while (ncount < maxcount .and. (.not. trial_flag .or. ntrial < maxtrials))
 
       ntrial = ntrial + 1
 
 ! Work with a copy of coords1
 
-      auxcoords1 = coords1
+      workcoords1 = coords1
 
-! Aply a random rotation to auxcoords1
+! Aply a random rotation to workcoords1
 
-      call rotate(natom, auxcoords1, torotquat(rand3()))
+      call rotate(natom, workcoords1, torotquat(rand3()))
 
 ! Minimize the euclidean distance
 
-      call getatomap(natom, coords0, auxcoords1, nblock, blocksize, bias, atomap)
-      rotquat = leastrotquat(natom, weights, coords0, auxcoords1, atomap)
+      call minatomap(natom, coords0, workcoords1, nblock, blocksize, bias, weights, atomap, olddist)
+      rotquat = leastrotquat(natom, weights, coords0, workcoords1, atomap)
       prodquat = rotquat
       totalrot = rotangle(rotquat)
-      call rotate(natom, auxcoords1, rotquat)
+      call rotate(natom, workcoords1, rotquat)
+
       steps = 1
 
       do while (iter_flag)
-         biased_dist = squadist(natom, weights, coords0, auxcoords1, atomap) &
-               + totalbias(natom, weights, bias, atomap)
-         call getatomap(natom, coords0, auxcoords1, nblock, blocksize, bias, auxmap)
+         olddist = biasedist(natom, atomap, weights, coords0, workcoords1, bias)
+         call minatomap(natom, coords0, workcoords1, nblock, blocksize, bias, weights, auxmap, newdist)
          if (all(auxmap == atomap)) exit
-         new_biased_dist = squadist(natom, weights, coords0, auxcoords1, auxmap) &
-               + totalbias(natom, weights, bias, auxmap)
-         if (new_biased_dist > biased_dist) then
-            write (output_unit, '(a)') 'new_biased_dist is larger than biased_dist!'
-!                print *, biased_dist, new_biased_dist
+         if (newdist > olddist) then
+            write (output_unit, '(a)') 'newdist is larger than olddist!'
+!            print *, olddist, newdist
          end if
-         rotquat = leastrotquat(natom, weights, coords0, auxcoords1, auxmap)
+         rotquat = leastrotquat(natom, weights, coords0, workcoords1, auxmap)
          prodquat = quatmul(rotquat, prodquat)
-         call rotate(natom, auxcoords1, rotquat)
-         steps = steps + 1
+         call rotate(natom, workcoords1, rotquat)
          totalrot = totalrot + rotangle(rotquat)
          atomap = auxmap
+         steps = steps + 1
       end do
 
-      dist = squadist(natom, weights, coords0, auxcoords1, atomap)
+      nstep = nstep + steps
+
+      dist2 = squaredist(natom, weights, coords0, workcoords1, atomap)
 
 ! Check for new best mapping
 
       found = .false.
 
       do imap = 1, nmap
-         if (all(atomap == mapind(:, imap))) then
-            if (imap == 1) nmatch = nmatch + 1
+         if (all(atomap == mapping(:, imap))) then
+            if (imap == 1) ncount = ncount + 1
             mapcount(imap) = mapcount(imap) + 1
             avgsteps(imap) = avgsteps(imap) + (steps - avgsteps(imap))/mapcount(imap)
             avgrealrot(imap) = avgrealrot(imap) + (rotangle(prodquat) - avgrealrot(imap))/mapcount(imap)
             avgtotalrot(imap) = avgtotalrot(imap) + (totalrot - avgtotalrot(imap))/mapcount(imap)
             if (live_flag) then
                write (output_unit, '(a)', advance='no') achar(27)//'['//str(imap + 2)//'H'
-               call print_stats(imap, mapcount(imap), avgsteps(imap), avgtotalrot(imap), &
-                  avgrealrot(imap), mapdist(imap))
+               call print_body(imap, mapcount(imap), avgsteps(imap), avgtotalrot(imap), &
+                  avgrealrot(imap), mapdist2(imap))
             end if
             found = .true.
             exit
@@ -154,32 +155,32 @@ subroutine optimize_assignment( &
             overflow = .true.
          end if
          do imap = 1, nrec
-            if (imap > nmap .or. dist < mapdist(imap)) then
-               if (imap == 1) nmatch = 1
+            if (imap > nmap .or. dist2 < mapdist2(imap)) then
+               if (imap == 1) ncount = 1
                if (nmap < nrec) nmap = nmap + 1
                do jmap = nmap, imap + 1, -1
-                  mapind(:, jmap) = mapind(:, jmap - 1)
+                  mapping(:, jmap) = mapping(:, jmap - 1)
                   mapcount(jmap) = mapcount(jmap - 1)
-                  mapdist(jmap) = mapdist(jmap - 1)
+                  mapdist2(jmap) = mapdist2(jmap - 1)
                   avgsteps(jmap) = avgsteps(jmap - 1)
                   avgrealrot(jmap) = avgrealrot(jmap - 1)
                   avgtotalrot(jmap) = avgtotalrot(jmap - 1)
                   if (live_flag) then
                      write (output_unit, '(a)', advance='no') achar(27)//'['//str(jmap + 2)//'H'
-                     call print_stats(jmap, mapcount(jmap), avgsteps(jmap), avgtotalrot(jmap), &
-                        avgrealrot(jmap), mapdist(jmap))
+                     call print_body(jmap, mapcount(jmap), avgsteps(jmap), avgtotalrot(jmap), &
+                        avgrealrot(jmap), mapdist2(jmap))
                   end if
                end do
-               mapind(:, imap) = atomap
+               mapping(:, imap) = atomap
                mapcount(imap) = 1
-               mapdist(imap) = dist
+               mapdist2(imap) = dist2
                avgsteps(imap) = steps
                avgrealrot(imap) = rotangle(prodquat)
                avgtotalrot(imap) = totalrot
                if (live_flag) then
                   write (output_unit, '(a)', advance='no') achar(27)//'['//str(imap + 2)//'H'
-                  call print_stats(imap, mapcount(imap), avgsteps(imap), avgtotalrot(imap), &
-                     avgrealrot(imap), mapdist(imap))
+                  call print_body(imap, mapcount(imap), avgsteps(imap), avgtotalrot(imap), &
+                     avgrealrot(imap), mapdist2(imap))
                end if
                exit
             end if
@@ -188,7 +189,7 @@ subroutine optimize_assignment( &
 
       if (live_flag) then
          write (output_unit, '(a)', advance='no') achar(27)//'['//str(nmap + 3)//'H'
-         call print_footer(overflow, nmap, ntrial)
+         call print_footer()
       end if
 
    end do
@@ -196,16 +197,18 @@ subroutine optimize_assignment( &
    if (.not. live_flag) then
       call print_header()
       do imap = 1, nmap
-         call print_stats(imap, mapcount(imap), avgsteps(imap), avgtotalrot(imap), &
-            avgrealrot(imap), mapdist(imap))
+         call print_body(imap, mapcount(imap), avgsteps(imap), avgtotalrot(imap), &
+            avgrealrot(imap), mapdist2(imap))
       end do
-      call print_footer(overflow, nmap, ntrial)
+      call print_footer()
    end if
+
+   call print_stats(overflow, nrec, nmap, ntrial, nstep)
 
 end subroutine
 
 ! Find best correspondence between points sets with fixed orientation
-subroutine getatomap(natom, coords0, coords1, nblock, blocksize, bias, atomap)
+subroutine minatomap(natom, coords0, coords1, nblock, blocksize, bias, weights, atomap, totdist)
 
 ! nblock: Number of block atoms
 ! blocksize: Number of atoms in each block
@@ -215,9 +218,11 @@ subroutine getatomap(natom, coords0, coords1, nblock, blocksize, bias, atomap)
    integer, intent(in) :: natom, nblock
    integer, dimension(:), intent(in) :: blocksize
    real(wp), dimension(:, :), intent(in) :: coords0
+   real(wp), dimension(:, :), intent(in) :: coords1
    real(wp), dimension(:, :), intent(in) :: bias
-   real(wp), dimension(:, :), intent(inout) :: coords1
+   real(wp), dimension(:), intent(in) :: weights
    integer, dimension(:), intent(out) :: atomap
+   real(wp), intent(out) :: totdist
 
    integer :: h, offset
    integer, dimension(natom) :: perm
@@ -226,28 +231,32 @@ subroutine getatomap(natom, coords0, coords1, nblock, blocksize, bias, atomap)
 ! Fill distance matrix for each block
 
    offset = 0
+   totdist = 0
 
    do h = 1, nblock
       call minperm(blocksize(h), offset, coords0, coords1, bias, perm, dist)
       atomap(offset+1:offset+blocksize(h)) = perm(:blocksize(h)) + offset
+      totdist = totdist + weights(h)*dist
       offset = offset + blocksize(h)
    end do
 
 end subroutine
 
 ! Calculate total bias
-real(wp) function totalbias(natom, weights, bias, map) result(total)
+real(wp) function biasedist(natom, atomap, weights, coords0, coords1, bias) result(dist)
 
    integer, intent(in) :: natom
+   integer, dimension(:), intent(in) :: atomap
    real(wp), dimension(:), intent(in) :: weights
-   integer, dimension(:), intent(in) :: map
+   real(wp), dimension(:, :), intent(in) :: coords0
+   real(wp), dimension(:, :), intent(in) :: coords1
    real(wp), dimension(:, :), intent(in) :: bias
    integer :: i
 
-   total = 0.
+   dist = 0.
 
    do i = 1, natom
-      total = total + weights(i)*bias(i, map(i))
+      dist = dist + weights(i)*(sum((coords0(:, i) - coords1(:, atomap(i)))**2) + bias(i, atomap(i)))
    end do
 
 end function

@@ -16,35 +16,31 @@
 
 import numpy as np
 from ase import Atoms
-from molalignlibext import molalignlib
+from molalignlibext import settings, library
 
-class Alignable(Atoms):
-    def __init__(
-        self,
-        atoms,
-        mass_weighted = False,
-    ):
-        if not isinstance(atoms, Atoms):
+#print(library.align_atoms.__doc__)
+#print(library.assign_atoms.__doc__)
+
+class Alignment:
+    def __init__(self, atoms0, atoms1, mw=False):
+        if not isinstance(atoms0, Atoms):
             raise TypeError('An Atoms object was expected')
-        self.__dict__.update(atoms.__dict__)
-        self.mass_weighted = mass_weighted
-    def alignto(self, atoms):
-        if not isinstance(atoms, Atoms):
+        if not isinstance(atoms1, Atoms):
             raise TypeError('An Atoms object was expected')
-        znums0 = atoms.get_atomic_numbers()
-        types0 = np.ones(len(atoms), dtype=np.int32)
-        coords0 = atoms.positions.T # Convert to column-major order
-        znums1 = self.get_atomic_numbers()
-        types1 = np.ones(len(self), dtype=np.int32)
-        coords1 = self.positions.T # Convert to column-major order
-        if self.mass_weighted:
-            weights0 = atoms.get_masses()
-            weights1 = self.get_masses()
+        znums0 = atoms0.get_atomic_numbers()
+        types0 = np.ones(len(atoms0), dtype=np.int32)
+        coords0 = atoms0.positions.T # Convert to column-major order
+        znums1 = atoms1.get_atomic_numbers()
+        types1 = np.ones(len(atoms1), dtype=np.int32)
+        coords1 = atoms1.positions.T # Convert to column-major order
+        if mw:
+            weights0 = atoms0.get_masses()
+            weights1 = atoms1.get_masses()
         else:
-            weights0 = np.ones(len(atoms), dtype=np.float64)
-            weights1 = np.ones(len(self), dtype=np.float64)
-        travec, rotmat, error = \
-            molalignlib.align_atoms(
+            weights0 = np.ones(len(atoms0), dtype=np.float64)
+            weights1 = np.ones(len(atoms1), dtype=np.float64)
+        travec, rotmat, dist2, error = \
+            library.align_atoms(
                 znums0,
                 types0,
                 coords0,
@@ -56,13 +52,14 @@ class Alignable(Atoms):
             )
         if error:
             raise RuntimeError('Alignment failed')
-        self.positions = np.dot(self.positions, rotmat.T) + travec
-    def disto(self, atoms):
-        if self.mass_weighted:
-            weights = self.get_masses()/self.get_masses().sum()
-        else:
-            weights = 1./len(self)
-        return ((weights*((self.positions - atoms.positions)**2).sum(axis=1)).sum())**0.5
+        self.travec = travec
+        self.rotmat = rotmat.T
+        self.rmsd = dist2**0.5
+    def align(self, atoms):
+        return Atoms(
+            numbers = atoms.numbers,
+            positions = np.dot(atoms.positions, self.rotmat) + self.travec,
+        )
 
 class Assignment:
     def __init__(
@@ -70,60 +67,58 @@ class Assignment:
         atoms0,
         atoms1,
         biasing = False,
-        bias_tol = 0.2,
-        bias_scale = 1.e3,
+        biastol = 0.2,
         iteration = False,
-        testing = False,
+        debuginfo = False,
+        reproducible = False,
         records = 1,
-        count = 10,
-        trials = None,
-        mass_weighted = False,
+        maxcount = 10,
+        maxtrials = None,
+        mw = False,
     ):
         if not isinstance(atoms0, Atoms):
             raise TypeError('An Atoms object was expected')
         if not isinstance(atoms1, Atoms):
             raise TypeError('An Atoms object was expected as argument')
-        if type(biasing) is not bool:
+        if not isinstance(biasing, bool):
             raise TypeError('"biasing" must be a boolean')
-        if type(iteration) is not bool:
+        if not isinstance(iteration, bool):
             raise TypeError('"iteration" must be a boolean')
-        if type(testing) is not bool:
-            raise TypeError('"testing" must be a boolean')
-        if type(records) is not int:
+        if not isinstance(debuginfo, bool):
+            raise TypeError('"debuginfo" must be a boolean')
+        if not isinstance(records, int):
             raise TypeError('"records" must be an integer')
-        if type(count) is not int:
-            raise TypeError('"count" must be an integer')
-        if type(bias_tol) is not float:
-            raise TypeError('"bias_tol" must be a real')
-        if type(bias_scale) is not float:
-            raise TypeError('"bias_scale" must be a real')
-        if trials is None:
-            molalignlib.set_free_flag(True)
-        elif type(trials) is int:
-            molalignlib.set_free_flag(False)
-            molalignlib.set_max_trials(trials)
-        else:
-            raise TypeError('"trials" must be an integer')
-        molalignlib.set_bias_flag(biasing)
-        molalignlib.set_bias_scale(bias_scale)
-        molalignlib.set_bias_tol(bias_tol)
-        molalignlib.set_conv_flag(iteration)
-        molalignlib.set_test_flag(testing)
-        molalignlib.set_max_count(count)
-        znums0 = atoms0.get_atomic_numbers()
-        types0 = np.ones(len(atoms0), dtype=int)
-        coords0 = atoms0.positions.T # Convert to column-major order
-        znums1 = atoms1.get_atomic_numbers()
-        types1 = np.ones(len(atoms1), dtype=int)
-        coords1 = atoms1.positions.T # Convert to column-major order
-        if mass_weighted:
+        if not isinstance(maxcount, int):
+            raise TypeError('"maxcount" must be an integer')
+        if not isinstance(biastol, float):
+            raise TypeError('"biastol" must be a real')
+        if mw:
             weights0 = atoms0.get_masses()
             weights1 = atoms1.get_masses()
         else:
             weights0 = np.ones(len(atoms0), dtype=np.float64)
             weights1 = np.ones(len(atoms1), dtype=np.float64)
-        nmap, mapind, mapcount, mapdist, error = \
-            molalignlib.assign_atoms(
+        if maxtrials is None:
+            settings.trial_flag = False
+        else:
+            if isinstance(maxtrials, int) and maxtrials > 0:
+                settings.trial_flag = True
+                settings.maxtrials = maxtrials
+            else:
+                raise TypeError('"maxtrials" must be a positive integer')
+        settings.bias_flag = biasing
+        settings.iter_flag = iteration
+        settings.repro_flag = reproducible
+        settings.maxcount = maxcount
+        settings.biastol = biastol
+        znums0 = atoms0.get_atomic_numbers()
+        types0 = np.ones(len(atoms0), dtype=np.int32)
+        coords0 = atoms0.positions.T # Convert to column-major order
+        znums1 = atoms1.get_atomic_numbers()
+        types1 = np.ones(len(atoms1), dtype=np.int32)
+        coords1 = atoms1.positions.T # Convert to column-major order
+        nmap, mapping, mapcount, mapdist2, error = \
+            library.assign_atoms(
                 znums0,
                 types0,
                 coords0,
@@ -136,6 +131,7 @@ class Assignment:
             )
         if error:
             raise RuntimeError('Assignment failed')
-        self.dist = list(mapdist[:nmap])
-        self.count = list(mapcount[:nmap])
-        self.mapind = [mapind[:, i] - 1 for i in range(nmap)]
+        mapping = mapping - 1
+        self.mappings = [mapping[:, i] for i in range(nmap)]
+    def __iter__(self):
+        return iter(self.mappings)

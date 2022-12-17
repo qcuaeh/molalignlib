@@ -22,24 +22,24 @@ use settings
 implicit none
 
 private
-public squadist
-public leastsquadist
+public squaredist
+public leastsquaredist
 public leastrotquat
 
 contains
 
-real(wp) function squadist(natom, weights, coords0, coords1, atomap) result(dist)
+real(wp) function squaredist(natom, weights, coords0, coords1, atomap) result(dist2)
    integer, intent(in) :: natom
    integer, dimension(:), intent(in) :: atomap
    real(wp), dimension(:), intent(in) :: weights
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
 
-   dist = sum(weights(1:natom)*sum((coords1(:, atomap(1:natom)) - coords0(:, 1:natom))**2, dim=1))
+   dist2 = sum(weights(1:natom)*sum((coords1(:, atomap(1:natom)) - coords0(:, 1:natom))**2, dim=1))
 
 end function
 
 ! Purpose: Calculate least square distance from eigenvalues
-real(wp) function leastsquadist(natom, weights, coords0, coords1, atomap) result(dist)
+real(wp) function leastsquaredist(natom, weights, coords0, coords1, atomap) result(dist2)
     integer, intent(in) :: natom
     integer, dimension(:), intent(in) :: atomap
     real(wp), dimension(:), intent(in) :: weights
@@ -48,12 +48,12 @@ real(wp) function leastsquadist(natom, weights, coords0, coords1, atomap) result
 
     call kearsleymat(natom, weights, coords0, coords1, atomap, eigmat)
     call syeval4(eigmat, eigval)
-    dist = max(eigval(1), 0._wp)
+    dist2 = max(eigval(1), 0._wp)
 
 end function
 
 !! Purpose: Calculate least square distance from aligned coordinates
-!real(wp) function leastsquadist(natom, weights, coords0, coords1, atomap) result(dist)
+!real(wp) function leastsquaredist(natom, weights, coords0, coords1, atomap) result(dist2)
 !   integer, intent(in) :: natom
 !   integer, dimension(:), intent(in) :: atomap
 !   real(wp), dimension(:), intent(in) :: weights
@@ -62,7 +62,7 @@ end function
 !
 !   call kearsleymat(natom, weights, coords0, coords1, atomap, eigmat)
 !   call syevec4(eigmat, eigval)
-!   dist = squadist(natom, weights, coords0, rotated(natom, coords1, eigmat(:, 1)), atomap)
+!   dist2 = squaredist(natom, weights, coords0, rotated(natom, coords1, eigmat(:, 1)), atomap)
 !
 !end function
 

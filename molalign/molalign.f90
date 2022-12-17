@@ -26,7 +26,7 @@ program molalign
    use translation
    use rotation
    use alignment
-   use molalignlib
+   use library
 
    implicit none
 
@@ -34,17 +34,17 @@ program molalign
    integer :: i, nmap, nrec
    integer :: natom0, natom1
    integer :: unit, unit0, unit1
-   integer, allocatable :: mapind(:, :)
+   integer, allocatable :: mapping(:, :)
    integer, allocatable :: mapcount(:)
    integer, allocatable, dimension(:) :: znums0, znums1, types0, types1
    character(title_len) :: title0, title1
    character(arg_len) :: arg, files(2), fmtstdin, fmtin0, fmtin1, fmtout
    character(label_len), allocatable, dimension(:) :: labels0, labels1
-   real(wp) :: rmsd, travec(3), rotmat(3, 3)
-   real(wp), allocatable :: mapdist(:)
+   real(wp) :: travec(3), rotmat(3, 3), dist2
+   real(wp), allocatable :: mapdist2(:)
    real(wp), allocatable :: weights0(:), weights1(:)
    real(wp), dimension(:, :), allocatable :: coords0, coords1, aligned1
-   logical :: sort_flag, mirror_flag, stdin_flag
+   logical :: sort_flag, enan_flag, stdin_flag, test_flag
 
    procedure(f_realint), pointer :: weight_function
 
@@ -53,17 +53,16 @@ program molalign
    bias_flag = .false.
    iter_flag = .false.
    sort_flag = .false.
-   mirror_flag = .false.
-   free_flag = .true.
+   trial_flag = .false.
+   stdin_flag = .false.
+   repro_flag = .false.
+   enan_flag = .false.
    test_flag = .false.
    live_flag = .false.
-   debug_flag = .false.
-   stdin_flag = .false.
 
    nrec = 1
-   max_count = 10
-   bias_tol = 0.35
-   bias_scale = 1.e3
+   maxcount = 10
+   biastol = 0.35
    fmtstdin = 'xyz'
    fmtout = 'xyz'
 
@@ -80,24 +79,23 @@ program molalign
          live_flag = .true.
       case ('-test')
          test_flag = .true.
+         repro_flag = .true.
       case ('-sort')
          sort_flag = .true.
-      case ('-debug')
-         debug_flag = .true.
       case ('-fast')
          bias_flag = .true.
          iter_flag = .true.
       case ('-mass')
          weight_function => stdmass
-      case ('-mirror')
-         mirror_flag = .true.
+      case ('-enan')
+         enan_flag = .true.
       case ('-count')
-         call readoptarg(arg, max_count)
+         call readoptarg(arg, maxcount)
       case ('-trials')
-         free_flag = .false.
-         call readoptarg(arg, max_trials)
+         trial_flag = .false.
+         call readoptarg(arg, maxtrials)
       case ('-tol')
-         call readoptarg(arg, bias_tol)
+         call readoptarg(arg, biastol)
       case ('-rec')
          call readoptarg(arg, nrec)
       case ('-out')
@@ -114,8 +112,6 @@ program molalign
 !      case ('-none')
 !         bias_flag = .false.
 !         iter_flag = .false.
-!      case ('-scale')
-!         call readoptarg(arg, bias_scale)
       case default
          call readarg(arg, files)
       end select
@@ -147,7 +143,7 @@ program molalign
    call readfile(unit0, fmtin0, natom0, title0, labels0, coords0)
    call readfile(unit1, fmtin1, natom1, title1, labels1, coords1)
 
-   if (mirror_flag) then
+   if (enan_flag) then
       coords1(1, :) = -coords1(1, :)
    end if
 
@@ -157,9 +153,9 @@ program molalign
    allocate(types0(natom0), types1(natom1))
    allocate(weights0(natom0), weights1(natom1))
    allocate(aligned1(3, natom1))
-   allocate(mapind(natom0, nrec))
+   allocate(mapping(natom0, nrec))
    allocate(mapcount(nrec))
-   allocate(mapdist(nrec))
+   allocate(mapdist2(nrec))
 
    ! Get atomic numbers, types and weights
 
@@ -190,13 +186,12 @@ program molalign
          weights1, &
          nrec, &
          nmap, &
-         mapind, &
+         mapping, &
          mapcount, &
-         mapdist, &
+         mapdist2, &
          error)
 
       if (error /= 0) stop
-
 
       do i = 1, nmap
 
@@ -207,24 +202,27 @@ program molalign
             coords0, &
             weights0, &
             natom1, &
-            znums1(mapind(:, i)), &
-            types1(mapind(:, i)), &
-            coords1(:, mapind(:, i)), &
+            znums1(mapping(:, i)), &
+            types1(mapping(:, i)), &
+            coords1(:, mapping(:, i)), &
             weights1, &
             travec, &
             rotmat, &
+            dist2, &
             error)
 
          if (error /= 0) stop
 
          aligned1 = translated(natom1, rotated(natom1, coords1, rotmat), travec)
 
-         ! Write aligned coordinates
+         if (.not. test_flag) then
 
-         call open2write('aligned_'//str(i)//'.'//trim(fmtout), unit)
-         call writefile(unit, fmtout, natom0, title0, znums0, coords0)
-         call writefile(unit, fmtout, natom1, title1, znums1(mapind(:, i)), aligned1(:, mapind(:, i)))
-         close(unit)
+            call open2write('aligned_'//str(i)//'.'//trim(fmtout), unit)
+            call writefile(unit, fmtout, natom0, title0, znums0, coords0)
+            call writefile(unit, fmtout, natom1, title1, znums1(mapping(:, i)), aligned1(:, mapping(:, i)))
+            close(unit)
+
+         end if
 
       end do
 
@@ -245,23 +243,22 @@ program molalign
          weights1, &
          travec, &
          rotmat, &
+         dist2, &
          error)
 
       if (error /= 0) stop
 
       aligned1 = translated(natom1, rotated(natom1, coords1, rotmat), travec)
+      write (output_unit, '(a,1x,a,1x,a)') 'RMSD =', str(sqrt(dist2)), '(only alignment performed)'
 
-      ! Write aligned coordinates
+      if (.not. test_flag) then
 
-      call open2write('aligned.'//trim(fmtout), unit)
-      call writefile(unit, fmtout, natom0, title0, znums0, coords0)
-      call writefile(unit, fmtout, natom1, title1, znums1, aligned1) 
-      close(unit)
+         call open2write('aligned.'//trim(fmtout), unit)
+         call writefile(unit, fmtout, natom0, title0, znums0, coords0)
+         call writefile(unit, fmtout, natom1, title1, znums1, aligned1) 
+         close(unit)
 
-      ! Print RMSD
-
-      rmsd = sqrt(sum(weights0*sum((aligned1 - coords0)**2, dim=1)))
-      write (output_unit, '(a,1x,f0.4,1x,a)') 'RMSD:', rmsd, '(only alignment performed)'
+      end if
 
    end if
 
