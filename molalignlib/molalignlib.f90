@@ -22,7 +22,7 @@ implicit none
 
 contains
 
-! Purpose: Check and optimize mapping
+! Assign atoms0 and atoms1
 subroutine assign_atoms( &
    natom0, &
    znums0,  &
@@ -36,9 +36,9 @@ subroutine assign_atoms( &
    weights1, &
    nrec, &
    nmap, &
-   mapping, &
-   mapcount, &
-   mapdist2, &
+   maplist, &
+   countlist, &
+   dist2list, &
    error)
 
    use random
@@ -55,9 +55,9 @@ subroutine assign_atoms( &
    real(wp), intent(in) :: weights0(natom0)
    real(wp), intent(in) :: weights1(natom1)
    integer, intent(out) :: nmap, error
-   integer, intent(out) :: mapping(natom0, nrec)
-   integer, intent(out) :: mapcount(nrec)
-   real(wp), intent(out) :: mapdist2(nrec)
+   integer, intent(out) :: maplist(natom0, nrec)
+   integer, intent(out) :: countlist(nrec)
+   real(wp), intent(out) :: dist2list(nrec)
    integer :: i, h, offset
    integer :: nblock0, nblock1
    integer, dimension(:), allocatable :: atomorder0, atomorder1
@@ -153,18 +153,18 @@ subroutine assign_atoms( &
       weights0(atomorder0)/totalweight, &
       centered(natom0, coords0(:, atomorder0), center0), &
       centered(natom1, coords1(:, atomorder1), center1), &
-      nrec, nmap, mapping, mapcount, mapdist2 &
+      nrec, nmap, maplist, countlist, dist2list &
    )
 
    ! Reorder back to original atom ordering
 
    do i = 1, nmap
-      mapping(:, i) = atomorder1(mapping(atomunorder0, i))
+      maplist(:, i) = atomorder1(maplist(atomunorder0, i))
    end do
 
 end subroutine
 
-! Purpose: Superimpose coordinates of atom sets coords0 and coords1
+! Align atoms0 and atoms1
 subroutine align_atoms( &
    natom0, &
    znums0, &

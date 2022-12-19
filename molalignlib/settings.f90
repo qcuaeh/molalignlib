@@ -2,7 +2,7 @@ module settings
 use parameters
 implicit none
 
-logical :: bias_flag, iter_flag, trial_flag, repro_flag, live_flag
+logical :: bias_flag, iter_flag, trial_flag, repro_flag, stats_flag, live_flag
 integer :: maxcount, maxtrials
 real(wp) :: biastol
 

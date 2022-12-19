@@ -34,30 +34,31 @@ program molalign
    integer :: i, nmap, nrec
    integer :: natom0, natom1
    integer :: unit, unit0, unit1
-   integer, allocatable :: mapping(:, :)
-   integer, allocatable :: mapcount(:)
+   integer, allocatable :: maplist(:, :)
+   integer, allocatable :: countlist(:)
    integer, allocatable, dimension(:) :: znums0, znums1, types0, types1
    character(title_len) :: title0, title1
    character(arg_len) :: arg, files(2), fmtstdin, fmtin0, fmtin1, fmtout
    character(label_len), allocatable, dimension(:) :: labels0, labels1
    real(wp) :: travec(3), rotmat(3, 3), dist2
-   real(wp), allocatable :: mapdist2(:)
+   real(wp), allocatable :: dist2list(:)
    real(wp), allocatable :: weights0(:), weights1(:)
    real(wp), dimension(:, :), allocatable :: coords0, coords1, aligned1
-   logical :: sort_flag, enan_flag, stdin_flag, test_flag
+   logical :: sort_flag, enan_flag, stdin_flag, save_flag
 
    procedure(f_realint), pointer :: weight_function
 
    ! Set default options
 
+   save_flag = .true.
    bias_flag = .false.
    iter_flag = .false.
    sort_flag = .false.
    trial_flag = .false.
    stdin_flag = .false.
    repro_flag = .false.
+   stats_flag = .false.
    enan_flag = .false.
-   test_flag = .false.
    live_flag = .false.
 
    nrec = 1
@@ -77,9 +78,12 @@ program molalign
       select case (arg)
       case ('-live')
          live_flag = .true.
+      case ('-stats')
+         stats_flag = .true.
       case ('-test')
-         test_flag = .true.
          repro_flag = .true.
+         stats_flag = .true.
+         save_flag = .false.
       case ('-sort')
          sort_flag = .true.
       case ('-fast')
@@ -153,9 +157,9 @@ program molalign
    allocate(types0(natom0), types1(natom1))
    allocate(weights0(natom0), weights1(natom1))
    allocate(aligned1(3, natom1))
-   allocate(mapping(natom0, nrec))
-   allocate(mapcount(nrec))
-   allocate(mapdist2(nrec))
+   allocate(maplist(natom0, nrec))
+   allocate(countlist(nrec))
+   allocate(dist2list(nrec))
 
    ! Get atomic numbers, types and weights
 
@@ -186,12 +190,14 @@ program molalign
          weights1, &
          nrec, &
          nmap, &
-         mapping, &
-         mapcount, &
-         mapdist2, &
+         maplist, &
+         countlist, &
+         dist2list, &
          error)
 
       if (error /= 0) stop
+
+      write (output_unit, '(a,1x,a)') 'Optimized RMSD =', str(sqrt(dist2list(1)))
 
       do i = 1, nmap
 
@@ -202,9 +208,9 @@ program molalign
             coords0, &
             weights0, &
             natom1, &
-            znums1(mapping(:, i)), &
-            types1(mapping(:, i)), &
-            coords1(:, mapping(:, i)), &
+            znums1(maplist(:, i)), &
+            types1(maplist(:, i)), &
+            coords1(:, maplist(:, i)), &
             weights1, &
             travec, &
             rotmat, &
@@ -215,11 +221,11 @@ program molalign
 
          aligned1 = translated(natom1, rotated(natom1, coords1, rotmat), travec)
 
-         if (.not. test_flag) then
+         if (save_flag) then
 
             call open2write('aligned_'//str(i)//'.'//trim(fmtout), unit)
             call writefile(unit, fmtout, natom0, title0, znums0, coords0)
-            call writefile(unit, fmtout, natom1, title1, znums1(mapping(:, i)), aligned1(:, mapping(:, i)))
+            call writefile(unit, fmtout, natom1, title1, znums1(maplist(:, i)), aligned1(:, maplist(:, i)))
             close(unit)
 
          end if
@@ -249,9 +255,9 @@ program molalign
       if (error /= 0) stop
 
       aligned1 = translated(natom1, rotated(natom1, coords1, rotmat), travec)
-      write (output_unit, '(a,1x,a,1x,a)') 'RMSD =', str(sqrt(dist2)), '(only alignment performed)'
+      write (output_unit, '(a,1x,a)') 'RMSD =', str(sqrt(dist2))
 
-      if (.not. test_flag) then
+      if (save_flag) then
 
          call open2write('aligned.'//trim(fmtout), unit)
          call writefile(unit, fmtout, natom0, title0, znums0, coords0)

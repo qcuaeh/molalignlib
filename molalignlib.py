@@ -67,13 +67,13 @@ class Assignment:
         atoms0,
         atoms1,
         biasing = False,
-        biastol = 0.2,
         iteration = False,
-        debuginfo = False,
         reproducible = False,
-        records = 1,
-        maxcount = 10,
-        maxtrials = None,
+        stats = False,
+        rec = 1,
+        count = 10,
+        trials = None,
+        tol = 0.2,
         mw = False,
     ):
         if not isinstance(atoms0, Atoms):
@@ -84,40 +84,41 @@ class Assignment:
             raise TypeError('"biasing" must be a boolean')
         if not isinstance(iteration, bool):
             raise TypeError('"iteration" must be a boolean')
-        if not isinstance(debuginfo, bool):
-            raise TypeError('"debuginfo" must be a boolean')
-        if not isinstance(records, int):
-            raise TypeError('"records" must be an integer')
-        if not isinstance(maxcount, int):
-            raise TypeError('"maxcount" must be an integer')
-        if not isinstance(biastol, float):
-            raise TypeError('"biastol" must be a real')
+        if not isinstance(stats, bool):
+            raise TypeError('"stats" must be a boolean')
+        if not isinstance(rec, int):
+            raise TypeError('"rec" must be an integer')
+        if not isinstance(count, int):
+            raise TypeError('"count" must be an integer')
+        if not isinstance(tol, float):
+            raise TypeError('"tol" must be a real')
         if mw:
             weights0 = atoms0.get_masses()
             weights1 = atoms1.get_masses()
         else:
             weights0 = np.ones(len(atoms0), dtype=np.float64)
             weights1 = np.ones(len(atoms1), dtype=np.float64)
-        if maxtrials is None:
+        if trials is None:
             settings.trial_flag = False
         else:
-            if isinstance(maxtrials, int) and maxtrials > 0:
+            if isinstance(trials, int):
                 settings.trial_flag = True
-                settings.maxtrials = maxtrials
+                settings.maxtrials = trials
             else:
-                raise TypeError('"maxtrials" must be a positive integer')
+                raise TypeError('"trials" must be an integer')
         settings.bias_flag = biasing
         settings.iter_flag = iteration
         settings.repro_flag = reproducible
-        settings.maxcount = maxcount
-        settings.biastol = biastol
+        settings.stats_flag = stats
+        settings.maxcount = count
+        settings.biastol = tol
         znums0 = atoms0.get_atomic_numbers()
         types0 = np.ones(len(atoms0), dtype=np.int32)
         coords0 = atoms0.positions.T # Convert to column-major order
         znums1 = atoms1.get_atomic_numbers()
         types1 = np.ones(len(atoms1), dtype=np.int32)
         coords1 = atoms1.positions.T # Convert to column-major order
-        nmap, mapping, mapcount, mapdist2, error = \
+        nmap, maplist, countlist, dist2list, error = \
             library.assign_atoms(
                 znums0,
                 types0,
@@ -127,11 +128,13 @@ class Assignment:
                 types1,
                 coords1,
                 weights1,
-                records,
+                rec,
             )
         if error:
             raise RuntimeError('Assignment failed')
-        mapping = mapping - 1
-        self.mappings = [mapping[:, i] for i in range(nmap)]
+        maplist = maplist - 1
+        self.maplist = [maplist[:, i] for i in range(nmap)]
+        self.rmsdlist = [dist2list[i]**0.5 for i in range(nmap)]
+        self.countlist = [countlist[i] for i in range(nmap)]
     def __iter__(self):
-        return iter(self.mappings)
+        return iter(self.maplist)

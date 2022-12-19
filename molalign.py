@@ -20,13 +20,13 @@ from molalignlib import Assignment, Alignment
 
 def molalign():
 
-    # Parse arguments
     parser = ArgumentParser()
     parser.add_argument('-sort', action='store_true')
     parser.add_argument('-fast', action='store_true')
     parser.add_argument('-test', action='store_true')
     parser.add_argument('-mass', action='store_true')
     parser.add_argument('-enan', action='store_true')
+    parser.add_argument('-stats', action='store_true')
     parser.add_argument('-trials', type=int)
     parser.add_argument('-tol', type=float, default=0.35)
     parser.add_argument('-count', type=int, default=10)
@@ -37,7 +37,6 @@ def molalign():
     parser.add_argument('filelist', nargs='+')
     args = parser.parse_args()
 
-    # Read clusters coordinates
     if len(args.filelist) == 1:
         atoms0 = io.read(args.filelist[0], index=0)
         atoms1 = io.read(args.filelist[0], index=1)
@@ -69,13 +68,14 @@ def molalign():
             biasing = biasing,
             iteration = iteration,
             reproducible = reproducible,
-            records = args.rec,
-            biastol = args.tol,
-            maxcount = args.count,
-            maxtrials = args.trials,
+            stats = args.stats,
+            rec = args.rec,
+            tol = args.tol,
+            count = args.count,
+            trials = args.trials,
             mw = args.mass,
         )
-        # Align atoms1 to atoms0 for each calculated mapping and write coordinates to file
+        print('Optimized RMSD = {:.4f}'.format(assignments.rmsdlist[0]))
         for i, mapping in enumerate(assignments, start=1):
             alignment = Alignment(atoms0, atoms1[mapping], mw=args.mass)
             if not args.test:
@@ -83,7 +83,7 @@ def molalign():
                 io.write('aligned_{}.{ext}'.format(i, ext=args.out), alignment.align(atoms1[mapping]), append=True)
     else:
         alignment = Alignment(atoms0, atoms1, mw=args.mass)
-        print('RMSD = {:.4f} (only alignment performed)'.format(alignment.rmsd))
+        print('RMSD = {:.4f}'.format(alignment.rmsd))
         if not args.test:
             io.write('aligned.xyz', atoms0)
             io.write('aligned.xyz', alignment.align(atoms1), append=True)

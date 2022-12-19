@@ -5,9 +5,7 @@
 
 
 # Import modules
-import sys
-sys.path.append('/home/jmvasquez/repos/molalign')
-from ase import io
+from ase.io import read, write
 from molalignlib import Assignment, Alignment
 
 
@@ -15,8 +13,8 @@ from molalignlib import Assignment, Alignment
 
 
 # Read clusters coordinates
-atoms0 = io.read('Co138_0.xyz', index=0)
-atoms1 = io.read('Co138_1.xyz', index=0)
+atoms0 = read('Co138_0.xyz', index=0)
+atoms1 = read('Co138_1.xyz', index=0)
 
 
 # In[ ]:
@@ -24,7 +22,7 @@ atoms1 = io.read('Co138_1.xyz', index=0)
 
 # Create an assignment object between atoms0 and atoms1,
 # enable biasing and iteration and record up to 5 assignments
-assignments = Assignment(atoms0, atoms1, biasing=True, iteration=True, records=5)
+assignments = Assignment(atoms0, atoms1, biasing=True, iteration=True, stats=True, rec=5)
 
 
 # In[ ]:
@@ -34,7 +32,7 @@ assignments = Assignment(atoms0, atoms1, biasing=True, iteration=True, records=5
 # write the aligned coordinates to a file
 for i, mapping in enumerate(assignments, start=1):
     alignment = Alignment(atoms0, atoms1[mapping])
-    print(i, alignment.rmsd)
-    io.write('aligned_{}.xyz'.format(i), atoms0)
-    io.write('aligned_{}.xyz'.format(i), alignment.align(atoms1[mapping]), append=True)
+    print('rmsd{} = {:.4f}'.format(i, alignment.rmsd))
+    write('aligned_{}.xyz'.format(i), atoms0)
+    write('aligned_{}.xyz'.format(i), alignment.align(atoms1[mapping]), append=True)
 

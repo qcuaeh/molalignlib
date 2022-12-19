@@ -43,9 +43,9 @@ subroutine optimize_assignment( &
    coords1, &
    nrec, &
    nmap, &
-   mapping, &
-   mapcount, &
-   mapdist2 &
+   maplist, &
+   countlist, &
+   dist2list &
 )
 
    integer, intent(in) :: natom, nblock, nrec
@@ -53,9 +53,9 @@ subroutine optimize_assignment( &
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
    real(wp), dimension(:), intent(in) :: weights
    integer, intent(out) :: nmap
-   integer, intent(out) :: mapping(:, :)
-   integer, intent(out) :: mapcount(:)
-   real(wp), intent(out) :: mapdist2(:)
+   integer, intent(out) :: maplist(:, :)
+   integer, intent(out) :: countlist(:)
+   real(wp), intent(out) :: dist2list(:)
 
    logical found, overflow
    integer imap, jmap, ncount, ntrial, nstep, steps
@@ -72,7 +72,7 @@ subroutine optimize_assignment( &
 
 ! Print header and initial stats
 
-   if (live_flag) then
+   if (stats_flag .and. live_flag) then
       write (output_unit, '(a)', advance='no') achar(27)//'[1H'//achar(27)//'[J'
       call print_header()
    end if
@@ -129,21 +129,21 @@ subroutine optimize_assignment( &
 
       dist2 = squaredist(natom, weights, coords0, workcoords1, atomap)
 
-! Check for new best mapping
+! Check for new best maplist
 
       found = .false.
 
       do imap = 1, nmap
-         if (all(atomap == mapping(:, imap))) then
+         if (all(atomap == maplist(:, imap))) then
             if (imap == 1) ncount = ncount + 1
-            mapcount(imap) = mapcount(imap) + 1
-            avgsteps(imap) = avgsteps(imap) + (steps - avgsteps(imap))/mapcount(imap)
-            avgrealrot(imap) = avgrealrot(imap) + (rotangle(prodquat) - avgrealrot(imap))/mapcount(imap)
-            avgtotalrot(imap) = avgtotalrot(imap) + (totalrot - avgtotalrot(imap))/mapcount(imap)
-            if (live_flag) then
-               write (output_unit, '(a)', advance='no') achar(27)//'['//str(imap + 2)//'H'
-               call print_body(imap, mapcount(imap), avgsteps(imap), avgtotalrot(imap), &
-                  avgrealrot(imap), mapdist2(imap))
+            countlist(imap) = countlist(imap) + 1
+            avgsteps(imap) = avgsteps(imap) + (steps - avgsteps(imap))/countlist(imap)
+            avgrealrot(imap) = avgrealrot(imap) + (rotangle(prodquat) - avgrealrot(imap))/countlist(imap)
+            avgtotalrot(imap) = avgtotalrot(imap) + (totalrot - avgtotalrot(imap))/countlist(imap)
+            if (stats_flag .and. live_flag) then
+               write (output_unit, '(a)', advance='no') achar(27)//'['//str(imap+2)//'H'
+               call print_body(imap, countlist(imap), avgsteps(imap), avgtotalrot(imap), &
+                  avgrealrot(imap), dist2list(imap))
             end if
             found = .true.
             exit
@@ -155,55 +155,57 @@ subroutine optimize_assignment( &
             overflow = .true.
          end if
          do imap = 1, nrec
-            if (imap > nmap .or. dist2 < mapdist2(imap)) then
+            if (imap > nmap .or. dist2 < dist2list(imap)) then
                if (imap == 1) ncount = 1
                if (nmap < nrec) nmap = nmap + 1
                do jmap = nmap, imap + 1, -1
-                  mapping(:, jmap) = mapping(:, jmap - 1)
-                  mapcount(jmap) = mapcount(jmap - 1)
-                  mapdist2(jmap) = mapdist2(jmap - 1)
+                  maplist(:, jmap) = maplist(:, jmap - 1)
+                  countlist(jmap) = countlist(jmap - 1)
+                  dist2list(jmap) = dist2list(jmap - 1)
                   avgsteps(jmap) = avgsteps(jmap - 1)
                   avgrealrot(jmap) = avgrealrot(jmap - 1)
                   avgtotalrot(jmap) = avgtotalrot(jmap - 1)
-                  if (live_flag) then
+                  if (stats_flag .and. live_flag) then
                      write (output_unit, '(a)', advance='no') achar(27)//'['//str(jmap + 2)//'H'
-                     call print_body(jmap, mapcount(jmap), avgsteps(jmap), avgtotalrot(jmap), &
-                        avgrealrot(jmap), mapdist2(jmap))
+                     call print_body(jmap, countlist(jmap), avgsteps(jmap), avgtotalrot(jmap), &
+                        avgrealrot(jmap), dist2list(jmap))
                   end if
                end do
-               mapping(:, imap) = atomap
-               mapcount(imap) = 1
-               mapdist2(imap) = dist2
+               maplist(:, imap) = atomap
+               countlist(imap) = 1
+               dist2list(imap) = dist2
                avgsteps(imap) = steps
                avgrealrot(imap) = rotangle(prodquat)
                avgtotalrot(imap) = totalrot
-               if (live_flag) then
+               if (stats_flag .and. live_flag) then
                   write (output_unit, '(a)', advance='no') achar(27)//'['//str(imap + 2)//'H'
-                  call print_body(imap, mapcount(imap), avgsteps(imap), avgtotalrot(imap), &
-                     avgrealrot(imap), mapdist2(imap))
+                  call print_body(imap, countlist(imap), avgsteps(imap), avgtotalrot(imap), &
+                     avgrealrot(imap), dist2list(imap))
                end if
                exit
             end if
          end do
       end if
 
-      if (live_flag) then
+      if (stats_flag .and. live_flag) then
          write (output_unit, '(a)', advance='no') achar(27)//'['//str(nmap + 3)//'H'
          call print_footer()
       end if
 
    end do
 
-   if (.not. live_flag) then
+   if (stats_flag .and. .not. live_flag) then
       call print_header()
       do imap = 1, nmap
-         call print_body(imap, mapcount(imap), avgsteps(imap), avgtotalrot(imap), &
-            avgrealrot(imap), mapdist2(imap))
+         call print_body(imap, countlist(imap), avgsteps(imap), avgtotalrot(imap), &
+            avgrealrot(imap), dist2list(imap))
       end do
       call print_footer()
    end if
 
-   call print_stats(overflow, nrec, nmap, ntrial, nstep)
+   if (stats_flag) then
+      call print_stats(overflow, nrec, nmap, ntrial, nstep)
+   end if
 
 end subroutine
 
