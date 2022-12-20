@@ -34,7 +34,7 @@ real(wp) function squaredist(natom, weights, coords0, coords1, atomap) result(di
    real(wp), dimension(:), intent(in) :: weights
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
 
-   dist2 = sum(weights(1:natom)*sum((coords1(:, atomap(1:natom)) - coords0(:, 1:natom))**2, dim=1))
+   dist2 = sum(weights(1:natom)*sum((coords0(:, 1:natom) - coords1(:, atomap(1:natom)))**2, dim=1))
 
 end function
 

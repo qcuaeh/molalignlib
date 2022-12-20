@@ -27,13 +27,13 @@ public getblocks
 
 contains
 
-subroutine getblocks(natom, znums, types, nblock, blocksize, blockindex, atomorder)
+subroutine getblocks(natom, znums, types, nblock, bsize, blockindex, atomorder)
 ! Purpose: Group atoms by atomic numbers and types
    integer, intent(in) :: natom
    integer, dimension(:), intent(in) :: znums, types
    integer, intent(out) :: nblock
    integer, intent(out) :: atomorder(:)
-   integer, dimension(:), intent(out) :: blocksize, blockindex
+   integer, dimension(:), intent(out) :: bsize, blockindex
 
    integer :: i, j
    logical :: remaining(natom)
@@ -51,7 +51,7 @@ subroutine getblocks(natom, znums, types, nblock, blocksize, blockindex, atomord
    do i = 1, natom
       if (remaining(i)) then
          nblock = nblock + 1
-         blocksize(nblock) = 1
+         bsize(nblock) = 1
          blockznum(nblock) = znums(i)
          blocktype(nblock) = types(i)
          blockindex(i) = nblock
@@ -59,7 +59,7 @@ subroutine getblocks(natom, znums, types, nblock, blocksize, blockindex, atomord
             if (remaining(i)) then
                if (znums(j) == znums(i) .and. types(j) == types(i)) then
                   blockindex(j) = nblock
-                  blocksize(nblock) = blocksize(nblock) + 1
+                  bsize(nblock) = bsize(nblock) + 1
                   remaining(j) = .false.
                end if
             end if
@@ -70,21 +70,21 @@ subroutine getblocks(natom, znums, types, nblock, blocksize, blockindex, atomord
 ! Order blocks by atomic type
 
    blockorder(:nblock) = order(blocktype, nblock)
-   blocksize(:nblock) = blocksize(blockorder(:nblock))
+   bsize(:nblock) = bsize(blockorder(:nblock))
    blockorder(:nblock) = inversemap(blockorder(:nblock))
    blockindex = blockorder(blockindex)
 
 ! Order blocks by atomic number
 
    blockorder(:nblock) = order(blockznum, nblock)
-   blocksize(:nblock) = blocksize(blockorder(:nblock))
+   bsize(:nblock) = bsize(blockorder(:nblock))
    blockorder(:nblock) = inversemap(blockorder(:nblock))
    blockindex = blockorder(blockindex)
 
 ! Order blocks by block size
 
-!    blockorder(:nblock) = order(blocksize, nblock)
-!    blocksize(:nblock) = blocksize(blockorder(:nblock))
+!    blockorder(:nblock) = order(bsize, nblock)
+!    bsize(:nblock) = bsize(blockorder(:nblock))
 !    blockorder(:nblock) = inversemap(blockorder(:nblock))
 !    blockindex = blockorder(blockindex)
 

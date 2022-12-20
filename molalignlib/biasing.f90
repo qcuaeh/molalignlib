@@ -23,9 +23,9 @@ implicit none
 
 contains
 
-subroutine setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
+subroutine setadjbias(natom, nblock, bsize, coords0, coords1, bias)
    integer, intent(in) :: natom, nblock
-   integer, dimension(:), intent(in) :: blocksize
+   integer, dimension(:), intent(in) :: bsize
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
    real(wp), dimension(:, :), intent(out) :: bias
 
@@ -37,22 +37,22 @@ subroutine setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
    do i = 1, natom
       offset = 0
       do h = 1, nblock
-         do j = offset + 1, offset + blocksize(h)
+         do j = offset + 1, offset + bsize(h)
             d0(j, i) = sqrt(sum((coords0(:, j) - coords0(:, i))**2))
          end do
-         call sort(d0(:, i), offset + 1, offset + blocksize(h))
-         offset = offset + blocksize(h)
+         call sort(d0(:, i), offset + 1, offset + bsize(h))
+         offset = offset + bsize(h)
       end do
    end do
 
    do i = 1, natom
       offset = 0
       do h = 1, nblock
-         do j = offset + 1, offset + blocksize(h)
+         do j = offset + 1, offset + bsize(h)
             d1(j, i) = sqrt(sum((coords1(:, j) - coords1(:, i))**2))
          end do
-         call sort(d1(:, i), offset + 1, offset + blocksize(h))
-         offset = offset + blocksize(h)
+         call sort(d1(:, i), offset + 1, offset + bsize(h))
+         offset = offset + bsize(h)
       end do
    end do
 
@@ -61,14 +61,14 @@ subroutine setadjbias(natom, nblock, blocksize, coords0, coords1, bias)
 
    if (bias_flag) then
       do h = 1, nblock
-         do i = offset + 1, offset + blocksize(h)
-            do j = offset + 1, offset + blocksize(h)
+         do i = offset + 1, offset + bsize(h)
+            do j = offset + 1, offset + bsize(h)
                if (any(abs(d1(:, j) - d0(:, i)) > biastol)) then
                   bias(i, j) = biascale**2
                end if
             end do
          end do
-         offset = offset + blocksize(h)
+         offset = offset + bsize(h)
       end do
    end if
 

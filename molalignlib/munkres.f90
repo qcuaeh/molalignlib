@@ -21,12 +21,12 @@ implicit none
 
 contains
 
-subroutine minperm(n, o, p, q, bias, perm, dist)
+subroutine minperm(n, p, q, pq, perm, dist)
 
-   integer, intent(in) :: n, o
-   real(wp), intent(in) :: p(:, :), q(:, :)
-   real(wp), intent(in) :: bias(:, :)
-   integer, intent(out) :: perm(:)
+   integer, intent(in) :: n
+   real(wp), intent(in) :: p(3, n), q(3, n)
+   real(wp), intent(in) :: pq(n, n)
+   integer, intent(out) :: perm(n)
    real(wp), intent(out) :: dist
 
    integer :: i, j
@@ -36,7 +36,7 @@ subroutine minperm(n, o, p, q, bias, perm, dist)
 
    do i = 1, n
       do j = 1, n
-         c(i, j) = sum((q(:, o + j) - p(:, o + i))**2) + bias(o + i, o + j)
+         c(i, j) = sum((p(:, i) - q(:, j))**2) + pq(i, j)
       end do
    end do
 

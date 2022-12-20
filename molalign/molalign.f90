@@ -61,7 +61,7 @@ program molalign
    enan_flag = .false.
    live_flag = .false.
 
-   nrec = 1
+   nrec = 5
    maxcount = 10
    biastol = 0.35
    fmtstdin = 'xyz'

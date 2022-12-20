@@ -30,7 +30,7 @@ def molalign():
     parser.add_argument('-trials', type=int)
     parser.add_argument('-tol', type=float, default=0.35)
     parser.add_argument('-count', type=int, default=10)
-    parser.add_argument('-rec', type=int, default=1)
+    parser.add_argument('-rec', type=int, default=5)
     parser.add_argument('-out', type=str, default='xyz')
     #parser.add_argument('-live', action='store_true')
     #parser.add_argument('-stdin', action='store_true')

@@ -40,24 +40,20 @@ implicit none
 
 contains
 
-subroutine minperm(n, o, p, q, bias, perm, dist)
+subroutine minperm(n, p, q, pq, perm, dist)
 
 !   Input
 !     n  : System size
 !     p,q: Coordinate vectors (n particles)
-!     s  : Box lengths (or dummy if open B.C.)
-!     pbc: Periodic boundary conditions?
-   integer n, o
-   real(wp) p(:, :), q(:, :)
-   real(wp) bias(:, :)
-!   real(wp) s(3), sx, sy, sz, worstdist, worstradius
-!   logical pbc
+   integer n
+   real(wp) p(3, n), q(3, n)
+   real(wp) pq(n, n)
 
 !   Output
 !     perm: Permutation so that p(i) <--> q(perm(i))
 !     dist: Minimum attainable distance
 !   We have
-   integer perm(:)
+   integer perm(n)
    real(wp) dist
    
 !   Parameters
@@ -76,7 +72,7 @@ subroutine minperm(n, o, p, q, bias, perm, dist)
 !   cc(first(i)..first(i+1)-1):
 !     Matrix elements of row i
    integer first(n+1), x(n), y(n)
-   integer m, i, j, k, l, l2, a, j1, n8, sz8, t
+   integer m, i, j, j1, k, l, l2, a, n8, sz8, t
    integer(int64) u(n), v(n), d, h
    integer, allocatable :: kk(:)
    integer(int64), allocatable :: cc(:)
@@ -85,11 +81,8 @@ subroutine minperm(n, o, p, q, bias, perm, dist)
 !   Distance function
 !    real(wp) permdist
 
-!   s(1)=sx
-!   s(2)=sy
-!   s(3)=sz
    m = maxnei
-   if(n .le. maxnei) m = n
+   if (n .le. maxnei) m = n
    sz8 = m*n
    n8 = n
 
@@ -97,14 +90,13 @@ subroutine minperm(n, o, p, q, bias, perm, dist)
       first(i+1) = i*m + 1
    end do
 
-   if(m .eq. n) then
+   if (m .eq. n) then
 
-!   Compute the full matrix...
-
+!  Compute the full matrix...
       do i=1,n
-         k = first(i)-1
+         k = first(i) - 1
          do j=1,n
-            cc(k+j) = int((sum((p(:,o+i) - q(:,o+j))**2) + bias(o+i,o+j))*scale, int64)
+            cc(k+j) = int((sum((p(:,i) - q(:,j))**2) + pq(i,j))*scale, int64)
             kk(k+j) = j
 !            write(*,*) i, j, '-->', cc(k+j)
          end do
@@ -112,21 +104,41 @@ subroutine minperm(n, o, p, q, bias, perm, dist)
 
    else
 
-!   We need to store the distances of the maxnei closeest neighbors
-!   of each particle. The following builds a heap to keep track of
-!   the maxnei closest neighbours seen so far. It might be more
-!   efficient to use quick-select instead... (This is definately
-!   true in the limit of infinite systems.)
+!  Create and maintain an ordered list, smallest to largest from kk(m*(i-1)+1:m*i) for atom i.
+!  NOTE that there is no symmetry with respect to exchange of I and J!
+!  This runs slower than the next heap algorithm.
+
+!      cc(1:m*n) = huge(1_int64)
+!      do i = 1,n
+!         k = first(i) - 1
+!         do j = 1,n
+!            d = int((sum((p(:,i) - q(:,j))**2) + pq(i,j))*scale, int64)
+!            if (d > cc(k+m)) cycle
+!            do j1 = m,2,-1
+!               if (d > cc(k+j1-1)) exit
+!               cc(k+j1) = cc(k+j1-1)
+!               kk(k+j1) = kk(k+j1-1)
+!            end do
+!            cc(k+j1) = d
+!            kk(k+j1) = j
+!         end do
+!      end do
+
+!  We need to store the distances of the maxnei closeest neighbors
+!  of each particle. The following builds a heap to keep track of
+!  the maxnei closest neighbours seen so far. It might be more
+!  efficient to use quick-select instead... (This is definately
+!  true in the limit of infinite systems.)
 
       do i=1,n
-         k = first(i)-1
+         k = first(i) - 1
          do j=1,m
-            cc(k+j) = int((sum((p(:,o+i) - q(:,o+j))**2) + bias(o+i,o+j))*scale, int64)
+            cc(k+j) = int((sum((p(:,i) - q(:,j))**2) + pq(i,j))*scale, int64)
             kk(k+j) = j
             l = j
-10             if(l .le. 1) goto 11
+10             if (l .le. 1) goto 11
             l2 = l/2
-            if(cc(k+l2) .lt. cc(k+l)) then
+            if (cc(k+l2) .lt. cc(k+l)) then
                h = cc(k+l2)
                cc(k+l2) = cc(k+l)
                cc(k+l) = h
@@ -136,22 +148,21 @@ subroutine minperm(n, o, p, q, bias, perm, dist)
                l = l2
                goto 10
             end if
-11          end do
-         
+11       end do
          do j=m+1,n
-            d = int((sum((p(:,o+i) - q(:,o+j))**2) + bias(o+i,o+j))*scale, int64)
-            if(d .lt. cc(k+1)) then
+            d = int((sum((p(:,i) - q(:,j))**2) + pq(i,j))*scale, int64)
+            if (d .lt. cc(k+1)) then
                cc(k+1) = d
                kk(k+1) = j
                l = 1
 20                l2 = 2*l
-               if(l2+1 .gt. m) goto 21
-               if(cc(k+l2+1) .gt. cc(k+l2)) then
+               if (l2+1 .gt. m) goto 21
+               if (cc(k+l2+1) .gt. cc(k+l2)) then
                   a = k+l2+1
                else
                   a = k+l2
                end if
-               if(cc(a) .gt. cc(k+l)) then
+               if (cc(a) .gt. cc(k+l)) then
                   h = cc(a)
                   cc(a) = cc(k+l)
                   cc(k+l) = h
@@ -183,20 +194,20 @@ subroutine minperm(n, o, p, q, bias, perm, dist)
 !   Call bipartite matching routine
    call jovosap(n8, sz8, cc, kk, first, x, y, u, v, h)
 
-   if(h .lt. 0) then
+   if (h .lt. 0) then
 !   If initial guess correct, deduce solution distance
 !   which is not done in jovosap
       h = 0
       do i=1,n
          j = first(i)
- 30         if (j.gt.n*maxnei) then
+30       if (j.gt.n*maxnei) then
 !            print '(a,i6,a)','minperm> warning a - matching failed'
-            do J1=1,n
-               perm(J1)=J1
+            do j1=1,n
+               perm(j1)=j1
             end do
             return
          end if
-         if(kk(j) .ne. x(i)) then
+         if (kk(j) .ne. x(i)) then
             j = j + 1
             goto 30
          end if
@@ -211,18 +222,6 @@ subroutine minperm(n, o, p, q, bias, perm, dist)
    end do
 
    dist = real(h, wp) / scale
-
-!    WORSTDIST=-1.0D0
-!    DO I=1,N
-!      DUMMY=(p(3*(i-1)+1)-q(3*(perm(i)-1)+1))**2+(p(3*(i-1)+2)-q(3*(perm(i)-1)+2))**2+(p(3*(i-1)+3)-q(3*(perm(i)-1)+3))**2
-!       IF (DUMMY.GT.WORSTDIST) THEN
-!          WORSTDIST=DUMMY 
-!          WORSTRADIUS=p(3*(i-1)+1)**2+p(3*(i-1)+2)**2+p(3*(i-1)+3)**2
-!       ENDIF
-!    ENDDO
-!    WORSTDIST=SQRT(WORSTDIST)
-!    WORSTRADIUS=MAX(SQRT(WORSTRADIUS),1.0D0)
-!    RETURN
 
 end subroutine
    

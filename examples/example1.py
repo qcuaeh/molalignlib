@@ -32,7 +32,6 @@ assignments = Assignment(atoms0, atoms1, biasing=True, iteration=True, stats=Tru
 # write the aligned coordinates to a file
 for i, mapping in enumerate(assignments, start=1):
     alignment = Alignment(atoms0, atoms1[mapping])
-    print('rmsd{} = {:.4f}'.format(i, alignment.rmsd))
     write('aligned_{}.xyz'.format(i), atoms0)
     write('aligned_{}.xyz'.format(i), alignment.align(atoms1[mapping]), append=True)
 

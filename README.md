@@ -12,8 +12,8 @@ near-congruence problem for atom clusters.
 Before installing
 -----------------
 
-You will need a modern Fortran compiler and LAPACK to build the program from source or to install the python package with pip. It is
-recommended to use your package manager to install them:
+You will need a modern Fortran compiler and LAPACK to build the program from source, and additionally Python 3 to use
+the python interface. It is recommended to install gfortran and LAPACK with your package manager:
 
 in RHEL or Fedora use *yum*
 
@@ -26,7 +26,7 @@ and in Debian, Ubuntu, etc. use *apt*
 Install molalign with pip
 ----------------------------
 
-The python library only supports Python 3 so make sure that you are using the right version of *pip*:
+The Python library only supports Python 3 so make sure that you are using the right version of *pip*:
 
     pip3 install molalign
 
@@ -56,14 +56,14 @@ These options are supported by both, the native executable and the python script
 
 <code>-sort</code> Sort atoms by optimal assignment.  
 <code>-fast</code> Enable biasing and iterative convergence.  
-<code>-tol *TOL*</code> Set biasing tolerance to *TOL* (defaults to 0.35 Å).  
-<code>-count *N*</code> Set count threshold to *N* (defaults to 10).  
 <code>-trials *N*</code> Set maximum number of trials to *N*.  
-<code>-rec *N*</code> Set number of recorded solutions to *N* (defaults to 1).  
+<code>-count *N*</code> Set count threshold to *N* (defaults to 10).  
+<code>-tol *TOL*</code> Set biasing tolerance to *TOL* (defaults to 0.35 Å).  
 <code>-out *EXT*</code> Set output file format to *EXT* (defaults to *xyz*).  
-<code>-test</code> Generate the same sequence of random numbers on every run.  
+<code>-rec *N*</code> Record up to *N* assignments (defaults to 5).  
+<code>-stats</code> Print detailed statistics of the calculation.  
+<code>-enan</code> Align with enantiomer (mirrored coordinates).  
 <code>-mass</code> Use mass weighted coordinates.  
-<code>-enan</code> Use mirrored coordinates.  
 
 These options are only supported by the native executable:
 
@@ -104,46 +104,33 @@ can be useful to report more than one assignment using the `-rec` option.
 
 To avoid too long computations the `-trials` option can be used to stop the computation if the number of trials exceeds *N*.
 
-To have reproducible results use the option `-test`, which will force the generation of the same stream of random numbers on every run.
-
 Examples
 --------
 
-To reproduce exactly the same output as in these examples include the option `-test`.
+Notice than whe the `-stats` option is enabled the output will change on every run due to different seeds being used for the
+initialization of the random number generator.
 
 For small distortions the default tolerance is enough:
 
     ./build/molalign examples/Co138_0.xyz examples/Co138_1.xyz -sort -fast
-     Map    Count    Steps     Total      Real       RMSD
-    -----------------------------------------------------
-       1       10     10.0      74.4      54.5     0.0506
-    -----------------------------------------------------
+    Optimized RMSD = 0.0506
     
     ./build/molalign examples/Co138_0.xyz examples/Co138_2.xyz -sort -fast
-     Map    Count    Steps     Total      Real       RMSD
-    -----------------------------------------------------
-       1       10     14.4      84.9      65.7     0.0977
-    -----------------------------------------------------
+    Optimized RMSD = 0.0977
 
 but if the maximum distortion is larger than the tolerance then a wrong alignmnet can be obtained:
 
     ./build/molalign examples/Co138_0.xyz examples/Co138_3.xyz -sort -fast
-     Map    Count    Steps     Total      Real       RMSD
-    -----------------------------------------------------
-       1       10      1.0     133.3     133.3     2.9315
-    -----------------------------------------------------
+    Optimized RMSD = 2.9315
 
 Increasing the tolerance will fix the problem but will significatively slow the calculation:
 
     ./build/molalign examples/Co138_0.xyz examples/Co138_3.xyz -sort -fast -tol 0.69
-     Map    Count    Steps     Total      Real       RMSD
-    -----------------------------------------------------
-       1       10      2.4      15.1       8.2     0.1973
-    -----------------------------------------------------
+    Optimized RMSD = 0.1973
 
-Sometimes it is necessary to record more than one alignment due to the cluster symmetry, for example:
+Sometimes there are more than a one correct alignment due to the cluster symmetry, for example:
 
-    ./build/molalign examples/Co138_0.xyz examples/Co138_1.xyz -sort -fast -rec 5
+    ./build/molalign examples/Co138_0.xyz examples/Co138_1.xyz -sort -fast -stats
      Map    Count    Steps     Total      Real       RMSD
     -----------------------------------------------------
        1       10     10.0      74.4      54.5     0.0506
@@ -152,5 +139,9 @@ Sometimes it is necessary to record more than one alignment due to the cluster s
        4        1      2.0       8.4       7.1     0.6652
        5        1      7.0      30.5       9.8     0.6716
     -----------------------------------------------------
+    Random trials = 81
+    Optimization steps = 706
+    Visited local minima > 5
+    Optimized RMSD = 0.0506
 
 The ouput shows that there are 3 degenerated solutions due to the symmetry of the cluster.

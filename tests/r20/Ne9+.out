@@ -13,4 +13,5 @@
 -----------------------------------------------------
 Random trials = 128
 Optimization steps = 136
-Local minima = 10
+Visited local minima = 10
+Optimized RMSD = 0.1802
