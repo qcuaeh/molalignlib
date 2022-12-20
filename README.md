@@ -1,11 +1,11 @@
-MolAlign
-========
+MolAlignLib
+===========
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qcuaeh/molalign.git/HEAD?labpath=examples)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qcuaeh/molalignlib.git/HEAD?labpath=examples)
 
-MolAlign is a fortran library based on random rotations and pseudo local minimizations to reliably find solutions to the
-near-congruence problem for atom clusters.
+*molalignlib* is a fortran library based on random rotations and pseudo local minimizations to align rigid molecules and atom
+clusters and also has a Python and a command line interface.
 
 ![graphical abstract](abstract.png)
 
@@ -23,12 +23,12 @@ and in Debian, Ubuntu, etc. use *apt*
 
     apt install gfortran liblapack-dev
 
-Install molalign with pip
+Install molalignlib with pip
 ----------------------------
 
 The Python library only supports Python 3 so make sure that you are using the right version of *pip*:
 
-    pip3 install molalign
+    pip3 install molalignlib
 
 It will install the *molalign* executable in your path and the *molalignlib* python module which provides the classes *Align* and
 *Assign*:
@@ -47,7 +47,7 @@ and run:
 
     ./build.sh
 
-It will create the executable inside the *build* directory.
+It will create the *molalign* executable inside the *build* directory.
 
 Program options
 ---------------

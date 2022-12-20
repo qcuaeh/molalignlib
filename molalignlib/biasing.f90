@@ -1,4 +1,4 @@
-! MolAlign
+! MolAlignLib
 ! Copyright (C) 2022 José M. Vásquez
 
 ! This program is free software: you can redistribute it and/or modify
