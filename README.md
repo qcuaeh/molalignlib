@@ -1,10 +1,10 @@
-MolAlignLib
+molAlignLib
 ===========
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qcuaeh/molalignlib.git/HEAD?labpath=examples)
 
-*molalignlib* is a fortran library based on random rotations and pseudo local minimizations to align rigid molecules and atom
+**molAlignLib** is a fortran library based on random rotations and quasi-local RMSD minimizations to align rigid molecules and atom
 clusters and also has a Python and a command line interface.
 
 ![graphical abstract](abstract.png)

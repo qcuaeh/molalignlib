@@ -170,9 +170,9 @@ makeprog molalign
 clean_build
 
 # Run tests
-#runtests tests/r5 -test -rec 10 -sort -fast -tol 0.17
-runtests tests/r10 -test -rec 10 -sort -fast -tol 0.35
-#runtests tests/r20 -test -rec 10 -sort -fast -tol 0.69
+#runtests tests/0.05 -test -rec 10 -sort -fast -tol 0.17
+runtests tests/0.1 -test -rec 10 -sort -fast -tol 0.35
+#runtests tests/0.2 -test -rec 10 -sort -fast -tol 0.69
 
 # Build dynamic library
 #compile -pic molalignlib
