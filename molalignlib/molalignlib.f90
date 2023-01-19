@@ -38,10 +38,10 @@ subroutine assign_atoms( &
    nmap, &
    maplist, &
    countlist, &
-   dist2list, &
    error)
 
    use random
+   use arrutils
    use sorting
    use assorting
    use translation
@@ -57,7 +57,6 @@ subroutine assign_atoms( &
    integer, intent(out) :: nmap, error
    integer, intent(out) :: maplist(natom0, nrec)
    integer, intent(out) :: countlist(nrec)
-   real(wp), intent(out) :: dist2list(nrec)
    integer :: i, h, offset
    integer :: nblock0, nblock1
    integer, dimension(:), allocatable :: atomorder0, atomorder1
@@ -73,7 +72,7 @@ subroutine assign_atoms( &
    ! Abort if clusters have different number of atoms
 
    if (natom0 /= natom1) then
-      write (output_unit, '(a)') 'Error: The clusters have different number of atoms'
+      write (error_unit, '(a)') 'Error: The clusters have different number of atoms'
       error = 1
       return
    end if
@@ -92,13 +91,13 @@ subroutine assign_atoms( &
 
    ! Get inverse atom ordering
 
-   atomunorder0 = inversemap(atomorder0)
-   atomunorder1 = inversemap(atomorder1)
+   atomunorder0 = inverperm(atomorder0)
+   atomunorder1 = inverperm(atomorder1)
 
    ! Abort if clusters are not isomers
 
    if (any(znums0(atomorder0) /= znums1(atomorder1))) then
-      write (output_unit, '(a)') 'Error: The clusters are not isomers'
+      write (error_unit, '(a)') 'Error: The clusters are not isomers'
       error = 1
       return
    end if
@@ -106,7 +105,7 @@ subroutine assign_atoms( &
    ! Abort if there are conflicting types
 
    if (any(types0(atomorder0) /= types1(atomorder1))) then
-      write (output_unit, '(a)') 'Error: There are conflicting atom types'
+      write (error_unit, '(a)') 'Error: There are conflicting atom types'
       error = 1
       return
    end if
@@ -114,7 +113,7 @@ subroutine assign_atoms( &
    ! Abort if there are conflicting weights
 
    if (any(weights0(atomorder0) /= weights1(atomorder1))) then
-      write (output_unit, '(a)') 'Error: There are conflicting weights'
+      write (error_unit, '(a)') 'Error: There are conflicting weights'
       error = 1
       return
    end if
@@ -125,7 +124,7 @@ subroutine assign_atoms( &
    do h = 1, nblock0
       do i = 2, blocksize0(h)
          if (weights0(atomorder0(offset+i)) /= weights0(atomorder0(offset+1))) then
-            write (output_unit, '(a)') 'Error: Atoms of the same type must weight the same'
+            write (error_unit, '(a)') 'Error: Atoms of the same type must weight the same'
             error = 1
             return
          end if
@@ -153,8 +152,7 @@ subroutine assign_atoms( &
       weights0(atomorder0)/totalweight, &
       centered(natom0, coords0(:, atomorder0), center0), &
       centered(natom1, coords1(:, atomorder1), center1), &
-      nrec, nmap, maplist, countlist, dist2list &
-   )
+      nrec, nmap, maplist, countlist)
 
    ! Reorder back to original atom ordering
 
@@ -178,9 +176,9 @@ subroutine align_atoms( &
    weights1, &
    travec, &
    rotmat, &
-   dist2, &
    error)
 
+   use arrutils
    use sorting
    use translation
    use rotation
@@ -193,7 +191,7 @@ subroutine align_atoms( &
    real(wp), intent(in) :: weights1(natom1)
    real(wp), intent(in) :: coords0(3, natom0)
    real(wp), intent(in) :: coords1(3, natom1)
-   real(wp), intent(out) :: travec(3), rotmat(3, 3), dist2
+   real(wp), intent(out) :: travec(3), rotmat(3, 3)
    integer, intent(out) :: error
    real(wp) :: totalweight
    real(wp) :: center0(3), center1(3)
@@ -206,7 +204,7 @@ subroutine align_atoms( &
    ! Abort if clusters have different number of atoms
 
    if (natom0 /= natom1) then
-      write (output_unit, '(a)') 'Error: The clusters have different number of atoms'
+      write (error_unit, '(a)') 'Error: The clusters have different number of atoms'
       error = 1
       return
    end if
@@ -214,7 +212,7 @@ subroutine align_atoms( &
    ! Abort if clusters are not isomers
 
    if (any(sorted(znums0, natom0) /= sorted(znums1, natom1))) then
-      write (output_unit, '(a)') 'Error: The clusters are not isomers'
+      write (error_unit, '(a)') 'Error: The clusters are not isomers'
       error = 1
       return
    end if
@@ -222,7 +220,7 @@ subroutine align_atoms( &
    ! Abort if atoms are not ordered
 
    if (any(znums0 /= znums1)) then
-      write (output_unit, '(a)') 'Error: The atoms are not in the same order'
+      write (error_unit, '(a)') 'Error: The atoms are not in the same order'
       error = 1
       return
    end if
@@ -230,7 +228,7 @@ subroutine align_atoms( &
    ! Abort if there are conflicting types
 
    if (any(sorted(types0, natom0) /= sorted(types1, natom1))) then
-      write (output_unit, '(a)') 'Error: There are conflicting atom types'
+      write (error_unit, '(a)') 'Error: There are conflicting atom types'
       error = 1
       return
    end if
@@ -238,7 +236,7 @@ subroutine align_atoms( &
    ! Abort if types are not ordered
 
    if (any(types0 /= types1)) then
-      write (output_unit, '(a)') 'Error: The atom types are not in the same order'
+      write (error_unit, '(a)') 'Error: The atom types are not in the same order'
       error = 1
       return
    end if
@@ -258,8 +256,7 @@ subroutine align_atoms( &
       natom0, weights0/totalweight, &
       centered(natom0, coords0, center0), &
       centered(natom1, coords1, center1), &
-      identitymap(natom0) &
-   ))
+      idenperm(natom0)))
 
    ! Calculate optimal translation vector
 
@@ -268,7 +265,6 @@ subroutine align_atoms( &
    ! Calculate RMSD
 
    aligned1 = translated(natom1, rotated(natom1, coords1, rotmat), travec)
-   dist2 = sum(weights0/totalweight*sum((aligned1 - coords0)**2, dim=1))
 
 end subroutine
 

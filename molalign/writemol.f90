@@ -30,7 +30,7 @@ subroutine open2write(filename, unit)
 
    open(newunit=unit, file=filename, action='write', status='replace', iostat=stat)
    if (stat /= 0) then
-      write (error_unit, '(a,1x,a,1x,a)') 'Error opening', trim(filename), 'for writing'
+      write (error_unit, '(a,1x,a,1x,a)') 'Error opening', filename, 'for writing'
       stop
    end if
 
@@ -66,7 +66,7 @@ subroutine writefile(unit, fmtout, natom, title, znums, coords, opt_nbond, opt_b
    case ('mol2')
       call writemol2file(unit, natom, title, znums, coords, nbond, bonds)
    case default
-      write (error_unit, '(a,1x,a)') 'Invalid format:', trim(fmtout)
+      write (error_unit, '(a,1x,a)') 'Invalid format:', fmtout
       stop
    end select
 
@@ -80,7 +80,7 @@ subroutine writexyzfile(unit, natom, title, znums, coords)
    integer :: i
 
    write (unit, '(i0)') natom
-   write (unit, '(a)') trim(title)
+   write (unit, '(a)') title
 
    do i = 1, natom
       write (unit, '(a,3(2x,f12.6))') elsym(znums(i)), coords(:, i)
@@ -99,7 +99,7 @@ subroutine writemol2file(unit, natom, title, znums, coords, nbond, bonds)
    
    write (unit, '(a)') '@<TRIPOS>MOLECULE'
    if (title /= '') then
-      write (unit, '(a)') trim(title)
+      write (unit, '(a)') title
    else
       write (unit, '(a)') 'Untitled'
    end if

@@ -1,12 +1,10 @@
 module settings
 use parameters
-implicit none
 
+implicit none
+integer, parameter :: maxcoord = 16
 logical :: bias_flag, iter_flag, trial_flag, repro_flag, stats_flag, live_flag
 integer :: maxcount, maxtrials
-real(wp) :: biastol
-
-integer, parameter :: maxcoord = 16
-real(wp), parameter :: biascale = 1.E3
+real(wp) :: bias_tol, bias_scale
 
 end module

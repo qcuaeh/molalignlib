@@ -43,7 +43,7 @@ subroutine print_stats(overflow, nrec, nmap, ntrial, nstep)
    logical, intent(in) :: overflow
    integer, intent(in) :: nrec, nmap, ntrial, nstep
    write (output_unit, '(a,1x,i0)') 'Random trials =', ntrial
-   write (output_unit, '(a,1x,i0)') 'Optimization steps =', nstep
+   write (output_unit, '(a,1x,i0)') 'Minimization steps =', nstep
    if (overflow) then
       write (output_unit, '(a,1x,i0)') 'Visited local minima >', nrec
    else

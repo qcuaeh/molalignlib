@@ -1,4 +1,4 @@
 readmol.f90
 writemol.f90
-optparse.f90
+argparse.f90
 molalign.f90

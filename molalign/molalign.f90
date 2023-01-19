@@ -19,7 +19,7 @@ program molalign
    use parameters
    use settings
    use strutils
-   use optparse
+   use argparse
    use chemutils
    use readmol
    use writemol
@@ -33,39 +33,42 @@ program molalign
    integer :: error
    integer :: i, nmap, nrec
    integer :: natom0, natom1
-   integer :: unit, unit0, unit1
-   integer, allocatable :: maplist(:, :)
-   integer, allocatable :: countlist(:)
-   integer, allocatable, dimension(:) :: znums0, znums1, types0, types1
-   character(title_len) :: title0, title1
-   character(arg_len) :: arg, files(2), fmtstdin, fmtin0, fmtin1, fmtout
-   character(label_len), allocatable, dimension(:) :: labels0, labels1
-   real(wp) :: travec(3), rotmat(3, 3), dist2
-   real(wp), allocatable :: dist2list(:)
-   real(wp), allocatable :: weights0(:), weights1(:)
+   integer :: read_unit0, read_unit1, write_unit
+   integer, allocatable, dimension(:) :: znums0, znums1
+   integer, allocatable, dimension(:) :: types0, types1
+   integer, allocatable, dimension(:) :: countlist
+   integer, allocatable, dimension(:, :) :: maplist
+   character(:), allocatable :: arg
+   character(:), allocatable :: pathin1, pathin2, pathout
+   character(:), allocatable :: fmtin, fmtin0, fmtin1, fmtout
+   character(:), allocatable :: title0, title1
+   character(maxstrlen) :: posargs(2)
+   character(maxlblen), allocatable, dimension(:) :: labels0, labels1
+   real(wp) :: rmsd, travec(3), rotmat(3, 3)
+   real(wp), allocatable, dimension(:) :: weights0, weights1
    real(wp), dimension(:, :), allocatable :: coords0, coords1, aligned1
-   logical :: sort_flag, enan_flag, stdin_flag, save_flag
+   logical :: sort_flag, enan_flag, stdin_flag, stdout_flag
 
    procedure(f_realint), pointer :: weight_function
 
    ! Set default options
 
-   save_flag = .true.
    bias_flag = .false.
    iter_flag = .false.
    sort_flag = .false.
    trial_flag = .false.
    stdin_flag = .false.
+   stdout_flag = .false.
    repro_flag = .false.
    stats_flag = .false.
    enan_flag = .false.
    live_flag = .false.
 
-   nrec = 5
+   nrec = 1
    maxcount = 10
-   biastol = 0.35
-   fmtstdin = 'xyz'
-   fmtout = 'xyz'
+   bias_tol = 0.35
+   bias_scale = 1.e3
+   pathout = 'aligned.xyz'
 
    weight_function => unity
 
@@ -83,12 +86,10 @@ program molalign
       case ('-test')
          repro_flag = .true.
          stats_flag = .true.
-         save_flag = .false.
+         stdout_flag = .true.
+         fmtout = 'xyz'
       case ('-sort')
          sort_flag = .true.
-      case ('-fast')
-         bias_flag = .true.
-         iter_flag = .true.
       case ('-mass')
          weight_function => stdmass
       case ('-enan')
@@ -99,14 +100,23 @@ program molalign
          trial_flag = .false.
          call readoptarg(arg, maxtrials)
       case ('-tol')
-         call readoptarg(arg, biastol)
+         call readoptarg(arg, bias_tol)
+      case ('-scale')
+         call readoptarg(arg, bias_scale)
       case ('-rec')
          call readoptarg(arg, nrec)
       case ('-out')
-         call readoptarg(arg, fmtout)
+         call readoptarg(arg, pathout)
       case ('-stdin')
          stdin_flag = .true.
-         call readoptarg(arg, fmtstdin)
+         call readoptarg(arg, fmtin0)
+         call readoptarg(arg, fmtin1)
+      case ('-stdout')
+         stdout_flag = .true.
+         call readoptarg(arg, fmtout)
+      case ('-fast')
+         bias_flag = .true.
+         iter_flag = .true.
 !      case ('-bias')
 !         bias_flag = .true.
 !         iter_flag = .false.
@@ -117,35 +127,36 @@ program molalign
 !         bias_flag = .false.
 !         iter_flag = .false.
       case default
-         call readarg(arg, files)
+         call readposarg(arg, posargs)
       end select
 
    end do
 
    if (stdin_flag) then
-      unit0 = input_unit
-      unit1 = input_unit
-      fmtin0 = fmtstdin
-      fmtin1 = fmtstdin
+      read_unit0 = input_unit
+      read_unit1 = input_unit
    else
       select case (ipos)
       case (0)
          write (error_unit, '(a)') 'Error: No file paths were specified'
          stop
       case (1)
-         call open2read(files(1), unit0, fmtin0)
-         unit1 = unit0
+         pathin1 = trim(posargs(1))
+         call open2read(pathin1, read_unit0, fmtin0)
+         read_unit1 = read_unit0
          fmtin1 = fmtin0
       case (2)
-         call open2read(files(1), unit0, fmtin0)
-         call open2read(files(2), unit1, fmtin1)
+         pathin1 = trim(posargs(1))
+         pathin2 = trim(posargs(2))
+         call open2read(pathin1, read_unit0, fmtin0)
+         call open2read(pathin2, read_unit1, fmtin1)
       end select
    end if
 
    ! Read coordinates
 
-   call readfile(unit0, fmtin0, natom0, title0, labels0, coords0)
-   call readfile(unit1, fmtin1, natom1, title1, labels1, coords1)
+   call readfile(read_unit0, fmtin0, natom0, title0, labels0, coords0)
+   call readfile(read_unit1, fmtin1, natom1, title1, labels1, coords1)
 
    if (enan_flag) then
       coords1(1, :) = -coords1(1, :)
@@ -159,7 +170,6 @@ program molalign
    allocate(aligned1(3, natom1))
    allocate(maplist(natom0, nrec))
    allocate(countlist(nrec))
-   allocate(dist2list(nrec))
 
    ! Get atomic numbers, types and weights
 
@@ -172,6 +182,18 @@ program molalign
       call readlabel(labels1(i), znums1(i), types1(i))
       weights1(i) = weight_function(znums1(i))
    end do
+
+   if (stdout_flag) then
+      write_unit = output_unit
+   else
+      fmtout = baseext(pathout)
+      if (len(fmtout) > 0) then
+         call open2write(pathout, write_unit)
+      else
+         write (error_unit, '(a)') 'Error: Output file must have an extension'
+         stop
+      end if
+   end if
 
    ! Sort atoms to minimize MSD
 
@@ -192,12 +214,9 @@ program molalign
          nmap, &
          maplist, &
          countlist, &
-         dist2list, &
          error)
 
       if (error /= 0) stop
-
-      write (output_unit, '(a,1x,a)') 'Optimized RMSD =', str(sqrt(dist2list(1)))
 
       do i = 1, nmap
 
@@ -214,21 +233,20 @@ program molalign
             weights1, &
             travec, &
             rotmat, &
-            dist2, &
             error)
 
          if (error /= 0) stop
 
          aligned1 = translated(natom1, rotated(natom1, coords1, rotmat), travec)
+         rmsd = sqrt(sum(weights0*sum((aligned1(:, maplist(:, i)) - coords0)**2, dim=1))/sum(weights0))
 
-         if (save_flag) then
-
-            call open2write('aligned_'//str(i)//'.'//trim(fmtout), unit)
-            call writefile(unit, fmtout, natom0, title0, znums0, coords0)
-            call writefile(unit, fmtout, natom1, title1, znums1(maplist(:, i)), aligned1(:, maplist(:, i)))
-            close(unit)
-
+         if (i == 1) then
+            write (output_unit, '(a)') 'Optimized RMSD = ' // realstr(rmsd, 4)
+            call writefile(write_unit, fmtout, natom0, 'Reference', znums0, coords0)
          end if
+
+         call writefile(write_unit, fmtout, natom1, 'RMSD ' // realstr(rmsd, 4), znums1(maplist(:, i)), &
+            aligned1(:, maplist(:, i)))
 
       end do
 
@@ -249,22 +267,16 @@ program molalign
          weights1, &
          travec, &
          rotmat, &
-         dist2, &
          error)
 
       if (error /= 0) stop
 
       aligned1 = translated(natom1, rotated(natom1, coords1, rotmat), travec)
-      write (output_unit, '(a,1x,a)') 'RMSD =', str(sqrt(dist2))
+      rmsd = sqrt(sum(weights0*sum((aligned1 - coords0)**2, dim=1))/sum(weights0))
 
-      if (save_flag) then
-
-         call open2write('aligned.'//trim(fmtout), unit)
-         call writefile(unit, fmtout, natom0, title0, znums0, coords0)
-         call writefile(unit, fmtout, natom1, title1, znums1, aligned1) 
-         close(unit)
-
-      end if
+      write (error_unit, '(a)') 'RMSD = ' // realstr(rmsd, 4)
+      call writefile(write_unit, fmtout, natom0, 'Reference', znums0, coords0)
+      call writefile(write_unit, fmtout, natom1, 'RMSD ' // realstr(rmsd, 4), znums1, aligned1)
 
    end if
 

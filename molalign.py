@@ -14,37 +14,41 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from ase import io
+from os import path
 from argparse import ArgumentParser
-from molalignlib import Assignment, Alignment
+from ase.io import read, write
+from molalignlib import assign
 
 def molalign():
 
     parser = ArgumentParser()
+    parser.add_argument('filelist', nargs='+')
     parser.add_argument('-sort', action='store_true')
     parser.add_argument('-fast', action='store_true')
-    parser.add_argument('-test', action='store_true')
     parser.add_argument('-mass', action='store_true')
     parser.add_argument('-enan', action='store_true')
     parser.add_argument('-stats', action='store_true')
     parser.add_argument('-trials', type=int)
-    parser.add_argument('-tol', type=float, default=0.35)
-    parser.add_argument('-count', type=int, default=10)
-    parser.add_argument('-rec', type=int, default=5)
-    parser.add_argument('-out', type=str, default='xyz')
-    #parser.add_argument('-live', action='store_true')
-    #parser.add_argument('-stdin', action='store_true')
-    parser.add_argument('filelist', nargs='+')
+    parser.add_argument('-tol', type=float)
+    parser.add_argument('-scale', type=float)
+    parser.add_argument('-count', type=int)
+    parser.add_argument('-rec', type=int, default=1)
+    parser.add_argument('-out', type=str, default='aligned.xyz')
+#    parser.add_argument('-stdin', type=str)
+#    parser.add_argument('-stdout', stype=str)
+#    parser.add_argument('-live', action='store_true')
+#    parser.add_argument('-test', action='store_true')
     args = parser.parse_args()
 
     if len(args.filelist) == 1:
-        atoms0 = io.read(args.filelist[0], index=0)
-        atoms1 = io.read(args.filelist[0], index=1)
+        atoms0 = read(args.filelist[0], index=0)
+        atoms1 = read(args.filelist[0], index=1)
     elif len(args.filelist) == 2:
-        atoms0 = io.read(args.filelist[0], index=0)
-        atoms1 = io.read(args.filelist[1], index=0)
+        atoms0 = read(args.filelist[0], index=0)
+        atoms1 = read(args.filelist[1], index=0)
     else:
         print('Error: Too many files')
+        raise SystemExit
 
     if args.enan:
         atoms1.positions[:, 0] = -atoms1.positions[:, 0]
@@ -56,37 +60,39 @@ def molalign():
         biasing = False
         iteration = False
 
-    if args.test:
-        reproducible = True
-    else:
-        reproducible = False
+    if not path.splitext(args.out)[1]:
+        print('Error: Output file must have an extension')
+        raise SystemExit
 
     if args.sort:
-        assignments = Assignment(
+        assignments = assign(
             atoms0,
             atoms1,
             biasing = biasing,
             iteration = iteration,
-            reproducible = reproducible,
+            massweighted = args.mass,
             stats = args.stats,
-            rec = args.rec,
-            tol = args.tol,
+            records = args.rec,
+            tolerance = args.tol,
+            scale = args.scale,
             count = args.count,
             trials = args.trials,
-            mw = args.mass,
         )
-        print('Optimized RMSD = {:.4f}'.format(assignments.rmsdlist[0]))
-        for i, mapping in enumerate(assignments, start=1):
-            alignment = Alignment(atoms0, atoms1[mapping], mw=args.mass)
-            if not args.test:
-                io.write('aligned_{}.{ext}'.format(i, ext=args.out), atoms0)
-                io.write('aligned_{}.{ext}'.format(i, ext=args.out), alignment.align(atoms1[mapping]), append=True)
+        i = assignments.pop(0)
+        atoms2 = atoms1[i.mapping]
+        rmsd = atoms2.alignto(atoms0, massweighted=args.mass)
+        print('Optimized RMSD = {:.4f}'.format(rmsd))
+        write(args.out, atoms0, comment='Reference')
+        write(args.out, atoms2, append=True, comment='RMSD {:.4f}'.format(rmsd))
+        for i in assignments:
+            atoms2 = atoms1[i.mapping]
+            rmsd = atoms2.alignto(atoms0, massweighted=args.mass)
+            write(args.out, atoms2, append=True, comment='RMSD {:.4f}'.format(rmsd))
     else:
-        alignment = Alignment(atoms0, atoms1, mw=args.mass)
-        print('RMSD = {:.4f}'.format(alignment.rmsd))
-        if not args.test:
-            io.write('aligned.xyz', atoms0)
-            io.write('aligned.xyz', alignment.align(atoms1), append=True)
+        rmsd = atoms1.alignto(atoms0, massweighted=args.mass)
+        print('RMSD = {:.4f}'.format(rmsd))
+        write(args.out, atoms0, comment='Reference')
+        write(args.out, atoms1, append=True, comment='RMSD {:.4f}'.format(rmsd))
 
 if __name__ == '__main__':
     molalign()

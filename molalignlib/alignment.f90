@@ -98,7 +98,7 @@ subroutine kearsleymat(natom, weights, coords0, coords1, atomap, eigmat)
       q(:, i) = coords0(:, i) - coords1(:, atomap(i))
    end do
 
-! Calculate upper diagonal elements of the matrix
+! Calculate uppercase diagonal elements of the matrix
 
    do i = 1, natom
       auxmat(1, 1) = q(1, i)**2 + q(2, i)**2 + q(3, i)**2

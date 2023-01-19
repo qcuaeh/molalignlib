@@ -1,5 +1,6 @@
 parameters.f90
 settings.f90
+arrutils.f90
 strutils.f90
 lapack.f90
 rnglib.f90

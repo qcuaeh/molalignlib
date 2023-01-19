@@ -26,25 +26,25 @@ contains
 subroutine open2read(filepath, unit, fileext)
    character(*), intent(in) :: filepath
    integer, intent(out) :: unit
-   character(*), intent(out) :: fileext
-   character(len(filepath)) :: filename
+   character(:), allocatable, intent(out) :: fileext
+   character(:), allocatable :: filename
    integer :: stat
+
+   if (len(filepath) == 0) then
+      write (error_unit, '(a)') 'Error: File path is empty'
+      stop
+   end if
+
+   fileext = baseext(filepath)
+
+   if (len(fileext) == 0) then
+      write (error_unit, '(a,1x,a)') 'Missing file extension:', filepath
+      stop
+   end if
 
    open(newunit=unit, file=filepath, action='read', status='old', iostat=stat)
    if (stat /= 0) then
-      write (error_unit, '(a,1x,a,1x,a)') 'Error opening', trim(filepath), 'for reading'
-      stop
-   end if
-
-   filename = basename(filepath)
-   if (len_trim(filename) == 0) then
-      write (error_unit, '(a,1x,a)') 'Invalid file path:', trim(filepath)
-      stop
-   end if
-
-   fileext = getext(filename)
-   if (len_trim(fileext) == 0) then
-      write (error_unit, '(a,1x,a)') 'Missing file extension:', trim(filepath)
+      write (error_unit, '(a,1x,a,1x,a)') 'Error opening', filepath, 'for reading'
       stop
    end if
 
@@ -54,7 +54,7 @@ subroutine readfile(unit, fmtin, natom, title, labels, coords, opt_nbond, opt_bo
    integer, intent(in) :: unit
    character(*), intent(in) :: fmtin
    integer, intent(out) :: natom
-   character(*), intent(out) :: title
+   character(:), allocatable, intent(out) :: title
    character(*), dimension(:), allocatable, intent(out) :: labels
    real(wp), dimension(:, :), allocatable, intent(out) :: coords
    integer, optional, intent(out) :: opt_nbond
@@ -81,7 +81,7 @@ subroutine readfile(unit, fmtin, natom, title, labels, coords, opt_nbond, opt_bo
 !    case ('mol2')
 !        call readmol2file(unit, natom, title, labels, coords, nbond, bonds)
    case default
-      write (error_unit, '(a,1x,a)') 'Invalid format:', trim(fmtin)
+      write (error_unit, '(a,1x,a)') 'Invalid format:', fmtin
       stop
    end select
 
@@ -92,7 +92,8 @@ subroutine readxyzfile(unit, natom, title, labels, coords)
    integer, intent(out) :: natom
    real(wp), dimension(:, :), allocatable, intent(out) :: coords
    character(*), dimension(:), allocatable, intent(out) :: labels
-   character(*), intent(out) :: title
+   character(:), allocatable, intent(out) :: title
+   character(maxstrlen) :: buffer
    integer :: i, stat
 
    read (unit, *, iostat=stat) natom
@@ -103,7 +104,8 @@ subroutine readxyzfile(unit, natom, title, labels, coords)
 
    allocate (labels(natom), coords(3, natom))
 
-   read (unit, '(a)', iostat=stat) title
+   read (unit, '(a)', iostat=stat) buffer
+   title = trim(buffer)
    if (stat < 0) then
       write (error_unit, '(a)') 'Unexpected end of file!'
       stop

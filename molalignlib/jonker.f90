@@ -36,6 +36,7 @@
 
 module lap
 use parameters
+use arrutils
 implicit none
 
 contains
@@ -201,11 +202,13 @@ subroutine minperm(n, p, q, pq, perm, dist)
       do i=1,n
          j = first(i)
 30       if (j.gt.n*maxnei) then
+            write (error_unit, '(a)') 'Error: Assignment failed'
+            stop
 !            print '(a,i6,a)','minperm> warning a - matching failed'
-            do j1=1,n
-               perm(j1)=j1
-            end do
-            return
+!            do j1=1,n
+!               perm(j1)=j1
+!            end do
+!            return
          end if
          if (kk(j) .ne. x(i)) then
             j = j + 1
@@ -220,6 +223,11 @@ subroutine minperm(n, p, q, pq, perm, dist)
       if (perm(i).gt.n) perm(i)=n
       if (perm(i).lt.1) perm(i)=1
    end do
+
+   if (.not. isperm(perm, n)) then
+      write (error_unit, '(a)') 'Error: Assignment failed'
+      stop
+   end if
 
    dist = real(h, wp) / scale
 

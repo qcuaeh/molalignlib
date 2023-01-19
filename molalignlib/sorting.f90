@@ -24,8 +24,6 @@ private
 public sort
 public sorted
 public order
-public identitymap
-public inversemap
 
 interface sort
    module procedure intquicksort
@@ -43,26 +41,6 @@ interface order
 end interface
 
 contains
-
-! Purpose: Get an identity map
-function identitymap(n)
-   integer, intent(in) :: n
-   integer :: identitymap(n)
-   integer :: i
-   do i = 1, n
-      identitymap(i) = i
-   end do
-end function
-
-! Purpose: Get the inverse map
-function inversemap(map)
-   integer, intent(in) :: map(:)
-   integer :: inversemap(size(map))
-   integer :: i
-   do i = 1, size(map)
-      inversemap(map(i)) = i
-   end do
-end function
 
 function intsorted(x, n) result(y)
    integer, intent(in) :: n
@@ -83,16 +61,16 @@ end function
 function intorder(x, n) result(o)
    integer, intent(in) :: n
    integer, intent(in) :: x(:)
-   integer :: o(n), t((n+1)/2)
-   o = identitymap(n)
+   integer :: i, o(n), t((n+1)/2)
+   o = [(i, i=1, n)]
    call intmergesort(x, o, n, t)
 end function
 
 function charorder(x, n) result(o)
    integer, intent(in) :: n
    character(*), intent(in) :: x(:)
-   integer :: o(n), t((n+1)/2)
-   o = identitymap(n)
+   integer :: i, o(n), t((n+1)/2)
+   o = [(i, i=1, n)]
    call charmergesort(x, o, n, t)
 end function
 

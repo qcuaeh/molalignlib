@@ -129,7 +129,7 @@ runtests() {
    for file in "$testdir"/*.out; do
       name=$(basename "$file")
       echo -n Running test ${name%.out}.xyz...
-      if diff -bB <("$executable" "$testdir/${name%.out}.xyz" "$@") "$file" > /dev/null; then
+      if diff -bB <("$executable" "$testdir/${name%.out}.xyz" "$@" 2>&1) "$file" > /dev/null; then
           echo \ passed
       else
           echo \ failed
@@ -170,9 +170,9 @@ makeprog molalign
 clean_build
 
 # Run tests
-#runtests tests/0.05 -test -rec 10 -sort -fast -tol 0.17
-runtests tests/0.1 -test -rec 10 -sort -fast -tol 0.35
-#runtests tests/0.2 -test -rec 10 -sort -fast -tol 0.69
+#runtests tests/0.05 -test -rec 5 -sort -fast -tol 0.17
+runtests tests/0.1 -test -rec 5 -sort -fast -tol 0.35
+#runtests tests/0.2 -test -rec 5 -sort -fast -tol 0.69
 
 # Build dynamic library
 #compile -pic molalignlib

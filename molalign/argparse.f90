@@ -14,7 +14,7 @@
 ! You should have received a copy of the GNU General Public License
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-module optparse
+module argparse
 use parameters
 
 implicit none
@@ -22,10 +22,10 @@ integer :: iarg, ipos
 
 private
 public ipos
-public initarg
 public getarg
-public readarg
+public readposarg
 public readoptarg
+public initarg
 
 interface readoptarg
    module procedure readstroptarg
@@ -42,32 +42,35 @@ subroutine initarg()
 
 end subroutine
 
-subroutine readarg(arg, files)
-   character(arg_len), intent(in) :: arg
-   character(arg_len), intent(out) :: files(:)
+subroutine readposarg(arg, posargs)
+   character(*), intent(in) :: arg
+   character(maxstrlen), intent(out) :: posargs(:)
 
    if (arg(1:1) == '-') then
-      write (error_unit, '(a,1x,a)') 'Error: Unknown option', trim(arg)
+      write (error_unit, '(a,1x,a)') 'Unknown option:', arg
       stop
    end if
 
    ipos = ipos + 1
 
-   if (ipos > size(files)) then
-      write (error_unit, '(a)') 'Error: Too many files'
+   if (ipos > size(posargs)) then
+      write (error_unit, '(a)') 'Too many positional arguments'
       stop
    end if
 
-   files(ipos) = arg
+   posargs(ipos) = arg
 
 end subroutine
 
 logical function getarg(arg)
-   character(arg_len), intent(out) :: arg
+   character(:), allocatable, intent(out) :: arg
+   integer arglen
 
    iarg = iarg + 1
 
    if (iarg <= command_argument_count()) then
+      call get_command_argument(iarg, length=arglen)
+      allocate(character(arglen) :: arg)
       call get_command_argument(iarg, arg)
       getarg = .true.
    else
@@ -76,57 +79,62 @@ logical function getarg(arg)
 
 end function
 
-subroutine getoptarg(option, optarg)
-   character(arg_len), intent(in) :: option
-   character(arg_len), intent(out) :: optarg
+subroutine getoptarg(option, arg)
+   character(*), intent(in) :: option
+   character(:), allocatable, intent(out) :: arg
+   integer arglen
 
    iarg = iarg + 1
 
    if (iarg <= command_argument_count()) then
-      call get_command_argument(iarg, optarg)
-      if (optarg(1:1) /= '-') then
+      call get_command_argument(iarg, length=arglen)
+      allocate(character(arglen) :: arg)
+      call get_command_argument(iarg, arg)
+      if (arg(1:1) /= '-') then
          return
       end if
    end if
 
-   write (error_unit, '(a,1x,a,1x,a)') 'Option', trim(option), 'requires an argument'
+   write (error_unit, '(a,1x,a,1x,a)') 'Option', option, 'requires an argument'
    stop
 
 end subroutine
 
 subroutine readstroptarg(option, optval)
-   character(arg_len), intent(in) :: option
-   character(arg_len), intent(out) :: optval
+   character(*), intent(in) :: option
+   character(:), allocatable, intent(out) :: optval
+   character(:), allocatable :: arg 
 
-   call getoptarg(option, optval)
+   call getoptarg(option, arg)
+   optval = arg
 
 end subroutine
 
 subroutine readintoptarg(option, optval)
-   character(arg_len), intent(in) :: option
+   character(*), intent(in) :: option
    integer, intent(out) :: optval
-   character(arg_len) :: optarg
+   character(:), allocatable :: arg 
    integer :: stat
 
-   call getoptarg(option, optarg)
-   read (optarg, *, iostat=stat) optval
+   call getoptarg(option, arg)
+   read (arg, *, iostat=stat) optval
    if (stat /= 0) then
-      write (error_unit, '(a,1x,a,1x,a)') 'Option', trim(option), 'requires an integer argument'
+      write (error_unit, '(a,1x,a,1x,a)') 'Option', option, 'requires an integer argument'
       stop
    end if
 
 end subroutine
 
 subroutine readrealoptarg(option, optval)
-   character(arg_len), intent(in) :: option
+   character(*), intent(in) :: option
    real(wp), intent(out) :: optval
-   character(arg_len) :: optarg
+   character(:), allocatable :: arg 
    integer :: stat
 
-   call getoptarg(option, optarg)
-   read (optarg, *, iostat=stat) optval
+   call getoptarg(option, arg)
+   read (arg, *, iostat=stat) optval
    if (stat /= 0) then
-      write (error_unit, '(a,1x,a,1x,a)') 'Option', trim(option), 'requires a numeric argument'
+      write (error_unit, '(a,1x,a,1x,a)') 'Option', option, 'requires a numeric argument'
       stop
    end if
 

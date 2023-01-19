@@ -17,6 +17,7 @@
 module assorting
 use parameters
 use settings
+use arrutils
 use sorting
 use chemdata
 
@@ -71,21 +72,21 @@ subroutine getblocks(natom, znums, types, nblock, bsize, blockindex, atomorder)
 
    blockorder(:nblock) = order(blocktype, nblock)
    bsize(:nblock) = bsize(blockorder(:nblock))
-   blockorder(:nblock) = inversemap(blockorder(:nblock))
+   blockorder(:nblock) = inverperm(blockorder(:nblock))
    blockindex = blockorder(blockindex)
 
 ! Order blocks by atomic number
 
    blockorder(:nblock) = order(blockznum, nblock)
    bsize(:nblock) = bsize(blockorder(:nblock))
-   blockorder(:nblock) = inversemap(blockorder(:nblock))
+   blockorder(:nblock) = inverperm(blockorder(:nblock))
    blockindex = blockorder(blockindex)
 
 ! Order blocks by block size
 
 !    blockorder(:nblock) = order(bsize, nblock)
 !    bsize(:nblock) = bsize(blockorder(:nblock))
-!    blockorder(:nblock) = inversemap(blockorder(:nblock))
+!    blockorder(:nblock) = inverperm(blockorder(:nblock))
 !    blockindex = blockorder(blockindex)
 
 ! Save atom order

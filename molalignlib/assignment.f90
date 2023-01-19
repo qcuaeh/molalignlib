@@ -44,9 +44,7 @@ subroutine optimize_assignment( &
    nrec, &
    nmap, &
    maplist, &
-   countlist, &
-   dist2list &
-)
+   countlist)
 
    integer, intent(in) :: natom, nblock, nrec
    integer, dimension(:), intent(in) :: bsize
@@ -55,14 +53,13 @@ subroutine optimize_assignment( &
    integer, intent(out) :: nmap
    integer, intent(out) :: maplist(:, :)
    integer, intent(out) :: countlist(:)
-   real(wp), intent(out) :: dist2list(:)
 
    logical visited, overflow
    integer imap, ntrial, nstep, steps
    integer, dimension(natom) :: atomap, auxmap
    real(wp) :: dist2, olddist, newdist, totalrot
    real(wp), dimension(4) :: rotquat, prodquat
-   real(wp), dimension(nrec) :: avgsteps, avgtotalrot, avgrealrot
+   real(wp), dimension(nrec) :: dist2rec, avgsteps, avgtotalrot, avgrealrot
    real(wp) :: bias(natom, natom)
    real(wp) :: workcoords1(3, natom)
 
@@ -73,7 +70,7 @@ subroutine optimize_assignment( &
 ! Print header and initial stats
 
    if (stats_flag .and. live_flag) then
-      write (output_unit, '(a)', advance='no') achar(27)//'[1H'//achar(27)//'[J'
+      write (error_unit, '(a)', advance='no') achar(27) // '[1H' // achar(27) // '[J'
       call print_header()
    end if
 
@@ -97,7 +94,7 @@ subroutine optimize_assignment( &
 
 ! Aply a random rotation to workcoords1
 
-      call rotate(natom, workcoords1, torotquat(rand3()))
+      call rotate(natom, workcoords1, genrotquat(rand3()))
 
 ! Minimize the euclidean distance
 
@@ -114,7 +111,7 @@ subroutine optimize_assignment( &
          call minatomap(natom, coords0, workcoords1, nblock, bsize, bias, weights, auxmap, newdist)
          if (all(auxmap == atomap)) exit
          if (newdist > olddist) then
-            write (output_unit, '(a)') 'newdist is larger than olddist!'
+            write (error_unit, '(a)') 'newdist is larger than olddist!'
 !            print *, olddist, newdist
          end if
          rotquat = leastrotquat(natom, weights, coords0, workcoords1, auxmap)
@@ -140,9 +137,9 @@ subroutine optimize_assignment( &
             avgrealrot(imap) = avgrealrot(imap) + (rotangle(prodquat) - avgrealrot(imap))/countlist(imap)
             avgtotalrot(imap) = avgtotalrot(imap) + (totalrot - avgtotalrot(imap))/countlist(imap)
             if (stats_flag .and. live_flag) then
-               write (output_unit, '(a)', advance='no') achar(27)//'['//str(imap+2)//'H'
+               write (error_unit, '(a)', advance='no') achar(27) // '[' // intstr(imap + 2) // 'H'
                call print_body(imap, countlist(imap), avgsteps(imap), avgtotalrot(imap), &
-                  avgrealrot(imap), dist2list(imap))
+                  avgrealrot(imap), dist2rec(imap))
             end if
             visited = .true.
             exit
@@ -154,37 +151,37 @@ subroutine optimize_assignment( &
             nmap = nmap + 1
          else
             overflow = .true.
-            if (dist2 > dist2list(nmap)) cycle
+            if (dist2 > dist2rec(nmap)) cycle
          end if
          do imap = nmap, 2, -1
-            if (dist2 > dist2list(imap - 1)) exit
+            if (dist2 > dist2rec(imap - 1)) exit
             maplist(:, imap) = maplist(:, imap - 1)
             countlist(imap) = countlist(imap - 1)
-            dist2list(imap) = dist2list(imap - 1)
+            dist2rec(imap) = dist2rec(imap - 1)
             avgsteps(imap) = avgsteps(imap - 1)
             avgrealrot(imap) = avgrealrot(imap - 1)
             avgtotalrot(imap) = avgtotalrot(imap - 1)
             if (stats_flag .and. live_flag) then
-               write (output_unit, '(a)', advance='no') achar(27)//'['//str(imap + 2)//'H'
+               write (error_unit, '(a)', advance='no') achar(27) // '[' // intstr(imap + 2) // 'H'
                call print_body(imap, countlist(imap), avgsteps(imap), avgtotalrot(imap), &
-                  avgrealrot(imap), dist2list(imap))
+                  avgrealrot(imap), dist2rec(imap))
             end if
          end do
          maplist(:, imap) = atomap
          countlist(imap) = 1
-         dist2list(imap) = dist2
+         dist2rec(imap) = dist2
          avgsteps(imap) = steps
          avgrealrot(imap) = rotangle(prodquat)
          avgtotalrot(imap) = totalrot
          if (stats_flag .and. live_flag) then
-            write (output_unit, '(a)', advance='no') achar(27)//'['//str(imap + 2)//'H'
+            write (error_unit, '(a)', advance='no') achar(27) // '[' // intstr(imap + 2) // 'H'
             call print_body(imap, countlist(imap), avgsteps(imap), avgtotalrot(imap), &
-               avgrealrot(imap), dist2list(imap))
+               avgrealrot(imap), dist2rec(imap))
          end if
       end if
 
       if (stats_flag .and. live_flag) then
-         write (output_unit, '(a)', advance='no') achar(27)//'['//str(nmap + 3)//'H'
+         write (error_unit, '(a)', advance='no') achar(27) // '[' // intstr(nmap + 3) // 'H'
          call print_footer()
       end if
 
@@ -194,7 +191,7 @@ subroutine optimize_assignment( &
       call print_header()
       do imap = 1, nmap
          call print_body(imap, countlist(imap), avgsteps(imap), avgtotalrot(imap), &
-            avgrealrot(imap), dist2list(imap))
+            avgrealrot(imap), dist2rec(imap))
       end do
       call print_footer()
    end if

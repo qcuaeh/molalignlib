@@ -63,8 +63,8 @@ subroutine setadjbias(natom, nblock, bsize, coords0, coords1, bias)
       do h = 1, nblock
          do i = offset + 1, offset + bsize(h)
             do j = offset + 1, offset + bsize(h)
-               if (any(abs(d1(:, j) - d0(:, i)) > biastol)) then
-                  bias(i, j) = biascale**2
+               if (any(abs(d1(:, j) - d0(:, i)) > bias_tol)) then
+                  bias(i, j) = bias_scale**2
                end if
             end do
          end do

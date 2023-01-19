@@ -6,7 +6,7 @@
 
 # Import modules
 from ase.io import read, write
-from molalignlib import Assignment, Alignment
+from molalignlib import assign
 
 
 # In[ ]:
@@ -20,18 +20,17 @@ atoms1 = read('Co138_1.xyz', index=0)
 # In[ ]:
 
 
-# Create an assignment object between atoms0 and atoms1,
-# enable biasing and iteration and record up to 5 assignments
-assignments = Assignment(atoms0, atoms1, biasing=True, iteration=True, stats=True, rec=5)
+# Find the 5 best assignments between atoms0 and atoms1 using biasing and iteration
+assignments = assign(atoms0, atoms1, biasing=True, iteration=True, stats=True, records=5)
 
 
 # In[ ]:
 
 
-# Align atoms1 to atoms0 for each assignment and
-# write the aligned coordinates to a file
-for i, mapping in enumerate(assignments, start=1):
-    alignment = Alignment(atoms0, atoms1[mapping])
-    write('aligned_{}.xyz'.format(i), atoms0)
-    write('aligned_{}.xyz'.format(i), alignment.align(atoms1[mapping]), append=True)
+# Align atoms1 to atoms0 for each assignment and write the aligned coordinates to a file
+write('aligned.xyz', atoms0, comment='Reference')
+for i in assignments:
+    atoms2 = atoms1[i.mapping]
+    rmsd = atoms2.alignto(atoms0)
+    write('aligned.xyz', atoms2, append=True, comment='RMSD {:.4f}'.format(rmsd))
 

@@ -58,7 +58,7 @@ subroutine readlabel(label, znum, type)
    integer :: m, n
 
    n = len_trim(label)
-   m = verify(upper(trim(label)), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+   m = verify(uppercase(trim(label)), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ')
 
    if (m == 0) then
       type = 0
@@ -78,12 +78,12 @@ function atomic_number(symbol) result(z)
    integer :: z
 
    do z = 1, nelem
-      if (upper(symbol) == upper(elsym(z))) then
+      if (uppercase(symbol) == uppercase(elsym(z))) then
          return
       end if
    end do
 
-   select case (upper(symbol))
+   select case (uppercase(symbol))
    case ('LJ')
       z = 1001
    case default
