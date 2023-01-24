@@ -72,7 +72,7 @@ subroutine minperm(n, p, q, pq, perm, dist)
 !     Column indexes of existing elements in row i
 !   cc(first(i)..first(i+1)-1):
 !     Matrix elements of row i
-   integer first(n+1), x(n), y(n)
+   integer first(n+1), y(n)
    integer m, i, j, j1, k, l, l2, a, n8, sz8, t
    integer(int64) u(n), v(n), d, h
    integer, allocatable :: kk(:)
@@ -193,7 +193,7 @@ subroutine minperm(n, p, q, pq, perm, dist)
    end if
 
 !   Call bipartite matching routine
-   call jovosap(n8, sz8, cc, kk, first, x, y, u, v, h)
+   call jovosap(n8, sz8, cc, kk, first, perm, y, u, v, h)
 
    if (h .lt. 0) then
 !   If initial guess correct, deduce solution distance
@@ -210,19 +210,13 @@ subroutine minperm(n, p, q, pq, perm, dist)
 !            end do
 !            return
          end if
-         if (kk(j) .ne. x(i)) then
+         if (kk(j) .ne. perm(i)) then
             j = j + 1
             goto 30
          end if
          h = h + cc(j)
       end do
    end if
-
-   do i=1,n
-      perm(i) = int(x(i))
-      if (perm(i).gt.n) perm(i)=n
-      if (perm(i).lt.1) perm(i)=1
-   end do
 
    if (.not. isperm(perm, n)) then
       write (error_unit, '(a)') 'Error: Assignment failed'

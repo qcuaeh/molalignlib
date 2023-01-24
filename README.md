@@ -1,10 +1,10 @@
-molAlignLib
+MolAlignLib
 ===========
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qcuaeh/molalignlib.git/HEAD?labpath=examples)
 
-**molAlignLib** is a fortran library based on random rotations and quasi-local RMSD minimizations to align rigid molecules and atom
+**MolAlignLib** is a fortran library based on random rotations and quasi-local RMSD minimizations to align rigid molecules and atom
 clusters. It includes a command line and a Python interface.
 
 ![graphical abstract](abstract.png)
@@ -93,8 +93,8 @@ Advanced usage
 --------------
 
 The performance of the computation when sorting is requested can be greatly improved by enabling biasing and iteration with the
-`-fast` option, however if the tolerance is set too small it will make the assignment fail. In such cases increase the tolerance
-with the `-tol` option from the default of 0.35 Å to a value larger than the maximum expected displacement of the atoms.
+`-fast` option, however if the tolerance is set too small it will make the assignment fail. In such cases the tolerance must be
+increased with the `-tol` option to a value larger than the maximum expected displacement of the atoms.
 
 By default a threshold of 10 counts is used to stop the computation, reducing this threshold with the `-count` option will
 proportionally reduce the computation time but the probability of obtaining suboptimal assignmnets will increase. To avoid too

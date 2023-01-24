@@ -4,7 +4,7 @@ arrutils.f90
 strutils.f90
 lapack.f90
 rnglib.f90
-jonker.f90
+lap-jv.f90
 #munkres.f90
 math.f90
 random.f90
