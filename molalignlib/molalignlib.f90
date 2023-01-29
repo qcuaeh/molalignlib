@@ -34,29 +34,29 @@ subroutine assign_atoms( &
    types1, &
    coords1, &
    weights1, &
+   maxrec, &
    nrec, &
-   nmap, &
-   maplist, &
+   permlist, &
    countlist, &
    error)
 
    use random
-   use arrutils
+   use discrete
    use sorting
    use assorting
    use translation
    use assignment
 
-   integer, intent(in) :: natom0, natom1, nrec
+   integer, intent(in) :: natom0, natom1, maxrec
    integer, dimension(natom0), intent(in) :: znums0, types0
    integer, dimension(natom1), intent(in) :: znums1, types1
    real(wp), intent(in) :: coords0(3, natom0)
    real(wp), intent(in) :: coords1(3, natom1)
    real(wp), intent(in) :: weights0(natom0)
    real(wp), intent(in) :: weights1(natom1)
-   integer, intent(out) :: nmap, error
-   integer, intent(out) :: maplist(natom0, nrec)
-   integer, intent(out) :: countlist(nrec)
+   integer, intent(out) :: nrec, error
+   integer, intent(out) :: permlist(natom0, maxrec)
+   integer, intent(out) :: countlist(maxrec)
    integer :: i, h, offset
    integer :: nblock0, nblock1
    integer, dimension(:), allocatable :: atomorder0, atomorder1
@@ -91,8 +91,8 @@ subroutine assign_atoms( &
 
    ! Get inverse atom ordering
 
-   atomunorder0 = inverperm(atomorder0)
-   atomunorder1 = inverperm(atomorder1)
+   atomunorder0 = inverseperm(atomorder0)
+   atomunorder1 = inverseperm(atomorder1)
 
    ! Abort if clusters are not isomers
 
@@ -152,12 +152,12 @@ subroutine assign_atoms( &
       weights0(atomorder0)/totalweight, &
       centered(natom0, coords0(:, atomorder0), center0), &
       centered(natom1, coords1(:, atomorder1), center1), &
-      nrec, nmap, maplist, countlist)
+      maxrec, nrec, permlist, countlist)
 
    ! Reorder back to original atom ordering
 
-   do i = 1, nmap
-      maplist(:, i) = atomorder1(maplist(atomunorder0, i))
+   do i = 1, nrec
+      permlist(:, i) = atomorder1(permlist(atomunorder0, i))
    end do
 
 end subroutine
@@ -178,7 +178,7 @@ subroutine align_atoms( &
    rotmat, &
    error)
 
-   use arrutils
+   use discrete
    use sorting
    use translation
    use rotation
@@ -256,7 +256,7 @@ subroutine align_atoms( &
       natom0, weights0/totalweight, &
       centered(natom0, coords0, center0), &
       centered(natom1, coords1, center1), &
-      idenperm(natom0)))
+      identityperm(natom0)))
 
    ! Calculate optimal translation vector
 

@@ -1,21 +1,30 @@
+! MolAlignLib
+! Copyright (C) 2022 José M. Vásquez
+
 ! GMIN: A program for finding global minima
 ! Copyright (C) 1999-2006 David J. Wales
-! This file is part of GMIN.
-!
-! GMIN is free software; you can redistribute it and/or modify
+
+! This program is free software: you can redistribute it and/or modify
 ! it under the terms of the GNU General Public License as published by
-! the Free Software Foundation; either version 2 of the License, or
+! the Free Software Foundation, either version 3 of the License, or
 ! (at your option) any later version.
-!
-! GMIN is distributed in the hope that it will be useful,
+
+! This program is distributed in the hope that it will be useful,
 ! but WITHOUT ANY WARRANTY; without even the implied warranty of
 ! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 ! GNU General Public License for more details.
-!
+
 ! You should have received a copy of the GNU General Public License
-! along with this program; if not, write to the Free Software
-! Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-!
+! along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+module lap
+use parameters
+implicit none
+
+contains
+
+subroutine minperm(n, p, q, pq, perm, dist)
+
 !   Interface to spjv.f for calculating minimum distance
 !   of two atomic configurations with respect to
 !   particle permutations.
@@ -34,18 +43,10 @@
 !   i.e.
 !     sum(i=1,n) permdist(p(i), q(perm(i))) == dist
 
-module lap
-use parameters
-use arrutils
-implicit none
-
-contains
-
-subroutine minperm(n, p, q, pq, perm, dist)
-
 !   Input
 !     n  : System size
 !     p,q: Coordinate vectors (n particles)
+
    integer n
    real(wp) p(3, n), q(3, n)
    real(wp) pq(n, n)
@@ -87,16 +88,16 @@ subroutine minperm(n, p, q, pq, perm, dist)
    sz8 = m*n
    n8 = n
 
-   do i=0,n
+   do i = 0,n
       first(i+1) = i*m + 1
    end do
 
    if (m .eq. n) then
 
 !  Compute the full matrix...
-      do i=1,n
+      do i = 1,n
          k = first(i) - 1
-         do j=1,n
+         do j = 1,n
             cc(k+j) = int((sum((p(:,i) - q(:,j))**2) + pq(i,j))*scale, int64)
             kk(k+j) = j
 !            write(*,*) i, j, '-->', cc(k+j)
@@ -131,9 +132,9 @@ subroutine minperm(n, p, q, pq, perm, dist)
 !  efficient to use quick-select instead... (This is definately
 !  true in the limit of infinite systems.)
 
-      do i=1,n
+      do i = 1,n
          k = first(i) - 1
-         do j=1,m
+         do j = 1,m
             cc(k+j) = int((sum((p(:,i) - q(:,j))**2) + pq(i,j))*scale, int64)
             kk(k+j) = j
             l = j
@@ -150,7 +151,7 @@ subroutine minperm(n, p, q, pq, perm, dist)
                goto 10
             end if
 11       end do
-         do j=m+1,n
+         do j = m+1,n
             d = int((sum((p(:,i) - q(:,j))**2) + pq(i,j))*scale, int64)
             if (d .lt. cc(k+1)) then
                cc(k+1) = d
@@ -199,16 +200,11 @@ subroutine minperm(n, p, q, pq, perm, dist)
 !   If initial guess correct, deduce solution distance
 !   which is not done in jovosap
       h = 0
-      do i=1,n
+      do i = 1,n
          j = first(i)
 30       if (j.gt.n*maxnei) then
             write (error_unit, '(a)') 'Error: Assignment failed'
             stop
-!            print '(a,i6,a)','minperm> warning a - matching failed'
-!            do j1=1,n
-!               perm(j1)=j1
-!            end do
-!            return
          end if
          if (kk(j) .ne. perm(i)) then
             j = j + 1
@@ -218,41 +214,30 @@ subroutine minperm(n, p, q, pq, perm, dist)
       end do
    end if
 
-   if (.not. isperm(perm, n)) then
-      write (error_unit, '(a)') 'Error: Assignment failed'
-      stop
-   end if
+!  Test if perm is a valid permutation
+   do i = 1,n
+      do j = 1,n
+         if (perm(j) == i) exit
+      end do
+      if (j == n + 1) then
+         write (error_unit, '(a)') 'Error: Assignment failed'
+         stop
+      end if
+   end do
 
    dist = real(h, wp) / scale
 
 end subroutine
    
-!   The following routine performs weighted bipartite matching for
-!   for a sparse non-negative integer weight matrix.
-!   The original source is
-!       http://www.magiclogic.com/assignment.html
-!   A publication reference can be found on the above homepage and
-!   in a comment below
-!   
-
 subroutine jovosap(n,sz,cc,kk,first,x,y,u,v,h)
-   integer n,sz
-   integer kk(sz),first(n+1),x(n),y(n)
-   integer i,i0,j,j0,j1,k,l,l0,t,t0,td,cnt
-   integer lab(n),free(n),todo(n)
-   integer(int64) cc(sz),u(n),v(n),d(n)
-   integer(int64) h,v0,vj,dj,min,bigint
-   logical ok(n)
 
-!   I don't know how to make g77 read integer*8 constants/parameters.
-!     PARAMETER (BIGINT = 10**12) does not work(!)
-!   nor does
-!     PARAMETER (BIGINT = 1000000000000)
-!   but this seems to be ok:
-   bigint = 10**9
-   bigint = bigint * 1000
+! This subroutine performs weighted bipartite matching for
+! for a sparse non-negative integer weight matrix.
+! The original source is
+!     http://www.magiclogic.com/assignment.html
+! A publication reference can be found on the above homepage and
+! in a comment below
 
-!
 ! THIS SUBROUTINE SOLVES THE SPARSE LINEAR ASSIGNMENT PROBLEM
 ! ACCORDING 
 !
@@ -262,28 +247,35 @@ subroutine jovosap(n,sz,cc,kk,first,x,y,u,v,h)
 ! by
 ! 
 ! R. Jonker and A. Volgenant, University of Amsterdam.
-!
-!
+
 ! INPUT PARAMETERS :
 ! N = NUMBER OF ROWS AND COLUMNS
 ! C = WEIGHT MATRIX
-!
+
 ! OUTPUT PARAMETERS
 ! X = COL ASSIGNED TO ROW
 ! Y = ROW ASSIGNED TO COL
 ! U = DUAL ROW VARIABLE
 ! V = DUAL COLUMN VARIABLE
 ! H = VALUE OF OPTIMAL SOLUTION
-!
+
 ! INITIALIZATION
 
 !   Next line added by tomaso@nada.kth.se, to enable detection
 !   of solutions being equivalent to the initial guess
 
-!
 ! If Y(:) is initialised to zero then we see segmentation faults if 
 ! a Y element is unset, etc.
-!
+
+   integer n,sz
+   integer kk(sz),first(n+1),x(n),y(n)
+   integer i,i0,j,j0,j1,k,l,l0,t,t0,td,cnt
+   integer lab(n),free(n),todo(n)
+   integer(int64) cc(sz),u(n),v(n),d(n)
+   integer(int64) h,v0,vj,dj,min
+   logical ok(n)
+
+   integer(int64), parameter :: bigint = 1000000000000_int64
 
    y(1:n) = 0
    x(1:n) = 0

@@ -205,7 +205,7 @@ function genrotmat(x) result(rotmat)
 
    rotmat = matmul(left, right)
 
-!    print *, det33(rotmat)
+!    print *, det3(rotmat)
 
 end function
 

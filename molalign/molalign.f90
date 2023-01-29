@@ -31,13 +31,13 @@ program molalign
    implicit none
 
    integer :: error
-   integer :: i, nmap, nrec
+   integer :: i, nrec, maxrec
    integer :: natom0, natom1
    integer :: read_unit0, read_unit1, write_unit
    integer, allocatable, dimension(:) :: znums0, znums1
    integer, allocatable, dimension(:) :: types0, types1
    integer, allocatable, dimension(:) :: countlist
-   integer, allocatable, dimension(:, :) :: maplist
+   integer, allocatable, dimension(:, :) :: permlist
    character(:), allocatable :: arg
    character(:), allocatable :: pathin1, pathin2, pathout
    character(:), allocatable :: fmtin, fmtin0, fmtin1, fmtout
@@ -64,7 +64,7 @@ program molalign
    enan_flag = .false.
    live_flag = .false.
 
-   nrec = 1
+   maxrec = 1
    maxcount = 10
    bias_tol = 0.35
    bias_scale = 1.e3
@@ -104,7 +104,7 @@ program molalign
       case ('-scale')
          call readoptarg(arg, bias_scale)
       case ('-rec')
-         call readoptarg(arg, nrec)
+         call readoptarg(arg, maxrec)
       case ('-out')
          call readoptarg(arg, pathout)
       case ('-stdin')
@@ -168,8 +168,8 @@ program molalign
    allocate(types0(natom0), types1(natom1))
    allocate(weights0(natom0), weights1(natom1))
    allocate(aligned1(3, natom1))
-   allocate(maplist(natom0, nrec))
-   allocate(countlist(nrec))
+   allocate(permlist(natom0, maxrec))
+   allocate(countlist(maxrec))
 
    ! Get atomic numbers, types and weights
 
@@ -210,15 +210,15 @@ program molalign
          types1, &
          coords1, &
          weights1, &
+         maxrec, &
          nrec, &
-         nmap, &
-         maplist, &
+         permlist, &
          countlist, &
          error)
 
       if (error /= 0) stop
 
-      do i = 1, nmap
+      do i = 1, nrec
 
          call align_atoms( &
             natom0, &
@@ -227,9 +227,9 @@ program molalign
             coords0, &
             weights0, &
             natom1, &
-            znums1(maplist(:, i)), &
-            types1(maplist(:, i)), &
-            coords1(:, maplist(:, i)), &
+            znums1(permlist(:, i)), &
+            types1(permlist(:, i)), &
+            coords1(:, permlist(:, i)), &
             weights1, &
             travec, &
             rotmat, &
@@ -238,15 +238,15 @@ program molalign
          if (error /= 0) stop
 
          aligned1 = translated(natom1, rotated(natom1, coords1, rotmat), travec)
-         rmsd = sqrt(sum(weights0*sum((aligned1(:, maplist(:, i)) - coords0)**2, dim=1))/sum(weights0))
+         rmsd = sqrt(sum(weights0*sum((aligned1(:, permlist(:, i)) - coords0)**2, dim=1))/sum(weights0))
 
          if (i == 1) then
             write (output_unit, '(a)') 'Optimized RMSD = ' // realstr(rmsd, 4)
             call writefile(write_unit, fmtout, natom0, 'Reference', znums0, coords0)
          end if
 
-         call writefile(write_unit, fmtout, natom1, 'RMSD ' // realstr(rmsd, 4), znums1(maplist(:, i)), &
-            aligned1(:, maplist(:, i)))
+         call writefile(write_unit, fmtout, natom1, 'RMSD ' // realstr(rmsd, 4), znums1(permlist(:, i)), &
+            aligned1(:, permlist(:, i)))
 
       end do
 

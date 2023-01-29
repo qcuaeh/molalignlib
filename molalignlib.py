@@ -22,11 +22,11 @@ from molalignlibext import settings, library
 #print(library.assign_atoms.__doc__)
 
 class Assignment:
-    def __init__(self, count, mapping):
+    def __init__(self, count, order):
         self.count = count
-        self.mapping = mapping
+        self.order = order
 
-def assign(
+def assign_atoms(
     atoms0,
     atoms1,
     biasing = None,
@@ -107,7 +107,7 @@ def assign(
     znums1 = atoms1.get_atomic_numbers()
     types1 = np.ones(len(atoms1), dtype=np.int32)
     coords1 = atoms1.positions.T # Convert to column-major order
-    nmap, maplist, countlist, error = \
+    nrec, permlist, countlist, error = \
         library.assign_atoms(
             znums0,
             types0,
@@ -121,9 +121,9 @@ def assign(
         )
     if error:
         raise RuntimeError('Assignment failed')
-    return [Assignment(countlist[i], maplist[:, i] - 1) for i in range(nmap)]
+    return [Assignment(countlist[i], permlist[:, i] - 1) for i in range(nrec)]
 
-def alignto(self, other, massweighted=None):
+def align_to(self, other, massweighted=None):
     if not isinstance(other, Atoms):
         raise TypeError('An Atoms object was expected')
     if massweighted is None:
@@ -161,4 +161,4 @@ def alignto(self, other, massweighted=None):
     return rmsd
 
 # Monkey patch Atoms class
-Atoms.alignto = alignto
+Atoms.align_to = align_to

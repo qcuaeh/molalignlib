@@ -17,7 +17,7 @@
 from os import path
 from argparse import ArgumentParser
 from ase.io import read, write
-from molalignlib import assign
+from molalignlib import assign_atoms
 
 def molalign():
 
@@ -65,7 +65,7 @@ def molalign():
         raise SystemExit
 
     if args.sort:
-        assignments = assign(
+        assignments = assign_atoms(
             atoms0,
             atoms1,
             biasing = biasing,
@@ -79,17 +79,17 @@ def molalign():
             trials = args.trials,
         )
         i = assignments.pop(0)
-        atoms2 = atoms1[i.mapping]
-        rmsd = atoms2.alignto(atoms0, massweighted=args.mass)
+        atoms2 = atoms1[i.order]
+        rmsd = atoms2.align_to(atoms0, massweighted=args.mass)
         print('Optimized RMSD = {:.4f}'.format(rmsd))
         write(args.out, atoms0, comment='Reference')
         write(args.out, atoms2, append=True, comment='RMSD {:.4f}'.format(rmsd))
         for i in assignments:
-            atoms2 = atoms1[i.mapping]
-            rmsd = atoms2.alignto(atoms0, massweighted=args.mass)
+            atoms2 = atoms1[i.order]
+            rmsd = atoms2.align_to(atoms0, massweighted=args.mass)
             write(args.out, atoms2, append=True, comment='RMSD {:.4f}'.format(rmsd))
     else:
-        rmsd = atoms1.alignto(atoms0, massweighted=args.mass)
+        rmsd = atoms1.align_to(atoms0, massweighted=args.mass)
         print('RMSD = {:.4f}'.format(rmsd))
         write(args.out, atoms0, comment='Reference')
         write(args.out, atoms1, append=True, comment='RMSD {:.4f}'.format(rmsd))

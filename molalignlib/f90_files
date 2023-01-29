@@ -1,12 +1,11 @@
 parameters.f90
 settings.f90
-arrutils.f90
 strutils.f90
-lapack.f90
+linear.f90
+discrete.f90
 rnglib.f90
 lap-jv.f90
-#munkres.f90
-math.f90
+#lap-hun.f90
 random.f90
 sorting.f90
 biasing.f90

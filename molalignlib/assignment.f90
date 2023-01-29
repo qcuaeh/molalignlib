@@ -17,15 +17,14 @@
 module assignment
 use parameters
 use settings
-use math
 use random
 use strutils
+use lap
 use translation
 use alignment
 use rotation
 use biasing
 use printing
-use lap
 
 implicit none
 
@@ -41,25 +40,25 @@ subroutine optimize_assignment( &
    weights, &
    coords0, &
    coords1, &
+   maxrec, &
    nrec, &
-   nmap, &
-   maplist, &
+   permlist, &
    countlist)
 
-   integer, intent(in) :: natom, nblock, nrec
+   integer, intent(in) :: natom, nblock, maxrec
    integer, dimension(:), intent(in) :: bsize
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
    real(wp), dimension(:), intent(in) :: weights
-   integer, intent(out) :: nmap
-   integer, intent(out) :: maplist(:, :)
+   integer, intent(out) :: nrec
+   integer, intent(out) :: permlist(:, :)
    integer, intent(out) :: countlist(:)
 
    logical visited, overflow
-   integer imap, ntrial, nstep, steps
-   integer, dimension(natom) :: atomap, auxmap
+   integer irec, ntrial, nstep, steps
+   integer, dimension(natom) :: atomperm, auxmap
    real(wp) :: dist2, olddist, newdist, totalrot
    real(wp), dimension(4) :: rotquat, prodquat
-   real(wp), dimension(nrec) :: dist2rec, avgsteps, avgtotalrot, avgrealrot
+   real(wp), dimension(maxrec) :: dist2rec, avgsteps, avgtotalrot, avgrealrot
    real(wp) :: bias(natom, natom)
    real(wp) :: workcoords1(3, natom)
 
@@ -76,7 +75,7 @@ subroutine optimize_assignment( &
 
 ! Initialize loop variables
 
-   nmap = 0
+   nrec = 0
    nstep = 0
    ntrial = 0
    countlist(1) = 0
@@ -98,8 +97,8 @@ subroutine optimize_assignment( &
 
 ! Minimize the euclidean distance
 
-      call minatomap(natom, coords0, workcoords1, nblock, bsize, bias, weights, atomap, olddist)
-      rotquat = leastrotquat(natom, weights, coords0, workcoords1, atomap)
+      call minatomperm(natom, coords0, workcoords1, nblock, bsize, bias, weights, atomperm, olddist)
+      rotquat = leastrotquat(natom, weights, coords0, workcoords1, atomperm)
       prodquat = rotquat
       totalrot = rotangle(rotquat)
       call rotate(natom, workcoords1, rotquat)
@@ -107,9 +106,9 @@ subroutine optimize_assignment( &
       steps = 1
 
       do while (iter_flag)
-         olddist = biasedist(natom, atomap, weights, coords0, workcoords1, bias)
-         call minatomap(natom, coords0, workcoords1, nblock, bsize, bias, weights, auxmap, newdist)
-         if (all(auxmap == atomap)) exit
+         olddist = biasdist(natom, atomperm, weights, coords0, workcoords1, bias)
+         call minatomperm(natom, coords0, workcoords1, nblock, bsize, bias, weights, auxmap, newdist)
+         if (all(auxmap == atomperm)) exit
          if (newdist > olddist) then
             write (error_unit, '(a)') 'newdist is larger than olddist!'
 !            print *, olddist, newdist
@@ -118,28 +117,28 @@ subroutine optimize_assignment( &
          prodquat = quatmul(rotquat, prodquat)
          call rotate(natom, workcoords1, rotquat)
          totalrot = totalrot + rotangle(rotquat)
-         atomap = auxmap
+         atomperm = auxmap
          steps = steps + 1
       end do
 
       nstep = nstep + steps
 
-      dist2 = squaredist(natom, weights, coords0, workcoords1, atomap)
+      dist2 = squaredist(natom, weights, coords0, workcoords1, atomperm)
 
-! Check for new best maplist
+! Check for new best permlist
 
       visited = .false.
 
-      do imap = 1, nmap
-         if (all(atomap == maplist(:, imap))) then
-            countlist(imap) = countlist(imap) + 1
-            avgsteps(imap) = avgsteps(imap) + (steps - avgsteps(imap))/countlist(imap)
-            avgrealrot(imap) = avgrealrot(imap) + (rotangle(prodquat) - avgrealrot(imap))/countlist(imap)
-            avgtotalrot(imap) = avgtotalrot(imap) + (totalrot - avgtotalrot(imap))/countlist(imap)
+      do irec = 1, nrec
+         if (all(atomperm == permlist(:, irec))) then
+            countlist(irec) = countlist(irec) + 1
+            avgsteps(irec) = avgsteps(irec) + (steps - avgsteps(irec))/countlist(irec)
+            avgrealrot(irec) = avgrealrot(irec) + (rotangle(prodquat) - avgrealrot(irec))/countlist(irec)
+            avgtotalrot(irec) = avgtotalrot(irec) + (totalrot - avgtotalrot(irec))/countlist(irec)
             if (stats_flag .and. live_flag) then
-               write (error_unit, '(a)', advance='no') achar(27) // '[' // intstr(imap + 2) // 'H'
-               call print_body(imap, countlist(imap), avgsteps(imap), avgtotalrot(imap), &
-                  avgrealrot(imap), dist2rec(imap))
+               write (error_unit, '(a)', advance='no') achar(27) // '[' // intstr(irec + 2) // 'H'
+               call print_body(irec, countlist(irec), avgsteps(irec), avgtotalrot(irec), &
+                  avgrealrot(irec), dist2rec(irec))
             end if
             visited = .true.
             exit
@@ -147,41 +146,41 @@ subroutine optimize_assignment( &
       end do
 
       if (.not. visited) then
-         if (nmap < nrec) then
-            nmap = nmap + 1
+         if (nrec < maxrec) then
+            nrec = nrec + 1
          else
             overflow = .true.
-            if (dist2 > dist2rec(nmap)) cycle
+            if (dist2 > dist2rec(nrec)) cycle
          end if
-         do imap = nmap, 2, -1
-            if (dist2 > dist2rec(imap - 1)) exit
-            maplist(:, imap) = maplist(:, imap - 1)
-            countlist(imap) = countlist(imap - 1)
-            dist2rec(imap) = dist2rec(imap - 1)
-            avgsteps(imap) = avgsteps(imap - 1)
-            avgrealrot(imap) = avgrealrot(imap - 1)
-            avgtotalrot(imap) = avgtotalrot(imap - 1)
+         do irec = nrec, 2, -1
+            if (dist2 > dist2rec(irec - 1)) exit
+            permlist(:, irec) = permlist(:, irec - 1)
+            countlist(irec) = countlist(irec - 1)
+            dist2rec(irec) = dist2rec(irec - 1)
+            avgsteps(irec) = avgsteps(irec - 1)
+            avgrealrot(irec) = avgrealrot(irec - 1)
+            avgtotalrot(irec) = avgtotalrot(irec - 1)
             if (stats_flag .and. live_flag) then
-               write (error_unit, '(a)', advance='no') achar(27) // '[' // intstr(imap + 2) // 'H'
-               call print_body(imap, countlist(imap), avgsteps(imap), avgtotalrot(imap), &
-                  avgrealrot(imap), dist2rec(imap))
+               write (error_unit, '(a)', advance='no') achar(27) // '[' // intstr(irec + 2) // 'H'
+               call print_body(irec, countlist(irec), avgsteps(irec), avgtotalrot(irec), &
+                  avgrealrot(irec), dist2rec(irec))
             end if
          end do
-         maplist(:, imap) = atomap
-         countlist(imap) = 1
-         dist2rec(imap) = dist2
-         avgsteps(imap) = steps
-         avgrealrot(imap) = rotangle(prodquat)
-         avgtotalrot(imap) = totalrot
+         permlist(:, irec) = atomperm
+         countlist(irec) = 1
+         dist2rec(irec) = dist2
+         avgsteps(irec) = steps
+         avgrealrot(irec) = rotangle(prodquat)
+         avgtotalrot(irec) = totalrot
          if (stats_flag .and. live_flag) then
-            write (error_unit, '(a)', advance='no') achar(27) // '[' // intstr(imap + 2) // 'H'
-            call print_body(imap, countlist(imap), avgsteps(imap), avgtotalrot(imap), &
-               avgrealrot(imap), dist2rec(imap))
+            write (error_unit, '(a)', advance='no') achar(27) // '[' // intstr(irec + 2) // 'H'
+            call print_body(irec, countlist(irec), avgsteps(irec), avgtotalrot(irec), &
+               avgrealrot(irec), dist2rec(irec))
          end if
       end if
 
       if (stats_flag .and. live_flag) then
-         write (error_unit, '(a)', advance='no') achar(27) // '[' // intstr(nmap + 3) // 'H'
+         write (error_unit, '(a)', advance='no') achar(27) // '[' // intstr(nrec + 3) // 'H'
          call print_footer()
       end if
 
@@ -189,25 +188,25 @@ subroutine optimize_assignment( &
 
    if (stats_flag .and. .not. live_flag) then
       call print_header()
-      do imap = 1, nmap
-         call print_body(imap, countlist(imap), avgsteps(imap), avgtotalrot(imap), &
-            avgrealrot(imap), dist2rec(imap))
+      do irec = 1, nrec
+         call print_body(irec, countlist(irec), avgsteps(irec), avgtotalrot(irec), &
+            avgrealrot(irec), dist2rec(irec))
       end do
       call print_footer()
    end if
 
    if (stats_flag) then
-      call print_stats(overflow, nrec, nmap, ntrial, nstep)
+      call print_stats(overflow, maxrec, nrec, ntrial, nstep)
    end if
 
 end subroutine
 
 ! Find best correspondence between points sets with fixed orientation
-subroutine minatomap(natom, coords0, coords1, nblock, bsize, bias, weights, atomap, totdist)
+subroutine minatomperm(natom, coords0, coords1, nblock, bsize, bias, weights, atomperm, totdist)
 
 ! nblock: Number of block atoms
 ! bsize: Number of atoms in each block
-! atomap: Map between correspondent points in the adjmat
+! atomperm: Map between correspondent points in the adjmat
 ! offset: First element of current block
 
    integer, intent(in) :: natom, nblock
@@ -216,7 +215,7 @@ subroutine minatomap(natom, coords0, coords1, nblock, bsize, bias, weights, atom
    real(wp), dimension(:, :), intent(in) :: coords1
    real(wp), dimension(:, :), intent(in) :: bias
    real(wp), dimension(:), intent(in) :: weights
-   integer, dimension(:), intent(out) :: atomap
+   integer, dimension(:), intent(out) :: atomperm
    real(wp), intent(out) :: totdist
 
    integer :: h, offset
@@ -231,30 +230,11 @@ subroutine minatomap(natom, coords0, coords1, nblock, bsize, bias, weights, atom
    do h = 1, nblock
       call minperm(bsize(h), coords0(:, offset+1:offset+bsize(h)), coords1(:, offset+1:offset+bsize(h)), &
          bias(offset+1:offset+bsize(h), offset+1:offset+bsize(h)), perm, dist)
-      atomap(offset+1:offset+bsize(h)) = perm(:bsize(h)) + offset
+      atomperm(offset+1:offset+bsize(h)) = perm(:bsize(h)) + offset
       totdist = totdist + weights(h)*dist
       offset = offset + bsize(h)
    end do
 
 end subroutine
-
-! Calculate total bias
-real(wp) function biasedist(natom, atomap, weights, coords0, coords1, bias) result(dist)
-
-   integer, intent(in) :: natom
-   integer, dimension(:), intent(in) :: atomap
-   real(wp), dimension(:), intent(in) :: weights
-   real(wp), dimension(:, :), intent(in) :: coords0
-   real(wp), dimension(:, :), intent(in) :: coords1
-   real(wp), dimension(:, :), intent(in) :: bias
-   integer :: i
-
-   dist = 0.
-
-   do i = 1, natom
-      dist = dist + weights(i)*(sum((coords0(:, i) - coords1(:, atomap(i)))**2) + bias(i, atomap(i)))
-   end do
-
-end function
 
 end module

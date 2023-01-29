@@ -27,11 +27,11 @@ subroutine print_header()
    write (output_unit, '(a)') '-----------------------------------------------------'
 end subroutine
 
-subroutine print_body(imap, matches, avgsteps, avgtotalrot, avgrealrot, dist2)
-   integer, intent(in) :: imap, matches
+subroutine print_body(irec, matches, avgsteps, avgtotalrot, avgrealrot, dist2)
+   integer, intent(in) :: irec, matches
    real(wp), intent(in) :: avgsteps, avgtotalrot, avgrealrot, dist2
    write (output_unit, '(i4,3x,i6,5x,f4.1,5x,f5.1,5x,f5.1,3x,f8.4)') &
-      imap, matches, avgsteps, 90./asin(1.)*avgtotalrot, 90./asin(1.)*avgrealrot, sqrt(dist2)
+      irec, matches, avgsteps, 90./asin(1.)*avgtotalrot, 90./asin(1.)*avgrealrot, sqrt(dist2)
 end subroutine
 
 subroutine print_footer()
@@ -39,15 +39,15 @@ subroutine print_footer()
    write (output_unit, '(a)') '-----------------------------------------------------'
 end subroutine
 
-subroutine print_stats(overflow, nrec, nmap, ntrial, nstep)
+subroutine print_stats(overflow, maxrec, nrec, ntrial, nstep)
    logical, intent(in) :: overflow
-   integer, intent(in) :: nrec, nmap, ntrial, nstep
+   integer, intent(in) :: maxrec, nrec, ntrial, nstep
    write (output_unit, '(a,1x,i0)') 'Random trials =', ntrial
    write (output_unit, '(a,1x,i0)') 'Minimization steps =', nstep
    if (overflow) then
-      write (output_unit, '(a,1x,i0)') 'Visited local minima >', nrec
+      write (output_unit, '(a,1x,i0)') 'Visited local minima >', maxrec
    else
-      write (output_unit, '(a,1x,i0)') 'Visited local minima =', nmap
+      write (output_unit, '(a,1x,i0)') 'Visited local minima =', nrec
    end if
 end subroutine
 

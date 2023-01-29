@@ -30,11 +30,11 @@ The Python library only supports Python 3 so make sure that you are using the ri
 
     pip3 install molalignlib
 
-It will install the *molalign* executable in your path and the *molalignlib* python module which provides the *assign* function
-and the *alignto* method, which extends ASE's *Atoms* class (see example1.py):
+It will install the *molalign* executable in your path and the *molalignlib* python module which provides the *assign_atoms* function
+and the *align_to* method, which extends ASE's *Atoms* class (see example1.py):
 
     >>> from ase import Atoms
-    >>> from molalignlib import assign
+    >>> from molalignlib import assign_atoms
 
 Build molalign from source 
 --------------------------
@@ -93,8 +93,8 @@ Advanced usage
 --------------
 
 The performance of the computation when sorting is requested can be greatly improved by enabling biasing and iteration with the
-`-fast` option, however if the tolerance is set too small it will make the assignment fail. In such cases the tolerance must be
-increased with the `-tol` option to a value larger than the maximum expected displacement of the atoms.
+`-fast` option, however if the tolerance is set too small the assignment will fail. In such cases the tolerance must be increased
+with the `-tol` option to a value larger than the maximum expected displacement of the atoms.
 
 By default a threshold of 10 counts is used to stop the computation, reducing this threshold with the `-count` option will
 proportionally reduce the computation time but the probability of obtaining suboptimal assignmnets will increase. To avoid too
@@ -105,9 +105,6 @@ multiple equivalent assignments are possible so it can be useful to print more t
 
 Examples
 --------
-
-In these examples notice than the stats will change on every run due to different seeds being used for the initialization
-of the random number generator, but the final RMSD should be always the same.
 
 For small atom displacements the default tolerance is enough:
 
@@ -144,3 +141,6 @@ Sometimes there is more than one optimal assignment due to symmetry:
     Optimized RMSD = 0.0506
 
 The ouput shows that there are 3 equivalent optimal assignments.
+
+Note: The stats can be different than those shown in the examples, due to the use of different random seeds on each run,
+but the optimized RMSD should be the same.
