@@ -4,8 +4,8 @@ MolAlignLib
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qcuaeh/molalignlib.git/HEAD?labpath=examples)
 
-**MolAlignLib** is a fortran library based on random rotations and quasi-local RMSD minimizations to align rigid molecules and atom
-clusters. It includes a command line and a Python interface.
+**MolAlignLib** is a fortran library based on random rotations and quasi-local RMSD minimizations to align rigid molecules and
+clusters. The details of the method can be found in publication [[1]](#1).
 
 ![graphical abstract](abstract.png)
 
@@ -144,3 +144,11 @@ The ouput shows that there are 3 equivalent optimal assignments.
 
 Note: The stats can be different than those shown in the examples, due to the use of different random seeds on each run,
 but the optimized RMSD should be the same.
+
+References
+----------
+
+<a id="1">[1]</a>
+J. M. Vasquez-Perez, L. A. Zarate-Hernandez, C. Z. Gomez-Castro, U. A. Nolasco-Hernandez.
+A Practical Algorithm to Solve the Near-Congruence Problem for Rigid Molecules and Clusters,
+Journal of Chemical Information and Modeling (2023), DOI: <https://doi.org/10.1021/acs.jcim.2c01187>

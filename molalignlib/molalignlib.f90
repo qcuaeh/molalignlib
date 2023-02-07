@@ -58,11 +58,11 @@ subroutine assign_atoms( &
    integer, intent(out) :: permlist(natom0, maxrec)
    integer, intent(out) :: countlist(maxrec)
    integer :: i, h, offset
-   integer :: nblock0, nblock1
+   integer :: nblk0, nblk1
    integer, dimension(:), allocatable :: atomorder0, atomorder1
-   integer, dimension(:), allocatable :: atomunorder0, atomunorder1
-   integer, dimension(:), allocatable :: blockidx0, blockidx1
-   integer, dimension(:), allocatable :: blocksize0, blocksize1
+   integer, dimension(:), allocatable :: invatomorder0, invatomorder1
+   integer, dimension(:), allocatable :: blkid0, blkid1
+   integer, dimension(:), allocatable :: blksz0, blksz1
    real(wp) :: center0(3), center1(3), totalweight
 
    ! Set error code to 0 by default
@@ -80,19 +80,19 @@ subroutine assign_atoms( &
    ! Allocate arrays
 
    allocate(atomorder0(natom0), atomorder1(natom1))
-   allocate(atomunorder0(natom0), atomunorder1(natom1))
-   allocate(blockidx0(natom0), blockidx1(natom1))
-   allocate(blocksize0(natom0), blocksize1(natom1))
+   allocate(invatomorder0(natom0), invatomorder1(natom1))
+   allocate(blkid0(natom0), blkid1(natom1))
+   allocate(blksz0(natom0), blksz1(natom1))
 
    ! Group atoms by label
 
-   call getblocks(natom0, znums0, types0, nblock0, blocksize0, blockidx0, atomorder0)
-   call getblocks(natom1, znums1, types1, nblock1, blocksize1, blockidx1, atomorder1)
+   call getblocks(natom0, znums0, types0, nblk0, blksz0, blkid0, atomorder0)
+   call getblocks(natom1, znums1, types1, nblk1, blksz1, blkid1, atomorder1)
 
    ! Get inverse atom ordering
 
-   atomunorder0 = inverseperm(atomorder0)
-   atomunorder1 = inverseperm(atomorder1)
+   invatomorder0 = inverseperm(atomorder0)
+   invatomorder1 = inverseperm(atomorder1)
 
    ! Abort if clusters are not isomers
 
@@ -121,15 +121,15 @@ subroutine assign_atoms( &
    ! Abort if there are inconsistent weights
 
    offset = 0
-   do h = 1, nblock0
-      do i = 2, blocksize0(h)
+   do h = 1, nblk0
+      do i = 2, blksz0(h)
          if (weights0(atomorder0(offset+i)) /= weights0(atomorder0(offset+1))) then
             write (error_unit, '(a)') 'Error: Atoms of the same type must weight the same'
             error = 1
             return
          end if
       end do
-      offset = offset + blocksize0(h)
+      offset = offset + blksz0(h)
    end do
 
    ! Calculate total weight
@@ -148,7 +148,7 @@ subroutine assign_atoms( &
    ! Remap atoms to minimize distance and difference
 
    call optimize_assignment( &
-      natom0, nblock0, blocksize0, &
+      natom0, nblk0, blksz0, &
       weights0(atomorder0)/totalweight, &
       centered(natom0, coords0(:, atomorder0), center0), &
       centered(natom1, coords1(:, atomorder1), center1), &
@@ -157,7 +157,7 @@ subroutine assign_atoms( &
    ! Reorder back to original atom ordering
 
    do i = 1, nrec
-      permlist(:, i) = atomorder1(permlist(atomunorder0, i))
+      permlist(:, i) = atomorder1(permlist(invatomorder0, i))
    end do
 
 end subroutine

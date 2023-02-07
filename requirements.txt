@@ -1,2 +1,2 @@
 numpy
-ase
+ase-core

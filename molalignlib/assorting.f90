@@ -28,39 +28,39 @@ public getblocks
 
 contains
 
-subroutine getblocks(natom, znums, types, nblock, bsize, blockindex, atomorder)
+subroutine getblocks(natom, znums, types, nblk, blksz, blkid, atomorder)
 ! Purpose: Group atoms by atomic numbers and types
    integer, intent(in) :: natom
    integer, dimension(:), intent(in) :: znums, types
-   integer, intent(out) :: nblock
+   integer, intent(out) :: nblk
    integer, intent(out) :: atomorder(:)
-   integer, dimension(:), intent(out) :: bsize, blockindex
+   integer, dimension(:), intent(out) :: blksz, blkid
 
    integer :: i, j
    logical :: remaining(natom)
-   integer :: blockznum(natom)
-   integer :: blocktype(natom)
-   integer :: blockorder(natom)
+   integer :: blkznum(natom)
+   integer :: blktype(natom)
+   integer :: blkorder(natom)
 
 ! Initialization
 
-   nblock = 0
+   nblk = 0
    remaining = .true.
 
 ! Create block list
 
    do i = 1, natom
       if (remaining(i)) then
-         nblock = nblock + 1
-         bsize(nblock) = 1
-         blockznum(nblock) = znums(i)
-         blocktype(nblock) = types(i)
-         blockindex(i) = nblock
+         nblk = nblk + 1
+         blksz(nblk) = 1
+         blkznum(nblk) = znums(i)
+         blktype(nblk) = types(i)
+         blkid(i) = nblk
          do j = i + 1, natom
             if (remaining(i)) then
                if (znums(j) == znums(i) .and. types(j) == types(i)) then
-                  blockindex(j) = nblock
-                  bsize(nblock) = bsize(nblock) + 1
+                  blkid(j) = nblk
+                  blksz(nblk) = blksz(nblk) + 1
                   remaining(j) = .false.
                end if
             end if
@@ -70,28 +70,28 @@ subroutine getblocks(natom, znums, types, nblock, bsize, blockindex, atomorder)
 
 ! Order blocks by atomic type
 
-   blockorder(:nblock) = order(blocktype, nblock)
-   bsize(:nblock) = bsize(blockorder(:nblock))
-   blockorder(:nblock) = inverseperm(blockorder(:nblock))
-   blockindex = blockorder(blockindex)
+   blkorder(:nblk) = order(blktype, nblk)
+   blksz(:nblk) = blksz(blkorder(:nblk))
+   blkorder(:nblk) = inverseperm(blkorder(:nblk))
+   blkid = blkorder(blkid)
 
 ! Order blocks by atomic number
 
-   blockorder(:nblock) = order(blockznum, nblock)
-   bsize(:nblock) = bsize(blockorder(:nblock))
-   blockorder(:nblock) = inverseperm(blockorder(:nblock))
-   blockindex = blockorder(blockindex)
+   blkorder(:nblk) = order(blkznum, nblk)
+   blksz(:nblk) = blksz(blkorder(:nblk))
+   blkorder(:nblk) = inverseperm(blkorder(:nblk))
+   blkid = blkorder(blkid)
 
 ! Order blocks by block size
 
-!    blockorder(:nblock) = order(bsize, nblock)
-!    bsize(:nblock) = bsize(blockorder(:nblock))
-!    blockorder(:nblock) = inverseperm(blockorder(:nblock))
-!    blockindex = blockorder(blockindex)
+!    blkorder(:nblk) = order(blksz, nblk)
+!    blksz(:nblk) = blksz(blkorder(:nblk))
+!    blkorder(:nblk) = inverseperm(blkorder(:nblk))
+!    blkid = blkorder(blkid)
 
 ! Save atom order
 
-   atomorder = order(blockindex, natom)
+   atomorder = order(blkid, natom)
 
 end subroutine
 
