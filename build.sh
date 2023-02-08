@@ -112,7 +112,6 @@ makepyext() {
    fi
    pushd "$buildir" >/dev/null
    echo Linking extension module...
-   echo "$f2py_f2cmap" > "$buildir/.f2py_f2cmap"
    "$F2PY" -h "$name.pyf" -m "$name" --overwrite-signature "${f2py_files[@]}" --quiet
    "$F2PY" -c "$name.pyf" --fcompiler=gnu95 --link-lapack "${obj_files[@]}" --quiet
    popd >/dev/null

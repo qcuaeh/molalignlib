@@ -30,11 +30,8 @@ The Python library only supports Python 3 so make sure that you are using the ri
 
     pip3 install molalignlib
 
-It will install the *molalign* executable in your path and the *molalignlib* python module which provides the *assign_atoms* function
-and the *align_to* method, which extends ASE's *Atoms* class (see example1.py):
-
-    >>> from ase import Atoms
-    >>> from molalignlib import assign_atoms
+It will install the *molalign* executable in your path. It will also install the *molalignlib* python module which provides the
+*assign_atoms* function and the *align_to* method (see the python examples in the *examples* directory for details).
 
 Build molalign from source 
 --------------------------
@@ -43,12 +40,14 @@ Clone the repository:
 
     git clone https://github.com/qcuaeh/molalign.git
 
-then enter its directory, rename *gnu.env* (or *intel.env* if you have the Intel fortran compiler and MKL installed) as *build.env*
-and run:
+then enter its directory and run:
 
     ./build.sh
 
 It will create the *molalign* executable inside the *build* directory.
+
+If you have other compiler/library instead of gfortran/LAPACK edit the *build.env* file before runnnig the build script.
+An example for intel/MKL is in the examples directory.
 
 Program options
 ---------------
@@ -142,8 +141,9 @@ Sometimes there is more than one optimal assignment due to symmetry:
 
 The ouput shows that there are 3 equivalent optimal assignments.
 
-Note: The stats can be different than those shown in the examples, due to the use of different random seeds on each run,
-but the optimized RMSD should be the same.
+Note:
+Due to the use of different random seeds on each run, the stats of the examples can be different but the optimized RMSD should be
+always the same.
 
 References
 ----------

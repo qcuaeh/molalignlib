@@ -15,9 +15,6 @@ with open(path.join('molalignlib', 'f2py_files'), 'r') as file:
         if not line.startswith('#'):
             f2py_files.append(path.join('molalignlib', line.rstrip()))
 
-with open('.f2py_f2cmap', 'w') as file:
-    file.write(repr({'real': {'sp': 'float', 'dp': 'double', 'wp': 'double'}}))
-
 molalignlib = ('molalignlib', dict(sources=f90_files, extra_f90_compile_args=['-O3', '-ffast-math']))
 molalignlibext = Extension('molalignlibext', sources=f2py_files, libraries=['molalignlib', 'lapack'])
 
