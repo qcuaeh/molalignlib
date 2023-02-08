@@ -15,7 +15,7 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module translation
-use settings
+use kinds
 
 implicit none
 

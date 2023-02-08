@@ -15,8 +15,8 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
+import molalignlibext
 from ase import Atoms
-from molalignlibext import settings, library
 
 #print(library.align_atoms.__doc__)
 #print(library.assign_atoms.__doc__)
@@ -87,28 +87,36 @@ def assign_atoms(
         weights0 = np.ones(len(atoms0), dtype=np.float64)
         weights1 = np.ones(len(atoms1), dtype=np.float64)
     if trials is None:
-        settings.trial_flag = False
+        molalignlibext.flags.trial_flag = False
     else:
         if isinstance(trials, int):
-            settings.trial_flag = True
-            settings.maxtrials = trials
+            molalignlibext.flags.trial_flag = True
+            molalignlibext.bounds.maxtrials = trials
         else:
             raise TypeError('"trials" must be an integer')
-    settings.bias_flag = biasing
-    settings.iter_flag = iteration
-    settings.repro_flag = reproducible
-    settings.stats_flag = stats
-    settings.maxcount = count
-    settings.bias_tol = tolerance
-    settings.bias_scale = scale
+    if len(atoms0) != len(atoms1):
+        raise ValueError('Error: Unequal number of atoms')
+    molalignlibext.flags.bias_flag = biasing
+    molalignlibext.flags.iter_flag = iteration
+    molalignlibext.flags.repro_flag = reproducible
+    molalignlibext.flags.stats_flag = stats
+    molalignlibext.bounds.natom0 = len(atoms0)
+    molalignlibext.bounds.natom1 = len(atoms1)
+    molalignlibext.bounds.maxrec = records
+    molalignlibext.bounds.maxcount = count
+    molalignlibext.biasing.bias_tol = tolerance
+    molalignlibext.biasing.bias_scale = scale
     znums0 = atoms0.get_atomic_numbers()
     types0 = np.ones(len(atoms0), dtype=np.int32)
     coords0 = atoms0.positions.T # Convert to column-major order
     znums1 = atoms1.get_atomic_numbers()
     types1 = np.ones(len(atoms1), dtype=np.int32)
     coords1 = atoms1.positions.T # Convert to column-major order
-    nrec, permlist, countlist, error = \
-        library.assign_atoms(
+#    permlist = np.empty((records, len(atoms0)), dtype=np.int32).T
+    permlist = np.empty((len(atoms0), records), dtype=np.int32, order='F')
+    countlist = np.empty(records, dtype=np.int32)
+    nrec, error = \
+        molalignlibext.library.assign_atoms(
             znums0,
             types0,
             coords0,
@@ -117,7 +125,8 @@ def assign_atoms(
             types1,
             coords1,
             weights1,
-            records,
+            permlist,
+            countlist,
         )
     if error:
         raise RuntimeError('Assignment failed')
@@ -143,7 +152,7 @@ def align_to(self, other, massweighted=None):
         weights0 = np.ones(len(other), dtype=np.float64)
         weights1 = np.ones(len(self), dtype=np.float64)
     travec, rotmat, error = \
-        library.align_atoms(
+        molalignlibext.library.align_atoms(
             znums0,
             types0,
             coords0,

@@ -1,5 +1,5 @@
 module linear
-use parameters
+use kinds
 
 implicit none
 

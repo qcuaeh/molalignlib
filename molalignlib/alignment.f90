@@ -15,9 +15,9 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module alignment
+use kinds
 use linear
 use rotation
-use settings
 
 implicit none
 

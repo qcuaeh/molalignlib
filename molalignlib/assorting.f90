@@ -15,8 +15,7 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module assorting
-use parameters
-use settings
+use kinds
 use discrete
 use sorting
 use chemdata

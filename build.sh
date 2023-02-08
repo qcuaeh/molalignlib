@@ -73,7 +73,7 @@ compile() {
    fi
 }
 
-makeprog() {
+make_prog() {
    name=$1
    executable=$buildir/$1
    if test -z "$name"; then
@@ -87,7 +87,7 @@ makeprog() {
    echo Done
 }
 
-makelib() {
+make_lib() {
    name=$1
    if test -z "$name"; then
       echo Error: name is empty
@@ -100,7 +100,7 @@ makelib() {
    echo Done
 }
 
-makepyext() {
+make_pyext() {
    name=$1
    if test -z "$name"; then
       echo Error: name is empty
@@ -162,23 +162,36 @@ while IFS= read -r line; do
    declare -- "$var"="$value"
 done < <(grep -v ^# ./build.env)
 
-# Build program
-compile molalignlib
-compile molalign
-makeprog molalign
-clean_build
+if test $# -gt 0; then
+   target=$1
+else
+   target=prog
+fi
 
-# Run tests
-#runtests tests/0.05 -test -rec 5 -sort -fast -tol 0.17
-runtests tests/0.1 -test -rec 5 -sort -fast -tol 0.35
-#runtests tests/0.2 -test -rec 5 -sort -fast -tol 0.69
-
-# Build dynamic library
-#compile -pic molalignlib
-#makelib molalignlib
-#clean_build
-
-# Build python extension module
-#compile -pic molalignlib
-#makepyext molalignlibext
-#clean_build
+case $target in
+prog)
+   # Build program
+   compile molalignlib
+   compile molalign
+   make_prog molalign
+   clean_build
+   # Run tests
+   #runtests tests/0.05 -test -rec 5 -sort -fast -tol 0.17
+   runtests tests/0.1 -test -rec 5 -sort -fast -tol 0.35
+   #runtests tests/0.2 -test -rec 5 -sort -fast -tol 0.69
+   ;;
+lib)
+   # Build dynamic library
+   compile -pic molalignlib
+   make_lib molalignlib
+   clean_build
+   ;;
+pyext)
+   # Build python extension module
+   compile -pic molalignlib
+   make_pyext molalignlibext
+   clean_build
+   ;;
+*)
+   echo Unknown target $target
+esac

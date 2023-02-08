@@ -15,8 +15,9 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module assignment
-use parameters
-use settings
+use kinds
+use flags
+use bounds
 use random
 use strutils
 use lap

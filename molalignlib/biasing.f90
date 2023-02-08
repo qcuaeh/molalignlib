@@ -15,11 +15,13 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module biasing
-
-use settings
+use kinds
+use flags
 use sorting
 
 implicit none
+real(wp) :: bias_tol
+real(wp) :: bias_scale
 
 contains
 

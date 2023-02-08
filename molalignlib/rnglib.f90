@@ -1,5 +1,5 @@
 module rnglib
-use parameters
+use kinds
 implicit none
 
 private

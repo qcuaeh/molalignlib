@@ -15,8 +15,9 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module library
-use parameters
-use settings
+use io
+use kinds
+use bounds
 
 implicit none
 
@@ -24,20 +25,17 @@ contains
 
 ! Assign atoms0 and atoms1
 subroutine assign_atoms( &
-   natom0, &
    znums0,  &
    types0, &
    coords0, &
    weights0, &
-   natom1, &
    znums1, &
    types1, &
    coords1, &
    weights1, &
-   maxrec, &
-   nrec, &
    permlist, &
    countlist, &
+   nrec, &
    error)
 
    use random
@@ -47,16 +45,13 @@ subroutine assign_atoms( &
    use translation
    use assignment
 
-   integer, intent(in) :: natom0, natom1, maxrec
-   integer, dimension(natom0), intent(in) :: znums0, types0
-   integer, dimension(natom1), intent(in) :: znums1, types1
-   real(wp), intent(in) :: coords0(3, natom0)
-   real(wp), intent(in) :: coords1(3, natom1)
-   real(wp), intent(in) :: weights0(natom0)
-   real(wp), intent(in) :: weights1(natom1)
+   integer, dimension(:), intent(in) :: znums0, types0
+   integer, dimension(:), intent(in) :: znums1, types1
+   real(wp), dimension(:, :), intent(in) :: coords0, coords1
+   real(wp), dimension(:), intent(in) :: weights0, weights1
+   integer, dimension(:, :), intent(inout) :: permlist
+   integer, dimension(:), intent(inout) :: countlist
    integer, intent(out) :: nrec, error
-   integer, intent(out) :: permlist(natom0, maxrec)
-   integer, intent(out) :: countlist(maxrec)
    integer :: i, h, offset
    integer :: nblk0, nblk1
    integer, dimension(:), allocatable :: atomorder0, atomorder1
@@ -164,12 +159,10 @@ end subroutine
 
 ! Align atoms0 and atoms1
 subroutine align_atoms( &
-   natom0, &
    znums0, &
    types0, &
    coords0, &
    weights0, &
-   natom1, &
    znums1, &
    types1, &
    coords1, &
@@ -184,13 +177,10 @@ subroutine align_atoms( &
    use rotation
    use alignment
 
-   integer, intent(in) :: natom0, natom1
-   integer, dimension(natom0), intent(in) :: znums0, types0
-   integer, dimension(natom1), intent(in) :: znums1, types1
-   real(wp), intent(in) :: weights0(natom0)
-   real(wp), intent(in) :: weights1(natom1)
-   real(wp), intent(in) :: coords0(3, natom0)
-   real(wp), intent(in) :: coords1(3, natom1)
+   integer, dimension(:), intent(in) :: znums0, types0
+   integer, dimension(:), intent(in) :: znums1, types1
+   real(wp), dimension(:, :), intent(in) :: coords0, coords1
+   real(wp), dimension(:), intent(in) :: weights0, weights1
    real(wp), intent(out) :: travec(3), rotmat(3, 3)
    integer, intent(out) :: error
    real(wp) :: totalweight

@@ -15,8 +15,7 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module strutils
-use parameters
-use settings
+use kinds
 
 implicit none
 

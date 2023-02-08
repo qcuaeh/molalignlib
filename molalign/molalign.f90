@@ -16,8 +16,10 @@
 
 program molalign
 
-   use parameters
-   use settings
+   use kinds
+   use flags
+   use bounds
+   use biasing
    use strutils
    use argparse
    use chemutils
@@ -30,9 +32,7 @@ program molalign
 
    implicit none
 
-   integer :: error
-   integer :: i, nrec, maxrec
-   integer :: natom0, natom1
+   integer :: i, nrec, error
    integer :: read_unit0, read_unit1, write_unit
    integer, allocatable, dimension(:) :: znums0, znums1
    integer, allocatable, dimension(:) :: types0, types1
@@ -43,7 +43,7 @@ program molalign
    character(:), allocatable :: fmtin, fmtin0, fmtin1, fmtout
    character(:), allocatable :: title0, title1
    character(maxstrlen) :: posargs(2)
-   character(maxlblen), allocatable, dimension(:) :: labels0, labels1
+   character(maxstrlen), allocatable, dimension(:) :: labels0, labels1
    real(wp) :: rmsd, travec(3), rotmat(3, 3)
    real(wp), allocatable, dimension(:) :: weights0, weights1
    real(wp), dimension(:, :), allocatable :: coords0, coords1, aligned1
@@ -200,20 +200,17 @@ program molalign
    if (sort_flag) then
 
       call assign_atoms( &
-         natom0, &
          znums0, &
          types0, &
          coords0, &
          weights0, &
-         natom1, &
          znums1, &
          types1, &
          coords1, &
          weights1, &
-         maxrec, &
-         nrec, &
          permlist, &
          countlist, &
+         nrec, &
          error)
 
       if (error /= 0) stop
@@ -221,12 +218,10 @@ program molalign
       do i = 1, nrec
 
          call align_atoms( &
-            natom0, &
             znums0, &
             types0, &
             coords0, &
             weights0, &
-            natom1, &
             znums1(permlist(:, i)), &
             types1(permlist(:, i)), &
             coords1(:, permlist(:, i)), &
@@ -255,12 +250,10 @@ program molalign
       ! Align atoms to minimize RMSD
 
       call align_atoms( &
-         natom0, &
          znums0, &
          types0, &
          coords0, &
          weights0, &
-         natom1, &
          znums1, &
          types1, &
          coords1, &

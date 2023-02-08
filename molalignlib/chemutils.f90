@@ -15,7 +15,7 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module chemutils
-use parameters
+use kinds
 use chemdata
 use strutils
 
@@ -30,7 +30,7 @@ public readlabel
 
 abstract interface
    real(wp) function f_realint(z)
-      use parameters
+      use kinds
       integer, intent(in) :: z
    end function
 end interface

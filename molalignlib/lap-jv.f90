@@ -18,7 +18,10 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module lap
-use parameters
+use io
+use kinds
+use iso_fortran_env, only: int64
+
 implicit none
 
 contains

@@ -15,8 +15,9 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module printing
-use parameters
-use settings
+use io
+use kinds
+use flags
 
 implicit none
 

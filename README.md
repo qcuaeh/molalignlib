@@ -7,7 +7,7 @@ MolAlignLib
 **MolAlignLib** is a fortran library based on random rotations and quasi-local RMSD minimizations to align rigid molecules and
 clusters. The details of the method can be found in publication [[1]](#1).
 
-![graphical abstract](abstract.png)
+![graphical abstract](assets/abstract.png)
 
 Before installing
 -----------------
@@ -46,8 +46,8 @@ then enter its directory and run:
 
 It will create the *molalign* executable inside the *build* directory.
 
-If you have other compiler/library instead of gfortran/LAPACK edit the *build.env* file before runnnig the build script.
-An example for intel/MKL is in the examples directory.
+If you have a compiler other than gfortran, edit the *build.env* file before runnig the build script. An example for ifort is
+included in the *assets* directory.
 
 Program options
 ---------------

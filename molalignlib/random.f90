@@ -15,22 +15,23 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module random
-use parameters
-use settings
+use io
+use kinds
+use flags
 use rnglib
 
 implicit none
 
 abstract interface
    subroutine f_sp(x)
-      use parameters
+      use kinds
       real(sp) :: x
    end subroutine
 end interface
 
 abstract interface
    subroutine f_dp(x)
-      use parameters
+      use kinds
       real(dp) :: x
    end subroutine
 end interface

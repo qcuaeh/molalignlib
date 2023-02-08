@@ -4,7 +4,8 @@
 # In[ ]:
 
 
-# Import modules
+# Ase must be imported before molalignlib
+# in order to patch the Atoms class with the align_to method
 from ase.io import read, write
 from molalignlib import assign_atoms
 
