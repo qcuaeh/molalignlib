@@ -7,13 +7,13 @@ MolAlignLib
 **MolAlignLib** is a fortran library based on random rotations and quasi-local RMSD minimizations to align rigid molecules and
 clusters. The details of the method can be found in publication [[1]](#1).
 
-![graphical abstract](assets/abstract.png)
+![graphical abstract](abstract.png)
 
 Before installing
 -----------------
 
-You will need a modern Fortran compiler and LAPACK to build the program from source, and additionally Python 3 to use
-the python interface. It is recommended to install gfortran and LAPACK with your package manager:
+You will need gfortran and LAPACK to build the program from source, and also Python 3 to use the Python interface.
+It is recommended to install them with your package manager:
 
 in RHEL or Fedora use *yum*
 
@@ -23,31 +23,31 @@ and in Debian, Ubuntu, etc. use *apt*
 
     apt install gfortran liblapack-dev
 
-Install molalignlib with pip
-----------------------------
-
-The Python library only supports Python 3 so make sure that you are using the right version of *pip*:
-
-    pip3 install molalignlib
-
-It will install the *molalign* executable in your path. It will also install the *molalignlib* python module which provides the
-*assign_atoms* function and the *align_to* method (see the python examples in the *examples* directory for details).
-
-Build molalign from source 
---------------------------
+Build from source 
+-----------------
 
 Clone the repository:
 
-    git clone https://github.com/qcuaeh/molalign.git
+    git clone https://github.com/qcuaeh/molalignlib.git
 
-then enter its directory and run:
+then enter the cloned directory and run:
 
     ./build.sh
 
 It will create the *molalign* executable inside the *build* directory.
 
-If you have a compiler other than gfortran, edit the *build.env* file before runnig the build script. An example for ifort is
-included in the *assets* directory.
+Note:
+If you have a compiler other than gfortran, edit the *build.env* file to suit your system before runnig the build script.
+
+or install with pip
+-------------------
+
+The Python library only supports Python 3 so make sure that you are using the right version of *pip*:
+
+    pip3 install molalignlib
+
+It will install the *molalign* executable and the *molalignlib* Python module. The module provides the
+*assign_atoms* function and the *align_to* method (see the Python examples in the *examples* directory for details).
 
 Program options
 ---------------

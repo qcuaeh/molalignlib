@@ -160,7 +160,7 @@ while IFS= read -r line; do
    var=${line%%=*}
    value=${line#*=}
    declare -- "$var"="$value"
-done < <(grep -v ^# ./build.env)
+done < <(grep -v -e^# -e^$ ./build.env)
 
 if test $# -gt 0; then
    target=$1
