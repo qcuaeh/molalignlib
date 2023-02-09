@@ -2,10 +2,10 @@ MolAlignLib
 ===========
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qcuaeh/molalignlib.git/HEAD?labpath=examples/example1.ipynb)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qcuaeh/molalignlib.git/HEAD?labpath=examples)
 
-**MolAlignLib** is a fortran library based on random rotations and quasi-local RMSD minimizations to align rigid molecules and
-clusters. The details of the method can be found in publication [[1]](#1).
+**MolAlignLib** is a fortran library based on random rotations and quasi-local RMSD minimizations to align rigid molecules
+and clusters [[1]](#1). It can be used through a command line or a Python interface.
 
 ![graphical abstract](abstract.png)
 
@@ -30,14 +30,11 @@ Clone the repository:
 
     git clone https://github.com/qcuaeh/molalignlib.git
 
-then enter the cloned directory and run:
+then enter the cloned directory, edit the *build.env* file to suit your system, and run:
 
     ./build.sh
 
 It will create the *molalign* executable inside the *build* directory.
-
-Note:
-If you have a compiler other than gfortran, edit the *build.env* file to suit your system before runnig the build script.
 
 or install with pip
 -------------------
@@ -46,8 +43,14 @@ The Python library only supports Python 3 so make sure that you are using the ri
 
     pip3 install molalignlib
 
-It will install the *molalign* executable and the *molalignlib* Python module. The module provides the
-*assign_atoms* function and the *align_to* method (see the Python examples in the *examples* directory for details).
+It will install the *molalign* executable and the *molalignlib* Python module.
+
+or try on Binder
+----------------
+
+You can try the Python module on Binder:
+
+- [Run example1.ipynb](https://mybinder.org/v2/gh/qcuaeh/molalignlib.git/HEAD?labpath=examples/example1.ipynb)
 
 Program options
 ---------------
@@ -72,9 +75,8 @@ These options are only supported by the native executable:
 <code>-stdin *EXT*</code> Read coordinates from standard input in *EXT* format.  
 <code>-stdout *EXT*</code> Write coordinates to standard output in *EXT* format.  
  
-The native executable only supports *xyz* as input format and
-*xyz*/*mol2* as output formats, while the python script supports many more formats.
-Note that the format is determined from the file extension when reading/writing from/to a file.
+The native executable only supports *xyz* as input format and *xyz*/*mol2* as output formats, while the python script supports
+many more formats. Note that the format is determined from the file extension when reading/writing from/to a file.
 
 Basic usage
 -----------
@@ -142,8 +144,8 @@ Sometimes there is more than one optimal assignment due to symmetry:
 The ouput shows that there are 3 equivalent optimal assignments.
 
 Note:
-Due to the use of different random seeds on each run, the stats of the examples can be different but the optimized RMSD should be
-always the same.
+Due to the use of different random seeds, the stats will be different on each run, but the optimized RMSD should be always
+the same.
 
 References
 ----------
