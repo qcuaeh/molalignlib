@@ -151,6 +151,8 @@ def align_to(self, other, massweighted=None):
     else:
         weights0 = np.ones(len(other), dtype=np.float64)
         weights1 = np.ones(len(self), dtype=np.float64)
+    molalignlibext.bounds.natom0 = len(other)
+    molalignlibext.bounds.natom1 = len(self)
     travec, rotmat, error = \
         molalignlibext.library.align_atoms(
             znums0,
