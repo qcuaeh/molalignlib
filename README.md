@@ -5,7 +5,7 @@ MolAlignLib
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qcuaeh/molalignlib.git/HEAD?labpath=examples)
 
 **MolAlignLib** is a fortran library based on random rotations and quasi-local RMSD minimizations to align rigid molecules
-and clusters [[1]](#1). It can be used through a command line or a Python interface.
+and clusters [[1]](#1). It can be used through the *molalign* command or through a Python interface.
 
 ![graphical abstract](abstract.png)
 
@@ -57,7 +57,7 @@ Program options
 
 These options are supported by both, the native executable and the python script:
 
-<code>-sort</code> Sort atoms by RMSD-minimizing order.  
+<code>-sort</code> Reorder the atoms to minimize the RMSD.  
 <code>-trials *N*</code> Set maximum number of trials to *N*.  
 <code>-fast</code> Enable biasing and iterative minimization steps.  
 <code>-count *N*</code> Set the count threshold to *N* (defaults to 10).  
@@ -75,8 +75,8 @@ These options are only supported by the native executable:
 <code>-stdin *EXT*</code> Read coordinates from standard input in *EXT* format.  
 <code>-stdout *EXT*</code> Write coordinates to standard output in *EXT* format.  
  
-The native executable only supports *xyz* as input format and *xyz*/*mol2* as output formats, while the python script supports
-many more formats. Note that the format is determined from the file extension when reading/writing from/to a file.
+The native executable only supports *xyz* as input format and *xyz*/*mol2* as output formats, while the python script
+supports many more formats. Note that the format is determined from the file extension when reading/writing from/to a file.
 
 Basic usage
 -----------
@@ -85,21 +85,23 @@ The syntax of the command is
 
     molalign [option[s]] file [file]
 
-If only a file is specified then two sets of coordinates will be read from the file, otherwise a single set of coordinates will
-be read from each file.
+If only a file is specified then two sets of coordinates will be read from the file, otherwise a single set of coordinates
+will be read from each file.
 
-To align the atoms without reordering run the command without options and to align with optimal assigment add the `-sort` option.
+To align the atoms without reordering, run the command without options.
+
+To reorder and align the atoms to minimize the RMSD, run the command with the `-sort` option.
 
 Advanced usage
 --------------
 
-The performance of the computation when sorting is requested can be greatly improved by enabling biasing and iteration with the
-`-fast` option, however if the tolerance is set too small the assignment will fail. In such cases the tolerance must be increased
-with the `-tol` option to a value larger than the maximum expected displacement of the atoms.
+When reordering is requested, the computation time can be greatly reduced by enabling biasing and iteration with the `-fast`
+option, however if the tolerance is set too small the assignment will fail. In such cases the tolerance must be increased with
+the `-tol` option to a value larger than the maximum expected displacement of the atoms.
 
 By default a threshold of 10 counts is used to stop the computation, reducing this threshold with the `-count` option will
-proportionally reduce the computation time but the probability of obtaining suboptimal assignmnets will increase. To avoid too
-long computations the `-trials` option can be used to stop the computation before reaching the count threshold.
+proportionally reduce the computation time but the probability of obtaining suboptimal assignments will increase. To avoid
+too long computations the `-trials` option can be used to stop the computation before reaching the count threshold.
 
 The algorithm always explores multiple possible assignments, but only the best one is stored by default. For symmetric clusters
 multiple equivalent assignments are possible so it can be useful to print more than one result using the `-rec` option.
