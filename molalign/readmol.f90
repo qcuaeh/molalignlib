@@ -15,7 +15,7 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module readmol
-use io
+use stdio
 use bounds
 use strutils
 use chemdata

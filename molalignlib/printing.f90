@@ -15,7 +15,7 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module printing
-use io
+use stdio
 use kinds
 use flags
 

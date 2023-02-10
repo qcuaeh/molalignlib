@@ -1,9 +1,6 @@
 MolAlignLib
 ===========
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qcuaeh/molalignlib.git/HEAD?labpath=examples)
-
 **MolAlignLib** is a fortran library based on random rotations and quasi-local RMSD minimizations to align rigid molecules
 and clusters [[1]](#1). It can be used with its command line interface or as a Python library.
 
@@ -75,8 +72,8 @@ These options are only supported by the native executable:
 <code>-stdin *EXT*</code> Read coordinates from standard input in *EXT* format.  
 <code>-stdout *EXT*</code> Write coordinates to standard output in *EXT* format.  
  
-The native executable only supports *xyz* as input format and *xyz*/*mol2* as output formats, while the python script
-supports many more formats. Note that the format is determined from the file extension when reading/writing from/to a file.
+The native executable only supports *xyz* and *mol2*, while the python script supports many more formats. Note that
+the format is determined from the file extension when reading from or writing to a file.
 
 Basic usage
 -----------

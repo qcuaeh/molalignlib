@@ -28,11 +28,14 @@ program molalign
    use translation
    use rotation
    use alignment
+   use adjacency
+   use discrete
    use library
 
    implicit none
 
-   integer :: i, nrec, error
+   integer :: i
+   integer :: nrec, error
    integer :: read_unit0, read_unit1, write_unit
    integer, allocatable, dimension(:) :: znums0, znums1
    integer, allocatable, dimension(:) :: types0, types1
@@ -46,8 +49,12 @@ program molalign
    character(maxstrlen), allocatable, dimension(:) :: labels0, labels1
    real(wp) :: rmsd, travec(3), rotmat(3, 3)
    real(wp), allocatable, dimension(:) :: weights0, weights1
-   real(wp), dimension(:, :), allocatable :: coords0, coords1, aligned1
+   real(wp), allocatable, dimension(:, :) :: coords0, coords1, aligned1
    logical :: sort_flag, enan_flag, stdin_flag, stdout_flag
+   integer, dimension(:), allocatable :: nadj0, nadj1
+   integer, dimension(:, :), allocatable :: adjlist0, adjlist1
+   logical, dimension(:, :), allocatable :: adjmat0, adjmat1
+   real(wp) :: adjrad(nelem)
 
    procedure(f_realint), pointer :: weight_function
 
@@ -167,6 +174,9 @@ program molalign
    allocate(znums0(natom0), znums1(natom1))
    allocate(types0(natom0), types1(natom1))
    allocate(weights0(natom0), weights1(natom1))
+   allocate(nadj0(natom0), nadj1(natom1))
+   allocate(adjmat0(natom0, natom0), adjmat1(natom1, natom1))
+   allocate(adjlist0(maxcoord, natom0), adjlist1(maxcoord, natom1))
    allocate(aligned1(3, natom1))
    allocate(permlist(natom0, maxrec))
    allocate(countlist(maxrec))
@@ -195,6 +205,21 @@ program molalign
       end if
    end if
 
+   ! Set adjacency radii
+
+   adjrad = covrad + 0.25*(vdwrad - covrad)
+
+   ! Check adjacency radii
+
+   if (any(adjrad < covrad) .or. any(adjrad > vdwrad)) then
+       write (error_unit, '(a)') 'There are unphysical atomic radii!'
+   end if
+
+   ! Get adjacency matrices and lists
+
+   call getadjmat(natom0, coords0, adjrad(znums0), adjmat0)
+   call getadjmat(natom1, coords1, adjrad(znums1), adjmat1)
+
    ! Sort atoms to minimize MSD
 
    if (sort_flag) then
@@ -203,10 +228,12 @@ program molalign
          znums0, &
          types0, &
          coords0, &
+         adjmat0, &
          weights0, &
          znums1, &
          types1, &
          coords1, &
+         adjmat1, &
          weights1, &
          permlist, &
          countlist, &
@@ -237,11 +264,11 @@ program molalign
 
          if (i == 1) then
             write (output_unit, '(a)') 'Optimized RMSD = ' // realstr(rmsd, 4)
-            call writefile(write_unit, fmtout, natom0, 'Reference', znums0, coords0)
+            call writefile(write_unit, fmtout, natom0, 'Reference', znums0, coords0, adjmat0)
          end if
 
          call writefile(write_unit, fmtout, natom1, 'RMSD ' // realstr(rmsd, 4), znums1(permlist(:, i)), &
-            aligned1(:, permlist(:, i)))
+            aligned1(:, permlist(:, i)), adjmat1(permlist(:, i), permlist(:, i)))
 
       end do
 
@@ -268,8 +295,8 @@ program molalign
       rmsd = sqrt(sum(weights0*sum((aligned1 - coords0)**2, dim=1))/sum(weights0))
 
       write (error_unit, '(a)') 'RMSD = ' // realstr(rmsd, 4)
-      call writefile(write_unit, fmtout, natom0, 'Reference', znums0, coords0)
-      call writefile(write_unit, fmtout, natom1, 'RMSD ' // realstr(rmsd, 4), znums1, aligned1)
+      call writefile(write_unit, fmtout, natom0, 'Reference', znums0, coords0, adjmat0)
+      call writefile(write_unit, fmtout, natom1, 'RMSD ' // realstr(rmsd, 4), znums1, aligned1, adjmat1)
 
    end if
 

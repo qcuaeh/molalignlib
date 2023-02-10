@@ -6,5 +6,6 @@ logical :: live_flag
 logical :: trial_flag
 logical :: repro_flag
 logical :: stats_flag
+logical :: bond_flag = .true.
 
 end module

@@ -15,7 +15,7 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module library
-use io
+use stdio
 use kinds
 use bounds
 
@@ -28,10 +28,12 @@ subroutine assign_atoms( &
    znums0,  &
    types0, &
    coords0, &
+   adjmat0, &
    weights0, &
    znums1, &
    types1, &
    coords1, &
+   adjmat1, &
    weights1, &
    permlist, &
    countlist, &
@@ -43,10 +45,12 @@ subroutine assign_atoms( &
    use sorting
    use assorting
    use translation
+   use adjacency
    use assignment
 
    integer, dimension(:), intent(in) :: znums0, types0
    integer, dimension(:), intent(in) :: znums1, types1
+   logical, dimension(:, :), intent(in) :: adjmat0, adjmat1
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
    real(wp), dimension(:), intent(in) :: weights0, weights1
    integer, dimension(:, :), intent(inout) :: permlist
@@ -54,20 +58,26 @@ subroutine assign_atoms( &
    integer, intent(out) :: nrec, error
    integer :: i, h, offset
    integer :: nblk0, nblk1
-   integer, dimension(:), allocatable :: atomorder0, atomorder1
-   integer, dimension(:), allocatable :: invatomorder0, invatomorder1
+   integer :: neqv0, neqv1
    integer, dimension(:), allocatable :: blkid0, blkid1
    integer, dimension(:), allocatable :: blksz0, blksz1
-   real(wp) :: center0(3), center1(3), totalweight
+   integer, dimension(:), allocatable :: atomorder0, atomorder1
+   integer, dimension(:), allocatable :: invatomorder0, invatomorder1
+   integer, dimension(:), allocatable :: nadj0, nadj1
+   integer, dimension(:, :), allocatable :: adjlist0, adjlist1
+   integer, dimension(:), allocatable :: eqvid0, eqvid1
+   integer, dimension(:), allocatable :: eqvsz0, eqvsz1
+   real(wp) :: totalweight
+   real(wp) :: center0(3), center1(3)
 
    ! Set error code to 0 by default
 
    error = 0
 
-   ! Abort if clusters have different number of atoms
+   ! Abort if molecules have different number of atoms
 
    if (natom0 /= natom1) then
-      write (error_unit, '(a)') 'Error: The clusters have different number of atoms'
+      write (error_unit, '(a)') 'Error: The molecules have different number of atoms'
       error = 1
       return
    end if
@@ -78,21 +88,40 @@ subroutine assign_atoms( &
    allocate(invatomorder0(natom0), invatomorder1(natom1))
    allocate(blkid0(natom0), blkid1(natom1))
    allocate(blksz0(natom0), blksz1(natom1))
+   allocate(nadj0(natom0), nadj1(natom1))
+   allocate(adjlist0(maxcoord, natom0), adjlist1(maxcoord, natom1))
+   allocate(eqvid0(natom0), eqvid1(natom1))
+   allocate(eqvsz0(natom0), eqvsz1(natom1))
+
+   ! Get adjacency lists
+
+   call adjmat2list(natom0, adjmat0, nadj0, adjlist0)
+   call adjmat2list(natom1, adjmat1, nadj1, adjlist1)
 
    ! Group atoms by label
 
-   call getblocks(natom0, znums0, types0, nblk0, blksz0, blkid0, atomorder0)
-   call getblocks(natom1, znums1, types1, nblk1, blksz1, blkid1, atomorder1)
+   call grouptypes(natom0, znums0, types0, nblk0, blksz0, blkid0)
+   call grouptypes(natom1, znums1, types1, nblk1, blksz1, blkid1)
 
-   ! Get inverse atom ordering
+   ! Group atoms by NMA at infinite level
+
+   call groupequiv(natom0, nblk0, blkid0, nadj0, adjlist0, neqv0, eqvsz0, eqvid0)
+   call groupequiv(natom1, nblk1, blkid1, nadj1, adjlist1, neqv1, eqvsz1, eqvid1)
+
+   ! Get atom order
+
+   atomorder0 = order(eqvid0, natom0)
+   atomorder1 = order(eqvid1, natom1)
+
+   ! Get inverse atom order
 
    invatomorder0 = inverseperm(atomorder0)
    invatomorder1 = inverseperm(atomorder1)
 
-   ! Abort if clusters are not isomers
+   ! Abort if molecules are not isomers
 
    if (any(znums0(atomorder0) /= znums1(atomorder1))) then
-      write (error_unit, '(a)') 'Error: The clusters are not isomers'
+      write (error_unit, '(a)') 'Error: The molecules are not isomers'
       error = 1
       return
    end if
@@ -191,18 +220,18 @@ subroutine align_atoms( &
 
    error = 0
 
-   ! Abort if clusters have different number of atoms
+   ! Abort if molecules have different number of atoms
 
    if (natom0 /= natom1) then
-      write (error_unit, '(a)') 'Error: The clusters have different number of atoms'
+      write (error_unit, '(a)') 'Error: The molecules have different number of atoms'
       error = 1
       return
    end if
 
-   ! Abort if clusters are not isomers
+   ! Abort if molecules are not isomers
 
    if (any(sorted(znums0, natom0) /= sorted(znums1, natom1))) then
-      write (error_unit, '(a)') 'Error: The clusters are not isomers'
+      write (error_unit, '(a)') 'Error: The molecules are not isomers'
       error = 1
       return
    end if

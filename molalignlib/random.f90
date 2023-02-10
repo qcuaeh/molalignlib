@@ -15,7 +15,7 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module random
-use io
+use stdio
 use kinds
 use flags
 use rnglib

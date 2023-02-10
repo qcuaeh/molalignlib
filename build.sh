@@ -174,11 +174,11 @@ prog)
    compile molalignlib
    compile molalign
    make_prog molalign
-   clean_build
+#   clean_build
    # Run tests
-   #runtests tests/0.05 -test -rec 5 -sort -fast -tol 0.17
+#   runtests tests/0.05 -test -rec 5 -sort -fast -tol 0.17
    runtests tests/0.1 -test -rec 5 -sort -fast -tol 0.35
-   #runtests tests/0.2 -test -rec 5 -sort -fast -tol 0.69
+#   runtests tests/0.2 -test -rec 5 -sort -fast -tol 0.69
    ;;
 lib)
    # Build dynamic library
