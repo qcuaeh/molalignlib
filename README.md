@@ -5,7 +5,7 @@ MolAlignLib
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qcuaeh/molalignlib.git/HEAD?labpath=examples)
 
 **MolAlignLib** is a fortran library based on random rotations and quasi-local RMSD minimizations to align rigid molecules
-and clusters [[1]](#1). It can be used through the *molalign* command or through a Python interface.
+and clusters [[1]](#1). It can be used with its command line interface or as a Python library.
 
 ![graphical abstract](abstract.png)
 
@@ -43,7 +43,7 @@ The Python library only supports Python 3 so make sure that you are using the ri
 
     pip3 install molalignlib
 
-It will install the *molalign* executable and the *molalignlib* Python module.
+It will install the *molalign* script and the *molalignlib* Python module.
 
 or try on Binder
 ----------------
@@ -142,8 +142,6 @@ Sometimes there is more than one optimal assignment due to symmetry:
     Minimization steps = 706
     Visited local minima > 5
     Optimized RMSD = 0.0506
-
-The ouput shows that there are 3 equivalent optimal assignments.
 
 Note:
 Due to the use of different random seeds, the stats will be different on each run, but the optimized RMSD should be always
