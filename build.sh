@@ -7,6 +7,7 @@ toarray() {
 }
 
 clean_build() {
+   $quick_build && return
    if test -d build; then
       pushd build >/dev/null
       for file in *.f90 *.mod *.o; do
@@ -14,8 +15,6 @@ clean_build() {
       done
       popd >/dev/null
    fi
-   unset obj_files
-   unset f2py_files
 }
 
 compile() {
@@ -64,7 +63,7 @@ compile() {
          "$F90" "${flags[@]}" -c "$srcfile" -o "$objfile"
       fi
       obj_files+=("$objfile")
-   done < <(grep -v ^# "$srcdir/f90_files")
+   done < <(grep -v ^# "$srcdir/source_files")
    popd >/dev/null
    if test -f "$srcdir/f2py_files"; then
       while IFS= read -r f2pyfile; do
@@ -119,6 +118,7 @@ make_pyext() {
 }
 
 runtests() {
+   $quick_build && return
    testdir=$topdir/$1
    shift
    if test -z "$executable"; then
@@ -162,6 +162,22 @@ while IFS= read -r line; do
    declare -- "$var"="$value"
 done < <(grep -v -e^# -e^$ ./build.env)
 
+quick_build=false
+
+while getopts "q" opt; do
+  case $opt in
+    q)
+      quick_build=true
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      ;;
+  esac
+done
+
+# Eliminate the options from the positional parameters
+shift $((OPTIND-1))
+
 if test $# -gt 0; then
    target=$1
 else
@@ -171,26 +187,26 @@ fi
 case $target in
 prog)
    # Build program
+   clean_build
    compile molalignlib
    compile molalign
    make_prog molalign
-#   clean_build
    # Run tests
-#   runtests tests/0.05 -test -rec 5 -sort -fast -tol 0.17
-   runtests tests/0.1 -test -rec 5 -sort -fast -tol 0.35
-#   runtests tests/0.2 -test -rec 5 -sort -fast -tol 0.69
+#   runtests tests/jcim.2c01187/0.05 -test -rec 5 -sort -fast -tol 0.17
+   runtests tests/jcim.2c01187/0.1 -test -rec 5 -sort -fast -tol 0.35
+#   runtests tests/jcim.2c01187/0.2 -test -rec 5 -sort -fast -tol 0.69
    ;;
 lib)
    # Build dynamic library
+   clean_build
    compile -pic molalignlib
    make_lib molalignlib
-   clean_build
    ;;
 pyext)
    # Build python extension module
+   clean_build
    compile -pic molalignlib
    make_pyext molalignlibext
-   clean_build
    ;;
 *)
    echo Unknown target $target
