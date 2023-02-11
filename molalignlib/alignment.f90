@@ -39,19 +39,19 @@ real(wp) function squaredist(natom, weights, coords0, coords1, atomperm) result(
 
 end function
 
-real(wp) function biasdist(natom, atomperm, weights, coords0, coords1, bias) result(dist)
+real(wp) function biasdist(natom, atomperm, weights, coords0, coords1, biasmat) result(dist)
    integer, intent(in) :: natom
    integer, dimension(:), intent(in) :: atomperm
    real(wp), dimension(:), intent(in) :: weights
    real(wp), dimension(:, :), intent(in) :: coords0
    real(wp), dimension(:, :), intent(in) :: coords1
-   real(wp), dimension(:, :), intent(in) :: bias
+   real(wp), dimension(:, :), intent(in) :: biasmat
    integer :: i
 
    dist = 0.
 
    do i = 1, natom
-      dist = dist + weights(i)*(sum((coords0(:, i) - coords1(:, atomperm(i)))**2) + bias(i, atomperm(i)))
+      dist = dist + weights(i)*(sum((coords0(:, i) - coords1(:, atomperm(i)))**2) + biasmat(i, atomperm(i)))
    end do
 
 end function

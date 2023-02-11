@@ -60,7 +60,6 @@ program molalign
 
    ! Set default options
 
-   bias_flag = .false.
    iter_flag = .false.
    sort_flag = .false.
    trial_flag = .false.
@@ -70,6 +69,8 @@ program molalign
    stats_flag = .false.
    enan_flag = .false.
    live_flag = .false.
+   bias_flag = .false.
+   bond_flag = .false.
 
    maxrec = 1
    maxcount = 10
@@ -97,6 +98,13 @@ program molalign
          fmtout = 'xyz'
       case ('-sort')
          sort_flag = .true.
+      case ('-fast')
+         iter_flag = .true.
+         bias_flag = .true.
+      case ('-bind')
+         iter_flag = .true.
+         bias_flag = .true.
+         bond_flag = .true.
       case ('-mass')
          weight_function => stdmass
       case ('-enan')
@@ -121,18 +129,6 @@ program molalign
       case ('-stdout')
          stdout_flag = .true.
          call readoptarg(arg, fmtout)
-      case ('-fast')
-         bias_flag = .true.
-         iter_flag = .true.
-!      case ('-bias')
-!         bias_flag = .true.
-!         iter_flag = .false.
-!      case ('-iter')
-!         bias_flag = .false.
-!         iter_flag = .true.
-!      case ('-none')
-!         bias_flag = .false.
-!         iter_flag = .false.
       case default
          call readposarg(arg, posargs)
       end select

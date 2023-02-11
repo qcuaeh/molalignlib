@@ -128,12 +128,12 @@ function sameadjacency(ntype, atomtype0, nadj0, adjlist0, atomtype1, nadj1, adjl
 
 end function
 
-subroutine getmnatypes(natom, nin, intype, nadj, adjlist, nout, outype, outsize, parentype)
+subroutine getmnatypes(natom, nin, intype, nadj, adjlist, nout, outype, outsize, uptype)
     integer, intent(in) :: natom, nin
     integer, dimension(:), intent(in) :: intype, nadj
     integer, dimension(:, :), intent(in) :: adjlist
     integer, intent(out) :: nout
-    integer, dimension(:), intent(out) :: outype, outsize, parentype
+    integer, dimension(:), intent(out) :: outype, outsize, uptype
 
     integer :: i, j
     logical :: untyped(natom)
@@ -146,7 +146,7 @@ subroutine getmnatypes(natom, nin, intype, nadj, adjlist, nout, outype, outsize,
             nout = nout + 1
             outype(i) = nout
             outsize(nout) = 1
-            parentype(nout) = intype(i)
+            uptype(nout) = intype(i)
             do j = i + 1, natom
 !               print '(a, x, i0, x, i0)', trim(elsym(intype0(i))), i, j
                 if (untyped(j)) then
@@ -172,7 +172,7 @@ subroutine groupequiv(natom, nblk, blkid, nadj, adjlist, neqv, eqvsz, eqvid)
     integer, dimension(:), intent(out) :: eqvid, eqvsz
 
     integer i, nin, neqv
-    integer, dimension(natom) :: intype, grouporder, parentype, basetype
+    integer, dimension(natom) :: intype, grouporder, uptype, basetype
 
     nin = nblk
     intype = blkid
@@ -180,8 +180,8 @@ subroutine groupequiv(natom, nblk, blkid, nadj, adjlist, neqv, eqvsz, eqvid)
 
     do
 
-        call getmnatypes(natom, nin, intype, nadj, adjlist, neqv, eqvid, eqvsz, parentype)
-        basetype(:neqv) = basetype(parentype(:neqv))
+        call getmnatypes(natom, nin, intype, nadj, adjlist, neqv, eqvid, eqvsz, uptype)
+        basetype(:neqv) = basetype(uptype(:neqv))
 
         if (all(eqvid == intype)) exit
 

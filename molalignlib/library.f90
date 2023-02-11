@@ -18,6 +18,16 @@ module library
 use stdio
 use kinds
 use bounds
+use random
+use biasing
+use discrete
+use sorting
+use assorting
+use rotation
+use translation
+use adjacency
+use alignment
+use assignment
 
 implicit none
 
@@ -39,14 +49,6 @@ subroutine assign_atoms( &
    countlist, &
    nrec, &
    error)
-
-   use random
-   use discrete
-   use sorting
-   use assorting
-   use translation
-   use adjacency
-   use assignment
 
    integer, dimension(:), intent(in) :: znums0, types0
    integer, dimension(:), intent(in) :: znums1, types1
@@ -172,11 +174,15 @@ subroutine assign_atoms( &
    ! Remap atoms to minimize distance and difference
 
    call optimize_assignment( &
-      natom0, nblk0, blksz0, &
+      natom0, &
+      nblk0, &
+      blksz0, &
       weights0(atomorder0)/totalweight, &
       centered(natom0, coords0(:, atomorder0), center0), &
       centered(natom1, coords1(:, atomorder1), center1), &
-      maxrec, nrec, permlist, countlist)
+      permlist, &
+      countlist, &
+      nrec)
 
    ! Reorder back to original atom ordering
 
@@ -199,12 +205,6 @@ subroutine align_atoms( &
    travec, &
    rotmat, &
    error)
-
-   use discrete
-   use sorting
-   use translation
-   use rotation
-   use alignment
 
    integer, dimension(:), intent(in) :: znums0, types0
    integer, dimension(:), intent(in) :: znums1, types1
@@ -272,7 +272,8 @@ subroutine align_atoms( &
    ! Calculate optimal rotation matrix
 
    rotmat = rotquat2rotmat(leastrotquat( &
-      natom0, weights0/totalweight, &
+      natom0, &
+      weights0/totalweight, &
       centered(natom0, coords0, center0), &
       centered(natom1, coords1, center1), &
       identityperm(natom0)))
