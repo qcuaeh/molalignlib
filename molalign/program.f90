@@ -63,7 +63,7 @@ program molalign
    trial_flag = .false.
    stdin_flag = .false.
    stdout_flag = .false.
-   seed_flag = .false.
+   test_flag = .false.
    stats_flag = .false.
    enan_flag = .false.
    live_flag = .false.
@@ -91,16 +91,13 @@ program molalign
       case ('-stats')
          stats_flag = .true.
       case ('-test')
-         seed_flag = .true.
-         stats_flag = .true.
-         stdout_flag = .true.
-         fmtout = 'xyz'
+         test_flag = .true.
       case ('-sort')
          sort_flag = .true.
       case ('-fast')
          iter_flag = .true.
          bias_flag = .true.
-!         bias_func => setsdnbias
+!         bias_func => setcrossbias
 !      case ('-topo')
 !         iter_flag = .true.
 !         bias_flag = .true.
@@ -213,15 +210,15 @@ program molalign
          natom0, &
          znums0, &
          types0, &
+         weights0, &
          coords0, &
          adjmat0, &
-         weights0, &
          natom1, &
          znums1, &
          types1, &
+         weights1, &
          coords1, &
          adjmat1, &
-         weights1, &
          permlist, &
          countlist, &
          nrec, &
@@ -235,13 +232,13 @@ program molalign
             natom0, &
             znums0, &
             types0, &
-            coords0, &
             weights0, &
+            coords0, &
             natom1, &
             znums1(permlist(:, i)), &
             types1(permlist(:, i)), &
+            weights1(permlist(:, i)), &
             coords1(:, permlist(:, i)), &
-            weights1, &
             travec, &
             rotmat, &
             error)
@@ -269,13 +266,13 @@ program molalign
          natom0, &
          znums0, &
          types0, &
-         coords0, &
          weights0, &
+         coords0, &
          natom1, &
          znums1, &
          types1, &
-         coords1, &
          weights1, &
+         coords1, &
          travec, &
          rotmat, &
          error)

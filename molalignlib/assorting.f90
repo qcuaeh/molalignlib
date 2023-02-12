@@ -15,6 +15,7 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module assorting
+use stdio
 use kinds
 use discrete
 use sorting
@@ -24,12 +25,16 @@ implicit none
 
 contains
 
-subroutine grouptypes(natom, znums, types, nblk, blksz, blkid)
+subroutine grouptypes(natom, znums, types, weights, nblk, blksz, blkwt, blkid)
 ! Purpose: Group atoms by atomic numbers and types
    integer, intent(in) :: natom
-   integer, dimension(:), intent(in) :: znums, types
+   integer, dimension(:), intent(in) :: znums
+   integer, dimension(:), intent(in) :: types
+   real(wp), dimension(:), intent(in) :: weights
    integer, intent(out) :: nblk
-   integer, dimension(:), intent(out) :: blksz, blkid
+   integer, dimension(:), intent(out) :: blksz
+   real(wp), dimension(:), intent(out) :: blkwt
+   integer, dimension(:), intent(out) :: blkid
 
    integer :: i, j
    logical :: remaining(natom)
@@ -37,12 +42,12 @@ subroutine grouptypes(natom, znums, types, nblk, blksz, blkid)
    integer :: blktype(natom)
    integer :: blkorder(natom)
 
-! Initialization
+   ! Initialization
 
    nblk = 0
    remaining = .true.
 
-! Create block list
+   ! Create block list
 
    do i = 1, natom
       if (remaining(i)) then
@@ -50,35 +55,42 @@ subroutine grouptypes(natom, znums, types, nblk, blksz, blkid)
          blksz(nblk) = 1
          blkznum(nblk) = znums(i)
          blktype(nblk) = types(i)
+         blkwt(nblk) = weights(i)
          blkid(i) = nblk
          do j = i + 1, natom
             if (remaining(i)) then
                if (znums(j) == znums(i) .and. types(j) == types(i)) then
-                  blkid(j) = nblk
-                  blksz(nblk) = blksz(nblk) + 1
-                  remaining(j) = .false.
+                  if (weights(j) == weights(i)) then
+                     blkid(j) = nblk
+                     blksz(nblk) = blksz(nblk) + 1
+                     remaining(j) = .false.
+                  else
+                     ! Abort if there are inconsistent weights
+                     write (error_unit, '(a)') 'Error: There are incosistent weights'
+                     stop
+                  end if
                end if
             end if
          end do
       end if
    end do
 
-! Order blocks by atomic type
+   ! Order blocks by atomic type
 
    blkorder(:nblk) = order(blktype, nblk)
    blksz(:nblk) = blksz(blkorder(:nblk))
    blkorder(:nblk) = inverseperm(blkorder(:nblk))
    blkid = blkorder(blkid)
 
-! Order blocks by atomic number
+   ! Order blocks by atomic number
 
    blkorder(:nblk) = order(blkznum, nblk)
    blksz(:nblk) = blksz(blkorder(:nblk))
    blkorder(:nblk) = inverseperm(blkorder(:nblk))
    blkid = blkorder(blkid)
 
-! Order blocks by block size
-
+!   ! Order blocks by block size
+!
 !   blkorder(:nblk) = order(blksz, nblk)
 !   blksz(:nblk) = blksz(blkorder(:nblk))
 !   blkorder(:nblk) = inverseperm(blkorder(:nblk))

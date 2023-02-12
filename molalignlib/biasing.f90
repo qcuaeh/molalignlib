@@ -25,16 +25,23 @@ real(wp) :: bias_scale
 
 contains
 
-subroutine setsdnbias(natom, nblk, blksz, coords0, coords1, biasmat)
+subroutine setcrossbias(natom, nblk, blksz, coords0, coords1, biasmat)
 ! Purpose: Set biases from sorted distances to neighbors equivalence
 
    integer, intent(in) :: natom, nblk
    integer, dimension(:), intent(in) :: blksz
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
    real(wp), dimension(:, :), intent(out) :: biasmat
-
    integer :: h, i, j, offset
    real(wp), allocatable :: d0(:, :), d1(:, :)
+
+   ! Set default bias
+
+   biasmat(:, :) = 0
+
+   ! Quick return
+
+   if (.not. bias_flag) return
 
    allocate(d0(natom, natom), d1(natom, natom))
 
@@ -61,7 +68,6 @@ subroutine setsdnbias(natom, nblk, blksz, coords0, coords1, biasmat)
    end do
 
    offset = 0
-   biasmat(:, :) = 0
 
    do h = 1, nblk
       do i = offset + 1, offset + blksz(h)

@@ -22,20 +22,20 @@ subroutine getadjmat(natom, coords, znums, adjmat)
    real(wp) :: atomdist
    real(wp) :: adjrad(natom)
 
-! Keep default bonding
+   ! Quick return
 
    if (.not. bond_flag) return
 
-! Start with no bonding
+   ! Initialization
 
    adjmat(:, :) = .false.
 
-! Set adjacency radii
+   ! Set adjacency radii
 
    adjrad(:) = covrad(znums) + 0.25*(vdwrad(znums) - covrad(znums))
 
-! Change adjacency matrix i,j to true if atoms i and j are closer
-! than the sum of their adjacency radius
+   ! Change adjacency matrix i,j to true if atoms i and j are closer
+   ! than the sum of their adjacency radius
 
    do i = 1, natom
       do j = i + 1, natom

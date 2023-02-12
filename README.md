@@ -63,12 +63,12 @@ These options are supported by both, the native executable and the python script
 &emsp;<code>-rec *N*</code>&nbsp; Record up to *N* assignments (defaults to 1).  
 &emsp;<code>-enan</code>&nbsp; Align with enantiomer (mirrored coordinates).  
 &emsp;<code>-stats</code>&nbsp; Print detailed stats of the calculation.  
+&emsp;<code>-test</code>&nbsp; Produce repeatable results for testing.  
 &emsp;<code>-mass</code>&nbsp; Use mass weighted coordinates.  
 
 These options are only supported by the native executable:
 
 &emsp;<code>-live</code>&nbsp; Show progress in real time.  
-&emsp;<code>-test</code>&nbsp; Produce repeatable results for testing.  
 &emsp;<code>-stdin *EXT*</code>&nbsp; Read coordinates from standard input in *EXT* format.  
 &emsp;<code>-stdout *EXT*</code>&nbsp; Write coordinates to standard output in *EXT* format.  
  

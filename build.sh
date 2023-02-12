@@ -19,21 +19,10 @@ clean_build() {
 
 compile() {
    pic=false
-   debug=false
    toarray std_flags
    toarray pic_flags
    toarray optim_flags
    toarray debug_flags
-   options=$(getopt -o '' -al pic,debug -- "$@") || exit
-   eval set -- "$options"
-   while true; do
-      case "$1" in
-      --pic) pic=true; shift ;;
-      --debug) debug=true; shift ;;
-      --) shift; break ;;
-      *) exit
-      esac
-   done
    srcdir=$topdir/$1
    if test ! -d "$srcdir"; then
       echo Error: $srcdir does not exist
@@ -41,10 +30,10 @@ compile() {
    fi
    pushd "$buildir" >/dev/null
    flags=("${std_flags[@]}")
-   if $pic; then
+   if $pic_build; then
       flags+=("${pic_flags[@]}")
    fi
-   if $debug; then
+   if $debug_build; then
       flags+=("${debug_flags[@]}")
    else
       flags+=("${optim_flags[@]}")
@@ -119,6 +108,7 @@ make_pyext() {
 
 runtests() {
    $quick_build && return
+   $debug_build && return
    testdir=$topdir/$1
    shift
    if test -z "$executable"; then
@@ -162,20 +152,24 @@ while IFS= read -r line; do
    declare -- "$var"="$value"
 done < <(grep -v -e^# -e^$ ./build.env)
 
+debug_build=false
 quick_build=false
 
-while getopts "q" opt; do
+while getopts ":dq" opt; do
   case $opt in
+    d)
+      debug_build=true
+      ;;
     q)
       quick_build=true
       ;;
     \?)
       echo "Invalid option: -$OPTARG" >&2
+      exit 1
       ;;
   esac
 done
 
-# Eliminate the options from the positional parameters
 shift $((OPTIND-1))
 
 if test $# -gt 0; then
@@ -188,24 +182,27 @@ case $target in
 prog)
    # Build program
    clean_build
+   pic_build=false
    compile molalignlib
    compile molalign
    make_prog molalign
    # Run tests
-#   runtests tests/jcim.2c01187/0.05 -test -rec 5 -sort -fast -tol 0.17
-   runtests tests/jcim.2c01187/0.1 -test -rec 5 -sort -fast -tol 0.35
-#   runtests tests/jcim.2c01187/0.2 -test -rec 5 -sort -fast -tol 0.69
+#   runtests tests/jcim.2c01187/0.05 -test -stats -stdout xyz -rec 5 -sort -fast -tol 0.17
+   runtests tests/jcim.2c01187/0.1 -test -stats -stdout xyz -rec 5 -sort -fast -tol 0.35
+#   runtests tests/jcim.2c01187/0.2 -test -stats -stdout xyz -rec 5 -sort -fast -tol 0.69
    ;;
 lib)
    # Build dynamic library
    clean_build
-   compile -pic molalignlib
+   pic_build=true
+   compile molalignlib
    make_lib molalignlib
    ;;
 pyext)
    # Build python extension module
    clean_build
-   compile -pic molalignlib
+   pic_build=true
+   compile molalignlib
    make_pyext molalignlibext
    ;;
 *)

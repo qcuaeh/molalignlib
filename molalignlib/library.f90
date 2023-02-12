@@ -38,15 +38,15 @@ subroutine assign_atoms( &
    natom0, &
    znums0,  &
    types0, &
-   coords0, &
-   adjmat0, &
    weights0, &
+   incoords0, &
+   adjmat0, &
    natom1, &
    znums1, &
    types1, &
-   coords1, &
-   adjmat1, &
    weights1, &
+   incoords1, &
+   adjmat1, &
    permlist, &
    countlist, &
    nrec, &
@@ -56,24 +56,27 @@ subroutine assign_atoms( &
    integer, dimension(:), intent(in) :: znums0, znums1
    integer, dimension(:), intent(in) :: types0, types1
    logical, dimension(:, :), intent(in) :: adjmat0, adjmat1
-   real(wp), dimension(:, :), intent(in) :: coords0, coords1
+   real(wp), dimension(:, :), intent(in) :: incoords0, incoords1
    real(wp), dimension(:), intent(in) :: weights0, weights1
    integer, dimension(:, :), intent(inout) :: permlist
    integer, dimension(:), intent(inout) :: countlist
    integer, intent(out) :: nrec, error
-   integer :: i, h, offset
+
+   integer :: i
    integer :: nblk0, nblk1
    integer :: neqv0, neqv1
    integer, dimension(:), allocatable :: blkid0, blkid1
    integer, dimension(:), allocatable :: blksz0, blksz1
+   real(wp), dimension(:), allocatable :: blkwt0, blkwt1
    integer, dimension(:), allocatable :: atomorder0, atomorder1
-   integer, dimension(:), allocatable :: invatomorder0, invatomorder1
+   integer, dimension(:), allocatable :: backorder0, backorder1
    integer, dimension(:), allocatable :: nadj0, nadj1
    integer, dimension(:, :), allocatable :: adjlist0, adjlist1
    integer, dimension(:), allocatable :: eqvid0, eqvid1
    integer, dimension(:), allocatable :: eqvsz0, eqvsz1
-   real(wp) :: totalweight
    real(wp) :: center0(3), center1(3)
+   real(wp), dimension(:, :), allocatable :: coords0, coords1
+   real(wp), dimension(:, :), allocatable :: biasmat
 
    ! Set error code to 0 by default
 
@@ -90,13 +93,16 @@ subroutine assign_atoms( &
    ! Allocate arrays
 
    allocate(atomorder0(natom0), atomorder1(natom1))
-   allocate(invatomorder0(natom0), invatomorder1(natom1))
+   allocate(backorder0(natom0), backorder1(natom1))
    allocate(blkid0(natom0), blkid1(natom1))
    allocate(blksz0(natom0), blksz1(natom1))
+   allocate(blkwt0(natom0), blkwt1(natom1))
    allocate(nadj0(natom0), nadj1(natom1))
    allocate(adjlist0(maxcoord, natom0), adjlist1(maxcoord, natom1))
    allocate(eqvid0(natom0), eqvid1(natom1))
    allocate(eqvsz0(natom0), eqvsz1(natom1))
+   allocate(coords0(3, natom0), coords1(3, natom1))
+   allocate(biasmat(natom0, natom1))
 
    ! Get adjacency lists
 
@@ -105,8 +111,8 @@ subroutine assign_atoms( &
 
    ! Group atoms by label
 
-   call grouptypes(natom0, znums0, types0, nblk0, blksz0, blkid0)
-   call grouptypes(natom1, znums1, types1, nblk1, blksz1, blkid1)
+   call grouptypes(natom0, znums0, types0, weights0, nblk0, blksz0, blkwt0, blkid0)
+   call grouptypes(natom1, znums1, types1, weights1, nblk1, blksz1, blkwt1, blkid1)
 
    ! Group atoms by NMA at infinite level
 
@@ -120,8 +126,8 @@ subroutine assign_atoms( &
 
    ! Get inverse atom order
 
-   invatomorder0 = inverseperm(atomorder0)
-   invatomorder1 = inverseperm(atomorder1)
+   backorder0 = inverseperm(atomorder0)
+   backorder1 = inverseperm(atomorder1)
 
    ! Abort if molecules are not isomers
 
@@ -141,34 +147,25 @@ subroutine assign_atoms( &
 
    ! Abort if there are conflicting weights
 
-   if (any(weights0(atomorder0) /= weights1(atomorder1))) then
+   if (any(abs(weights0(atomorder0) - weights1(atomorder1)) > 1.E-6)) then
       write (error_unit, '(a)') 'Error: There are conflicting weights'
       error = 1
       return
    end if
 
-   ! Abort if there are inconsistent weights
-
-   offset = 0
-   do h = 1, nblk0
-      do i = 2, blksz0(h)
-         if (weights0(atomorder0(offset+i)) /= weights0(atomorder0(offset+1))) then
-            write (error_unit, '(a)') 'Error: Atoms of the same type must weight the same'
-            error = 1
-            return
-         end if
-      end do
-      offset = offset + blksz0(h)
-   end do
-
-   ! Calculate total weight
-
-   totalweight = sum(weights0)
-
    ! Calculate centroids
 
-   center0 = centroid(natom0, weights0, coords0)
-   center1 = centroid(natom1, weights1, coords1)
+   center0 = centroid(natom0, weights0, incoords0)
+   center1 = centroid(natom1, weights1, incoords1)
+
+   ! Reorder and translate coordinates
+
+   coords0 = centered(natom0, incoords0(:, atomorder0), center0)
+   coords1 = centered(natom1, incoords1(:, atomorder1), center1)
+
+   ! Calculate biases
+
+   call setcrossbias(natom0, nblk0, blksz0, coords0, coords1, biasmat)
 
    ! Initialize random number generator
 
@@ -180,9 +177,10 @@ subroutine assign_atoms( &
       natom0, &
       nblk0, &
       blksz0, &
-      weights0(atomorder0)/totalweight, &
-      centered(natom0, coords0(:, atomorder0), center0), &
-      centered(natom1, coords1(:, atomorder1), center1), &
+      blkwt0, &
+      coords0, &
+      coords1, &
+      biasmat, &
       permlist, &
       countlist, &
       nrec)
@@ -190,7 +188,7 @@ subroutine assign_atoms( &
    ! Reorder back to original atom ordering
 
    do i = 1, nrec
-      permlist(:, i) = atomorder1(permlist(invatomorder0, i))
+      permlist(:, i) = atomorder1(permlist(backorder0, i))
    end do
 
 end subroutine
@@ -200,13 +198,13 @@ subroutine align_atoms( &
    natom0, &
    znums0, &
    types0, &
-   coords0, &
    weights0, &
+   coords0, &
    natom1, &
    znums1, &
    types1, &
-   coords1, &
    weights1, &
+   coords1, &
    travec, &
    rotmat, &
    error)
@@ -218,7 +216,6 @@ subroutine align_atoms( &
    real(wp), dimension(:), intent(in) :: weights0, weights1
    real(wp), intent(out) :: travec(3), rotmat(3, 3)
    integer, intent(out) :: error
-   real(wp) :: totalweight
    real(wp) :: center0(3), center1(3)
    real(wp) :: aligned1(3, natom1)
 
@@ -266,10 +263,6 @@ subroutine align_atoms( &
       return
    end if
 
-   ! Calculate total weight
-
-   totalweight = sum(weights0)
-
    ! Calculate centroids
 
    center0 = centroid(natom0, weights0, coords0)
@@ -279,7 +272,7 @@ subroutine align_atoms( &
 
    rotmat = rotquat2rotmat(leastrotquat( &
       natom0, &
-      weights0/totalweight, &
+      weights0, &
       centered(natom0, coords0, center0), &
       centered(natom1, coords1, center1), &
       identityperm(natom0)))

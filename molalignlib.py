@@ -30,6 +30,8 @@ def assign_atoms(
     atoms0,
     atoms1,
     biasing = None,
+    testing = None,
+    bonding = None,
     iteration = None,
     massweighted = None,
     stats = None,
@@ -47,6 +49,14 @@ def assign_atoms(
         biasing = False
     elif type(biasing) is not bool:
         raise TypeError('"biasing" must be a boolean')
+    if testing is None:
+        testing = False
+    elif type(testing) is not bool:
+        raise TypeError('"testing" must be a boolean')
+    if bonding is None:
+        bonding = False
+    elif type(bonding) is not bool:
+        raise TypeError('"bonding" must be a boolean')
     if iteration is None:
         iteration = False
     elif type(iteration) is not bool:
@@ -86,10 +96,10 @@ def assign_atoms(
     natom0 = len(atoms0)
     natom1 = len(atoms1)
     molalignlibext.flags.bias_flag = biasing
+    molalignlibext.flags.test_flag = testing
+    molalignlibext.flags.bond_flag = bonding
     molalignlibext.flags.iter_flag = iteration
     molalignlibext.flags.stats_flag = stats
-    molalignlibext.flags.seed_flag = False
-    molalignlibext.flags.bond_flag = False
     molalignlibext.bounds.maxrec = records
     molalignlibext.bounds.maxcount = count
     molalignlibext.biasing.bias_tol = tolerance
@@ -116,15 +126,15 @@ def assign_atoms(
             natom0,
             znums0,
             types0,
+            weights0,
             coords0,
             adjmat0,
-            weights0,
             natom1,
             znums1,
             types1,
+            weights1,
             coords1,
             adjmat1,
-            weights1,
             permlist,
             countlist,
         )
@@ -160,13 +170,13 @@ def align_to(self, other, massweighted=None):
             natom0,
             znums0,
             types0,
-            coords0,
             weights0,
+            coords0,
             natom1,
             znums1,
             types1,
-            coords1,
             weights1,
+            coords1,
         )
     if error:
         raise RuntimeError('Alignment failed')
