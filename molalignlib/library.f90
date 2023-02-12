@@ -35,11 +35,13 @@ contains
 
 ! Assign atoms0 and atoms1
 subroutine assign_atoms( &
+   natom0, &
    znums0,  &
    types0, &
    coords0, &
    adjmat0, &
    weights0, &
+   natom1, &
    znums1, &
    types1, &
    coords1, &
@@ -50,8 +52,9 @@ subroutine assign_atoms( &
    nrec, &
    error)
 
-   integer, dimension(:), intent(in) :: znums0, types0
-   integer, dimension(:), intent(in) :: znums1, types1
+   integer, intent(in) :: natom0, natom1
+   integer, dimension(:), intent(in) :: znums0, znums1
+   integer, dimension(:), intent(in) :: types0, types1
    logical, dimension(:, :), intent(in) :: adjmat0, adjmat1
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
    real(wp), dimension(:), intent(in) :: weights0, weights1
@@ -194,10 +197,12 @@ end subroutine
 
 ! Align atoms0 and atoms1
 subroutine align_atoms( &
+   natom0, &
    znums0, &
    types0, &
    coords0, &
    weights0, &
+   natom1, &
    znums1, &
    types1, &
    coords1, &
@@ -206,6 +211,7 @@ subroutine align_atoms( &
    rotmat, &
    error)
 
+   integer, intent(in) :: natom0, natom1
    integer, dimension(:), intent(in) :: znums0, types0
    integer, dimension(:), intent(in) :: znums1, types1
    real(wp), dimension(:, :), intent(in) :: coords0, coords1

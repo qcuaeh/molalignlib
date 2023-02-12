@@ -65,11 +65,7 @@ subroutine optimize_assignment( &
 ! Calculate biases
 
    if (bias_flag) then
-      if (bond_flag) then
-         call setmnabias(natom, nblk, blksz, coords0, coords1, biasmat)
-      else
-         call setsdnbias(natom, nblk, blksz, coords0, coords1, biasmat)
-      end if
+      call setsdnbias(natom, nblk, blksz, coords0, coords1, biasmat)
    else
       biasmat(:, :) = 0
    end if

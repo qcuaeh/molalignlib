@@ -51,74 +51,116 @@ subroutine open2read(filepath, unit, fileext)
 
 end subroutine
 
-subroutine readfile(unit, fmtin, natom, title, labels, coords, opt_nbond, opt_bonds)
+subroutine readfile(unit, fmtin, title, natom, labels, coords, adjmat)
    integer, intent(in) :: unit
    character(*), intent(in) :: fmtin
    integer, intent(out) :: natom
    character(:), allocatable, intent(out) :: title
    character(*), dimension(:), allocatable, intent(out) :: labels
    real(wp), dimension(:, :), allocatable, intent(out) :: coords
-   integer, optional, intent(out) :: opt_nbond
-   integer, target, optional, intent(out) :: opt_bonds(:, :)
+   logical, dimension(:, :), allocatable, intent(out) :: adjmat
 
-   integer :: nbond
-   integer, pointer :: bonds(:, :)
+   integer i
+   integer, allocatable :: nbond
+   integer, allocatable :: bonds(:, :)
    
-   if (present(opt_nbond)) then
-      nbond = opt_nbond
-      if (present(opt_bonds)) then
-         bonds => opt_bonds
-      else
-         write (error_unit, '(a)') 'Bond list is missing!'
-         stop
-      end if
-   else
-      nbond = 0
-   end if
+   nbond = 0
 
    select case (fmtin)
    case ('xyz')
-      call readxyzfile(unit, natom, title, labels, coords)
-!    case ('mol2')
-!        call readmol2file(unit, natom, title, labels, coords, nbond, bonds)
+      call readxyzfile(unit, title, natom, labels, coords)
+   case ('mol2')
+      call readmol2file(unit, title, natom, labels, coords, nbond, bonds)
    case default
       write (error_unit, '(a,1x,a)') 'Invalid format:', fmtin
       stop
    end select
 
+   allocate(adjmat(natom, natom))
+
+   adjmat(:, :) = .false.
+
+   do i = 1, nbond
+      adjmat(bonds(1, i), bonds(2, i)) = .true.
+      adjmat(bonds(2, i), bonds(1, i)) = .true.
+   end do
+
 end subroutine
 
-subroutine readxyzfile(unit, natom, title, labels, coords)
+subroutine readxyzfile(unit, title, natom, labels, coords)
    integer, intent(in) :: unit
    integer, intent(out) :: natom
    real(wp), dimension(:, :), allocatable, intent(out) :: coords
    character(*), dimension(:), allocatable, intent(out) :: labels
    character(:), allocatable, intent(out) :: title
-   character(maxstrlen) :: buffer
+   character(ll) :: buffer
+
    integer :: i, stat
 
-   read (unit, *, iostat=stat) natom
-   if (stat < 0) then
-      write (error_unit, '(a)') 'Unexpected end of file!'
-      stop
-   end if
+   read (unit, *, end=99) natom
 
-   allocate (labels(natom), coords(3, natom))
+   allocate(labels(natom), coords(3, natom))
 
-   read (unit, '(a)', iostat=stat) buffer
+   read (unit, '(a)', end=99) buffer
    title = trim(buffer)
-   if (stat < 0) then
-      write (error_unit, '(a)') 'Unexpected end of file!'
-      stop
-   end if
 
    do i = 1, natom
-      read (unit, *, iostat=stat) labels(i), coords(:, i)
-      if (stat < 0) then
-         write (error_unit, '(a)') 'Unexpected end of file!'
-         stop
-      end if
+      read (unit, *, end=99) labels(i), coords(:, i)
    end do
+
+   return
+
+   99 continue
+   write (error_unit, '(a)') 'Unexpected end of file!'
+   stop
+
+end subroutine
+
+subroutine readmol2file(unit, title, natom, labels, coords, nbond, bonds)
+   integer, intent(in) :: unit
+   integer, intent(out) :: natom, nbond
+   integer, dimension(:, :), allocatable, intent(out) :: bonds
+   real(wp), dimension(:, :), allocatable, intent(out) :: coords
+   character(*), dimension(:), allocatable, intent(out) :: labels
+   character(:), allocatable, intent(out) :: title
+   character(ll) :: buffer
+   integer :: i, id
+
+   do
+      read (unit, '(a)', end=99) buffer
+      if (buffer == '@<TRIPOS>MOLECULE') exit
+   end do
+
+   read (unit, '(a)', end=99) buffer
+   title = trim(buffer)
+   read (unit, *, end=99) natom, nbond
+
+   allocate(labels(natom), coords(3, natom))
+   allocate(bonds(2, nbond))
+
+   do
+      read (unit, '(a)', end=99) buffer
+      if (buffer == '@<TRIPOS>ATOM') exit
+   end do
+
+   do i = 1, natom
+      read (unit, *, end=99) id, labels(i), coords(:,i)
+   end do
+
+   do
+      read (unit, '(a)', end=99) buffer
+      if (buffer == '@<TRIPOS>BOND') exit
+   end do
+
+   do i = 1, nbond
+      read (unit, *, end=99) id, bonds(:,i)
+   end do
+
+   return
+
+   99 continue
+   write (error_unit, '(a)') 'Unexpected end of file!'
+   stop
 
 end subroutine
 

@@ -26,7 +26,7 @@ real(wp) :: bias_scale
 contains
 
 subroutine setsdnbias(natom, nblk, blksz, coords0, coords1, biasmat)
-! Purpose: Calculate biases from sorted distances to neighbors
+! Purpose: Set biases from sorted distances to neighbors equivalence
 
    integer, intent(in) :: natom, nblk
    integer, dimension(:), intent(in) :: blksz
@@ -73,16 +73,6 @@ subroutine setsdnbias(natom, nblk, blksz, coords0, coords1, biasmat)
       end do
       offset = offset + blksz(h)
    end do
-
-end subroutine
-
-subroutine setmnabias(natom, nblk, blksz, coords0, coords1, biasmat)
-! Purpose: Calculate biases from multilevel neighborhood of atoms
-
-   integer, intent(in) :: natom, nblk
-   integer, dimension(:), intent(in) :: blksz
-   real(wp), dimension(:, :), intent(in) :: coords0, coords1
-   real(wp), dimension(:, :), intent(out) :: biasmat
 
 end subroutine
 

@@ -37,7 +37,7 @@ subroutine open2write(filename, unit)
 
 end subroutine
 
-subroutine writefile(unit, fmtout, natom, title, znums, coords, adjmat)
+subroutine writefile(unit, fmtout, title, natom, znums, coords, adjmat)
    integer, intent(in) :: unit, natom
    integer, dimension(:), intent(in) :: znums
    real(wp), dimension(:, :), intent(in) :: coords
@@ -46,7 +46,6 @@ subroutine writefile(unit, fmtout, natom, title, znums, coords, adjmat)
    integer :: i, j, nbond, bonds(2, natom*maxcoord)
 
    nbond = 0
-
    do i = 1, natom
       do j = i + 1, natom
          if (adjmat(i, j)) then
@@ -59,9 +58,9 @@ subroutine writefile(unit, fmtout, natom, title, znums, coords, adjmat)
 
    select case (fmtout)
    case ('xyz')
-      call writexyzfile(unit, natom, title, znums, coords)
+      call writexyzfile(unit, title, natom, znums, coords)
    case ('mol2')
-      call writemol2file(unit, natom, title, znums, coords, nbond, bonds)
+      call writemol2file(unit, title, natom, znums, coords, nbond, bonds)
    case default
       write (error_unit, '(a,1x,a)') 'Invalid format:', fmtout
       stop
@@ -69,7 +68,7 @@ subroutine writefile(unit, fmtout, natom, title, znums, coords, adjmat)
 
 end subroutine
 
-subroutine writexyzfile(unit, natom, title, znums, coords)
+subroutine writexyzfile(unit, title, natom, znums, coords)
    character(*), intent(in) :: title
    integer, intent(in) :: unit, natom
    integer, dimension(:), intent(in) :: znums
@@ -85,7 +84,7 @@ subroutine writexyzfile(unit, natom, title, znums, coords)
 
 end subroutine
 
-subroutine writemol2file(unit, natom, title, znums, coords, nbond, bonds)
+subroutine writemol2file(unit, title, natom, znums, coords, nbond, bonds)
    character(*), intent(in) :: title
    integer, intent(in) :: unit, natom
    integer, dimension(:), intent(in) :: znums
