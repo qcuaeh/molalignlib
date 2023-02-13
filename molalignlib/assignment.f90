@@ -38,43 +38,49 @@ subroutine optimize_assignment( &
    natom, &
    nblk, &
    blksz, &
-   weights, &
+   blkwt, &
    coords0, &
    coords1, &
-   maxrec, &
-   nrec, &
+   biasmat, &
    permlist, &
-   countlist)
+   countlist, &
+   nrec)
 
-   integer, intent(in) :: natom, nblk, maxrec
+   integer, intent(in) :: natom, nblk
    integer, dimension(:), intent(in) :: blksz
+   real(wp), dimension(:), intent(in) :: blkwt
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
-   real(wp), dimension(:), intent(in) :: weights
-   integer, intent(out) :: nrec
+   real(wp), dimension(:, :), intent(in) :: biasmat
    integer, intent(out) :: permlist(:, :)
    integer, intent(out) :: countlist(:)
+   integer, intent(out) :: nrec
 
+   integer :: h, offset
    logical visited, overflow
    integer irec, ntrial, nstep, steps
    integer, dimension(natom) :: atomperm, auxmap
    real(wp) :: dist2, olddist, newdist, totalrot
    real(wp), dimension(4) :: rotquat, prodquat
    real(wp), dimension(maxrec) :: dist2rec, avgsteps, avgtotalrot, avgrealrot
-   real(wp) :: bias(natom, natom)
    real(wp) :: workcoords1(3, natom)
+   real(wp) :: weights(natom)
 
-! Set bias for non equivalent atoms 
+   ! Distribute weights to atoms
 
-   call setadjbias(natom, nblk, blksz, coords0, coords1, bias)
+   offset = 0
+   do h = 1, nblk
+      weights(offset+1:offset+blksz(h)) = blkwt(h)
+      offset = offset + blksz(h)
+   end do
 
-! Print header and initial stats
+   ! Print header and initial stats
 
    if (stats_flag .and. live_flag) then
       write (error_unit, '(a)', advance='no') achar(27) // '[1H' // achar(27) // '[J'
       call print_header()
    end if
 
-! Initialize loop variables
+   ! Initialize loop variables
 
    nrec = 0
    nstep = 0
@@ -82,23 +88,23 @@ subroutine optimize_assignment( &
    countlist(1) = 0
    overflow = .false.
 
-! Loop for map searching
+   ! Loop for map searching
 
    do while (countlist(1) < maxcount .and. (.not. trial_flag .or. ntrial < maxtrials))
 
       ntrial = ntrial + 1
 
-! Work with a copy of coords1
+   ! Work with a copy of coords1
 
       workcoords1 = coords1
 
-! Aply a random rotation to workcoords1
+   ! Aply a random rotation to workcoords1
 
       call rotate(natom, workcoords1, genrotquat(rand3()))
 
-! Minimize the euclidean distance
+   ! Minimize the euclidean distance
 
-      call minatomperm(natom, coords0, workcoords1, nblk, blksz, bias, weights, atomperm, olddist)
+      call minatomperm(natom, coords0, workcoords1, nblk, blksz, blkwt, biasmat, atomperm, olddist)
       rotquat = leastrotquat(natom, weights, coords0, workcoords1, atomperm)
       prodquat = rotquat
       totalrot = rotangle(rotquat)
@@ -107,8 +113,8 @@ subroutine optimize_assignment( &
       steps = 1
 
       do while (iter_flag)
-         olddist = biasdist(natom, atomperm, weights, coords0, workcoords1, bias)
-         call minatomperm(natom, coords0, workcoords1, nblk, blksz, bias, weights, auxmap, newdist)
+         olddist = squaredist(natom, weights, coords0, workcoords1, atomperm) + biasdist(natom, weights, biasmat, atomperm)
+         call minatomperm(natom, coords0, workcoords1, nblk, blksz, blkwt, biasmat, auxmap, newdist)
          if (all(auxmap == atomperm)) exit
          if (newdist > olddist) then
             write (error_unit, '(a)') 'newdist is larger than olddist!'
@@ -126,7 +132,7 @@ subroutine optimize_assignment( &
 
       dist2 = squaredist(natom, weights, coords0, workcoords1, atomperm)
 
-! Check for new best permlist
+      ! Check for new best permlist
 
       visited = .false.
 
@@ -139,7 +145,7 @@ subroutine optimize_assignment( &
             if (stats_flag .and. live_flag) then
                write (error_unit, '(a)', advance='no') achar(27) // '[' // intstr(irec + 2) // 'H'
                call print_body(irec, countlist(irec), avgsteps(irec), avgtotalrot(irec), &
-                  avgrealrot(irec), dist2rec(irec))
+                  avgrealrot(irec), dist2rec(irec)/sum(weights))
             end if
             visited = .true.
             exit
@@ -164,7 +170,7 @@ subroutine optimize_assignment( &
             if (stats_flag .and. live_flag) then
                write (error_unit, '(a)', advance='no') achar(27) // '[' // intstr(irec + 2) // 'H'
                call print_body(irec, countlist(irec), avgsteps(irec), avgtotalrot(irec), &
-                  avgrealrot(irec), dist2rec(irec))
+                  avgrealrot(irec), dist2rec(irec)/sum(weights))
             end if
          end do
          permlist(:, irec) = atomperm
@@ -176,7 +182,7 @@ subroutine optimize_assignment( &
          if (stats_flag .and. live_flag) then
             write (error_unit, '(a)', advance='no') achar(27) // '[' // intstr(irec + 2) // 'H'
             call print_body(irec, countlist(irec), avgsteps(irec), avgtotalrot(irec), &
-               avgrealrot(irec), dist2rec(irec))
+               avgrealrot(irec), dist2rec(irec)/sum(weights))
          end if
       end if
 
@@ -191,7 +197,7 @@ subroutine optimize_assignment( &
       call print_header()
       do irec = 1, nrec
          call print_body(irec, countlist(irec), avgsteps(irec), avgtotalrot(irec), &
-            avgrealrot(irec), dist2rec(irec))
+            avgrealrot(irec), dist2rec(irec)/sum(weights))
       end do
       call print_footer()
    end if
@@ -203,7 +209,7 @@ subroutine optimize_assignment( &
 end subroutine
 
 ! Find best correspondence between points sets with fixed orientation
-subroutine minatomperm(natom, coords0, coords1, nblk, blksz, bias, weights, atomperm, totdist)
+subroutine minatomperm(natom, coords0, coords1, nblk, blksz, blkwt, biasmat, atomperm, totdist)
 
 ! nblk: Number of block atoms
 ! blksz: Number of atoms in each block
@@ -212,10 +218,10 @@ subroutine minatomperm(natom, coords0, coords1, nblk, blksz, bias, weights, atom
 
    integer, intent(in) :: natom, nblk
    integer, dimension(:), intent(in) :: blksz
+   real(wp), dimension(:), intent(in) :: blkwt
    real(wp), dimension(:, :), intent(in) :: coords0
    real(wp), dimension(:, :), intent(in) :: coords1
-   real(wp), dimension(:, :), intent(in) :: bias
-   real(wp), dimension(:), intent(in) :: weights
+   real(wp), dimension(:, :), intent(in) :: biasmat
    integer, dimension(:), intent(out) :: atomperm
    real(wp), intent(out) :: totdist
 
@@ -223,16 +229,16 @@ subroutine minatomperm(natom, coords0, coords1, nblk, blksz, bias, weights, atom
    integer, dimension(natom) :: perm
    real(wp) :: dist
 
-! Fill distance matrix for each block
+   ! Fill distance matrix for each block
 
    offset = 0
    totdist = 0
 
    do h = 1, nblk
       call minperm(blksz(h), coords0(:, offset+1:offset+blksz(h)), coords1(:, offset+1:offset+blksz(h)), &
-         bias(offset+1:offset+blksz(h), offset+1:offset+blksz(h)), perm, dist)
+         biasmat(offset+1:offset+blksz(h), offset+1:offset+blksz(h)), perm, dist)
       atomperm(offset+1:offset+blksz(h)) = perm(:blksz(h)) + offset
-      totdist = totdist + weights(h)*dist
+      totdist = totdist + blkwt(h)*dist
       offset = offset + blksz(h)
    end do
 

@@ -28,11 +28,15 @@ program molalign
    use translation
    use rotation
    use alignment
+   use adjacency
+   use discrete
    use library
 
    implicit none
 
-   integer :: i, nrec, error
+   integer :: i
+   integer :: nrec, error
+   integer :: natom0, natom1
    integer :: read_unit0, read_unit1, write_unit
    integer, allocatable, dimension(:) :: znums0, znums1
    integer, allocatable, dimension(:) :: types0, types1
@@ -42,30 +46,33 @@ program molalign
    character(:), allocatable :: pathin1, pathin2, pathout
    character(:), allocatable :: fmtin, fmtin0, fmtin1, fmtout
    character(:), allocatable :: title0, title1
-   character(maxstrlen) :: posargs(2)
-   character(maxstrlen), allocatable, dimension(:) :: labels0, labels1
+   character(ll) :: posargs(2)
+   character(wl), allocatable, dimension(:) :: labels0, labels1
    real(wp) :: rmsd, travec(3), rotmat(3, 3)
    real(wp), allocatable, dimension(:) :: weights0, weights1
-   real(wp), dimension(:, :), allocatable :: coords0, coords1, aligned1
+   real(wp), allocatable, dimension(:, :) :: coords0, coords1, aligned1
    logical :: sort_flag, enan_flag, stdin_flag, stdout_flag
+   logical, dimension(:, :), allocatable :: adjmat0, adjmat1
 
    procedure(f_realint), pointer :: weight_function
 
    ! Set default options
 
-   bias_flag = .false.
    iter_flag = .false.
    sort_flag = .false.
    trial_flag = .false.
    stdin_flag = .false.
    stdout_flag = .false.
-   repro_flag = .false.
+   test_flag = .false.
    stats_flag = .false.
    enan_flag = .false.
    live_flag = .false.
+   bias_flag = .false.
+   bond_flag = .false.
 
    maxrec = 1
    maxcount = 10
+   maxcoord = 32
    bias_tol = 0.35
    bias_scale = 1.e3
    pathout = 'aligned.xyz'
@@ -84,12 +91,19 @@ program molalign
       case ('-stats')
          stats_flag = .true.
       case ('-test')
-         repro_flag = .true.
-         stats_flag = .true.
-         stdout_flag = .true.
-         fmtout = 'xyz'
+         test_flag = .true.
       case ('-sort')
          sort_flag = .true.
+      case ('-fast')
+         iter_flag = .true.
+         bias_flag = .true.
+!         bias_func => setcrossbias
+!      case ('-topo')
+!         iter_flag = .true.
+!         bias_flag = .true.
+!         bias_func => setmnabias
+      case ('-bond')
+         bond_flag = .true.
       case ('-mass')
          weight_function => stdmass
       case ('-enan')
@@ -114,18 +128,6 @@ program molalign
       case ('-stdout')
          stdout_flag = .true.
          call readoptarg(arg, fmtout)
-      case ('-fast')
-         bias_flag = .true.
-         iter_flag = .true.
-!      case ('-bias')
-!         bias_flag = .true.
-!         iter_flag = .false.
-!      case ('-iter')
-!         bias_flag = .false.
-!         iter_flag = .true.
-!      case ('-none')
-!         bias_flag = .false.
-!         iter_flag = .false.
       case default
          call readposarg(arg, posargs)
       end select
@@ -155,8 +157,8 @@ program molalign
 
    ! Read coordinates
 
-   call readfile(read_unit0, fmtin0, natom0, title0, labels0, coords0)
-   call readfile(read_unit1, fmtin1, natom1, title1, labels1, coords1)
+   call readfile(read_unit0, fmtin0, title0, natom0, labels0, coords0, adjmat0)
+   call readfile(read_unit1, fmtin1, title1, natom1, labels1, coords1, adjmat1)
 
    if (enan_flag) then
       coords1(1, :) = -coords1(1, :)
@@ -195,19 +197,28 @@ program molalign
       end if
    end if
 
+   ! Get adjacency matrices and lists
+
+   call getadjmat(natom0, coords0, znums0, adjmat0)
+   call getadjmat(natom1, coords1, znums1, adjmat1)
+
    ! Sort atoms to minimize MSD
 
    if (sort_flag) then
 
       call assign_atoms( &
+         natom0, &
          znums0, &
          types0, &
-         coords0, &
          weights0, &
+         coords0, &
+         adjmat0, &
+         natom1, &
          znums1, &
          types1, &
-         coords1, &
          weights1, &
+         coords1, &
+         adjmat1, &
          permlist, &
          countlist, &
          nrec, &
@@ -218,14 +229,16 @@ program molalign
       do i = 1, nrec
 
          call align_atoms( &
+            natom0, &
             znums0, &
             types0, &
-            coords0, &
             weights0, &
+            coords0, &
+            natom1, &
             znums1(permlist(:, i)), &
             types1(permlist(:, i)), &
+            weights1(permlist(:, i)), &
             coords1(:, permlist(:, i)), &
-            weights1, &
             travec, &
             rotmat, &
             error)
@@ -237,11 +250,11 @@ program molalign
 
          if (i == 1) then
             write (output_unit, '(a)') 'Optimized RMSD = ' // realstr(rmsd, 4)
-            call writefile(write_unit, fmtout, natom0, 'Reference', znums0, coords0)
+            call writefile(write_unit, fmtout, 'Reference', natom0, znums0, coords0, adjmat0)
          end if
 
-         call writefile(write_unit, fmtout, natom1, 'RMSD ' // realstr(rmsd, 4), znums1(permlist(:, i)), &
-            aligned1(:, permlist(:, i)))
+         call writefile(write_unit, fmtout, 'RMSD ' // realstr(rmsd, 4), natom1, znums1(permlist(:, i)), &
+            aligned1(:, permlist(:, i)), adjmat1(permlist(:, i), permlist(:, i)))
 
       end do
 
@@ -250,14 +263,16 @@ program molalign
       ! Align atoms to minimize RMSD
 
       call align_atoms( &
+         natom0, &
          znums0, &
          types0, &
-         coords0, &
          weights0, &
+         coords0, &
+         natom1, &
          znums1, &
          types1, &
-         coords1, &
          weights1, &
+         coords1, &
          travec, &
          rotmat, &
          error)
@@ -268,8 +283,8 @@ program molalign
       rmsd = sqrt(sum(weights0*sum((aligned1 - coords0)**2, dim=1))/sum(weights0))
 
       write (error_unit, '(a)') 'RMSD = ' // realstr(rmsd, 4)
-      call writefile(write_unit, fmtout, natom0, 'Reference', znums0, coords0)
-      call writefile(write_unit, fmtout, natom1, 'RMSD ' // realstr(rmsd, 4), znums1, aligned1)
+      call writefile(write_unit, fmtout, 'Reference', natom0, znums0, coords0, adjmat0)
+      call writefile(write_unit, fmtout, 'RMSD ' // realstr(rmsd, 4), natom1, znums1, aligned1, adjmat1)
 
    end if
 

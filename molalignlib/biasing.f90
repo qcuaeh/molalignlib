@@ -25,15 +25,24 @@ real(wp) :: bias_scale
 
 contains
 
-subroutine setadjbias(natom, nblk, blksz, coords0, coords1, bias)
+subroutine setcrossbias(natom, nblk, blksz, coords0, coords1, biasmat)
+! Purpose: Set biases from sorted distances to neighbors equivalence
+
    integer, intent(in) :: natom, nblk
    integer, dimension(:), intent(in) :: blksz
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
-   real(wp), dimension(:, :), intent(out) :: bias
-
+   real(wp), dimension(:, :), intent(out) :: biasmat
    integer :: h, i, j, offset
-!    real(wp) d0(natom, natom), d1(natom, natom)
    real(wp), allocatable :: d0(:, :), d1(:, :)
+
+   ! Set default bias
+
+   biasmat(:, :) = 0
+
+   ! Quick return
+
+   if (.not. bias_flag) return
+
    allocate(d0(natom, natom), d1(natom, natom))
 
    do i = 1, natom
@@ -59,20 +68,17 @@ subroutine setadjbias(natom, nblk, blksz, coords0, coords1, bias)
    end do
 
    offset = 0
-   bias(:, :) = 0.
 
-   if (bias_flag) then
-      do h = 1, nblk
-         do i = offset + 1, offset + blksz(h)
-            do j = offset + 1, offset + blksz(h)
-               if (any(abs(d1(:, j) - d0(:, i)) > bias_tol)) then
-                  bias(i, j) = bias_scale**2
-               end if
-            end do
+   do h = 1, nblk
+      do i = offset + 1, offset + blksz(h)
+         do j = offset + 1, offset + blksz(h)
+            if (any(abs(d1(:, j) - d0(:, i)) > bias_tol)) then
+               biasmat(i, j) = bias_scale**2
+            end if
          end do
-         offset = offset + blksz(h)
       end do
-   end if
+      offset = offset + blksz(h)
+   end do
 
 end subroutine
 

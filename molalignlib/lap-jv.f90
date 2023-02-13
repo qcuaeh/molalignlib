@@ -18,7 +18,7 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module lap
-use io
+use stdio
 use kinds
 use iso_fortran_env, only: int64
 
@@ -77,7 +77,7 @@ subroutine minperm(n, p, q, pq, perm, dist)
 !   cc(first(i)..first(i+1)-1):
 !     Matrix elements of row i
    integer first(n+1), y(n)
-   integer m, i, j, j1, k, l, l2, a, n8, sz8, t
+   integer m, i, j, k, l, l2, a, n8, sz8, t
    integer(int64) u(n), v(n), d, h
    integer, allocatable :: kk(:)
    integer(int64), allocatable :: cc(:)

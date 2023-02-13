@@ -1,4 +1,4 @@
-io.f90
+stdio.f90
 kinds.f90
 flags.f90
 bounds.f90
@@ -17,6 +17,7 @@ chemutils.f90
 assorting.f90
 translation.f90
 rotation.f90
+adjacency.f90
 alignment.f90
 assignment.f90
 library.f90

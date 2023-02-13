@@ -15,7 +15,7 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module writemol
-use io
+use stdio
 use bounds
 use strutils
 use chemdata
@@ -37,35 +37,30 @@ subroutine open2write(filename, unit)
 
 end subroutine
 
-
-subroutine writefile(unit, fmtout, natom, title, znums, coords, opt_nbond, opt_bonds)
+subroutine writefile(unit, fmtout, title, natom, znums, coords, adjmat)
    integer, intent(in) :: unit, natom
    integer, dimension(:), intent(in) :: znums
-   integer, optional, intent(in) :: opt_nbond
-   integer, target, optional, intent(in) :: opt_bonds(:, :)
    real(wp), dimension(:, :), intent(in) :: coords
+   logical, dimension(:, :), intent(in) :: adjmat
    character(*), intent(in) :: title, fmtout
+   integer :: i, j, nbond, bonds(2, natom*maxcoord)
 
-   integer :: nbond
-   integer, pointer :: bonds(:, :)
-   
-   if (present(opt_nbond)) then
-      nbond = opt_nbond
-      if (present(opt_bonds)) then
-         bonds => opt_bonds
-      else
-         write (error_unit, '(a)') 'Bond list is missing!'
-         stop
-      end if
-   else
-      nbond = 0
-   end if
+   nbond = 0
+   do i = 1, natom
+      do j = i + 1, natom
+         if (adjmat(i, j)) then
+            nbond = nbond + 1
+            bonds(1, nbond) = i
+            bonds(2, nbond) = j
+         end if
+      end do
+   end do
 
    select case (fmtout)
    case ('xyz')
-      call writexyzfile(unit, natom, title, znums, coords)
+      call writexyzfile(unit, title, natom, znums, coords)
    case ('mol2')
-      call writemol2file(unit, natom, title, znums, coords, nbond, bonds)
+      call writemol2file(unit, title, natom, znums, coords, nbond, bonds)
    case default
       write (error_unit, '(a,1x,a)') 'Invalid format:', fmtout
       stop
@@ -73,7 +68,7 @@ subroutine writefile(unit, fmtout, natom, title, znums, coords, opt_nbond, opt_b
 
 end subroutine
 
-subroutine writexyzfile(unit, natom, title, znums, coords)
+subroutine writexyzfile(unit, title, natom, znums, coords)
    character(*), intent(in) :: title
    integer, intent(in) :: unit, natom
    integer, dimension(:), intent(in) :: znums
@@ -89,13 +84,13 @@ subroutine writexyzfile(unit, natom, title, znums, coords)
 
 end subroutine
 
-subroutine writemol2file(unit, natom, title, znums, coords, nbond, bonds)
+subroutine writemol2file(unit, title, natom, znums, coords, nbond, bonds)
    character(*), intent(in) :: title
    integer, intent(in) :: unit, natom
    integer, dimension(:), intent(in) :: znums
    real(wp), dimension(:, :), intent(in) :: coords
    integer, intent(in) :: nbond
-   integer, target, intent(in) :: bonds(:, :)
+   integer, intent(in) :: bonds(:, :)
    integer :: i
    
    write (unit, '(a)') '@<TRIPOS>MOLECULE'
@@ -117,7 +112,7 @@ subroutine writemol2file(unit, natom, title, znums, coords, nbond, bonds)
    write (unit, '(a)') '@<TRIPOS>BOND'
 
    do i = 1, nbond
-      write (unit, '(i4,1x,2(1x,i4),1x,a2)') i, bonds(:, i), '1'
+      write (unit, '(i4,1x,2(1x,i4),1x,a2)') i, bonds(1, i), bonds(2, i), '1'
    end do
 
 end subroutine

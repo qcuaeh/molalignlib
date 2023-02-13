@@ -80,14 +80,10 @@ function baseext(path)
    character(:), allocatable :: baseext
    integer pos
    pos = index(path, '/', back=.true.)
-   if (pos /= 0) then
-      basename = path(pos+1:len(path))
-   else
-      basename = path
-   end if
+   basename = path(pos+1:)
    pos = index(basename, '.', back=.true.)
    if (pos > 1 .and. pos < len(basename)) then
-      baseext = basename(pos+1:len(basename))
+      baseext = basename(pos+1:)
    else
       baseext = ''
    end if

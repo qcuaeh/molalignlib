@@ -27,6 +27,9 @@ def molalign():
     parser.add_argument('-fast', action='store_true')
     parser.add_argument('-mass', action='store_true')
     parser.add_argument('-enan', action='store_true')
+    parser.add_argument('-test', action='store_true')
+    parser.add_argument('-bond', action='store_true')
+#    parser.add_argument('-live', action='store_true')
     parser.add_argument('-stats', action='store_true')
     parser.add_argument('-trials', type=int)
     parser.add_argument('-tol', type=float)
@@ -36,8 +39,6 @@ def molalign():
     parser.add_argument('-out', type=str, default='aligned.xyz')
 #    parser.add_argument('-stdin', type=str)
 #    parser.add_argument('-stdout', stype=str)
-#    parser.add_argument('-live', action='store_true')
-#    parser.add_argument('-test', action='store_true')
     args = parser.parse_args()
 
     if len(args.filelist) == 1:
@@ -70,6 +71,8 @@ def molalign():
             atoms1,
             biasing = biasing,
             iteration = iteration,
+            testing = args.test,
+            bonding = args.bond,
             massweighted = args.mass,
             stats = args.stats,
             records = args.rec,

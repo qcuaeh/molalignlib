@@ -15,7 +15,7 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module random
-use io
+use stdio
 use kinds
 use flags
 use rnglib
@@ -66,7 +66,7 @@ subroutine initialize_random()
    integer, allocatable :: seed(:)
    integer :: unit, stat
 
-   if (repro_flag) then
+   if (test_flag) then
       randnum_sp => real_uni01_sp
       randnum_dp => real_uni01_dp
       call rnglib_init()

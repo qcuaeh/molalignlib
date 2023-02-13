@@ -29,34 +29,32 @@ public leastrotquat
 
 contains
 
-real(wp) function squaredist(natom, weights, coords0, coords1, atomperm) result(dist2)
+real(wp) function biasdist(natom, weights, biasmat, atomperm) result(dist)
+   integer, intent(in) :: natom
+   real(wp), dimension(:), intent(in) :: weights
+   real(wp), dimension(:, :), intent(in) :: biasmat
+   integer, dimension(:), intent(in) :: atomperm
+   integer :: i
+
+   dist = 0
+
+   do i = 1, natom
+      dist = dist + weights(i)*biasmat(i, atomperm(i))
+   end do
+
+end function
+
+real(wp) function squaredist(natom, weights, coords0, coords1, atomperm) result(dist)
    integer, intent(in) :: natom
    integer, dimension(:), intent(in) :: atomperm
    real(wp), dimension(:), intent(in) :: weights
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
 
-   dist2 = sum(weights(1:natom)*sum((coords0(:, 1:natom) - coords1(:, atomperm(1:natom)))**2, dim=1))
+   dist = sum(weights(1:natom)*sum((coords0(:, 1:natom) - coords1(:, atomperm(1:natom)))**2, dim=1))
 
 end function
 
-real(wp) function biasdist(natom, atomperm, weights, coords0, coords1, bias) result(dist)
-   integer, intent(in) :: natom
-   integer, dimension(:), intent(in) :: atomperm
-   real(wp), dimension(:), intent(in) :: weights
-   real(wp), dimension(:, :), intent(in) :: coords0
-   real(wp), dimension(:, :), intent(in) :: coords1
-   real(wp), dimension(:, :), intent(in) :: bias
-   integer :: i
-
-   dist = 0.
-
-   do i = 1, natom
-      dist = dist + weights(i)*(sum((coords0(:, i) - coords1(:, atomperm(i)))**2) + bias(i, atomperm(i)))
-   end do
-
-end function
-
-real(wp) function leastsquaredist(natom, weights, coords0, coords1, atomperm) result(dist2)
+real(wp) function leastsquaredist(natom, weights, coords0, coords1, atomperm) result(dist)
 ! Purpose: Calculate least square distance from eigenvalues
     integer, intent(in) :: natom
     integer, dimension(:), intent(in) :: atomperm
@@ -66,11 +64,11 @@ real(wp) function leastsquaredist(natom, weights, coords0, coords1, atomperm) re
 
     call kearsleymat(natom, weights, coords0, coords1, atomperm, eigmat)
     call syeval4(eigmat, eigval)
-    dist2 = max(eigval(1), 0._wp)
+    dist = max(eigval(1), 0._wp)
 
 end function
 
-!real(wp) function leastsquaredist(natom, weights, coords0, coords1, atomperm) result(dist2)
+!real(wp) function leastsquaredist(natom, weights, coords0, coords1, atomperm) result(dist)
 !! Purpose: Calculate least square distance from aligned coordinates
 !   integer, intent(in) :: natom
 !   integer, dimension(:), intent(in) :: atomperm
@@ -80,7 +78,7 @@ end function
 !
 !   call kearsleymat(natom, weights, coords0, coords1, atomperm, eigmat)
 !   call syevec4(eigmat, eigval)
-!   dist2 = squaredist(natom, weights, coords0, rotated(natom, coords1, eigmat(:, 1)), atomperm)
+!   dist = squaredist(natom, weights, coords0, rotated(natom, coords1, eigmat(:, 1)), atomperm)
 !
 !end function
 
@@ -109,7 +107,7 @@ subroutine kearsleymat(natom, weights, coords0, coords1, atomperm, eigmat)
    integer :: i
    real(wp) :: eigmat(4, 4), p(3, natom), q(3, natom), auxmat(4, 4)
 
-   eigmat = 0.0
+   eigmat = 0
 
    do i = 1, natom
       p(:, i) = coords0(:, i) + coords1(:, atomperm(i))

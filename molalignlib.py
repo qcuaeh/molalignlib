@@ -18,8 +18,8 @@ import numpy as np
 import molalignlibext
 from ase import Atoms
 
-#print(library.align_atoms.__doc__)
-#print(library.assign_atoms.__doc__)
+#print(molalignlibext.library.align_atoms.__doc__)
+#print(molalignlibext.library.assign_atoms.__doc__)
 
 class Assignment:
     def __init__(self, count, order):
@@ -30,8 +30,9 @@ def assign_atoms(
     atoms0,
     atoms1,
     biasing = None,
+    testing = None,
+    bonding = None,
     iteration = None,
-    reproducible = None,
     massweighted = None,
     stats = None,
     records = None,
@@ -48,14 +49,18 @@ def assign_atoms(
         biasing = False
     elif type(biasing) is not bool:
         raise TypeError('"biasing" must be a boolean')
+    if testing is None:
+        testing = False
+    elif type(testing) is not bool:
+        raise TypeError('"testing" must be a boolean')
+    if bonding is None:
+        bonding = False
+    elif type(bonding) is not bool:
+        raise TypeError('"bonding" must be a boolean')
     if iteration is None:
         iteration = False
     elif type(iteration) is not bool:
         raise TypeError('"iteration" must be a boolean')
-    if reproducible is None:
-        reproducible = False
-    elif type(reproducible) is not bool:
-        raise TypeError('"reproducible" must be a boolean')
     if massweighted is None:
         massweighted = False
     elif type(massweighted) is not bool:
@@ -80,12 +85,6 @@ def assign_atoms(
         scale = 1000.
     elif type(scale) is not float:
         raise TypeError('"scale" must be a float number')
-    if massweighted:
-        weights0 = atoms0.get_masses()
-        weights1 = atoms1.get_masses()
-    else:
-        weights0 = np.ones(len(atoms0), dtype=np.float64)
-        weights1 = np.ones(len(atoms1), dtype=np.float64)
     if trials is None:
         molalignlibext.flags.trial_flag = False
     else:
@@ -94,37 +93,48 @@ def assign_atoms(
             molalignlibext.bounds.maxtrials = trials
         else:
             raise TypeError('"trials" must be an integer')
-    if len(atoms0) != len(atoms1):
-        raise ValueError('Error: Unequal number of atoms')
+    natom0 = len(atoms0)
+    natom1 = len(atoms1)
     molalignlibext.flags.bias_flag = biasing
+    molalignlibext.flags.test_flag = testing
+    molalignlibext.flags.bond_flag = bonding
     molalignlibext.flags.iter_flag = iteration
-    molalignlibext.flags.repro_flag = reproducible
     molalignlibext.flags.stats_flag = stats
-    molalignlibext.bounds.natom0 = len(atoms0)
-    molalignlibext.bounds.natom1 = len(atoms1)
     molalignlibext.bounds.maxrec = records
     molalignlibext.bounds.maxcount = count
     molalignlibext.biasing.bias_tol = tolerance
     molalignlibext.biasing.bias_scale = scale
     znums0 = atoms0.get_atomic_numbers()
-    types0 = np.ones(len(atoms0), dtype=np.int32)
+    types0 = np.ones(natom0, dtype=np.int32)
     coords0 = atoms0.positions.T # Convert to column-major order
     znums1 = atoms1.get_atomic_numbers()
-    types1 = np.ones(len(atoms1), dtype=np.int32)
+    types1 = np.ones(natom1, dtype=np.int32)
     coords1 = atoms1.positions.T # Convert to column-major order
-#    permlist = np.empty((records, len(atoms0)), dtype=np.int32).T
-    permlist = np.empty((len(atoms0), records), dtype=np.int32, order='F')
+    adjmat0 = np.zeros((natom0, natom0), dtype=np.int8, order='F')
+    adjmat1 = np.zeros((natom1, natom1), dtype=np.int8, order='F')
+    if massweighted:
+        weights0 = atoms0.get_masses()
+        weights1 = atoms1.get_masses()
+    else:
+        weights0 = np.ones(natom0, dtype=np.float64)
+        weights1 = np.ones(natom1, dtype=np.float64)
+#    permlist = np.empty((records, natom0), dtype=np.int32).T
+    permlist = np.empty((natom0, records), dtype=np.int32, order='F')
     countlist = np.empty(records, dtype=np.int32)
     nrec, error = \
         molalignlibext.library.assign_atoms(
+            natom0,
             znums0,
             types0,
-            coords0,
             weights0,
+            coords0,
+            adjmat0,
+            natom1,
             znums1,
             types1,
-            coords1,
             weights1,
+            coords1,
+            adjmat1,
             permlist,
             countlist,
         )
@@ -139,30 +149,34 @@ def align_to(self, other, massweighted=None):
         massweighted = False
     elif type(massweighted) is not bool:
         raise TypeError('"massweighted" must be a boolean')
+    natom0 = len(other)
+    natom1 = len(self)
     znums0 = other.get_atomic_numbers()
-    types0 = np.ones(len(other), dtype=np.int32)
+    types0 = np.ones(natom0, dtype=np.int32)
     coords0 = other.positions.T # Convert to column-major order
     znums1 = self.get_atomic_numbers()
-    types1 = np.ones(len(self), dtype=np.int32)
+    types1 = np.ones(natom1, dtype=np.int32)
     coords1 = self.positions.T # Convert to column-major order
     if massweighted:
         weights0 = other.get_masses()
         weights1 = self.get_masses()
     else:
-        weights0 = np.ones(len(other), dtype=np.float64)
-        weights1 = np.ones(len(self), dtype=np.float64)
-    molalignlibext.bounds.natom0 = len(other)
-    molalignlibext.bounds.natom1 = len(self)
+        weights0 = np.ones(natom0, dtype=np.float64)
+        weights1 = np.ones(natom1, dtype=np.float64)
+    molalignlibext.bounds.natom0 = natom0
+    molalignlibext.bounds.natom1 = natom1
     travec, rotmat, error = \
         molalignlibext.library.align_atoms(
+            natom0,
             znums0,
             types0,
-            coords0,
             weights0,
+            coords0,
+            natom1,
             znums1,
             types1,
-            coords1,
             weights1,
+            coords1,
         )
     if error:
         raise RuntimeError('Alignment failed')

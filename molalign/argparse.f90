@@ -15,7 +15,7 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module argparse
-use io
+use stdio
 use kinds
 use bounds
 
@@ -46,7 +46,7 @@ end subroutine
 
 subroutine readposarg(arg, posargs)
    character(*), intent(in) :: arg
-   character(maxstrlen), intent(out) :: posargs(:)
+   character(ll), intent(out) :: posargs(:)
 
    if (arg(1:1) == '-') then
       write (error_unit, '(a,1x,a)') 'Unknown option:', arg
