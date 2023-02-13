@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# ASE must be imported before MolAlignLib in order to patch ASE's Atoms class
-# with the align_to method
+# ASE must be imported before MolAlignLib
+# in order to patch ASE's Atoms class with the align_to method
 from ase.io import read, write
 from molalignlib import assign_atoms
 

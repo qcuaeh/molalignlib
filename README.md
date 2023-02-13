@@ -9,7 +9,7 @@ and clusters. The details of the method can be found in publication [[1]](#1).
 Before installing
 -----------------
 
-You will need gfortran and LAPACK to build the program from source, and also Python 3 to use the Python interface.
+You will need gfortran and LAPACK to build the program from source.
 It is recommended to install them with your package manager:
 
 in RHEL or Fedora use *yum*
@@ -33,21 +33,28 @@ then enter the cloned directory, edit the *build.env* file to suit your system, 
 
 It will create the *molalign* executable inside the *build* directory.
 
+The library also has Python interface, to install it run:
+
+    python3 setup.py install --user
+
+It will compile the library and install the *molalign* Python script and the *molalignlib* Python module
+in your user path.
+
 or install with pip
 -------------------
 
-The Python library only supports Python 3 so make sure that you are using the right version of *pip*:
+You can also install the library with *pip*:
 
     pip3 install molalignlib
 
-It will install the *molalign* script and the *molalignlib* Python module.
+It will install the *molalign* Python script and the *molalignlib* Python module in your system path.
 
 or try on Binder
 ----------------
 
-You can try the Python module on Binder:
+You can try the Python interface without installing anything:
 
-* [Example 1](https://mybinder.org/v2/gh/qcuaeh/molalignlib.git/HEAD?labpath=examples/example1.ipynb)
+* [Open example1.ipynb on Binder](https://mybinder.org/v2/gh/qcuaeh/molalignlib.git/HEAD?labpath=examples/example1.ipynb)
 
 Program options
 ---------------
