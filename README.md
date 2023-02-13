@@ -1,6 +1,3 @@
-MolAlignLib
-===========
-
 **MolAlignLib** is a fortran library based on random rotations and quasi-local RMSD minimizations to align rigid molecules
 and clusters. The details of the method can be found in publication [[1]](#1).
 
@@ -62,12 +59,12 @@ Program options
 These options are supported by both, the native executable and the python script:
 
 &emsp;<code>-sort</code>&nbsp; Reorder the atoms to minimize the RMSD.  
-&emsp;<code>-trials *N*</code>&nbsp;  Set maximum number of trials to *N*.  
+&emsp;<code>-trials <em>N</em></code>&nbsp;  Set maximum number of trials to *N*.  
 &emsp;<code>-fast</code>&nbsp; Enable biasing and iterative minimization steps.  
-&emsp;<code>-count *N*</code>&nbsp; Set the count threshold to *N* (defaults to 10).  
-&emsp;<code>-tol *TOL*</code>&nbsp; Set the biasing tolerance to *TOL* (defaults to 0.35 Å).  
-&emsp;<code>-out *NAME*</code>&nbsp; Set the output file name to *NAME* (defaults to *aligned.xyz*).  
-&emsp;<code>-rec *N*</code>&nbsp; Record up to *N* assignments (defaults to 1).  
+&emsp;<code>-count <em>N</em></code>&nbsp; Set the count threshold to *N* (defaults to 10).  
+&emsp;<code>-tol <em>TOL</em></code>&nbsp; Set the biasing tolerance to *TOL* (defaults to 0.35 Å).  
+&emsp;<code>-out <em>NAME</em></code>&nbsp; Set the output file name to *NAME* (defaults to *aligned.xyz*).  
+&emsp;<code>-rec <em>N</em></code>&nbsp; Record up to *N* assignments (defaults to 1).  
 &emsp;<code>-enan</code>&nbsp; Align with enantiomer (mirrored coordinates).  
 &emsp;<code>-stats</code>&nbsp; Print detailed stats of the calculation.  
 &emsp;<code>-test</code>&nbsp; Produce repeatable results for testing.  
@@ -76,8 +73,8 @@ These options are supported by both, the native executable and the python script
 These options are only supported by the native executable:
 
 &emsp;<code>-live</code>&nbsp; Show progress in real time.  
-&emsp;<code>-stdin *EXT*</code>&nbsp; Read coordinates from standard input in *EXT* format.  
-&emsp;<code>-stdout *EXT*</code>&nbsp; Write coordinates to standard output in *EXT* format.  
+&emsp;<code>-stdin <em>EXT</em></code>&nbsp; Read coordinates from standard input in *EXT* format.  
+&emsp;<code>-stdout <em>EXT</em></code>&nbsp; Write coordinates to standard output in *EXT* format.  
  
 The native executable only supports the *xyz* and *mol2* formats, while the python script supports many more.
 Note that the format is determined from the file extension when reading from or writing to a file.
