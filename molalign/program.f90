@@ -51,7 +51,7 @@ program molalign
    real(wp) :: rmsd, travec(3), rotmat(3, 3)
    real(wp), allocatable, dimension(:) :: weights0, weights1
    real(wp), allocatable, dimension(:, :) :: coords0, coords1, aligned1
-   logical :: sort_flag, enan_flag, stdin_flag, stdout_flag
+   logical :: sort_flag, mirror_flag, stdin_flag, stdout_flag
    logical, dimension(:, :), allocatable :: adjmat0, adjmat1
 
    procedure(f_realint), pointer :: weight_function
@@ -65,7 +65,7 @@ program molalign
    stdout_flag = .false.
    test_flag = .false.
    stats_flag = .false.
-   enan_flag = .false.
+   mirror_flag = .false.
    live_flag = .false.
    bias_flag = .false.
    bond_flag = .false.
@@ -106,8 +106,8 @@ program molalign
          bond_flag = .true.
       case ('-mass')
          weight_function => stdmass
-      case ('-enan')
-         enan_flag = .true.
+      case ('-mirror')
+         mirror_flag = .true.
       case ('-count')
          call readoptarg(arg, maxcount)
       case ('-trials')
@@ -160,7 +160,7 @@ program molalign
    call readfile(read_unit0, fmtin0, title0, natom0, labels0, coords0, adjmat0)
    call readfile(read_unit1, fmtin1, title1, natom1, labels1, coords1, adjmat1)
 
-   if (enan_flag) then
+   if (mirror_flag) then
       coords1(1, :) = -coords1(1, :)
    end if
 

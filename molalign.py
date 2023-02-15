@@ -26,7 +26,7 @@ def molalign():
     parser.add_argument('-sort', action='store_true')
     parser.add_argument('-fast', action='store_true')
     parser.add_argument('-mass', action='store_true')
-    parser.add_argument('-enan', action='store_true')
+    parser.add_argument('-mirror', action='store_true')
     parser.add_argument('-test', action='store_true')
     parser.add_argument('-bond', action='store_true')
 #    parser.add_argument('-live', action='store_true')
@@ -51,7 +51,7 @@ def molalign():
         print('Error: Too many files')
         raise SystemExit
 
-    if args.enan:
+    if args.mirror:
         atoms1.positions[:, 0] = -atoms1.positions[:, 0]
 
     if args.fast:

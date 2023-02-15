@@ -1,9 +1,6 @@
 ! MolAlignLib
 ! Copyright (C) 2022 José M. Vásquez
 
-! GMIN: A program for finding global minima
-! Copyright (C) 1999-2006 David J. Wales
-
 ! This program is free software: you can redistribute it and/or modify
 ! it under the terms of the GNU General Public License as published by
 ! the Free Software Foundation, either version 3 of the License, or
@@ -27,6 +24,9 @@ implicit none
 contains
 
 subroutine minperm(n, p, q, pq, perm, dist)
+
+! Adapted from GMIN: A program for finding global minima
+! Copyright (C) 1999-2006 David J. Wales
 
 !   Interface to spjv.f for calculating minimum distance
 !   of two atomic configurations with respect to
@@ -233,6 +233,9 @@ subroutine minperm(n, p, q, pq, perm, dist)
 end subroutine
    
 subroutine jovosap(n,sz,cc,kk,first,x,y,u,v,h)
+
+! Adapted from GMIN: A program for finding global minima
+! Copyright (C) 1999-2006 David J. Wales
 
 ! This subroutine performs weighted bipartite matching for
 ! for a sparse non-negative integer weight matrix.
