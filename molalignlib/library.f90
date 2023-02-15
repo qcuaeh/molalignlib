@@ -64,7 +64,6 @@ subroutine assign_atoms( &
 
    integer :: i
    integer :: nblk0, nblk1
-   integer :: neqv0, neqv1
    integer, dimension(:), allocatable :: blkid0, blkid1
    integer, dimension(:), allocatable :: blksz0, blksz1
    real(wp), dimension(:), allocatable :: blkwt0, blkwt1
@@ -72,8 +71,6 @@ subroutine assign_atoms( &
    integer, dimension(:), allocatable :: backorder0, backorder1
    integer, dimension(:), allocatable :: nadj0, nadj1
    integer, dimension(:, :), allocatable :: adjlist0, adjlist1
-   integer, dimension(:), allocatable :: eqvid0, eqvid1
-   integer, dimension(:), allocatable :: eqvsz0, eqvsz1
    real(wp) :: center0(3), center1(3)
    real(wp), dimension(:, :), allocatable :: coords0, coords1
    real(wp), dimension(:, :), allocatable :: biasmat
@@ -99,8 +96,6 @@ subroutine assign_atoms( &
    allocate(blkwt0(natom0), blkwt1(natom1))
    allocate(nadj0(natom0), nadj1(natom1))
    allocate(adjlist0(maxcoord, natom0), adjlist1(maxcoord, natom1))
-   allocate(eqvid0(natom0), eqvid1(natom1))
-   allocate(eqvsz0(natom0), eqvsz1(natom1))
    allocate(coords0(3, natom0), coords1(3, natom1))
    allocate(biasmat(natom0, natom1))
 
@@ -114,15 +109,10 @@ subroutine assign_atoms( &
    call grouptypes(natom0, znums0, types0, weights0, nblk0, blksz0, blkwt0, blkid0)
    call grouptypes(natom1, znums1, types1, weights1, nblk1, blksz1, blkwt1, blkid1)
 
-   ! Group atoms by NMA at infinite level
-
-   call groupequiv(natom0, nblk0, blkid0, nadj0, adjlist0, neqv0, eqvsz0, eqvid0)
-   call groupequiv(natom1, nblk1, blkid1, nadj1, adjlist1, neqv1, eqvsz1, eqvid1)
-
    ! Get atom order
 
-   atomorder0 = order(eqvid0, natom0)
-   atomorder1 = order(eqvid1, natom1)
+   atomorder0 = order(blkid0, natom0)
+   atomorder1 = order(blkid1, natom1)
 
    ! Get inverse atom order
 

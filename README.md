@@ -1,5 +1,5 @@
-**MolAlignLib** is a fortran library based on random rotations and quasi-local RMSD minimizations to align rigid molecules
-and clusters. The details of the method can be found in publication [[1]](#1).
+**MolAlignLib** is a Fortran and Python library based on random rotations and quasi-local RMSD minimizations to align rigid
+molecules and clusters. The details of the method can be found in publication [[1]](#1).
 
 ![graphical abstract](abstract.png)
 
@@ -9,11 +9,11 @@ Before installing
 You will need gfortran and LAPACK to build the program from source.
 It is recommended to install them with your package manager:
 
-in RHEL or Fedora use *yum*
+in RHEL, Fedora, etc. use *yum*
 
     yum install gcc-gfortran lapack-devel
 
-and in Debian, Ubuntu, etc. use *apt*
+or in Debian, Ubuntu, etc. use *apt*
 
     apt install gfortran liblapack-dev
 
@@ -34,8 +34,7 @@ The library also has Python interface, to install it run:
 
     python3 setup.py install --user
 
-It will compile the library and install the *molalign* Python script and the *molalignlib* Python module
-in your user path.
+It will compile and install the *molalign* Python script and the *molalignlib* Python module in your path.
 
 or install with pip
 -------------------
@@ -58,23 +57,23 @@ Program options
 
 These options are supported by both, the native executable and the python script:
 
-&emsp;<code>-sort</code>&nbsp; Reorder the atoms to minimize the RMSD.  
-&emsp;<code>-trials <em>N</em></code>&nbsp;  Set maximum number of trials to *N*.  
-&emsp;<code>-fast</code>&nbsp; Enable biasing and iterative minimization steps.  
-&emsp;<code>-count <em>N</em></code>&nbsp; Set the count threshold to *N* (defaults to 10).  
-&emsp;<code>-tol <em>TOL</em></code>&nbsp; Set the biasing tolerance to *TOL* (defaults to 0.35 Å).  
-&emsp;<code>-out <em>NAME</em></code>&nbsp; Set the output file name to *NAME* (defaults to *aligned.xyz*).  
-&emsp;<code>-rec <em>N</em></code>&nbsp; Record up to *N* assignments (defaults to 1).  
-&emsp;<code>-enan</code>&nbsp; Align with enantiomer (mirrored coordinates).  
-&emsp;<code>-stats</code>&nbsp; Print detailed stats of the calculation.  
-&emsp;<code>-test</code>&nbsp; Produce repeatable results for testing.  
-&emsp;<code>-mass</code>&nbsp; Use mass weighted coordinates.  
+<code>-sort</code>&nbsp; Reorder the atoms to minimize the RMSD.  
+<code>-trials <em>N</em></code>&nbsp;  Set maximum number of trials to *N*.  
+<code>-fast</code>&nbsp; Enable biasing and iterative minimization steps.  
+<code>-count <em>N</em></code>&nbsp; Set the count threshold to *N* (defaults to 10).  
+<code>-tol <em>TOL</em></code>&nbsp; Set the biasing tolerance to *TOL* (defaults to 0.35 Å).  
+<code>-out <em>NAME</em></code>&nbsp; Set the output file name to *NAME* (defaults to *aligned.xyz*).  
+<code>-rec <em>N</em></code>&nbsp; Record up to *N* assignments (defaults to 1).  
+<code>-stats</code>&nbsp; Print detailed stats of the calculation.  
+<code>-test</code>&nbsp; Use a fixed random seed for testing.  
+<code>-mirror</code>&nbsp; Reflect aligned coordinates.  
+<code>-mass</code>&nbsp; Use mass weighted RMSD.  
 
 These options are only supported by the native executable:
 
-&emsp;<code>-live</code>&nbsp; Show progress in real time.  
-&emsp;<code>-stdin <em>EXT</em></code>&nbsp; Read coordinates from standard input in *EXT* format.  
-&emsp;<code>-stdout <em>EXT</em></code>&nbsp; Write coordinates to standard output in *EXT* format.  
+<code>-live</code>&nbsp; Show progress in real time.  
+<code>-stdin <em>EXT</em></code>&nbsp; Read coordinates from standard input in *EXT* format.  
+<code>-stdout <em>EXT</em></code>&nbsp; Write coordinates to standard output in *EXT* format.  
  
 The native executable only supports the *xyz* and *mol2* formats, while the python script supports many more.
 Note that the format is determined from the file extension when reading from or writing to a file.
@@ -86,10 +85,11 @@ The syntax of the command is:
 
     molalign [option[s]] file [file]
 
-* To align the atoms without reordering, run the command without options.
-* To reorder and align the atoms run the command with the `-sort` option.
-* If only a file is specified, two sets of coordinates will be read from the file.
-* If two files are specified, a single set of coordinates will be read from each file.
+If only a file is specified, two sets of coordinates will be read from the file. If two files are specified, a single
+set of coordinates will be read from each file.
+
+To align the atoms without reordering, run the command without options. To reorder and align the atoms run the
+command with the `-sort` option.
 
 Advanced usage
 --------------

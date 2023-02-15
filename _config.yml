@@ -1,4 +1,5 @@
-remote_theme: pages-themes/minimal@v0.2.0
+title: MolAlignLib
+remote_theme: pages-themes/cayman@v0.2.0
 plugins:
 - jekyll-remote-theme
 google_site_verification: jRgNgoJG19KoJLGB1bhj28u8YlGMoSuzgkQ8PIz2V3s
