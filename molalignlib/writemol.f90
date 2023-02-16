@@ -24,51 +24,7 @@ implicit none
 
 contains
 
-subroutine open2write(filename, unit)
-   character(*), intent(in) :: filename
-   integer, intent(out) :: unit
-   integer :: stat
-
-   open(newunit=unit, file=filename, action='write', status='replace', iostat=stat)
-   if (stat /= 0) then
-      write (error_unit, '(a,1x,a,1x,a)') 'Error opening', filename, 'for writing'
-      stop
-   end if
-
-end subroutine
-
-subroutine writefile(unit, fmtout, title, natom, znums, coords, adjmat)
-   integer, intent(in) :: unit, natom
-   integer, dimension(:), intent(in) :: znums
-   real(wp), dimension(:, :), intent(in) :: coords
-   logical, dimension(:, :), intent(in) :: adjmat
-   character(*), intent(in) :: title, fmtout
-   integer :: i, j, nbond, bonds(2, natom*maxcoord)
-
-   nbond = 0
-   do i = 1, natom
-      do j = i + 1, natom
-         if (adjmat(i, j)) then
-            nbond = nbond + 1
-            bonds(1, nbond) = i
-            bonds(2, nbond) = j
-         end if
-      end do
-   end do
-
-   select case (fmtout)
-   case ('xyz')
-      call writexyzfile(unit, title, natom, znums, coords)
-   case ('mol2')
-      call writemol2file(unit, title, natom, znums, coords, nbond, bonds)
-   case default
-      write (error_unit, '(a,1x,a)') 'Invalid format:', fmtout
-      stop
-   end select
-
-end subroutine
-
-subroutine writexyzfile(unit, title, natom, znums, coords)
+subroutine writexyz(unit, title, natom, znums, coords)
    character(*), intent(in) :: title
    integer, intent(in) :: unit, natom
    integer, dimension(:), intent(in) :: znums
@@ -84,7 +40,7 @@ subroutine writexyzfile(unit, title, natom, znums, coords)
 
 end subroutine
 
-subroutine writemol2file(unit, title, natom, znums, coords, nbond, bonds)
+subroutine writemol2(unit, title, natom, znums, coords, nbond, bonds)
    character(*), intent(in) :: title
    integer, intent(in) :: unit, natom
    integer, dimension(:), intent(in) :: znums

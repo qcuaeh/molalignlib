@@ -14,11 +14,10 @@
 ! You should have received a copy of the GNU General Public License
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-module readmol
+module fileio
 use stdio
-use bounds
-use strutils
-use chemdata
+use readmol
+use writemol
 
 implicit none
 
@@ -51,6 +50,19 @@ subroutine open2read(filepath, unit, fileext)
 
 end subroutine
 
+subroutine open2write(filename, unit)
+   character(*), intent(in) :: filename
+   integer, intent(out) :: unit
+   integer :: stat
+
+   open(newunit=unit, file=filename, action='write', status='replace', iostat=stat)
+   if (stat /= 0) then
+      write (error_unit, '(a,1x,a,1x,a)') 'Error opening', filename, 'for writing'
+      stop
+   end if
+
+end subroutine
+
 subroutine readfile(unit, fmtin, title, natom, labels, coords, adjmat)
    integer, intent(in) :: unit
    character(*), intent(in) :: fmtin
@@ -68,9 +80,9 @@ subroutine readfile(unit, fmtin, title, natom, labels, coords, adjmat)
 
    select case (fmtin)
    case ('xyz')
-      call readxyzfile(unit, title, natom, labels, coords)
+      call readxyz(unit, title, natom, labels, coords)
    case ('mol2')
-      call readmol2file(unit, title, natom, labels, coords, nbond, bonds)
+      call readmol2(unit, title, natom, labels, coords, nbond, bonds)
    case default
       write (error_unit, '(a,1x,a)') 'Invalid format:', fmtin
       stop
@@ -87,80 +99,34 @@ subroutine readfile(unit, fmtin, title, natom, labels, coords, adjmat)
 
 end subroutine
 
-subroutine readxyzfile(unit, title, natom, labels, coords)
-   integer, intent(in) :: unit
-   integer, intent(out) :: natom
-   real(wp), dimension(:, :), allocatable, intent(out) :: coords
-   character(*), dimension(:), allocatable, intent(out) :: labels
-   character(:), allocatable, intent(out) :: title
-   character(ll) :: buffer
+subroutine writefile(unit, fmtout, title, natom, znums, coords, adjmat)
+   integer, intent(in) :: unit, natom
+   integer, dimension(:), intent(in) :: znums
+   real(wp), dimension(:, :), intent(in) :: coords
+   logical, dimension(:, :), intent(in) :: adjmat
+   character(*), intent(in) :: title, fmtout
+   integer :: i, j, nbond, bonds(2, natom*maxcoord)
 
-   integer :: i, stat
-
-   read (unit, *, end=99) natom
-
-   allocate(labels(natom), coords(3, natom))
-
-   read (unit, '(a)', end=99) buffer
-   title = trim(buffer)
-
+   nbond = 0
    do i = 1, natom
-      read (unit, *, end=99) labels(i), coords(:, i)
+      do j = i + 1, natom
+         if (adjmat(i, j)) then
+            nbond = nbond + 1
+            bonds(1, nbond) = i
+            bonds(2, nbond) = j
+         end if
+      end do
    end do
 
-   return
-
-   99 continue
-   write (error_unit, '(a)') 'Unexpected end of file!'
-   stop
-
-end subroutine
-
-subroutine readmol2file(unit, title, natom, labels, coords, nbond, bonds)
-   integer, intent(in) :: unit
-   integer, intent(out) :: natom, nbond
-   integer, dimension(:, :), allocatable, intent(out) :: bonds
-   real(wp), dimension(:, :), allocatable, intent(out) :: coords
-   character(*), dimension(:), allocatable, intent(out) :: labels
-   character(:), allocatable, intent(out) :: title
-   character(ll) :: buffer
-   integer :: i, id
-
-   do
-      read (unit, '(a)', end=99) buffer
-      if (buffer == '@<TRIPOS>MOLECULE') exit
-   end do
-
-   read (unit, '(a)', end=99) buffer
-   title = trim(buffer)
-   read (unit, *, end=99) natom, nbond
-
-   allocate(labels(natom), coords(3, natom))
-   allocate(bonds(2, nbond))
-
-   do
-      read (unit, '(a)', end=99) buffer
-      if (buffer == '@<TRIPOS>ATOM') exit
-   end do
-
-   do i = 1, natom
-      read (unit, *, end=99) id, labels(i), coords(:,i)
-   end do
-
-   do
-      read (unit, '(a)', end=99) buffer
-      if (buffer == '@<TRIPOS>BOND') exit
-   end do
-
-   do i = 1, nbond
-      read (unit, *, end=99) id, bonds(:,i)
-   end do
-
-   return
-
-   99 continue
-   write (error_unit, '(a)') 'Unexpected end of file!'
-   stop
+   select case (fmtout)
+   case ('xyz')
+      call writexyz(unit, title, natom, znums, coords)
+   case ('mol2')
+      call writemol2(unit, title, natom, znums, coords, nbond, bonds)
+   case default
+      write (error_unit, '(a,1x,a)') 'Invalid format:', fmtout
+      stop
+   end select
 
 end subroutine
 

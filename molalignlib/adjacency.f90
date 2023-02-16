@@ -11,7 +11,6 @@ implicit none
 contains
 
 subroutine getadjmat(natom, coords, znums, adjmat)
-! Purpose: Generate the adjacency matrix
 
    integer, intent(in) :: natom
    integer, dimension(:), intent(in) :: znums
@@ -50,7 +49,6 @@ subroutine getadjmat(natom, coords, znums, adjmat)
 end subroutine
 
 subroutine adjmat2list(natom, adjmat, nadj, adjlist)
-! Purpose: Generate the adjacency matrix
 
    integer, intent(in) :: natom
    logical, dimension(:, :), intent(in) :: adjmat
@@ -77,4 +75,25 @@ subroutine adjmat2list(natom, adjmat, nadj, adjlist)
 
 end subroutine
 
+subroutine adjlist2bonds(natom, nadj, adjlist, nbond, bonds)
+
+   integer, intent(in) :: natom
+   integer, dimension(:), intent(in) :: nadj
+   integer, dimension(:, :), intent(in) :: adjlist
+   integer, intent(out) :: nbond
+   integer, dimension(:, :), intent(out) :: bonds
+   integer :: i, j
+
+   nbond = 0
+
+   do i = 1, natom
+      do j =1, nadj(i)
+         nbond = nbond + 1
+         bonds(1, nbond) = i
+         bonds(2, nbond) = adjlist(j, i)
+      end do
+   end do
+
+end subroutine
+      
 end module

@@ -17,6 +17,7 @@
 module assorting
 use stdio
 use kinds
+use flags
 use discrete
 use sorting
 use chemdata
@@ -179,12 +180,23 @@ end subroutine
 subroutine groupequiv(natom, nblk, blkid, nadj, adjlist, neqv, eqvsz, eqvid)
 ! Group atoms by MNA at infinite lavel
     integer, intent(in) :: natom, nblk
-    integer, dimension(:), intent(in) :: nadj, blkid
+    integer, dimension(:), intent(in) :: nadj
+    integer, dimension(:), intent(in) :: blkid
     integer, dimension(:, :), intent(in) :: adjlist
-    integer, dimension(:), intent(out) :: eqvid, eqvsz
+    integer, dimension(:), intent(out) :: eqvid
+    integer, dimension(:), intent(out) :: eqvsz
 
     integer i, nin, neqv
     integer, dimension(natom) :: intype, grouporder, uptype, basetype
+
+    ! Quick return
+
+    if (.not. bond_flag) then
+       eqvid = blkid
+       return
+    end if
+
+    ! Determine MNA types iteratively
 
     nin = nblk
     intype = blkid

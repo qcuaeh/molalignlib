@@ -28,6 +28,7 @@ use translation
 use adjacency
 use alignment
 use assignment
+use writemol
 
 implicit none
 
@@ -64,6 +65,7 @@ subroutine assign_atoms( &
 
    integer :: i
    integer :: nblk0, nblk1
+   integer :: neqv0, neqv1
    integer, dimension(:), allocatable :: blkid0, blkid1
    integer, dimension(:), allocatable :: blksz0, blksz1
    real(wp), dimension(:), allocatable :: blkwt0, blkwt1
@@ -71,9 +73,27 @@ subroutine assign_atoms( &
    integer, dimension(:), allocatable :: backorder0, backorder1
    integer, dimension(:), allocatable :: nadj0, nadj1
    integer, dimension(:, :), allocatable :: adjlist0, adjlist1
+   integer, dimension(:), allocatable :: eqvid0, eqvid1
+   integer, dimension(:), allocatable :: eqvsz0, eqvsz1
    real(wp) :: center0(3), center1(3)
    real(wp), dimension(:, :), allocatable :: coords0, coords1
    real(wp), dimension(:, :), allocatable :: biasmat
+
+   integer :: j, h, offset
+   integer :: nbond0, nbond1
+   integer :: bonds0(2, maxcoord*natom0), bonds1(2, maxcoord*natom1)
+
+   ! Select bias function
+
+   if (bias_flag) then
+      if (bond_flag) then
+         bias_func => mnacrossbias
+      else
+         bias_func => sndcrossbias
+      end if
+   else
+      bias_func => nocrossbias
+   end if
 
    ! Set error code to 0 by default
 
@@ -96,10 +116,12 @@ subroutine assign_atoms( &
    allocate(blkwt0(natom0), blkwt1(natom1))
    allocate(nadj0(natom0), nadj1(natom1))
    allocate(adjlist0(maxcoord, natom0), adjlist1(maxcoord, natom1))
+   allocate(eqvid0(natom0), eqvid1(natom1))
+   allocate(eqvsz0(natom0), eqvsz1(natom1))
    allocate(coords0(3, natom0), coords1(3, natom1))
    allocate(biasmat(natom0, natom1))
 
-   ! Get adjacency lists
+   ! Calculate adjacency lists
 
    call adjmat2list(natom0, adjmat0, nadj0, adjlist0)
    call adjmat2list(natom1, adjmat1, nadj1, adjlist1)
@@ -108,6 +130,11 @@ subroutine assign_atoms( &
 
    call grouptypes(natom0, znums0, types0, weights0, nblk0, blksz0, blkwt0, blkid0)
    call grouptypes(natom1, znums1, types1, weights1, nblk1, blksz1, blkwt1, blkid1)
+
+   ! Group atoms by NMA at infinite level
+
+   call groupequiv(natom0, nblk0, blkid0, nadj0, adjlist0, neqv0, eqvsz0, eqvid0)
+   call groupequiv(natom1, nblk1, blkid1, nadj1, adjlist1, neqv1, eqvsz1, eqvid1)
 
    ! Get atom order
 
@@ -153,9 +180,28 @@ subroutine assign_atoms( &
    coords0 = centered(natom0, incoords0(:, atomorder0), center0)
    coords1 = centered(natom1, incoords1(:, atomorder1), center1)
 
+   ! Recalculate adjacency lists
+
+   call adjmat2list(natom0, adjmat0(atomorder0, atomorder0), nadj0, adjlist0)
+   call adjmat2list(natom1, adjmat1(atomorder1, atomorder1), nadj1, adjlist1)
+
    ! Calculate biases
 
-   call setcrossbias(natom0, nblk0, blksz0, coords0, coords1, biasmat)
+   call bias_func(natom0, nblk0, blksz0, nadj0, adjlist0, nadj1, adjlist1, coords0, coords1, biasmat)
+
+!   offset = 0
+!   do h = 1, nblk0
+!      do i = offset+1, offset+blksz0(h)
+!         write (output_unit, '(i0,":")', advance='no') i
+!         do j = offset+1, offset+blksz0(h)
+!            if (biasmat(i, j) == 0) then
+!               write (output_unit, '(1x,i0)', advance='no') j
+!            end if
+!         end do
+!         print *
+!      end do
+!      offset = offset + blksz0(h)
+!   end do
 
    ! Initialize random number generator
 
@@ -180,6 +226,12 @@ subroutine assign_atoms( &
    do i = 1, nrec
       permlist(:, i) = atomorder1(permlist(backorder0, i))
    end do
+
+!   open(unit=99, file='ordered.mol2', action='write', status='replace')
+!   call adjlist2bonds(natom0, nadj0, adjlist0, nbond0, bonds0)
+!   call writemol2(99, 'mol0', natom0, znums0(atomorder0), coords0, nbond0, bonds0)
+!   call adjlist2bonds(natom1, nadj1, adjlist1, nbond1, bonds1)
+!   call writemol2(99, 'mol1', natom1, znums1(atomorder1), coords1, nbond1, bonds1)
 
 end subroutine
 
