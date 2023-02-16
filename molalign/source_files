@@ -1,4 +1,3 @@
-readmol.f90
-writemol.f90
+fileio.f90
 argparse.f90
 program.f90

@@ -6,8 +6,8 @@ strutils.f90
 linear.f90
 discrete.f90
 rnglib.f90
-lap-jv.f90
-#lap-hun.f90
+#lap-jv.f90
+lap-hun.f90
 random.f90
 sorting.f90
 biasing.f90
@@ -20,4 +20,6 @@ rotation.f90
 adjacency.f90
 alignment.f90
 assignment.f90
+readmol.f90
+writemol.f90
 library.f90

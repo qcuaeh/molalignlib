@@ -20,17 +20,16 @@ program molalign
    use flags
    use bounds
    use biasing
-   use strutils
-   use argparse
-   use chemutils
-   use readmol
-   use writemol
-   use translation
    use rotation
+   use translation
+   use strutils
+   use chemutils
    use alignment
    use adjacency
    use discrete
    use library
+   use fileio
+   use argparse
 
    implicit none
 
@@ -54,30 +53,33 @@ program molalign
    logical :: sort_flag, mirror_flag, stdin_flag, stdout_flag
    logical, dimension(:, :), allocatable :: adjmat0, adjmat1
 
-   procedure(f_realint), pointer :: weight_function
+   procedure(f_realint), pointer :: weight_func
 
    ! Set default options
 
-   iter_flag = .false.
    sort_flag = .false.
+   iter_flag = .false.
+   bias_flag = .false.
+   bond_flag = .false.
    trial_flag = .false.
    stdin_flag = .false.
    stdout_flag = .false.
    test_flag = .false.
    stats_flag = .false.
    mirror_flag = .false.
+   maxlvl_flag = .false.
    live_flag = .false.
-   bias_flag = .false.
-   bond_flag = .false.
 
    maxrec = 1
    maxcount = 10
-   maxcoord = 32
+   maxlevel = 10
+   maxcoord = 24
    bias_tol = 0.35
    bias_scale = 1.e3
+   bias_ratio = 0.5
    pathout = 'aligned.xyz'
 
-   weight_function => unity
+   weight_func => unity
 
    ! Get user options
 
@@ -97,15 +99,10 @@ program molalign
       case ('-fast')
          iter_flag = .true.
          bias_flag = .true.
-!         bias_func => setcrossbias
-!      case ('-topo')
-!         iter_flag = .true.
-!         bias_flag = .true.
-!         bias_func => setmnabias
       case ('-bond')
          bond_flag = .true.
       case ('-mass')
-         weight_function => stdmass
+         weight_func => stdmass
       case ('-mirror')
          mirror_flag = .true.
       case ('-count')
@@ -117,6 +114,9 @@ program molalign
          call readoptarg(arg, bias_tol)
       case ('-scale')
          call readoptarg(arg, bias_scale)
+      case ('-level')
+         maxlvl_flag = .true.
+         call readoptarg(arg, maxlevel)
       case ('-rec')
          call readoptarg(arg, maxrec)
       case ('-out')
@@ -177,12 +177,12 @@ program molalign
 
    do i = 1, natom0
       call readlabel(labels0(i), znums0(i), types0(i))
-      weights0(i) = weight_function(znums0(i))
+      weights0(i) = weight_func(znums0(i))
    end do
 
    do i = 1, natom1
       call readlabel(labels1(i), znums1(i), types1(i))
-      weights1(i) = weight_function(znums1(i))
+      weights1(i) = weight_func(znums1(i))
    end do
 
    if (stdout_flag) then
