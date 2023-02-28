@@ -22,7 +22,7 @@ implicit none
 private
 public sort
 public sorted
-public order
+public sortorder
 
 interface sort
    module procedure intquicksort
@@ -34,7 +34,7 @@ interface sorted
    module procedure realsorted
 end interface
 
-interface order
+interface sortorder
    module procedure intorder
    module procedure charorder
 end interface

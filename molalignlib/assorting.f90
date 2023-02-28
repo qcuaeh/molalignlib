@@ -78,21 +78,21 @@ subroutine grouptypes(natom, znums, types, weights, nblk, blksz, blkwt, blkid)
 
    ! Order blocks by atomic type
 
-   blkorder(:nblk) = order(blktype, nblk)
+   blkorder(:nblk) = sortorder(blktype, nblk)
    blksz(:nblk) = blksz(blkorder(:nblk))
    blkorder(:nblk) = inverseperm(blkorder(:nblk))
    blkid = blkorder(blkid)
 
    ! Order blocks by atomic number
 
-   blkorder(:nblk) = order(blkznum, nblk)
+   blkorder(:nblk) = sortorder(blkznum, nblk)
    blksz(:nblk) = blksz(blkorder(:nblk))
    blkorder(:nblk) = inverseperm(blkorder(:nblk))
    blkid = blkorder(blkid)
 
 !   ! Order blocks by block size
 !
-!   blkorder(:nblk) = order(blksz, nblk)
+!   blkorder(:nblk) = sortorder(blksz, nblk)
 !   blksz(:nblk) = blksz(blkorder(:nblk))
 !   blkorder(:nblk) = inverseperm(blkorder(:nblk))
 !   blkid = blkorder(blkid)
@@ -214,7 +214,7 @@ subroutine groupequiv(natom, nblk, blkid, nadj, adjlist, neqv, eqvsz, eqvid)
 
     end do
 
-    grouporder(:neqv) = order(basetype, neqv)
+    grouporder(:neqv) = sortorder(basetype, neqv)
     eqvsz(:neqv) = eqvsz(grouporder(:neqv))
     grouporder(:neqv) = inverseperm(grouporder(:neqv))
     eqvid = grouporder(eqvid)

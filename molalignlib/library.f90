@@ -40,13 +40,13 @@ subroutine assign_atoms( &
    znums0,  &
    types0, &
    weights0, &
-   incoords0, &
+   coords0, &
    adjmat0, &
    natom1, &
    znums1, &
    types1, &
    weights1, &
-   incoords1, &
+   coords1, &
    adjmat1, &
    permlist, &
    countlist, &
@@ -57,7 +57,7 @@ subroutine assign_atoms( &
    integer, dimension(:), intent(in) :: znums0, znums1
    integer, dimension(:), intent(in) :: types0, types1
    logical, dimension(:, :), intent(in) :: adjmat0, adjmat1
-   real(wp), dimension(:, :), intent(in) :: incoords0, incoords1
+   real(wp), dimension(:, :), intent(in) :: coords0, coords1
    real(wp), dimension(:), intent(in) :: weights0, weights1
    integer, dimension(:, :), intent(inout) :: permlist
    integer, dimension(:), intent(inout) :: countlist
@@ -68,20 +68,14 @@ subroutine assign_atoms( &
    integer :: neqv0, neqv1
    integer, dimension(:), allocatable :: blkid0, blkid1
    integer, dimension(:), allocatable :: blksz0, blksz1
-   real(wp), dimension(:), allocatable :: blkwt0, blkwt1
    integer, dimension(:), allocatable :: atomorder0, atomorder1
    integer, dimension(:), allocatable :: backorder0, backorder1
    integer, dimension(:), allocatable :: nadj0, nadj1
    integer, dimension(:, :), allocatable :: adjlist0, adjlist1
    integer, dimension(:), allocatable :: eqvid0, eqvid1
    integer, dimension(:), allocatable :: eqvsz0, eqvsz1
+   real(wp), dimension(:), allocatable :: blkwt0, blkwt1
    real(wp) :: center0(3), center1(3)
-   real(wp), dimension(:, :), allocatable :: coords0, coords1
-   real(wp), dimension(:, :), allocatable :: biasmat
-
-   integer :: j, h, offset
-   integer :: nbond0, nbond1
-   integer :: bonds0(2, maxcoord*natom0), bonds1(2, maxcoord*natom1)
 
    ! Select bias function
 
@@ -118,8 +112,6 @@ subroutine assign_atoms( &
    allocate(adjlist0(maxcoord, natom0), adjlist1(maxcoord, natom1))
    allocate(eqvid0(natom0), eqvid1(natom1))
    allocate(eqvsz0(natom0), eqvsz1(natom1))
-   allocate(coords0(3, natom0), coords1(3, natom1))
-   allocate(biasmat(natom0, natom1))
 
    ! Calculate adjacency lists
 
@@ -138,8 +130,8 @@ subroutine assign_atoms( &
 
    ! Get atom order
 
-   atomorder0 = order(blkid0, natom0)
-   atomorder1 = order(blkid1, natom1)
+   atomorder0 = sortorder(eqvid0, natom0)
+   atomorder1 = sortorder(eqvid1, natom1)
 
    ! Get inverse atom order
 
@@ -172,36 +164,8 @@ subroutine assign_atoms( &
 
    ! Calculate centroids
 
-   center0 = centroid(natom0, weights0, incoords0)
-   center1 = centroid(natom1, weights1, incoords1)
-
-   ! Reorder and translate coordinates
-
-   coords0 = centered(natom0, incoords0(:, atomorder0), center0)
-   coords1 = centered(natom1, incoords1(:, atomorder1), center1)
-
-   ! Recalculate adjacency lists
-
-   call adjmat2list(natom0, adjmat0(atomorder0, atomorder0), nadj0, adjlist0)
-   call adjmat2list(natom1, adjmat1(atomorder1, atomorder1), nadj1, adjlist1)
-
-   ! Calculate biases
-
-   call bias_func(natom0, nblk0, blksz0, nadj0, adjlist0, nadj1, adjlist1, coords0, coords1, biasmat)
-
-!   offset = 0
-!   do h = 1, nblk0
-!      do i = offset+1, offset+blksz0(h)
-!         write (output_unit, '(i0,":")', advance='no') i
-!         do j = offset+1, offset+blksz0(h)
-!            if (biasmat(i, j) == 0) then
-!               write (output_unit, '(1x,i0)', advance='no') j
-!            end if
-!         end do
-!         print *
-!      end do
-!      offset = offset + blksz0(h)
-!   end do
+   center0 = centroid(natom0, weights0, coords0)
+   center1 = centroid(natom1, weights1, coords1)
 
    ! Initialize random number generator
 
@@ -214,9 +178,14 @@ subroutine assign_atoms( &
       nblk0, &
       blksz0, &
       blkwt0, &
-      coords0, &
-      coords1, &
-      biasmat, &
+      neqv0, &
+      eqvsz0, &
+      centered(natom0, coords0(:, atomorder0), center0), &
+      adjmat0(atomorder0, atomorder0), &
+      neqv1, &
+      eqvsz1, &
+      centered(natom1, coords1(:, atomorder1), center1), &
+      adjmat1(atomorder1, atomorder1), &
       permlist, &
       countlist, &
       nrec)
@@ -226,12 +195,6 @@ subroutine assign_atoms( &
    do i = 1, nrec
       permlist(:, i) = atomorder1(permlist(backorder0, i))
    end do
-
-!   open(unit=99, file='ordered.mol2', action='write', status='replace')
-!   call adjlist2bonds(natom0, nadj0, adjlist0, nbond0, bonds0)
-!   call writemol2(99, 'mol0', natom0, znums0(atomorder0), coords0, nbond0, bonds0)
-!   call adjlist2bonds(natom1, nadj1, adjlist1, nbond1, bonds1)
-!   call writemol2(99, 'mol1', natom1, znums1(atomorder1), coords1, nbond1, bonds1)
 
 end subroutine
 

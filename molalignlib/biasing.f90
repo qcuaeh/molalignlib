@@ -249,8 +249,8 @@ subroutine getmnacrosstypes(natom, nin, intype0, nadj0, adjlist0, intype1, nadj1
 
 end subroutine
 
-function sameadjacency(ntype, atomtype0, nadj0, adjlist0, atomtype1, ncoord1, adjlist1)
-    integer, intent(in) :: ntype, nadj0, ncoord1
+function sameadjacency(ntype, atomtype0, nadj0, adjlist0, atomtype1, nadj1, adjlist1)
+    integer, intent(in) :: ntype, nadj0, nadj1
     integer, dimension(:), intent(in) :: adjlist0, adjlist1
     integer, dimension(:) :: atomtype0, atomtype1
     logical :: sameadjacency
@@ -262,7 +262,7 @@ function sameadjacency(ntype, atomtype0, nadj0, adjlist0, atomtype1, ncoord1, ad
 
     sameadjacency = .true.
 
-    if (nadj0 /= ncoord1) then
+    if (nadj0 /= nadj1) then
         sameadjacency = .false.
         return
     end if
@@ -277,7 +277,7 @@ function sameadjacency(ntype, atomtype0, nadj0, adjlist0, atomtype1, ncoord1, ad
 !       typelist0(n0(atomtype0(adjlist0(i0))), atomtype0(adjlist0(i0))) = i0
     end do
 
-    do i1 = 1, ncoord1
+    do i1 = 1, nadj1
         n1(atomtype1(adjlist1(i1))) = n1(atomtype1(adjlist1(i1))) + 1
 !       typelist1(n1(atomtype1(adjlist1(i1))), atomtype1(adjlist1(i1))) = i1
     end do
@@ -287,7 +287,7 @@ function sameadjacency(ntype, atomtype0, nadj0, adjlist0, atomtype1, ncoord1, ad
         return
     end if
 
-!   print *, typelist0(:nadj0), '/', typelist1(:ncoord1)
+!   print *, typelist0(:nadj0), '/', typelist1(:nadj1)
 
 end function
 
