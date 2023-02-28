@@ -21,11 +21,13 @@ use bounds
 use random
 use strutils
 use adjacency
+use rotation
+use translation
 use sequencefrag
 use backtracking
-use translation
+use permutation
 use alignment
-use rotation
+use assorting
 use printing
 use biasing
 use lap
@@ -55,7 +57,8 @@ subroutine optimize_assignment( &
    nrec)
 
    integer, intent(in) :: natom, nblk, neqv0, neqv1
-   integer, dimension(:), intent(in) :: blksz, eqvsz0, eqvsz1
+   integer, dimension(:), intent(in) :: blksz
+   integer, dimension(:), intent(in) :: eqvsz0, eqvsz1
    real(wp), dimension(:), intent(in) :: blkwt
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
    logical, dimension(:, :), intent(in) :: adjmat0, adjmat1
@@ -63,27 +66,25 @@ subroutine optimize_assignment( &
    integer, intent(out) :: countlist(:)
    integer, intent(out) :: nrec
 
-   integer :: h, offset
+   logical visited, overflow
    integer :: nfrag0, nfrag1
    integer irec, mrec, ntrial, nstep, steps
    integer, dimension(natom) :: atomperm, auxperm
-   logical visited, overflow
+   integer :: adjdiff, recadjdiff(maxrec)
+   integer, dimension(natom) :: nadj0, nadj1
+   integer, dimension(maxcoord, natom) :: adjlist0, adjlist1
+   integer, dimension(natom) :: nadjeqv0, nadjeqv1
+   integer, dimension(maxcoord, natom) :: adjeqvsz0, adjeqvsz1
+   integer, dimension(natom) :: blkid
+   integer, dimension(natom) :: fragid0, fragid1
+   integer, dimension(natom) :: fragrt0, fragrt1
+   integer :: h, offset
    real(wp) :: dist2, olddist, newdist, totalrot
    real(wp), dimension(4) :: rotquat, prodquat
    real(wp), dimension(maxrec) :: recdist2, avgsteps, avgtotalrot, avgrealrot
    real(wp) :: biasmat(natom, natom)
    real(wp) :: workcoords1(3, natom)
    real(wp) :: weights(natom)
-
-   integer :: adjdiff, recadjdiff(maxrec)
-   integer, dimension(natom) :: nadj0, nadj1
-   integer, dimension(maxcoord, natom) :: adjlist0, adjlist1
-   integer, dimension(natom) :: blkid
-   integer, dimension(natom) :: fragid0, fragid1
-   integer, dimension(natom) :: fragrt0, fragrt1
-
-!   integer :: nbond0, nbond1
-!   integer :: bonds0(2, maxcoord*natom), bonds1(2, maxcoord*natom)
 
    ! Assign id's and weights to atoms
 
@@ -98,6 +99,11 @@ subroutine optimize_assignment( &
 
    call adjmat2list(natom, adjmat0, nadj0, adjlist0)
    call adjmat2list(natom, adjmat1, nadj1, adjlist1)
+
+   ! Group equivalent neighbors
+
+   call groupeqvnei(natom, neqv0, eqvsz0, nadj0, adjlist0, nadjeqv0, adjeqvsz0)
+   call groupeqvnei(natom, neqv1, eqvsz1, nadj1, adjlist1, nadjeqv1, adjeqvsz1)
 
    ! Detect fagments and starting atoms
 
@@ -179,12 +185,11 @@ subroutine optimize_assignment( &
       call backtrack_bonds(natom, weights, blkid, coords0, nadj0, adjlist0, adjmat0, &
          coords1, nadj1, adjlist1, adjmat1, atomperm, nfrag0, fragrt0)
 
-!      call permutate_bonds(natom, weights, coords0, adjmat0, adjlist0, nequiv0, eqvsz0, &
-!         equivset0, eqvid0, nadjeq0, adjeqsize0, coords1, adjmat1, atomperm, nfrag0, &
-!         fragrt0)
+      call permutate_bonds(natom, weights, coords0, adjmat0, adjlist0, neqv0, eqvsz0, &
+         nadjeqv0, adjeqvsz0, coords1, adjmat1, atomperm, nfrag0, fragrt0)
 
-      adjdiff = adjacencydiff(natom, adjmat0, adjmat1, atomperm)
       dist2 = leastsquaredist(natom, weights, coords0, coords1, atomperm)
+      adjdiff = adjacencydiff(natom, adjmat0, adjmat1, atomperm)
 
       ! Check for new best permlist
 
@@ -241,12 +246,6 @@ subroutine optimize_assignment( &
       call print_stats(nrec, weights, countlist, avgsteps, avgtotalrot, avgrealrot, recadjdiff, recdist2)
       call print_final_stats(overflow, maxrec, nrec, ntrial, nstep)
    end if
-
-!   open(unit=99, file='ordered.mol2', action='write', status='replace')
-!   call adjlist2bonds(natom, nadj0, adjlist0, nbond0, bonds0)
-!   call writemol2(99, 'coords0', natom, znums0(atomorder0), coords0, nbond0, bonds0)
-!   call adjlist2bonds(natom, nadj1, adjlist1, nbond1, bonds1)
-!   call writemol2(99, 'coords1', natom, znums1(atomorder1), coords1, nbond1, bonds1)
 
 end subroutine
 

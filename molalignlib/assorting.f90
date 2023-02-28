@@ -18,6 +18,7 @@ module assorting
 use stdio
 use kinds
 use flags
+use bounds
 use discrete
 use sorting
 use chemdata
@@ -26,7 +27,7 @@ implicit none
 
 contains
 
-subroutine grouptypes(natom, znums, types, weights, nblk, blksz, blkwt, blkid)
+subroutine groupblocks(natom, znums, types, weights, nblk, blksz, blkwt, blkid)
 ! Purpose: Group atoms by atomic numbers and types
    integer, intent(in) :: natom
    integer, dimension(:), intent(in) :: znums
@@ -96,6 +97,92 @@ subroutine grouptypes(natom, znums, types, weights, nblk, blksz, blkwt, blkid)
 !   blksz(:nblk) = blksz(blkorder(:nblk))
 !   blkorder(:nblk) = inverseperm(blkorder(:nblk))
 !   blkid = blkorder(blkid)
+
+end subroutine
+
+subroutine groupbytype(nelem, elements, types, groupid, ngroup, groupsize)
+! Purpose: Categorize atoms by typess
+    integer, intent(in) :: nelem
+    integer, intent(out) :: ngroup
+    integer, dimension(:), intent(in) :: types, elements
+    integer, dimension(:), intent(out) :: groupid, groupsize
+
+    integer i, j
+    integer, dimension(maxcoord) :: grouptype, grouporder
+    logical, dimension(maxcoord) :: remaining
+
+! Initialization
+
+    ngroup = 0
+    remaining = .true.
+
+! Create group lists
+
+    do i = 1, nelem
+        if (remaining(i)) then
+            ngroup = ngroup + 1
+            groupsize(ngroup) = 1
+            grouptype(ngroup) = types(elements(i))
+            groupid(i) = ngroup
+            do j = i + 1, nelem
+                if (remaining(i)) then
+                    if (types(elements(j)) == types(elements(i))) then
+                        groupid(j) = ngroup
+                        groupsize(ngroup) = groupsize(ngroup) + 1
+                        remaining(j) = .false.
+                    end if
+                end if
+            end do
+        end if
+    end do
+
+! Order groups by category type 
+
+    grouporder(:ngroup) = sortorder(grouptype, ngroup)
+    grouptype(:ngroup) = grouptype(grouporder(:ngroup))
+    groupsize(:ngroup) = groupsize(grouporder(:ngroup))
+    grouporder(:ngroup) = inverseperm(grouporder(:ngroup))
+    groupid(:nelem) = grouporder(groupid(:nelem))
+
+!    print *, groupid(:ngroup)
+!    print *, typess(grouporder)
+
+end subroutine
+
+subroutine groupeqvnei(natom, neqv, eqvsz, nadj, adjlist, nadjeqv, adjeqvsz)
+! Purpose: Categorize atoms by eqtypes
+   integer, intent(in) :: natom, neqv
+   integer, dimension(:), intent(in) :: nadj, eqvsz
+   integer, dimension(:, :), intent(inout) :: adjlist
+   integer, dimension(:), intent(out) :: nadjeqv
+   integer, dimension(:, :), intent(out) :: adjeqvsz
+
+   integer i, h, offset
+   integer :: eqvid(natom)
+   integer, dimension(maxcoord) :: adjeqvid, reorder
+
+   ! assing equivalence group
+
+   offset = 0
+   do h = 1, neqv
+      eqvid(offset+1:offset+eqvsz(h)) = h
+      offset = offset + eqvsz(h)
+   end do
+
+   do i = 1, natom
+      call groupbytype(nadj(i), adjlist(:, i), eqvid, adjeqvid, nadjeqv(i), adjeqvsz(:, i))
+      reorder(:nadj(i)) = sortorder(adjeqvid, nadj(i))
+      adjlist(:nadj(i), i) = adjlist(reorder(:nadj(i)), i)
+   end do
+
+!    do i = 1, natom
+!        print '(a, 1x, i0, 1x, a)', '--------------', i, '--------------'
+!        offset = 0
+!        do j = 1, nadjeqv(i)
+!            print *, adjlist(offset+1:offset+adjeqvsz(j, i), i)
+!            offset = offset + adjeqvsz(j, i)
+!         end do
+!    end do
 
 end subroutine
 

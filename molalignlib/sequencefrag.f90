@@ -27,6 +27,8 @@ subroutine runsequence (natom, nadj, adjlist, blksz, blkid, &
    character(80) :: fmtstr
    character(3) :: numat
 
+   ! assing equivalence group
+
    offset = 0
    do h = 1, neqv
       eqvid(offset+1:offset+eqvsz(h)) = h

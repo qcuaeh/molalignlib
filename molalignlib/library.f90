@@ -78,6 +78,8 @@ subroutine assign_atoms( &
    real(wp), dimension(:), allocatable :: blkwt0, blkwt1
    real(wp) :: center0(3), center1(3)
 
+!   integer :: nbond0, nbond1, bonds0(2, maxcoord*natom0), bonds1(2, maxcoord*natom1)
+
    ! Select bias function
 
    if (bias_flag) then
@@ -123,8 +125,8 @@ subroutine assign_atoms( &
 
    ! Group atoms by label
 
-   call grouptypes(natom0, znums0, types0, weights0, nblk0, blksz0, blkwt0, blkid0)
-   call grouptypes(natom1, znums1, types1, weights1, nblk1, blksz1, blkwt1, blkid1)
+   call groupblocks(natom0, znums0, types0, weights0, nblk0, blksz0, blkwt0, blkid0)
+   call groupblocks(natom1, znums1, types1, weights1, nblk1, blksz1, blkwt1, blkid1)
 
    ! Group atoms by NMA at infinite level
 
@@ -192,6 +194,15 @@ subroutine assign_atoms( &
       permlist, &
       countlist, &
       nrec)
+
+!   ! Print coordinates with internal order
+!   open(unit=99, file='ordered.mol2', action='write', status='replace')
+!   call adjmat2list(natom0, adjmat0(atomorder0, atomorder0), nadj0, adjlist0)
+!   call adjmat2list(natom1, adjmat1(atomorder1, atomorder1), nadj1, adjlist1)
+!   call adjlist2bonds(natom0, nadj0, adjlist0, nbond0, bonds0)
+!   call adjlist2bonds(natom1, nadj1, adjlist1, nbond1, bonds1)
+!   call writemol2(99, 'coords0', natom0, znums0(atomorder0), coords0(:, atomorder1), nbond0, bonds0)
+!   call writemol2(99, 'coords1', natom1, znums1(atomorder1), coords1(:, atomorder1), nbond1, bonds1)
 
    ! Reorder back to original atom ordering
 
