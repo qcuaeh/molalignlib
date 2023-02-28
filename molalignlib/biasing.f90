@@ -23,7 +23,7 @@ use sorting
 implicit none
 
 abstract interface
-   subroutine f_bias_func(natom, nblk, blksz, nadj0, adjlist0, nadj1, adjlist1, coords0, coords1, biasmat)
+   subroutine bias_func_proc(natom, nblk, blksz, nadj0, adjlist0, nadj1, adjlist1, coords0, coords1, biasmat)
       use kinds
       integer, intent(in) :: natom, nblk
       integer, dimension(:), intent(in) :: blksz
@@ -37,7 +37,7 @@ end interface
 real(wp) :: bias_tol
 real(wp) :: bias_scale
 real(wp) :: bias_ratio
-procedure(f_bias_func), pointer :: bias_func
+procedure(bias_func_proc), pointer :: bias_func
 
 contains
 
@@ -133,159 +133,159 @@ subroutine mnacrossbias(natom, nblk, blksz, nadj0, adjlist0, nadj1, adjlist1, co
    integer :: h, i, j, offset, lev, nin, nout
    integer, dimension(natom) :: intype0, intype1, outype0, outype1
 
-    lev = 0
-    nin = nblk
+   lev = 0
+   nin = nblk
 
-    offset = 0
-    do h = 1, nblk
-        intype0(offset+1:offset+blksz(h)) = h
-        intype1(offset+1:offset+blksz(h)) = h
-        offset = offset + blksz(h)
-    end do
+   offset = 0
+   do h = 1, nblk
+      intype0(offset+1:offset+blksz(h)) = h
+      intype1(offset+1:offset+blksz(h)) = h
+      offset = offset + blksz(h)
+   end do
 
-    do
+   do
 
-        lev = lev + 1
+      lev = lev + 1
 
-        if (maxlvl_flag) then
-            if (lev > maxlevel) exit
-        end if
+      if (maxlvl_flag) then
+         if (lev > maxlevel) exit
+      end if
 
-        call getmnacrosstypes(natom, nin, intype0, nadj0, adjlist0, intype1, nadj1, adjlist1, &
-            nout, outype0, outype1)
+      call getmnacrosstypes(natom, nin, intype0, nadj0, adjlist0, intype1, nadj1, adjlist1, &
+         nout, outype0, outype1)
 
-        offset = 0
+      offset = 0
 
-        do h = 1, nblk
-            do i = offset + 1, offset + blksz(h)
-                do j = offset + 1, offset + blksz(h)
-                    if (outype0(i) == outype1(j)) then
-                        biasmat(i, j) = 0
-                    else
-                        biasmat(i, j) = biasmat(i, j) + bias_scale**2*bias_ratio**(lev - 1)
-                    end if
-                end do
+      do h = 1, nblk
+         do i = offset + 1, offset + blksz(h)
+            do j = offset + 1, offset + blksz(h)
+               if (outype0(i) == outype1(j)) then
+                  biasmat(i, j) = 0
+               else
+                  biasmat(i, j) = biasmat(i, j) + bias_scale**2*bias_ratio**(lev - 1)
+               end if
             end do
-            offset = offset + blksz(h)
-        end do
+         end do
+         offset = offset + blksz(h)
+      end do
 
-        if (all(outype0 == intype0) .and. all((outype1 == intype1))) exit
+      if (all(outype0 == intype0) .and. all((outype1 == intype1))) exit
 
-        nin = nout
-        intype0 = outype0
-        intype1 = outype1
+      nin = nout
+      intype0 = outype0
+      intype1 = outype1
 
-    end do
+   end do
 
 !    print *, natom, nout
 
 end subroutine
 
 subroutine getmnacrosstypes(natom, nin, intype0, nadj0, adjlist0, intype1, nadj1, adjlist1, &
-        nout, outype0, outype1)
-    integer, intent(in) :: natom, nin
-    integer, dimension(:), intent(in) :: intype0, intype1, nadj0, nadj1
-    integer, dimension(:, :), intent(in) :: adjlist0, adjlist1
-    integer, intent(out) :: nout
-    integer, dimension(:), intent(out) :: outype0, outype1
+      nout, outype0, outype1)
+   integer, intent(in) :: natom, nin
+   integer, dimension(:), intent(in) :: intype0, intype1, nadj0, nadj1
+   integer, dimension(:, :), intent(in) :: adjlist0, adjlist1
+   integer, intent(out) :: nout
+   integer, dimension(:), intent(out) :: outype0, outype1
 
-    integer i, j
-    integer archetype(natom)
-    logical untyped(natom)
+   integer i, j
+   integer archetype(natom)
+   logical untyped(natom)
 
-    nout = 0
-    untyped(:) = .true.
+   nout = 0
+   untyped(:) = .true.
 
-    do i = 1, natom
-        if (untyped(i)) then
-            nout = nout + 1
-            outype0(i) = nout
-            archetype(nout) = i
-            do j = i + 1, natom
-                if (untyped(j)) then
-                    if (intype0(j) == intype0(i)) then
-                        if (sameadjacency(nin, intype0, nadj0(i), adjlist0(:, i), intype0, nadj0(j), adjlist0(:, j))) then
-                            outype0(j) = nout
-                            untyped(j) = .false.
-                        end if
-                    end if
-                end if
-            end do
-        end if
-    end do
-
-    untyped(:) = .true.
-
-    do i = 1, nout
-        do j = 1, natom
+   do i = 1, natom
+      if (untyped(i)) then
+         nout = nout + 1
+         outype0(i) = nout
+         archetype(nout) = i
+         do j = i + 1, natom
             if (untyped(j)) then
-                if (intype1(j) == intype0(archetype(i))) then
-                    if (sameadjacency(nin, intype0, nadj0(archetype(i)), adjlist0(:, archetype(i)), intype1, nadj1(j), &
-                                      adjlist1(:, j))) then
-                        outype1(j) = i
-                        untyped(j) = .false.
-                    end if
-                end if
+               if (intype0(j) == intype0(i)) then
+                  if (sameadjacency(nin, intype0, nadj0(i), adjlist0(:, i), intype0, nadj0(j), adjlist0(:, j))) then
+                     outype0(j) = nout
+                     untyped(j) = .false.
+                  end if
+               end if
             end if
-        end do
-    end do
+         end do
+      end if
+   end do
 
-    do i = 1, natom
-        if (untyped(i)) then
-            nout = nout + 1
-            outype1(i) = nout
-            do j = i + 1, natom
-                if (untyped(j)) then
-                    if (intype1(j) == intype1(i)) then
-                        if (sameadjacency(nin, intype1, nadj1(i), adjlist1(:, i), intype1, nadj1(j), adjlist1(:, j))) then
-                            outype1(j) = nout
-                            untyped(j) = .false.
-                        end if
-                    end if
-                end if
-            end do
-        end if
-    end do
+   untyped(:) = .true.
+
+   do i = 1, nout
+      do j = 1, natom
+         if (untyped(j)) then
+            if (intype1(j) == intype0(archetype(i))) then
+               if (sameadjacency(nin, intype0, nadj0(archetype(i)), adjlist0(:, archetype(i)), intype1, nadj1(j), &
+                            adjlist1(:, j))) then
+                  outype1(j) = i
+                  untyped(j) = .false.
+               end if
+            end if
+         end if
+      end do
+   end do
+
+   do i = 1, natom
+      if (untyped(i)) then
+         nout = nout + 1
+         outype1(i) = nout
+         do j = i + 1, natom
+            if (untyped(j)) then
+               if (intype1(j) == intype1(i)) then
+                  if (sameadjacency(nin, intype1, nadj1(i), adjlist1(:, i), intype1, nadj1(j), adjlist1(:, j))) then
+                     outype1(j) = nout
+                     untyped(j) = .false.
+                  end if
+               end if
+            end if
+         end do
+      end if
+   end do
 
 end subroutine
 
 function sameadjacency(ntype, atomtype0, nadj0, adjlist0, atomtype1, nadj1, adjlist1)
-    integer, intent(in) :: ntype, nadj0, nadj1
-    integer, dimension(:), intent(in) :: adjlist0, adjlist1
-    integer, dimension(:) :: atomtype0, atomtype1
-    logical :: sameadjacency
+   integer, intent(in) :: ntype, nadj0, nadj1
+   integer, dimension(:), intent(in) :: adjlist0, adjlist1
+   integer, dimension(:) :: atomtype0, atomtype1
+   logical :: sameadjacency
 
-    integer i0, i1, k
-    integer n0(ntype), n1(ntype)
+   integer i0, i1
+   integer n0(ntype), n1(ntype)
 !   real atoms0(3, maxcoord), atoms1(3, maxcoord)
 !   integer typelist0(maxcoord, nin), typelist1(maxcoord, nin)
 
-    sameadjacency = .true.
+   sameadjacency = .true.
 
-    if (nadj0 /= nadj1) then
-        sameadjacency = .false.
-        return
-    end if
+   if (nadj0 /= nadj1) then
+      sameadjacency = .false.
+      return
+   end if
 
 !   If coordination number is the same check if coordinated atoms are the same
 
-    n0(:) = 0
-    n1(:) = 0
+   n0(:) = 0
+   n1(:) = 0
 
-    do i0 = 1, nadj0
-        n0(atomtype0(adjlist0(i0))) = n0(atomtype0(adjlist0(i0))) + 1
+   do i0 = 1, nadj0
+      n0(atomtype0(adjlist0(i0))) = n0(atomtype0(adjlist0(i0))) + 1
 !       typelist0(n0(atomtype0(adjlist0(i0))), atomtype0(adjlist0(i0))) = i0
-    end do
+   end do
 
-    do i1 = 1, nadj1
-        n1(atomtype1(adjlist1(i1))) = n1(atomtype1(adjlist1(i1))) + 1
+   do i1 = 1, nadj1
+      n1(atomtype1(adjlist1(i1))) = n1(atomtype1(adjlist1(i1))) + 1
 !       typelist1(n1(atomtype1(adjlist1(i1))), atomtype1(adjlist1(i1))) = i1
-    end do
+   end do
 
-    if (any(n0 /= n1)) then
-        sameadjacency = .false.
-        return
-    end if
+   if (any(n0 /= n1)) then
+      sameadjacency = .false.
+      return
+   end if
 
 !   print *, typelist0(:nadj0), '/', typelist1(:nadj1)
 

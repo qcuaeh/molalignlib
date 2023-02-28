@@ -32,7 +32,7 @@ subroutine readxyz(unit, title, natom, labels, coords)
    character(:), allocatable, intent(out) :: title
    character(ll) :: buffer
 
-   integer :: i, stat
+   integer :: i
 
    read (unit, *, end=99) natom
 

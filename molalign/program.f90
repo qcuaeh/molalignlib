@@ -68,7 +68,6 @@ program molalign
    stats_flag = .false.
    mirror_flag = .false.
    maxlvl_flag = .false.
-   live_flag = .false.
 
    maxrec = 1
    maxcount = 10
@@ -88,8 +87,6 @@ program molalign
    do while (getarg(arg))
 
       select case (arg)
-      case ('-live')
-         live_flag = .true.
       case ('-stats')
          stats_flag = .true.
       case ('-test')

@@ -22,6 +22,7 @@ use random
 use biasing
 use discrete
 use sorting
+use printing
 use assorting
 use rotation
 use translation
@@ -82,8 +83,10 @@ subroutine assign_atoms( &
    if (bias_flag) then
       if (bond_flag) then
          bias_func => mnacrossbias
+         print_stats => print_stats_diff
       else
          bias_func => sndcrossbias
+         print_stats => print_stats_dist
       end if
    else
       bias_func => nocrossbias

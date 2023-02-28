@@ -64,11 +64,9 @@ subroutine optimize_assignment( &
    integer, intent(out) :: nrec
 
    integer :: h, offset
-   integer :: nbond0, nbond1
    integer :: nfrag0, nfrag1
    integer irec, mrec, ntrial, nstep, steps
    integer, dimension(natom) :: atomperm, auxperm
-   integer :: bonds0(2, maxcoord*natom), bonds1(2, maxcoord*natom)
    logical visited, overflow
    real(wp) :: dist2, olddist, newdist, totalrot
    real(wp), dimension(4) :: rotquat, prodquat
@@ -77,12 +75,15 @@ subroutine optimize_assignment( &
    real(wp) :: workcoords1(3, natom)
    real(wp) :: weights(natom)
 
-   integer :: diffa, recdiffa(maxrec)
+   integer :: adjdiff, recadjdiff(maxrec)
    integer, dimension(natom) :: nadj0, nadj1
    integer, dimension(maxcoord, natom) :: adjlist0, adjlist1
-   integer, dimension(natom) :: blkid, eqvid0, eqvid1
+   integer, dimension(natom) :: blkid
    integer, dimension(natom) :: fragid0, fragid1
    integer, dimension(natom) :: fragrt0, fragrt1
+
+!   integer :: nbond0, nbond1
+!   integer :: bonds0(2, maxcoord*natom), bonds1(2, maxcoord*natom)
 
    ! Assign id's and weights to atoms
 
@@ -93,18 +94,6 @@ subroutine optimize_assignment( &
       offset = offset + blksz(h)
    end do
 
-   offset = 0
-   do h = 1, neqv0
-      eqvid0(offset+1:offset+eqvsz0(h)) = h
-      offset = offset + eqvsz0(h)
-   end do
-
-   offset = 0
-   do h = 1, neqv1
-      eqvid1(offset+1:offset+eqvsz1(h)) = h
-      offset = offset + eqvsz1(h)
-   end do
-
    ! Recalculate adjacency lists
 
    call adjmat2list(natom, adjmat0, nadj0, adjlist0)
@@ -112,8 +101,8 @@ subroutine optimize_assignment( &
 
    ! Detect fagments and starting atoms
 
-   call runsequence(natom, nadj0, adjlist0, blksz, blkid, eqvsz0, eqvid0, nfrag0, fragrt0, fragid0)
-   call runsequence(natom, nadj1, adjlist1, blksz, blkid, eqvsz1, eqvid1, nfrag1, fragrt1, fragid1)
+   call runsequence(natom, nadj0, adjlist0, blksz, blkid, neqv0, eqvsz0, nfrag0, fragrt0, fragid0)
+   call runsequence(natom, nadj1, adjlist1, blksz, blkid, neqv1, eqvsz1, nfrag1, fragrt1, fragid1)
 
    ! Calculate biases
 
@@ -134,13 +123,6 @@ subroutine optimize_assignment( &
 !      end do
 !      offset = offset + blksz(h)
 !   end do
-
-   ! Print header and initial stats
-
-   if (stats_flag .and. live_flag) then
-      write (error_unit, '(a)', advance='no') achar(27) // '[1H' // achar(27) // '[J'
-      call print_header()
-   end if
 
    ! Initialize loop variables
 
@@ -201,7 +183,7 @@ subroutine optimize_assignment( &
 !         equivset0, eqvid0, nadjeq0, adjeqsize0, coords1, adjmat1, atomperm, nfrag0, &
 !         fragrt0)
 
-      diffa = adjacencydiff(natom, adjmat0, adjmat1, atomperm)
+      adjdiff = adjacencydiff(natom, adjmat0, adjmat1, atomperm)
       dist2 = leastsquaredist(natom, weights, coords0, coords1, atomperm)
 
       ! Check for new best permlist
@@ -214,11 +196,6 @@ subroutine optimize_assignment( &
             avgsteps(irec) = avgsteps(irec) + (steps - avgsteps(irec))/countlist(irec)
             avgrealrot(irec) = avgrealrot(irec) + (rotangle(prodquat) - avgrealrot(irec))/countlist(irec)
             avgtotalrot(irec) = avgtotalrot(irec) + (totalrot - avgtotalrot(irec))/countlist(irec)
-            if (stats_flag .and. live_flag) then
-               write (error_unit, '(a)', advance='no') achar(27) // '[' // intstr(irec + 2) // 'H'
-               call print_body(irec, countlist(irec), avgsteps(irec), avgtotalrot(irec), &
-                  avgrealrot(irec), recdist2(irec)/sum(weights))
-            end if
             visited = .true.
             exit
          end if
@@ -227,7 +204,7 @@ subroutine optimize_assignment( &
       if (.not. visited) then
          mrec = nrec + 1
          do irec = nrec, 1, -1
-            if (diffa < recdiffa(irec) .or. (diffa == recdiffa(irec) .and. dist2 < recdist2(irec))) then
+            if (adjdiff < recadjdiff(irec) .or. (adjdiff == recadjdiff(irec) .and. dist2 < recdist2(irec))) then
                mrec = irec
             else
                exit
@@ -242,50 +219,27 @@ subroutine optimize_assignment( &
             do irec = nrec, mrec + 1, -1
                countlist(irec) = countlist(irec - 1)
                recdist2(irec) = recdist2(irec - 1)
-               recdiffa(irec) = recdiffa(irec - 1)
+               recadjdiff(irec) = recadjdiff(irec - 1)
                avgsteps(irec) = avgsteps(irec - 1)
                avgrealrot(irec) = avgrealrot(irec - 1)
                avgtotalrot(irec) = avgtotalrot(irec - 1)
                permlist(:, irec) = permlist(:, irec - 1)
-               if (stats_flag .and. live_flag) then
-                  write (error_unit, '(a)', advance='no') achar(27) // '[' // intstr(irec + 2) // 'H'
-                  call print_body(irec, countlist(irec), avgsteps(irec), avgtotalrot(irec), &
-                     avgrealrot(irec), recdist2(irec)/sum(weights))
-               end if
             end do
             countlist(mrec) = 1
             recdist2(mrec) = dist2
-            recdiffa(mrec) = diffa
+            recadjdiff(mrec) = adjdiff
             avgsteps(mrec) = steps
             avgrealrot(mrec) = rotangle(prodquat)
             avgtotalrot(mrec) = totalrot
             permlist(:, mrec) = atomperm
-            if (stats_flag .and. live_flag) then
-               write (error_unit, '(a)', advance='no') achar(27) // '[' // intstr(mrec + 2) // 'H'
-               call print_body(mrec, countlist(mrec), avgsteps(mrec), avgtotalrot(mrec), &
-                  avgrealrot(mrec), recdist2(mrec)/sum(weights))
-            end if
          end if
-      end if
-
-      if (stats_flag .and. live_flag) then
-         write (error_unit, '(a)', advance='no') achar(27) // '[' // intstr(nrec + 3) // 'H'
-         call print_footer()
       end if
 
    end do
 
-   if (stats_flag .and. .not. live_flag) then
-      call print_header()
-      do irec = 1, nrec
-         call print_body(irec, countlist(irec), avgsteps(irec), avgtotalrot(irec), &
-            avgrealrot(irec), recdist2(irec)/sum(weights))
-      end do
-      call print_footer()
-   end if
-
    if (stats_flag) then
-      call print_stats(overflow, maxrec, nrec, ntrial, nstep)
+      call print_stats(nrec, weights, countlist, avgsteps, avgtotalrot, avgrealrot, recadjdiff, recdist2)
+      call print_final_stats(overflow, maxrec, nrec, ntrial, nstep)
    end if
 
 !   open(unit=99, file='ordered.mol2', action='write', status='replace')
