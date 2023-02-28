@@ -11,7 +11,6 @@ implicit none
 contains
 
 subroutine getadjmat(natom, coords, znums, adjmat)
-
    integer, intent(in) :: natom
    integer, dimension(:), intent(in) :: znums
    real(wp), dimension(:, :), intent(in) :: coords
@@ -49,7 +48,6 @@ subroutine getadjmat(natom, coords, znums, adjmat)
 end subroutine
 
 subroutine adjmat2list(natom, adjmat, nadj, adjlist)
-
    integer, intent(in) :: natom
    logical, dimension(:, :), intent(in) :: adjmat
    integer, dimension(:), intent(out) :: nadj
@@ -76,7 +74,6 @@ subroutine adjmat2list(natom, adjmat, nadj, adjlist)
 end subroutine
 
 subroutine adjlist2bonds(natom, nadj, adjlist, nbond, bonds)
-
    integer, intent(in) :: natom
    integer, dimension(:), intent(in) :: nadj
    integer, dimension(:, :), intent(in) :: adjlist
@@ -99,54 +96,54 @@ end subroutine
 function adjacencydiff(natom, adjmat0, adjmat1, atomperm) result(diff)
 ! Purpose: Check if two graphs are equal.
 ! Return the number of differences between graphs.
-    integer, intent(in) :: natom
-    integer, dimension(:), intent(in) :: atomperm
-    logical, dimension(:, :), intent(in) :: adjmat0, adjmat1
-    integer diff
+   integer, intent(in) :: natom
+   integer, dimension(:), intent(in) :: atomperm
+   logical, dimension(:, :), intent(in) :: adjmat0, adjmat1
+   integer diff
 
-    integer i, j
+   integer i, j
 
-    diff = 0
+   diff = 0
 
 ! Check differences element by element
 
-    do i = 1, natom
-        do j = i + 1, natom
-            if (adjmat0(i, j) .neqv. adjmat1(atomperm(i), atomperm(j))) then
-                diff = diff + 1
+   do i = 1, natom
+      do j = i + 1, natom
+         if (adjmat0(i, j) .neqv. adjmat1(atomperm(i), atomperm(j))) then
+            diff = diff + 1
 !                print *, i, j, adjmat0(i, j), adjmat1(atomperm(i), atomperm(j))
-            end if
-        end do
-    end do
+         end if
+      end do
+   end do
 
 end function
 
 function adjacencydelta(nadj0, adjlist0, adjmat1, atomperm, k, l) result(delta)
-    integer, intent(in) :: k, l
-    integer, dimension(:), intent(in) :: atomperm, nadj0
-    integer, dimension(:, :), intent(in) :: adjlist0
-    logical, dimension(:, :), intent(in) :: adjmat1
-    integer i, nkk, nkl, nll, nlk, delta
+   integer, intent(in) :: k, l
+   integer, dimension(:), intent(in) :: atomperm, nadj0
+   integer, dimension(:, :), intent(in) :: adjlist0
+   logical, dimension(:, :), intent(in) :: adjmat1
+   integer i, nkk, nkl, nll, nlk, delta
 
-    nkk = 0
-    nkl = 0
+   nkk = 0
+   nkl = 0
 
-    do i = 1, nadj0(k)
-        if (adjlist0(i, k) /= l) then
-            if (adjmat1(atomperm(k), atomperm(adjlist0(i, k)))) nkk = nkk + 1
-            if (adjmat1(atomperm(l), atomperm(adjlist0(i, k)))) nkl = nkl + 1
-        end if
-    end do
+   do i = 1, nadj0(k)
+      if (adjlist0(i, k) /= l) then
+         if (adjmat1(atomperm(k), atomperm(adjlist0(i, k)))) nkk = nkk + 1
+         if (adjmat1(atomperm(l), atomperm(adjlist0(i, k)))) nkl = nkl + 1
+      end if
+   end do
 
-    nll = 0
-    nlk = 0
+   nll = 0
+   nlk = 0
 
-    do i = 1, nadj0(l)
-        if (adjlist0(i, l) /= k) then
-            if (adjmat1(atomperm(l), atomperm(adjlist0(i, l)))) nll = nll + 1
-            if (adjmat1(atomperm(k), atomperm(adjlist0(i, l)))) nlk = nlk + 1
-        end if
-    end do
+   do i = 1, nadj0(l)
+      if (adjlist0(i, l) /= k) then
+         if (adjmat1(atomperm(l), atomperm(adjlist0(i, l)))) nll = nll + 1
+         if (adjmat1(atomperm(k), atomperm(adjlist0(i, l)))) nlk = nlk + 1
+      end if
+   end do
 
 !        dkk = nadj0(k) + nadj1(atomperm(k)) - 2*nkk
 !        dll = nadj0(l) + nadj1(atomperm(l)) - 2*nll
@@ -154,8 +151,8 @@ function adjacencydelta(nadj0, adjlist0, adjmat1, atomperm, k, l) result(delta)
 !        dlk = nadj0(l) + nadj1(atomperm(k)) - 2*nlk
 !        delta = dkl + dlk - dkk - dll
 
-    ! Notice that dkl + dlk - dkk - dll == 2*(nkk + nll - nkl - nlk)
-    delta = 2*(nkk + nll - nkl - nlk)
+   ! Notice that dkl + dlk - dkk - dll == 2*(nkk + nll - nkl - nlk)
+   delta = 2*(nkk + nll - nkl - nlk)
 
 end function
 

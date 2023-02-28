@@ -21,26 +21,50 @@ use flags
 
 implicit none
 
+abstract interface
+   subroutine print_stats_proc(nrec, weights, matches, avgsteps, avgtotalrot, avgrealrot, recadjdiff, recdist2)
+      use kinds
+      integer, intent(in) :: nrec
+      integer, dimension(:), intent(in) :: matches, recadjdiff
+      real(wp), dimension(:), intent(in) :: weights, avgsteps, avgtotalrot, avgrealrot, recdist2
+   end subroutine
+end interface
+
+procedure(print_stats_proc), pointer :: print_stats
+
 contains
 
-subroutine print_header()
+subroutine print_stats_dist(nrec, weights, matches, avgsteps, avgtotalrot, avgrealrot, recadjdiff, recdist2)
+   integer, intent(in) :: nrec
+   integer, dimension(:), intent(in) :: matches, recadjdiff
+   real(wp), dimension(:), intent(in) :: weights, avgsteps, avgtotalrot, avgrealrot, recdist2
+   integer :: irec
    write (output_unit, '(1x,a,4x,a,4x,a,5x,a,6x,a,7x,a)') 'Map', 'Count', 'Steps', 'Total', 'Real', 'RMSD'
    write (output_unit, '(a)') '-----------------------------------------------------'
-end subroutine
-
-subroutine print_body(irec, matches, avgsteps, avgtotalrot, avgrealrot, dist2)
-   integer, intent(in) :: irec, matches
-   real(wp), intent(in) :: avgsteps, avgtotalrot, avgrealrot, dist2
-   write (output_unit, '(i4,3x,i6,5x,f4.1,5x,f5.1,5x,f5.1,3x,f8.4)') &
-      irec, matches, avgsteps, 90./asin(1.)*avgtotalrot, 90./asin(1.)*avgrealrot, sqrt(dist2)
-end subroutine
-
-subroutine print_footer()
-   if (live_flag) write (output_unit, '(a)', advance='no') achar(27)//'[K'
+   do irec = 1, nrec
+      write (output_unit, '(i4,3x,i6,5x,f4.1,5x,f5.1,5x,f5.1,3x,f8.4)') &
+         irec, matches(irec), avgsteps(irec), 90./asin(1.)*avgtotalrot(irec), 90./asin(1.)*avgrealrot(irec), &
+         sqrt(recdist2(irec)/sum(weights))
+   end do
    write (output_unit, '(a)') '-----------------------------------------------------'
 end subroutine
 
-subroutine print_stats(overflow, maxrec, nrec, ntrial, nstep)
+subroutine print_stats_diff(nrec, weights, matches, avgsteps, avgtotalrot, avgrealrot, recadjdiff, recdist2)
+   integer, intent(in) :: nrec
+   integer, dimension(:), intent(in) :: matches, recadjdiff
+   real(wp), dimension(:), intent(in) :: weights, avgsteps, avgtotalrot, avgrealrot, recdist2
+   integer :: irec
+   write (output_unit, '(1x,a,4x,a,4x,a,5x,a,6x,a,3x,a,7x,a)') 'Map', 'Count', 'Steps', 'Total', 'Real', 'AdjD', 'RMSD'
+   write (output_unit, '(a)') '------------------------------------------------------------'
+   do irec = 1, nrec
+      write (output_unit, '(i4,3x,i6,5x,f4.1,5x,f5.1,5x,f5.1,3x,i4,3x,f8.4)') &
+         irec, matches(irec), avgsteps(irec), 90./asin(1.)*avgtotalrot(irec), 90./asin(1.)*avgrealrot(irec), &
+         recadjdiff(irec), sqrt(recdist2(irec)/sum(weights))
+   end do
+   write (output_unit, '(a)') '------------------------------------------------------------'
+end subroutine
+
+subroutine print_final_stats(overflow, maxrec, nrec, ntrial, nstep)
    logical, intent(in) :: overflow
    integer, intent(in) :: maxrec, nrec, ntrial, nstep
    write (output_unit, '(a,1x,i0)') 'Random trials =', ntrial
