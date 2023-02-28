@@ -3,8 +3,8 @@ kinds.f90
 flags.f90
 bounds.f90
 strutils.f90
-linear.f90
 discrete.f90
+linear.f90
 rnglib.f90
 #lap-jv.f90
 lap-hun.f90
@@ -19,6 +19,8 @@ translation.f90
 rotation.f90
 adjacency.f90
 alignment.f90
+sequencefrag.f90
+backtracking.f90
 assignment.f90
 readmol.f90
 writemol.f90

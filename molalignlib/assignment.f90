@@ -20,12 +20,15 @@ use flags
 use bounds
 use random
 use strutils
-use lap
+use adjacency
+use sequencefrag
+use backtracking
 use translation
 use alignment
 use rotation
-use biasing
 use printing
+use biasing
+use lap
 
 implicit none
 
@@ -39,39 +42,98 @@ subroutine optimize_assignment( &
    nblk, &
    blksz, &
    blkwt, &
+   neqv0, &
+   eqvsz0, &
    coords0, &
+   adjmat0, &
+   neqv1, &
+   eqvsz1, &
    coords1, &
-   biasmat, &
+   adjmat1, &
    permlist, &
    countlist, &
    nrec)
 
-   integer, intent(in) :: natom, nblk
-   integer, dimension(:), intent(in) :: blksz
+   integer, intent(in) :: natom, nblk, neqv0, neqv1
+   integer, dimension(:), intent(in) :: blksz, eqvsz0, eqvsz1
    real(wp), dimension(:), intent(in) :: blkwt
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
-   real(wp), dimension(:, :), intent(in) :: biasmat
+   logical, dimension(:, :), intent(in) :: adjmat0, adjmat1
    integer, intent(out) :: permlist(:, :)
    integer, intent(out) :: countlist(:)
    integer, intent(out) :: nrec
 
    integer :: h, offset
+   integer :: nbond0, nbond1
+   integer :: nfrag0, nfrag1
+   integer irec, mrec, ntrial, nstep, steps
+   integer, dimension(natom) :: atomperm, auxperm
+   integer :: bonds0(2, maxcoord*natom), bonds1(2, maxcoord*natom)
    logical visited, overflow
-   integer irec, ntrial, nstep, steps
-   integer, dimension(natom) :: atomperm, auxmap
    real(wp) :: dist2, olddist, newdist, totalrot
    real(wp), dimension(4) :: rotquat, prodquat
-   real(wp), dimension(maxrec) :: dist2rec, avgsteps, avgtotalrot, avgrealrot
+   real(wp), dimension(maxrec) :: recdist2, avgsteps, avgtotalrot, avgrealrot
+   real(wp) :: biasmat(natom, natom)
    real(wp) :: workcoords1(3, natom)
    real(wp) :: weights(natom)
 
-   ! Distribute weights to atoms
+   integer :: diffa, recdiffa(maxrec)
+   integer, dimension(natom) :: nadj0, nadj1
+   integer, dimension(maxcoord, natom) :: adjlist0, adjlist1
+   integer, dimension(natom) :: blkid, eqvid0, eqvid1
+   integer, dimension(natom) :: fragid0, fragid1
+   integer, dimension(natom) :: fragrt0, fragrt1
+
+   ! Assign id's and weights to atoms
 
    offset = 0
    do h = 1, nblk
+      blkid(offset+1:offset+blksz(h)) = h
       weights(offset+1:offset+blksz(h)) = blkwt(h)
       offset = offset + blksz(h)
    end do
+
+   offset = 0
+   do h = 1, neqv0
+      eqvid0(offset+1:offset+eqvsz0(h)) = h
+      offset = offset + eqvsz0(h)
+   end do
+
+   offset = 0
+   do h = 1, neqv1
+      eqvid1(offset+1:offset+eqvsz1(h)) = h
+      offset = offset + eqvsz1(h)
+   end do
+
+   ! Recalculate adjacency lists
+
+   call adjmat2list(natom, adjmat0, nadj0, adjlist0)
+   call adjmat2list(natom, adjmat1, nadj1, adjlist1)
+
+   ! Detect fagments and starting atoms
+
+   call runsequence(natom, nadj0, adjlist0, blksz, blkid, eqvsz0, eqvid0, nfrag0, fragrt0, fragid0)
+   call runsequence(natom, nadj1, adjlist1, blksz, blkid, eqvsz1, eqvid1, nfrag1, fragrt1, fragid1)
+
+   ! Calculate biases
+
+   call bias_func(natom, nblk, blksz, nadj0, adjlist0, nadj1, adjlist1, coords0, coords1, biasmat)
+
+   ! Print biases
+
+!   offset = 0
+!   do h = 1, nblk0
+!      do i = offset+1, offset+blksz(h)
+!         write (output_unit, '(i0,":")', advance='no') i
+!         do j = offset+1, offset+blksz(h)
+!            if (biasmat(i, j) == 0) then
+!               write (output_unit, '(1x,i0)', advance='no') j
+!            end if
+!         end do
+!         print *
+!      end do
+!      offset = offset + blksz(h)
+!   end do
 
    ! Print header and initial stats
 
@@ -114,23 +176,33 @@ subroutine optimize_assignment( &
 
       do while (iter_flag)
          olddist = squaredist(natom, weights, coords0, workcoords1, atomperm) + biasdist(natom, weights, biasmat, atomperm)
-         call minatomperm(natom, coords0, workcoords1, nblk, blksz, blkwt, biasmat, auxmap, newdist)
-         if (all(auxmap == atomperm)) exit
+         call minatomperm(natom, coords0, workcoords1, nblk, blksz, blkwt, biasmat, auxperm, newdist)
+         if (all(auxperm == atomperm)) exit
          if (newdist > olddist) then
             write (error_unit, '(a)') 'newdist is larger than olddist!'
 !            print *, olddist, newdist
          end if
-         rotquat = leastrotquat(natom, weights, coords0, workcoords1, auxmap)
+         rotquat = leastrotquat(natom, weights, coords0, workcoords1, auxperm)
          prodquat = quatmul(rotquat, prodquat)
          call rotate(natom, workcoords1, rotquat)
          totalrot = totalrot + rotangle(rotquat)
-         atomperm = auxmap
+         atomperm = auxperm
          steps = steps + 1
       end do
 
       nstep = nstep + steps
 
-      dist2 = squaredist(natom, weights, coords0, workcoords1, atomperm)
+!      dist2 = squaredist(natom, weights, coords0, workcoords1, atomperm)
+
+      call backtrack_bonds(natom, weights, blkid, coords0, nadj0, adjlist0, adjmat0, &
+         coords1, nadj1, adjlist1, adjmat1, atomperm, nfrag0, fragrt0)
+
+!      call permutate_bonds(natom, weights, coords0, adjmat0, adjlist0, nequiv0, eqvsz0, &
+!         equivset0, eqvid0, nadjeq0, adjeqsize0, coords1, adjmat1, atomperm, nfrag0, &
+!         fragrt0)
+
+      diffa = adjacencydiff(natom, adjmat0, adjmat1, atomperm)
+      dist2 = leastsquaredist(natom, weights, coords0, coords1, atomperm)
 
       ! Check for new best permlist
 
@@ -145,7 +217,7 @@ subroutine optimize_assignment( &
             if (stats_flag .and. live_flag) then
                write (error_unit, '(a)', advance='no') achar(27) // '[' // intstr(irec + 2) // 'H'
                call print_body(irec, countlist(irec), avgsteps(irec), avgtotalrot(irec), &
-                  avgrealrot(irec), dist2rec(irec)/sum(weights))
+                  avgrealrot(irec), recdist2(irec)/sum(weights))
             end if
             visited = .true.
             exit
@@ -153,36 +225,46 @@ subroutine optimize_assignment( &
       end do
 
       if (.not. visited) then
+         mrec = nrec + 1
+         do irec = nrec, 1, -1
+            if (diffa < recdiffa(irec) .or. (diffa == recdiffa(irec) .and. dist2 < recdist2(irec))) then
+               mrec = irec
+            else
+               exit
+            end if
+         end do
          if (nrec < maxrec) then
             nrec = nrec + 1
          else
             overflow = .true.
-            if (dist2 > dist2rec(nrec)) cycle
          end if
-         do irec = nrec, 2, -1
-            if (dist2 > dist2rec(irec - 1)) exit
-            permlist(:, irec) = permlist(:, irec - 1)
-            countlist(irec) = countlist(irec - 1)
-            dist2rec(irec) = dist2rec(irec - 1)
-            avgsteps(irec) = avgsteps(irec - 1)
-            avgrealrot(irec) = avgrealrot(irec - 1)
-            avgtotalrot(irec) = avgtotalrot(irec - 1)
+         if (mrec <= maxrec) then
+            do irec = nrec, mrec + 1, -1
+               countlist(irec) = countlist(irec - 1)
+               recdist2(irec) = recdist2(irec - 1)
+               recdiffa(irec) = recdiffa(irec - 1)
+               avgsteps(irec) = avgsteps(irec - 1)
+               avgrealrot(irec) = avgrealrot(irec - 1)
+               avgtotalrot(irec) = avgtotalrot(irec - 1)
+               permlist(:, irec) = permlist(:, irec - 1)
+               if (stats_flag .and. live_flag) then
+                  write (error_unit, '(a)', advance='no') achar(27) // '[' // intstr(irec + 2) // 'H'
+                  call print_body(irec, countlist(irec), avgsteps(irec), avgtotalrot(irec), &
+                     avgrealrot(irec), recdist2(irec)/sum(weights))
+               end if
+            end do
+            countlist(mrec) = 1
+            recdist2(mrec) = dist2
+            recdiffa(mrec) = diffa
+            avgsteps(mrec) = steps
+            avgrealrot(mrec) = rotangle(prodquat)
+            avgtotalrot(mrec) = totalrot
+            permlist(:, mrec) = atomperm
             if (stats_flag .and. live_flag) then
-               write (error_unit, '(a)', advance='no') achar(27) // '[' // intstr(irec + 2) // 'H'
-               call print_body(irec, countlist(irec), avgsteps(irec), avgtotalrot(irec), &
-                  avgrealrot(irec), dist2rec(irec)/sum(weights))
+               write (error_unit, '(a)', advance='no') achar(27) // '[' // intstr(mrec + 2) // 'H'
+               call print_body(mrec, countlist(mrec), avgsteps(mrec), avgtotalrot(mrec), &
+                  avgrealrot(mrec), recdist2(mrec)/sum(weights))
             end if
-         end do
-         permlist(:, irec) = atomperm
-         countlist(irec) = 1
-         dist2rec(irec) = dist2
-         avgsteps(irec) = steps
-         avgrealrot(irec) = rotangle(prodquat)
-         avgtotalrot(irec) = totalrot
-         if (stats_flag .and. live_flag) then
-            write (error_unit, '(a)', advance='no') achar(27) // '[' // intstr(irec + 2) // 'H'
-            call print_body(irec, countlist(irec), avgsteps(irec), avgtotalrot(irec), &
-               avgrealrot(irec), dist2rec(irec)/sum(weights))
          end if
       end if
 
@@ -197,7 +279,7 @@ subroutine optimize_assignment( &
       call print_header()
       do irec = 1, nrec
          call print_body(irec, countlist(irec), avgsteps(irec), avgtotalrot(irec), &
-            avgrealrot(irec), dist2rec(irec)/sum(weights))
+            avgrealrot(irec), recdist2(irec)/sum(weights))
       end do
       call print_footer()
    end if
@@ -205,6 +287,12 @@ subroutine optimize_assignment( &
    if (stats_flag) then
       call print_stats(overflow, maxrec, nrec, ntrial, nstep)
    end if
+
+!   open(unit=99, file='ordered.mol2', action='write', status='replace')
+!   call adjlist2bonds(natom, nadj0, adjlist0, nbond0, bonds0)
+!   call writemol2(99, 'coords0', natom, znums0(atomorder0), coords0, nbond0, bonds0)
+!   call adjlist2bonds(natom, nadj1, adjlist1, nbond1, bonds1)
+!   call writemol2(99, 'coords1', natom, znums1(atomorder1), coords1, nbond1, bonds1)
 
 end subroutine
 
