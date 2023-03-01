@@ -91,8 +91,8 @@ subroutine groupblocks(natom, znums, types, weights, nblk, blksz, blkwt, blkid)
    blkorder(:nblk) = inverseperm(blkorder(:nblk))
    blkid = blkorder(blkid)
 
-!   ! Order blocks by block size
-!
+   ! Order blocks by block size
+
 !   blkorder(:nblk) = sortorder(blksz, nblk)
 !   blksz(:nblk) = blksz(blkorder(:nblk))
 !   blkorder(:nblk) = inverseperm(blkorder(:nblk))
@@ -149,13 +149,13 @@ subroutine groupbytype(nelem, elements, types, groupid, ngroup, groupsize)
 
 end subroutine
 
-subroutine groupeqvnei(natom, neqv, eqvsz, nadj, adjlist, nadjeqv, adjeqvsz)
+subroutine groupeqvnei(natom, neqv, eqvsz, nadj, adjlist, neqvnei, eqvneisz)
 ! Purpose: Categorize atoms by eqtypes
    integer, intent(in) :: natom, neqv
    integer, dimension(:), intent(in) :: nadj, eqvsz
    integer, dimension(:, :), intent(inout) :: adjlist
-   integer, dimension(:), intent(out) :: nadjeqv
-   integer, dimension(:, :), intent(out) :: adjeqvsz
+   integer, dimension(:), intent(out) :: neqvnei
+   integer, dimension(:, :), intent(out) :: eqvneisz
 
    integer i, h, offset
    integer :: eqvid(natom)
@@ -170,7 +170,7 @@ subroutine groupeqvnei(natom, neqv, eqvsz, nadj, adjlist, nadjeqv, adjeqvsz)
    end do
 
    do i = 1, natom
-      call groupbytype(nadj(i), adjlist(:, i), eqvid, adjeqvid, nadjeqv(i), adjeqvsz(:, i))
+      call groupbytype(nadj(i), adjlist(:, i), eqvid, adjeqvid, neqvnei(i), eqvneisz(:, i))
       reorder(:nadj(i)) = sortorder(adjeqvid, nadj(i))
       adjlist(:nadj(i), i) = adjlist(reorder(:nadj(i)), i)
    end do
@@ -178,9 +178,9 @@ subroutine groupeqvnei(natom, neqv, eqvsz, nadj, adjlist, nadjeqv, adjeqvsz)
 !    do i = 1, natom
 !        print '(a, 1x, i0, 1x, a)', '--------------', i, '--------------'
 !        offset = 0
-!        do j = 1, nadjeqv(i)
-!            print *, adjlist(offset+1:offset+adjeqvsz(j, i), i)
-!            offset = offset + adjeqvsz(j, i)
+!        do j = 1, neqvnei(i)
+!            print *, adjlist(offset+1:offset+eqvneisz(j, i), i)
+!            offset = offset + eqvneisz(j, i)
 !         end do
 !    end do
 

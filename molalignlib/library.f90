@@ -78,7 +78,8 @@ subroutine assign_atoms( &
    real(wp), dimension(:), allocatable :: blkwt0, blkwt1
    real(wp) :: center0(3), center1(3)
 
-!   integer :: nbond0, nbond1, bonds0(2, maxcoord*natom0), bonds1(2, maxcoord*natom1)
+   integer :: nbond0, bonds0(2, maxcoord*natom0)
+   integer :: nbond1, bonds1(2, maxcoord*natom1)
 
    ! Select bias function
 
@@ -195,14 +196,14 @@ subroutine assign_atoms( &
       countlist, &
       nrec)
 
-!   ! Print coordinates with internal order
-!   open(unit=99, file='ordered.mol2', action='write', status='replace')
-!   call adjmat2list(natom0, adjmat0(atomorder0, atomorder0), nadj0, adjlist0)
-!   call adjmat2list(natom1, adjmat1(atomorder1, atomorder1), nadj1, adjlist1)
-!   call adjlist2bonds(natom0, nadj0, adjlist0, nbond0, bonds0)
-!   call adjlist2bonds(natom1, nadj1, adjlist1, nbond1, bonds1)
-!   call writemol2(99, 'coords0', natom0, znums0(atomorder0), coords0(:, atomorder1), nbond0, bonds0)
-!   call writemol2(99, 'coords1', natom1, znums1(atomorder1), coords1(:, atomorder1), nbond1, bonds1)
+   ! Print coordinates with internal order
+   open(unit=99, file='ordered.mol2', action='write', status='replace')
+   call adjmat2list(natom0, adjmat0(atomorder0, atomorder0), nadj0, adjlist0)
+   call adjmat2list(natom1, adjmat1(atomorder1, atomorder1), nadj1, adjlist1)
+   call adjlist2bonds(natom0, nadj0, adjlist0, nbond0, bonds0)
+   call adjlist2bonds(natom1, nadj1, adjlist1, nbond1, bonds1)
+   call writemol2(99, 'coords0', natom0, znums0(atomorder0), coords0(:, atomorder0), nbond0, bonds0)
+   call writemol2(99, 'coords1', natom1, znums1(atomorder1), coords1(:, atomorder1), nbond1, bonds1)
 
    ! Reorder back to original atom ordering
 
