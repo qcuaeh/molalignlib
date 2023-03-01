@@ -73,8 +73,8 @@ subroutine optimize_assignment( &
    integer :: adjdiff, recadjdiff(maxrec)
    integer, dimension(natom) :: nadj0, nadj1
    integer, dimension(maxcoord, natom) :: adjlist0, adjlist1
-   integer, dimension(natom) :: nadjeqv0, nadjeqv1
-   integer, dimension(maxcoord, natom) :: adjeqvsz0, adjeqvsz1
+   integer, dimension(natom) :: neqvnei0, neqvnei1
+   integer, dimension(maxcoord, natom) :: eqvneisz0, eqvneisz1
    integer, dimension(natom) :: blkid
    integer, dimension(natom) :: fragid0, fragid1
    integer, dimension(natom) :: fragrt0, fragrt1
@@ -102,8 +102,8 @@ subroutine optimize_assignment( &
 
    ! Group equivalent neighbors
 
-   call groupeqvnei(natom, neqv0, eqvsz0, nadj0, adjlist0, nadjeqv0, adjeqvsz0)
-   call groupeqvnei(natom, neqv1, eqvsz1, nadj1, adjlist1, nadjeqv1, adjeqvsz1)
+   call groupeqvnei(natom, neqv0, eqvsz0, nadj0, adjlist0, neqvnei0, eqvneisz0)
+   call groupeqvnei(natom, neqv1, eqvsz1, nadj1, adjlist1, neqvnei1, eqvneisz1)
 
    ! Detect fagments and starting atoms
 
@@ -186,7 +186,7 @@ subroutine optimize_assignment( &
          coords1, nadj1, adjlist1, adjmat1, atomperm, nfrag0, fragrt0)
 
       call permutate_bonds(natom, weights, coords0, adjmat0, adjlist0, neqv0, eqvsz0, &
-         nadjeqv0, adjeqvsz0, coords1, adjmat1, atomperm, nfrag0, fragrt0)
+         neqvnei0, eqvneisz0, workcoords1, adjmat1, atomperm, nfrag0, fragrt0)
 
       dist2 = leastsquaredist(natom, weights, coords0, coords1, atomperm)
       adjdiff = adjacencydiff(natom, adjmat0, adjmat1, atomperm)

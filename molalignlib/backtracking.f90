@@ -86,25 +86,23 @@ subroutine backtrack_bonds (natom, weights, blkid, coords0, nadj0, adjlist0, adj
       integer, intent(out) :: nmatch, matches(natom)
       integer, intent(out) :: nmismatch0, mismatches0(natom)
       integer, intent(out) :: nmismatch1, mismatches1(natom)
-      integer :: i, nnadj0, nnadj1, adj0(natom), adj1(natom)
+      integer :: i, adj0(natom), adj1(natom)
 
-      nnadj0 = nadj0(node)
-      adj0(:nnadj0) = adjlist0(:nnadj0, node)
-      nnadj1 = nadj1(mapping(node))
-      adj1(:nnadj1) = adjlist1(:nnadj1, mapping(node))
+      adj0(:nadj0(node)) = adjlist0(:nadj0(node), node)
+      adj1(:nadj1(mapping(node))) = adjlist1(:nadj1(mapping(node)), mapping(node))
       nmatch = 0
       nmismatch0 = 0
       nmismatch1 = 0
 
-      do i = 1, nnadj0
-         if (findInd(mapping(adj0(i)), nnadj1, adj1) /= 0) then
+      do i = 1, nadj0(node)
+         if (findInd(mapping(adj0(i)), nadj1(mapping(node)), adj1) /= 0) then
             call addInd(adj0(i), nmatch, matches)
          else
             call addInd(adj0(i), nmismatch0, mismatches0)
          end if
       end do
 
-      do i = 1, nnadj1
+      do i = 1, nadj1(mapping(node))
          if (findInd(adj1(i), nmatch, mapping(matches(:nmatch))) == 0) then
             call addInd(adj1(i), nmismatch1, mismatches1)
          end if

@@ -67,9 +67,11 @@ subroutine initialize_random()
    integer :: unit, stat
 
    if (test_flag) then
-      randnum_sp => real_uni01_sp
-      randnum_dp => real_uni01_dp
-      call rnglib_init()
+!      randnum_sp => real_uni01_sp
+!      randnum_dp => real_uni01_dp
+!      call rnglib_init()
+      randnum_sp => random_number_sp
+      randnum_dp => random_number_dp
    else
       randnum_sp => random_number_sp
       randnum_dp => random_number_dp

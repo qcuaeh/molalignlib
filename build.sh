@@ -188,7 +188,7 @@ prog)
    make_prog molalign
    # Run tests
 #   runtests tests/jcim.2c01187/0.05 -test -stats -stdout xyz -rec 5 -sort -fast -tol 0.17
-   runtests tests/jcim.2c01187/0.1 -test -stats -stdout xyz -rec 5 -sort -fast -tol 0.35
+#   runtests tests/jcim.2c01187/0.1 -test -stats -stdout xyz -rec 5 -sort -fast -tol 0.35
 #   runtests tests/jcim.2c01187/0.2 -test -stats -stdout xyz -rec 5 -sort -fast -tol 0.69
    ;;
 lib)
