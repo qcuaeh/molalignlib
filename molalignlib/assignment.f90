@@ -23,9 +23,8 @@ use strutils
 use adjacency
 use rotation
 use translation
-use sequencefrag
+use tracking
 use backtracking
-use permutation
 use alignment
 use assorting
 use printing
@@ -77,7 +76,7 @@ subroutine optimize_assignment( &
    integer, dimension(maxcoord, natom) :: eqvneisz0, eqvneisz1
    integer, dimension(natom) :: blkid
    integer, dimension(natom) :: fragid0, fragid1
-   integer, dimension(natom) :: fragrt0, fragrt1
+   integer, dimension(natom) :: fragroot0, fragroot1
    integer :: h, offset
    real(wp) :: dist2, olddist, newdist, totalrot
    real(wp), dimension(4) :: rotquat, prodquat
@@ -107,8 +106,8 @@ subroutine optimize_assignment( &
 
    ! Detect fagments and starting atoms
 
-   call runsequence(natom, nadj0, adjlist0, blksz, blkid, neqv0, eqvsz0, nfrag0, fragrt0, fragid0)
-   call runsequence(natom, nadj1, adjlist1, blksz, blkid, neqv1, eqvsz1, nfrag1, fragrt1, fragid1)
+   call getmolfrags(natom, nadj0, adjlist0, blksz, blkid, neqv0, eqvsz0, nfrag0, fragroot0, fragid0)
+   call getmolfrags(natom, nadj1, adjlist1, blksz, blkid, neqv1, eqvsz1, nfrag1, fragroot1, fragid1)
 
    ! Calculate biases
 
@@ -182,11 +181,11 @@ subroutine optimize_assignment( &
 
 !      dist2 = squaredist(natom, weights, coords0, workcoords1, atomperm)
 
-      call backtrack_bonds(natom, weights, blkid, coords0, nadj0, adjlist0, adjmat0, &
-         coords1, nadj1, adjlist1, adjmat1, atomperm, nfrag0, fragrt0)
+      call minadjdiff(natom, weights, blkid, coords0, nadj0, adjlist0, adjmat0, &
+         coords1, nadj1, adjlist1, adjmat1, atomperm, nfrag0, fragroot0)
 
-      call permutate_bonds(natom, weights, coords0, adjmat0, adjlist0, neqv0, eqvsz0, &
-         neqvnei0, eqvneisz0, workcoords1, adjmat1, atomperm, nfrag0, fragrt0)
+      call eqvatomperm(natom, weights, coords0, adjmat0, adjlist0, neqv0, eqvsz0, &
+         neqvnei0, eqvneisz0, workcoords1, adjmat1, atomperm, nfrag0, fragroot0)
 
       dist2 = leastsquaredist(natom, weights, coords0, coords1, atomperm)
       adjdiff = adjacencydiff(natom, adjmat0, adjmat1, atomperm)

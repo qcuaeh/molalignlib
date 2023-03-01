@@ -20,9 +20,8 @@ translation.f90
 rotation.f90
 adjacency.f90
 alignment.f90
-sequencefrag.f90
+tracking.f90
 backtracking.f90
-permutation.f90
 assignment.f90
 readmol.f90
 writemol.f90

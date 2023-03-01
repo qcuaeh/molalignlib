@@ -1,22 +1,22 @@
 ! purpose: determines the most convenient atom to start runs over the structure
-!          of each fragment in a molecule. (returns nfrag, fragrt)
-module sequencefrag
+!          of each fragment in a molecule. (returns nfrag, fragroot)
+module tracking
 
 use stdio
 use sorting
 implicit none
 private
-public runsequence
+public getmolfrags
 
 contains
 
-subroutine runsequence (natom, nadj, adjlist, blksz, blkid, &
-                  neqv, eqvsz, nfrag, fragrt, fragid)
+subroutine getmolfrags (natom, nadj, adjlist, blksz, blkid, &
+                  neqv, eqvsz, nfrag, fragroot, fragid)
 
    integer, intent(in) :: natom, neqv
    integer, dimension(:), intent(in) :: nadj, blksz, blkid, eqvsz
    integer, dimension(:, :), intent(in) :: adjlist
-   integer, intent(out) :: nfrag, fragrt(natom), fragid(natom)
+   integer, intent(out) :: nfrag, fragroot(natom), fragid(natom)
 
    integer :: h, n, f, firstn, prevn, offset
    integer, dimension(natom) :: eqvid
@@ -38,7 +38,7 @@ subroutine runsequence (natom, nadj, adjlist, blksz, blkid, &
    ! initialization
 
    nfrag = 0
-   fragrt(:) = 1
+   fragroot(:) = 1
 
    order = [ (n, n = 1, natom) ]
    track(:) = .false.
@@ -99,7 +99,7 @@ subroutine runsequence (natom, nadj, adjlist, blksz, blkid, &
       fragblock(:firstn,f) = fragblock(order(:firstn),f)
       fragequiv(:firstn,f) = fragequiv(order(:firstn),f)
       fragcoord(:prevn,f) = fragcoord(order(:prevn),f)
-      fragrt(f) = fragind(1,f)
+      fragroot(f) = fragind(1,f)
    end do
 
    ! print final vectors
@@ -111,7 +111,7 @@ subroutine runsequence (natom, nadj, adjlist, blksz, blkid, &
          print fmtstr, f, "frag block size:", fragblock(:fragsize(f),f)
          print fmtstr, f, "frag equiv size:", fragequiv(:fragsize(f),f)
          print fmtstr, f, "frag nadj:    ", fragcoord(:fragsize(f),f)
-         print '(i2,1x,a,1x,i10)', f, "fragment start ind:", fragrt(f)
+         print '(i2,1x,a,1x,i10)', f, "fragment start ind:", fragroot(f)
       end do
    end if
 
@@ -168,6 +168,6 @@ contains
       end do
    end function invsort
 
-end subroutine runsequence
+end subroutine getmolfrags
 
 end module
