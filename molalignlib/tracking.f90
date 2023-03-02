@@ -10,15 +10,16 @@ public getmolfrags
 
 contains
 
-subroutine getmolfrags (natom, nadj, adjlist, blksz, blkid, &
+subroutine getmolfrags (natom, nadj, adjlist, nblk, blksz, &
                   neqv, eqvsz, nfrag, fragroot, fragid)
 
-   integer, intent(in) :: natom, neqv
-   integer, dimension(:), intent(in) :: nadj, blksz, blkid, eqvsz
+   integer, intent(in) :: natom, nblk, neqv
+   integer, dimension(:), intent(in) :: nadj, blksz, eqvsz
    integer, dimension(:, :), intent(in) :: adjlist
    integer, intent(out) :: nfrag, fragroot(natom), fragid(natom)
 
    integer :: h, n, f, firstn, prevn, offset
+   integer, dimension(natom) :: blkid
    integer, dimension(natom) :: eqvid
    integer, dimension(natom) :: order
    integer, dimension(natom) :: fragsize
@@ -27,7 +28,15 @@ subroutine getmolfrags (natom, nadj, adjlist, blksz, blkid, &
    character(80) :: fmtstr
    character(3) :: numat
 
-   ! assing equivalence group
+   ! set atoms block indices
+
+   offset = 0
+   do h = 1, nblk
+      blkid(offset+1:offset+blksz(h)) = h
+      offset = offset + blksz(h)
+   end do
+
+   ! set atoms equivalence indices
 
    offset = 0
    do h = 1, neqv

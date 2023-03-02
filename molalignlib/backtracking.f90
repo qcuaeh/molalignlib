@@ -15,12 +15,12 @@ public eqvatomperm
 
 contains
 
-subroutine minadjdiff (natom, weights, blkid, coords0, nadj0, adjlist0, adjmat0, &
+subroutine minadjdiff (natom, weights, nblk, blksz, coords0, nadj0, adjlist0, adjmat0, &
            coords1, nadj1, adjlist1, adjmat1, atomperm, nfrag0, fragroot0)
 ! Purpose: Find best correspondence between points of graphs
 
-   integer, intent(in) :: natom
-   integer, dimension(:), intent(in) :: blkid, nadj0, nadj1
+   integer, intent(in) :: natom, nblk
+   integer, dimension(:), intent(in) :: blksz, nadj0, nadj1
    integer, dimension(:, :), intent(in) :: adjlist0, adjlist1
    integer, dimension(:), intent(inout) :: atomperm
    real(wp), dimension(:), intent(in) :: weights
@@ -31,11 +31,22 @@ subroutine minadjdiff (natom, weights, blkid, coords0, nadj0, adjlist0, adjmat0,
 
    logical, parameter :: printInfo = .false.
 
-   integer unmapping(natom), ntrack, track(natom)
+   integer blkid(natom)
+   integer h, i, offset, moldiff
+   integer ntrack, track(natom)
+   integer unmapping(natom)
    logical tracked(natom)
-   integer moldiff
    real(wp) moldist
-   integer i
+
+   ! set atoms block indices
+
+   offset = 0
+   do h = 1, nblk
+      blkid(offset+1:offset+blksz(h)) = h
+      offset = offset + blksz(h)
+   end do
+
+   !  initialization
 
    ntrack = 0
    tracked(:) = .false.
@@ -241,14 +252,14 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlist, neqv, eqvsz, &
 
    integer offset
 
-   ! get equivalence group offset
+   ! set equivalence group offsets
 
    eqvos(1) = 0
    do h = 1, neqv - 1
       eqvos(h+1) = eqvos(h) + eqvsz(h)
    end do
 
-   ! get equivalence group index
+   ! set atoms equivalence indices
 
    do h = 1, neqv
       eqvid(eqvos(h)+1:eqvos(h)+eqvsz(h)) = h

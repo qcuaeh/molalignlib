@@ -74,7 +74,6 @@ subroutine optimize_assignment( &
    integer, dimension(maxcoord, natom) :: adjlist0, adjlist1
    integer, dimension(natom) :: neqvnei0, neqvnei1
    integer, dimension(maxcoord, natom) :: eqvneisz0, eqvneisz1
-   integer, dimension(natom) :: blkid
    integer, dimension(natom) :: fragid0, fragid1
    integer, dimension(natom) :: fragroot0, fragroot1
    integer :: h, offset
@@ -89,7 +88,6 @@ subroutine optimize_assignment( &
 
    offset = 0
    do h = 1, nblk
-      blkid(offset+1:offset+blksz(h)) = h
       weights(offset+1:offset+blksz(h)) = blkwt(h)
       offset = offset + blksz(h)
    end do
@@ -106,8 +104,8 @@ subroutine optimize_assignment( &
 
    ! Detect fagments and starting atoms
 
-   call getmolfrags(natom, nadj0, adjlist0, blksz, blkid, neqv0, eqvsz0, nfrag0, fragroot0, fragid0)
-   call getmolfrags(natom, nadj1, adjlist1, blksz, blkid, neqv1, eqvsz1, nfrag1, fragroot1, fragid1)
+   call getmolfrags(natom, nadj0, adjlist0, nblk, blksz, neqv0, eqvsz0, nfrag0, fragroot0, fragid0)
+   call getmolfrags(natom, nadj1, adjlist1, nblk, blksz, neqv1, eqvsz1, nfrag1, fragroot1, fragid1)
 
    ! Calculate biases
 
@@ -179,14 +177,13 @@ subroutine optimize_assignment( &
 
       nstep = nstep + steps
 
-!      dist2 = squaredist(natom, weights, coords0, workcoords1, atomperm)
-
-      call minadjdiff(natom, weights, blkid, coords0, nadj0, adjlist0, adjmat0, &
+      call minadjdiff(natom, weights, nblk, blksz, coords0, nadj0, adjlist0, adjmat0, &
          coords1, nadj1, adjlist1, adjmat1, atomperm, nfrag0, fragroot0)
 
       call eqvatomperm(natom, weights, coords0, adjmat0, adjlist0, neqv0, eqvsz0, &
          neqvnei0, eqvneisz0, workcoords1, adjmat1, atomperm, nfrag0, fragroot0)
 
+!      dist2 = squaredist(natom, weights, coords0, workcoords1, atomperm)
       dist2 = leastsquaredist(natom, weights, coords0, coords1, atomperm)
       adjdiff = adjacencydiff(natom, adjmat0, adjmat1, atomperm)
 
