@@ -20,6 +20,7 @@ program molalign
    use flags
    use bounds
    use biasing
+   use printing
    use rotation
    use translation
    use strutils
@@ -72,13 +73,15 @@ program molalign
    maxrec = 1
    maxcount = 10
    maxlevel = 10
-   maxcoord = 24
+   maxcoord = 16
    bias_tol = 0.35
    bias_scale = 1.e3
    bias_ratio = 0.5
    pathout = 'aligned.xyz'
 
    weight_func => unity
+   bias_func => nocrossbias
+   print_stats => print_stats_dist
 
    ! Get user options
 
@@ -96,8 +99,13 @@ program molalign
       case ('-fast')
          iter_flag = .true.
          bias_flag = .true.
+         bias_func => sndcrossbias
       case ('-bond')
          bond_flag = .true.
+         iter_flag = .true.
+         bias_flag = .true.
+         bias_func => mnacrossbias
+         print_stats => print_stats_diff
       case ('-mass')
          weight_func => stdmass
       case ('-mirror')
@@ -196,8 +204,13 @@ program molalign
 
    ! Get adjacency matrices and lists
 
-   call getadjmat(natom0, coords0, znums0, adjmat0)
-   call getadjmat(natom1, coords1, znums1, adjmat1)
+   if (bond_flag) then
+      call getadjmat(natom0, coords0, znums0, adjmat0)
+      call getadjmat(natom1, coords1, znums1, adjmat1)
+   else
+      adjmat0(:, :) = .false.
+      adjmat1(:, :) = .false.
+   end if
 
    ! Sort atoms to minimize MSD
 

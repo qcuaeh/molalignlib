@@ -19,10 +19,8 @@ use stdio
 use kinds
 use bounds
 use random
-use biasing
-use discrete
 use sorting
-use printing
+use discrete
 use assorting
 use rotation
 use translation
@@ -78,22 +76,8 @@ subroutine assign_atoms( &
    real(wp), dimension(:), allocatable :: blkwt0, blkwt1
    real(wp) :: center0(3), center1(3)
 
-   integer :: nbond0, bonds0(2, maxcoord*natom0)
-   integer :: nbond1, bonds1(2, maxcoord*natom1)
-
-   ! Select bias function
-
-   if (bias_flag) then
-      if (bond_flag) then
-         bias_func => mnacrossbias
-         print_stats => print_stats_diff
-      else
-         bias_func => sndcrossbias
-         print_stats => print_stats_dist
-      end if
-   else
-      bias_func => nocrossbias
-   end if
+!  integer :: nbond0, bonds0(2, maxcoord*natom0)
+!  integer :: nbond1, bonds1(2, maxcoord*natom1)
 
    ! Set error code to 0 by default
 
@@ -102,7 +86,7 @@ subroutine assign_atoms( &
    ! Abort if molecules have different number of atoms
 
    if (natom0 /= natom1) then
-      write (error_unit, '(a)') 'Error: The molecules have different number of atoms'
+      write (error_unit, '(a)') 'Error: The molecules are not isomers'
       error = 1
       return
    end if
@@ -197,13 +181,13 @@ subroutine assign_atoms( &
       nrec)
 
    ! Print coordinates with internal order
-   open(unit=99, file='ordered.mol2', action='write', status='replace')
-   call adjmat2list(natom0, adjmat0(atomorder0, atomorder0), nadj0, adjlist0)
-   call adjmat2list(natom1, adjmat1(atomorder1, atomorder1), nadj1, adjlist1)
-   call adjlist2bonds(natom0, nadj0, adjlist0, nbond0, bonds0)
-   call adjlist2bonds(natom1, nadj1, adjlist1, nbond1, bonds1)
-   call writemol2(99, 'coords0', natom0, znums0(atomorder0), coords0(:, atomorder0), nbond0, bonds0)
-   call writemol2(99, 'coords1', natom1, znums1(atomorder1), coords1(:, atomorder1), nbond1, bonds1)
+!  open(unit=99, file='ordered.mol2', action='write', status='replace')
+!  call adjmat2list(natom0, adjmat0(atomorder0, atomorder0), nadj0, adjlist0)
+!  call adjmat2list(natom1, adjmat1(atomorder1, atomorder1), nadj1, adjlist1)
+!  call adjlist2bonds(natom0, nadj0, adjlist0, nbond0, bonds0)
+!  call adjlist2bonds(natom1, nadj1, adjlist1, nbond1, bonds1)
+!  call writemol2(99, 'coords0', natom0, znums0(atomorder0), coords0(:, atomorder0), nbond0, bonds0)
+!  call writemol2(99, 'coords1', natom1, znums1(atomorder1), coords1(:, atomorder1), nbond1, bonds1)
 
    ! Reorder back to original atom ordering
 
@@ -246,7 +230,7 @@ subroutine align_atoms( &
    ! Abort if molecules have different number of atoms
 
    if (natom0 /= natom1) then
-      write (error_unit, '(a)') 'Error: The molecules have different number of atoms'
+      write (error_unit, '(a)') 'Error: The molecules are not isomers'
       error = 1
       return
    end if
