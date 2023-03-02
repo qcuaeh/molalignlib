@@ -18,6 +18,7 @@ clean_build() {
 }
 
 compile() {
+   $build_flag || return 0
    pic=false
    toarray std_flags
    toarray pic_flags
@@ -62,35 +63,35 @@ compile() {
 }
 
 make_prog() {
-   name=$1
    executable=$buildir/$1
-   if test -z "$name"; then
+   $build_flag || return 0
+   if test -z "$1"; then
       echo Error: name is empty
       exit 1
    fi
    echo Linking program...
    pushd "$buildir" > /dev/null
-   "$F90" -o "$name" "${obj_files[@]}" -llapack
+   "$F90" -o "$1" "${obj_files[@]}" -llapack
    popd > /dev/null
    echo Done
 }
 
 make_lib() {
-   name=$1
-   if test -z "$name"; then
+   $build_flag || return 0
+   if test -z "$1"; then
       echo Error: name is empty
       exit 1
    fi
    echo Linking dynamic library...
    pushd "$buildir" >/dev/null
-   "$F90" -shared -o "$name.so" "${obj_files[@]}" -llapack
+   "$F90" -shared -o "$1.so" "${obj_files[@]}" -llapack
    popd >/dev/null
    echo Done
 }
 
 make_pyext() {
-   name=$1
-   if test -z "$name"; then
+   $build_flag || return 0
+   if test -z "$1"; then
       echo Error: name is empty
       exit 1
    fi
@@ -100,15 +101,14 @@ make_pyext() {
    fi
    pushd "$buildir" >/dev/null
    echo Linking extension module...
-   "$F2PY" -h "$name.pyf" -m "$name" --overwrite-signature "${f2py_files[@]}" --quiet
-   "$F2PY" -c "$name.pyf" --fcompiler=gnu95 --link-lapack "${obj_files[@]}" --quiet
+   "$F2PY" -h "$1.pyf" -m "$1" --overwrite-signature "${f2py_files[@]}" --quiet
+   "$F2PY" -c "$1.pyf" --fcompiler=gnu95 --link-lapack "${obj_files[@]}" --quiet
    popd >/dev/null
    echo Done
 }
 
 runtests() {
-   $quick_build && return
-   $debug_build && return
+   $test_flag || return 0
    testdir=$topdir/$1
    shift
    if test -z "$executable"; then
@@ -117,7 +117,7 @@ runtests() {
    fi
    for file in "$testdir"/*.out; do
       name=$(basename "$file")
-      echo -n Running test ${name%.out}.xyz...
+      echo -n Running test ${name%.out}...
       if diff -bB <("$executable" "$testdir/${name%.out}.xyz" "$@" 2>&1) "$file" > /dev/null; then
           echo \ passed
       else
@@ -152,15 +152,28 @@ while IFS= read -r line; do
    declare -- "$var"="$value"
 done < <(grep -v -e^# -e^$ ./build.env)
 
+test_flag=true
+build_flag=true
 debug_build=false
 quick_build=false
 
-while getopts ":dq" opt; do
+while getopts ":tqd" opt; do
   case $opt in
     d)
+      test_flag=false
+      build_flag=true
       debug_build=true
+      quick_build=false
       ;;
     q)
+      test_flag=false
+      build_flag=true
+      debug_build=false
+      quick_build=true
+      ;;
+    t)
+      test_flag=true
+      build_flag=false
       quick_build=true
       ;;
     \?)
@@ -188,7 +201,7 @@ prog)
    make_prog molalign
    # Run tests
 #   runtests tests/jcim.2c01187/0.05 -test -stats -stdout xyz -rec 5 -sort -fast -tol 0.17
-#   runtests tests/jcim.2c01187/0.1 -test -stats -stdout xyz -rec 5 -sort -fast -tol 0.35
+   runtests tests/jcim.2c01187/0.1 -test -stats -stdout xyz -rec 5 -sort -fast -tol 0.35
 #   runtests tests/jcim.2c01187/0.2 -test -stats -stdout xyz -rec 5 -sort -fast -tol 0.69
    ;;
 lib)
@@ -197,6 +210,7 @@ lib)
    pic_build=true
    compile molalignlib
    make_lib molalignlib
+   echo
    ;;
 pyext)
    # Build python extension module
@@ -204,6 +218,7 @@ pyext)
    pic_build=true
    compile molalignlib
    make_pyext molalignlibext
+   echo
    ;;
 *)
    echo Unknown target $target

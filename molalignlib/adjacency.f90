@@ -20,10 +20,6 @@ subroutine getadjmat(natom, coords, znums, adjmat)
    real(wp) :: atomdist
    real(wp) :: adjrad(natom)
 
-   ! Quick return
-
-   if (.not. bond_flag) return
-
    ! Initialization
 
    adjmat(:, :) = .false.

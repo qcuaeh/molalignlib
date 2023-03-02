@@ -276,13 +276,6 @@ subroutine groupequiv(natom, nblk, blkid, nadj, adjlist, neqv, eqvsz, eqvid)
    integer i, nin, neqv
    integer, dimension(natom) :: intype, grouporder, uptype, basetype
 
-   ! Quick return
-
-   if (.not. bond_flag) then
-     eqvid = blkid
-     return
-   end if
-
    ! Determine MNA types iteratively
 
    nin = nblk
