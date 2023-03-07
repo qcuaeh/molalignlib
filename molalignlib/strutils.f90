@@ -57,7 +57,10 @@ end function
 function intstr(x) result(str)
    integer, intent(in) :: x
    character(:), allocatable :: str
-   allocate(character(floor(log10(real(x, wp))) + 1) :: str)
+   integer :: l
+   l = floor(log10(real(max(abs(x), 1)))) + 1
+   if (x < 0) l = l + 1
+   allocate(character(l) :: str)
    write (str, '(i0)') x
 end function
 
@@ -68,7 +71,7 @@ function realstr(x, n) result(str)
    character(32) format
    character(:), allocatable :: str
    l = floor(log10(max(abs(x), 1.0_wp))) + n + 2
-   if (x < 0.) l = l + 1
+   if (x < 0) l = l + 1
    allocate(character(l) :: str)
    write (format, '(a,i0,a,i0,a)') '(f', l, '.', n, ')'
    write (str, format) x

@@ -19,7 +19,6 @@ program molalign
    use kinds
    use flags
    use bounds
-   use biasing
    use printing
    use rotation
    use translation
@@ -48,6 +47,7 @@ program molalign
    character(:), allocatable :: title0, title1
    character(ll) :: posargs(2)
    character(wl), allocatable, dimension(:) :: labels0, labels1
+   integer :: adjd
    real(wp) :: rmsd, travec(3), rotmat(3, 3)
    real(wp), allocatable, dimension(:) :: weights0, weights1
    real(wp), allocatable, dimension(:, :) :: coords0, coords1, aligned1
@@ -69,6 +69,7 @@ program molalign
    stats_flag = .false.
    mirror_flag = .false.
    maxlvl_flag = .false.
+   back_flag = .false.
 
    maxrec = 1
    maxcount = 10
@@ -80,7 +81,6 @@ program molalign
    pathout = 'aligned.xyz'
 
    weight_func => unity
-   bias_func => nocrossbias
    print_stats => print_stats_dist
 
    ! Get user options
@@ -96,15 +96,13 @@ program molalign
          test_flag = .true.
       case ('-sort')
          sort_flag = .true.
+      case ('-back')
+         back_flag = .true.
       case ('-fast')
          iter_flag = .true.
          bias_flag = .true.
-         bias_func => sndcrossbias
       case ('-bond')
          bond_flag = .true.
-         iter_flag = .true.
-         bias_flag = .true.
-         bias_func => mnacrossbias
          print_stats => print_stats_diff
       case ('-mass')
          weight_func => stdmass
@@ -113,7 +111,7 @@ program molalign
       case ('-count')
          call readoptarg(arg, maxcount)
       case ('-trials')
-         trial_flag = .false.
+         trial_flag = .true.
          call readoptarg(arg, maxtrials)
       case ('-tol')
          call readoptarg(arg, bias_tol)
@@ -255,10 +253,12 @@ program molalign
 
          if (error /= 0) stop
 
+         adjd = adjacencydiff(natom0, adjmat0, adjmat1, permlist(:, i))
          aligned1 = translated(natom1, rotated(natom1, coords1, rotmat), travec)
-         rmsd = sqrt(sum(weights0*sum((aligned1(:, permlist(:, i)) - coords0)**2, dim=1))/sum(weights0))
+         rmsd = sqrt(squaredist(natom0, weights0, coords0, aligned1, permlist(:, i))/sum(weights0))
 
          if (i == 1) then
+            if (bond_flag) write (output_unit, '(a)') 'Optimized AdjD = ' // intstr(adjd)
             write (output_unit, '(a)') 'Optimized RMSD = ' // realstr(rmsd, 4)
             call writefile(write_unit, fmtout, 'Reference', natom0, znums0, coords0, adjmat0)
          end if
@@ -289,10 +289,12 @@ program molalign
 
       if (error /= 0) stop
 
+      adjd = adjacencydiff(natom0, adjmat0, adjmat1, identityperm(natom0))
       aligned1 = translated(natom1, rotated(natom1, coords1, rotmat), travec)
-      rmsd = sqrt(sum(weights0*sum((aligned1 - coords0)**2, dim=1))/sum(weights0))
+      rmsd = sqrt(squaredist(natom0, weights0, coords0, aligned1, identityperm(natom0))/sum(weights0))
 
-      write (error_unit, '(a)') 'RMSD = ' // realstr(rmsd, 4)
+      if (bond_flag) write (output_unit, '(a)') 'Optimized AdjD = ' // intstr(adjd)
+      write (output_unit, '(a)') 'RMSD = ' // realstr(rmsd, 4)
       call writefile(write_unit, fmtout, 'Reference', natom0, znums0, coords0, adjmat0)
       call writefile(write_unit, fmtout, 'RMSD ' // realstr(rmsd, 4), natom1, znums1, aligned1, adjmat1)
 

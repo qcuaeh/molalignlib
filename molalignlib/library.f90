@@ -28,6 +28,7 @@ use adjacency
 use alignment
 use assignment
 use writemol
+use biasing
 
 implicit none
 
@@ -82,6 +83,18 @@ subroutine assign_atoms( &
    ! Set error code to 0 by default
 
    error = 0
+
+   !  Select bias function
+
+   if (bias_flag) then
+      if (bond_flag) then
+         bias_func => mnacrossbias
+      else
+         bias_func => sndcrossbias
+      end if
+   else
+      bias_func => nocrossbias
+   end if
 
    ! Abort if molecules have different number of atoms
 
