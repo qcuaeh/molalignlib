@@ -22,11 +22,11 @@ use flags
 implicit none
 
 abstract interface
-   subroutine print_stats_proc(nrec, weights, matches, avgsteps, avgtotalrot, avgrealrot, recadjdiff, recdist2)
+   subroutine print_stats_proc(nrec, matches, avgsteps, avgtotalrot, avgrealrot, recadjd, recrmsd)
       use kinds
       integer, intent(in) :: nrec
-      integer, dimension(:), intent(in) :: matches, recadjdiff
-      real(wp), dimension(:), intent(in) :: weights, avgsteps, avgtotalrot, avgrealrot, recdist2
+      integer, dimension(:), intent(in) :: matches, recadjd
+      real(wp), dimension(:), intent(in) :: avgsteps, avgtotalrot, avgrealrot, recrmsd
    end subroutine
 end interface
 
@@ -34,32 +34,32 @@ procedure(print_stats_proc), pointer :: print_stats
 
 contains
 
-subroutine print_stats_dist(nrec, weights, matches, avgsteps, avgtotalrot, avgrealrot, recadjdiff, recdist2)
+subroutine print_stats_dist(nrec, matches, avgsteps, avgtotalrot, avgrealrot, recadjd, recrmsd)
    integer, intent(in) :: nrec
-   integer, dimension(:), intent(in) :: matches, recadjdiff
-   real(wp), dimension(:), intent(in) :: weights, avgsteps, avgtotalrot, avgrealrot, recdist2
+   integer, dimension(:), intent(in) :: matches, recadjd
+   real(wp), dimension(:), intent(in) :: avgsteps, avgtotalrot, avgrealrot, recrmsd
    integer :: irec
    write (output_unit, '(1x,a,4x,a,4x,a,5x,a,6x,a,7x,a)') 'Map', 'Count', 'Steps', 'Total', 'Real', 'RMSD'
    write (output_unit, '(a)') '-----------------------------------------------------'
    do irec = 1, nrec
       write (output_unit, '(i4,3x,i6,5x,f4.1,5x,f5.1,5x,f5.1,3x,f8.4)') &
          irec, matches(irec), avgsteps(irec), 90./asin(1.)*avgtotalrot(irec), 90./asin(1.)*avgrealrot(irec), &
-         sqrt(recdist2(irec)/sum(weights))
+         recrmsd(irec)
    end do
    write (output_unit, '(a)') '-----------------------------------------------------'
 end subroutine
 
-subroutine print_stats_diff(nrec, weights, matches, avgsteps, avgtotalrot, avgrealrot, recadjdiff, recdist2)
+subroutine print_stats_diff(nrec, matches, avgsteps, avgtotalrot, avgrealrot, recadjd, recrmsd)
    integer, intent(in) :: nrec
-   integer, dimension(:), intent(in) :: matches, recadjdiff
-   real(wp), dimension(:), intent(in) :: weights, avgsteps, avgtotalrot, avgrealrot, recdist2
+   integer, dimension(:), intent(in) :: matches, recadjd
+   real(wp), dimension(:), intent(in) :: avgsteps, avgtotalrot, avgrealrot, recrmsd
    integer :: irec
    write (output_unit, '(1x,a,4x,a,4x,a,5x,a,6x,a,3x,a,7x,a)') 'Map', 'Count', 'Steps', 'Total', 'Real', 'AdjD', 'RMSD'
    write (output_unit, '(a)') '------------------------------------------------------------'
    do irec = 1, nrec
       write (output_unit, '(i4,3x,i6,5x,f4.1,5x,f5.1,5x,f5.1,3x,i4,3x,f8.4)') &
          irec, matches(irec), avgsteps(irec), 90./asin(1.)*avgtotalrot(irec), 90./asin(1.)*avgrealrot(irec), &
-         recadjdiff(irec), sqrt(recdist2(irec)/sum(weights))
+         recadjd(irec), recrmsd(irec)
    end do
    write (output_unit, '(a)') '------------------------------------------------------------'
 end subroutine

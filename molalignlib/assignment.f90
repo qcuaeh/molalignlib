@@ -69,7 +69,7 @@ subroutine optimize_assignment( &
    integer :: nfrag0, nfrag1
    integer irec, mrec, ntrial, nstep, steps
    integer, dimension(natom) :: atomperm, auxperm
-   integer :: adjdiff, recadjdiff(maxrec)
+   integer :: adjd, recadjd(maxrec)
    integer, dimension(natom) :: nadj0, nadj1
    integer, dimension(maxcoord, natom) :: adjlist0, adjlist1
    integer, dimension(natom) :: neqvnei0, neqvnei1
@@ -77,9 +77,9 @@ subroutine optimize_assignment( &
    integer, dimension(natom) :: fragid0, fragid1
    integer, dimension(natom) :: fragroot0, fragroot1
    integer :: h, offset
-   real(wp) :: dist2, olddist, newdist, totalrot
+   real(wp) :: rmsd, olddist, newdist, totalrot
    real(wp), dimension(4) :: rotquat, prodquat
-   real(wp), dimension(maxrec) :: recdist2, avgsteps, avgtotalrot, avgrealrot
+   real(wp), dimension(maxrec) :: recrmsd, avgsteps, avgtotalrot, avgrealrot
    real(wp) :: biasmat(natom, natom)
    real(wp) :: workcoords1(3, natom)
    real(wp) :: weights(natom)
@@ -177,15 +177,18 @@ subroutine optimize_assignment( &
 
       nstep = nstep + steps
 
-      call minadjdiff(natom, weights, nblk, blksz, coords0, nadj0, adjlist0, adjmat0, &
-         coords1, nadj1, adjlist1, adjmat1, atomperm, nfrag0, fragroot0)
+      if (back_flag) then
 
-      call eqvatomperm(natom, weights, coords0, adjmat0, adjlist0, neqv0, eqvsz0, &
-         neqvnei0, eqvneisz0, workcoords1, adjmat1, atomperm, nfrag0, fragroot0)
+         call minadjdiff(natom, weights, nblk, blksz, coords0, nadj0, adjlist0, adjmat0, &
+            coords1, nadj1, adjlist1, adjmat1, atomperm, nfrag0, fragroot0)
 
-!      dist2 = squaredist(natom, weights, coords0, workcoords1, atomperm)
-      dist2 = leastsquaredist(natom, weights, coords0, coords1, atomperm)
-      adjdiff = adjacencydiff(natom, adjmat0, adjmat1, atomperm)
+         call eqvatomperm(natom, weights, coords0, adjmat0, adjlist0, neqv0, eqvsz0, &
+            neqvnei0, eqvneisz0, workcoords1, adjmat1, atomperm, nfrag0, fragroot0)
+
+      end if
+
+      adjd = adjacencydiff(natom, adjmat0, adjmat1, atomperm)
+      rmsd = sqrt(leastsquaredist(natom, weights, coords0, coords1, atomperm)/sum(weights))
 
       ! Check for new best permlist
 
@@ -205,7 +208,7 @@ subroutine optimize_assignment( &
       if (.not. visited) then
          mrec = nrec + 1
          do irec = nrec, 1, -1
-            if (adjdiff < recadjdiff(irec) .or. (adjdiff == recadjdiff(irec) .and. dist2 < recdist2(irec))) then
+            if (adjd < recadjd(irec) .or. (adjd == recadjd(irec) .and. rmsd < recrmsd(irec))) then
                mrec = irec
             else
                exit
@@ -219,16 +222,16 @@ subroutine optimize_assignment( &
          if (mrec <= maxrec) then
             do irec = nrec, mrec + 1, -1
                countlist(irec) = countlist(irec - 1)
-               recdist2(irec) = recdist2(irec - 1)
-               recadjdiff(irec) = recadjdiff(irec - 1)
+               recrmsd(irec) = recrmsd(irec - 1)
+               recadjd(irec) = recadjd(irec - 1)
                avgsteps(irec) = avgsteps(irec - 1)
                avgrealrot(irec) = avgrealrot(irec - 1)
                avgtotalrot(irec) = avgtotalrot(irec - 1)
                permlist(:, irec) = permlist(:, irec - 1)
             end do
             countlist(mrec) = 1
-            recdist2(mrec) = dist2
-            recadjdiff(mrec) = adjdiff
+            recrmsd(mrec) = rmsd
+            recadjd(mrec) = adjd
             avgsteps(mrec) = steps
             avgrealrot(mrec) = rotangle(prodquat)
             avgtotalrot(mrec) = totalrot
@@ -239,7 +242,7 @@ subroutine optimize_assignment( &
    end do
 
    if (stats_flag) then
-      call print_stats(nrec, weights, countlist, avgsteps, avgtotalrot, avgrealrot, recadjdiff, recdist2)
+      call print_stats(nrec, countlist, avgsteps, avgtotalrot, avgrealrot, recadjd, recrmsd)
       call print_final_stats(overflow, maxrec, nrec, ntrial, nstep)
    end if
 
