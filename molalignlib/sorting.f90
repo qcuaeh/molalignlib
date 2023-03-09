@@ -36,6 +36,7 @@ end interface
 
 interface sortorder
    module procedure intorder
+   module procedure realorder
    module procedure charorder
 end interface
 
@@ -63,6 +64,14 @@ function intorder(x, n) result(o)
    integer :: i, o(n), t((n+1)/2)
    o = [(i, i=1, n)]
    call intmergesort(x, o, n, t)
+end function
+
+function realorder(x, n) result(o)
+   integer, intent(in) :: n
+   real(wp), intent(in) :: x(:)
+   integer :: i, o(n), t((n+1)/2)
+   o = [(i, i=1, n)]
+   call realmergesort(x, o, n, t)
 end function
 
 function charorder(x, n) result(o)
@@ -155,6 +164,58 @@ subroutine intmerge(x, a, na, b, nb, c, nc)
    end do
 end subroutine
  
+subroutine realmerge(x, a, na, b, nb, c, nc)
+   integer, intent(in) :: na, nb, nc
+   real(wp), intent(in) :: x(:)
+   integer, intent(in) :: b(nb)
+   integer, intent(inout) :: a(na), c(nc)
+    
+   integer :: i, j, k
+    
+   i = 1; j = 1; k = 1;
+   do while(i <= na .and. j <= nb)
+      if (x(a(i)) <= x(b(j))) then
+         c(k) = a(i)
+         i = i+1
+      else
+         c(k) = b(j)
+         j = j+1
+      end if
+      k = k + 1
+   end do
+   do while (i <= na)
+      c(k) = a(i)
+      i = i + 1
+      k = k + 1
+   end do
+end subroutine
+ 
+recursive subroutine realmergesort(x, o, n, t)
+   integer, intent(in) :: n
+   real(wp), intent(in) :: x(:)
+   integer, intent(inout) :: o(n)
+   integer, intent(out) :: t((n+1)/2)
+    
+   integer :: i, o1
+    
+   if (n < 2) return
+   if (n == 2) then
+      if (x(o(1)) > x(o(2))) then
+         o1 = o(1); o(1) = o(2); o(2) = o1
+      end if
+      return
+   end if      
+   i = (n+1)/2
+    
+   call realmergesort(x, o, i, t)
+   call realmergesort(x, o(i+1), n-i, t)
+    
+   if (x(o(i)) > x(o(i+1))) then
+      t(1:i) = o(1:i)
+      call realmerge(x, t, i, o(i+1), n-i, o, n)
+   end if
+end subroutine
+
 recursive subroutine intmergesort(x, o, n, t)
    integer, intent(in) :: n
    integer, intent(in) :: x(:)
