@@ -293,7 +293,7 @@ program molalign
       aligned1 = translated(natom1, rotated(natom1, coords1, rotmat), travec)
       rmsd = sqrt(squaredist(natom0, weights0, coords0, aligned1, identityperm(natom0))/sum(weights0))
 
-      if (bond_flag) write (output_unit, '(a)') 'Optimized AdjD = ' // intstr(adjd)
+      if (bond_flag) write (output_unit, '(a)') 'AdjD = ' // intstr(adjd)
       write (output_unit, '(a)') 'RMSD = ' // realstr(rmsd, 4)
       call writefile(write_unit, fmtout, 'Reference', natom0, znums0, coords0, adjmat0)
       call writefile(write_unit, fmtout, 'RMSD ' // realstr(rmsd, 4), natom1, znums1, aligned1, adjmat1)
