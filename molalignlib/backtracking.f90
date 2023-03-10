@@ -15,17 +15,18 @@ public eqvatomperm
 
 contains
 
-subroutine minadjdiff (natom, weights, nblk, blksz, coords0, nadj0, adjlist0, adjmat0, &
-           coords1, nadj1, adjlist1, adjmat1, atomperm, nfrag0, fragroot0)
+subroutine minadjdiff (natom, weights, nblk, blksz, coords0, nadj0, adjlist0, adjmat0, neqv0, &
+   eqvsz0, coords1, nadj1, adjlist1, adjmat1, neqv1, eqvsz1, atomperm, nfrag0, fragroot0)
 ! Purpose: Find best correspondence between points of graphs
 
-   integer, intent(in) :: natom, nblk
+   integer, intent(in) :: natom, nblk, neqv0, neqv1
    integer, dimension(:), intent(in) :: blksz, nadj0, nadj1
    integer, dimension(:, :), intent(in) :: adjlist0, adjlist1
-   integer, dimension(:), intent(inout) :: atomperm
+   integer, dimension(:), intent(in) :: eqvsz0, eqvsz1
    real(wp), dimension(:), intent(in) :: weights
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
    logical, dimension(:, :), intent(in) :: adjmat0, adjmat1
+   integer, dimension(:), intent(inout) :: atomperm
    integer, intent(in) :: nfrag0
    integer, dimension(:), intent(in) :: fragroot0
 
@@ -35,6 +36,7 @@ subroutine minadjdiff (natom, weights, nblk, blksz, coords0, nadj0, adjlist0, ad
    integer h, i, offset, moldiff
    integer ntrack, track(natom)
    integer unmapping(natom)
+   integer, dimension(natom) :: eqvid0, eqvid1
    logical tracked(natom)
    real(wp) moldist
 
@@ -46,15 +48,27 @@ subroutine minadjdiff (natom, weights, nblk, blksz, coords0, nadj0, adjlist0, ad
       offset = offset + blksz(h)
    end do
 
+   ! set atoms equivalence indices
+
+   offset = 0
+   do h = 1, neqv0
+      eqvid0(offset+1:offset+eqvsz0(h)) = h
+      offset = offset + eqvsz0(h)
+   end do
+
+   offset = 0
+   do h = 1, neqv1
+      eqvid1(offset+1:offset+eqvsz1(h)) = h
+      offset = offset + eqvsz1(h)
+   end do
+
    !  initialization
 
    ntrack = 0
    tracked(:) = .false.
    unmapping = inverseperm(atomperm)
-   moldiff = 0
-
-!    moldist = squaredist (natom, weights, coords0, coords1, atomperm)
-!    moldiff = adjacencydiff (natom, adjmat0, adjmat1, atomperm)
+   moldiff = adjacencydiff (natom, adjmat0, adjmat1, atomperm)
+   moldist = squaredist (natom, weights, coords0, coords1, atomperm)
 
    if ( printInfo ) then
       print '(a,1x,i0)', "moldiff:", moldiff
@@ -184,11 +198,11 @@ subroutine minadjdiff (natom, weights, nblk, blksz, coords0, nadj0, adjlist0, ad
                      unmapping_branch(mapping(mismatches0(i))) = unmapping(mismatches1(j))
 
                      ! Update ssd with swap
-!                            moldist_branch = moldist + weights(mismatches0(i))*( &
-!                                - sum((coords1(:, mapping(mismatches0(i))) - coords0(:, mismatches0(i)))**2) &
-!                                - sum((coords1(:, mismatches1(j)) - coords0(:, unmapping(mismatches1(j))))**2) &
-!                                + sum((coords1(:, mismatches1(j)) - coords0(:, mismatches0(i)))**2) &
-!                                + sum((coords1(:, mapping(mismatches0(i))) - coords0(:, unmapping(mismatches1(j))))**2))
+                     moldist_branch = moldist + weights(mismatches0(i))*( &
+                        - sum((coords1(:, mapping(mismatches0(i))) - coords0(:, mismatches0(i)))**2) &
+                        - sum((coords1(:, mismatches1(j)) - coords0(:, unmapping(mismatches1(j))))**2) &
+                        + sum((coords1(:, mismatches1(j)) - coords0(:, mismatches0(i)))**2) &
+                        + sum((coords1(:, mapping(mismatches0(i))) - coords0(:, unmapping(mismatches1(j))))**2))
 
                      ! Update adjd with swap
                      moldiff_branch = moldiff + adjacencydelta(nadj0, adjlist0, adjmat1, &
@@ -198,7 +212,16 @@ subroutine minadjdiff (natom, weights, nblk, blksz, coords0, nadj0, adjlist0, ad
                      call recursive_backtrack(mismatches0(i), mapping_branch, unmapping_branch, &
                         tracked_branch, moldiff_branch, moldist_branch, ntrack_branch, track_branch)
 
-                     if (moldiff_branch < moldiff) then
+                     if ( &
+                        moldiff_branch < moldiff &
+!                        .and. ( &
+!                           ( &
+!                              eqvid0(mismatches0(i)) == eqvid0(unmapping(mismatches1(j))) &
+!                              .and. eqvid1(mapping(mismatches0(i))) == eqvid1(mismatches1(j)) &
+!                           ) &
+!                           .or. moldist_branch < moldist &
+!                        ) &
+                     ) then
                         ntrack = ntrack_branch
                         track(:) = track_branch(:)
                         tracked(:) = tracked_branch(:)
