@@ -179,8 +179,8 @@ subroutine optimize_assignment( &
 
       if (back_flag) then
 
-         call minadjdiff(natom, weights, nblk, blksz, coords0, nadj0, adjlist0, adjmat0, &
-            coords1, nadj1, adjlist1, adjmat1, atomperm, nfrag0, fragroot0)
+         call minadjdiff(natom, weights, nblk, blksz, coords0, nadj0, adjlist0, adjmat0, neqv0, &
+            eqvsz0, workcoords1, nadj1, adjlist1, adjmat1, neqv1, eqvsz1, atomperm, nfrag0, fragroot0)
 
          call eqvatomperm(natom, weights, coords0, adjmat0, adjlist0, neqv0, eqvsz0, &
             neqvnei0, eqvneisz0, workcoords1, adjmat1, atomperm, nfrag0, fragroot0)
