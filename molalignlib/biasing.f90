@@ -143,6 +143,16 @@ subroutine mnacrossbias(natom, nblk, blksz, nadj0, adjlist0, nadj1, adjlist1, co
       offset = offset + blksz(h)
    end do
 
+   offset = 0
+   do h = 1, nblk
+      do i = offset + 1, offset + blksz(h)
+         do j = offset + 1, offset + blksz(h)
+            biasmat(i, j) = 0
+         end do
+      end do
+      offset = offset + blksz(h)
+   end do
+
    do
 
       lev = lev + 1
@@ -159,9 +169,7 @@ subroutine mnacrossbias(natom, nblk, blksz, nadj0, adjlist0, nadj1, adjlist1, co
       do h = 1, nblk
          do i = offset + 1, offset + blksz(h)
             do j = offset + 1, offset + blksz(h)
-               if (outype0(i) == outype1(j)) then
-                  biasmat(i, j) = 0
-               else
+               if (lev >= 1 .and. outype0(i) /= outype1(j)) then
                   biasmat(i, j) = biasmat(i, j) + bias_scale**2*bias_ratio**(lev - 1)
                end if
             end do
