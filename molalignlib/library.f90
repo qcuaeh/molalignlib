@@ -56,14 +56,14 @@ subroutine assign_atoms( &
    integer, intent(in) :: natom0, natom1
    integer, dimension(:), intent(in) :: znums0, znums1
    integer, dimension(:), intent(in) :: types0, types1
-   logical, dimension(:, :), intent(in) :: adjmat0, adjmat1
+   logical, dimension(:, :), intent(inout) :: adjmat0, adjmat1
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
    real(wp), dimension(:), intent(in) :: weights0, weights1
    integer, dimension(:, :), intent(inout) :: permlist
    integer, dimension(:), intent(inout) :: countlist
    integer, intent(out) :: nrec, error
 
-   integer :: i
+   integer :: i, j
    integer :: nblk0, nblk1
    integer :: neqv0, neqv1
    integer, dimension(:), allocatable :: blkid0, blkid1
@@ -175,6 +175,35 @@ subroutine assign_atoms( &
    call initialize_random()
 
    ! Remap atoms to minimize distance and difference
+
+   call optimize_assignment( &
+      natom0, &
+      nblk0, &
+      blksz0, &
+      blkwt0, &
+      neqv0, &
+      eqvsz0, &
+      centered(natom0, coords0(:, atomorder0), center0), &
+      adjmat0(atomorder0, atomorder0), &
+      neqv1, &
+      eqvsz1, &
+      centered(natom1, coords1(:, atomorder1), center1), &
+      adjmat1(atomorder1, atomorder1), &
+      permlist, &
+      countlist, &
+      nrec)
+
+   do i = 1, natom0
+      do j = i + 1, natom0
+         if (adjmat0(atomorder0(i), atomorder0(j)) .neqv. &
+            adjmat1(atomorder1(permlist(i, 1)), atomorder1(permlist(j, 1)))) then
+            adjmat0(atomorder0(i), atomorder0(j)) = .false.
+            adjmat0(atomorder0(j), atomorder0(i)) = .false.
+            adjmat1(atomorder1(permlist(i, 1)), atomorder1(permlist(j, 1))) = .false.
+            adjmat1(atomorder1(permlist(j, 1)), atomorder1(permlist(i, 1))) = .false.
+         end if
+      end do
+   end do
 
    call optimize_assignment( &
       natom0, &
