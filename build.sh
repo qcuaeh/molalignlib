@@ -160,21 +160,18 @@ quick_build=false
 while getopts ":tqd" opt; do
   case $opt in
     d)
-      test_flag=false
-      build_flag=true
       debug_build=true
-      quick_build=false
+      build_flag=true
+      test_flag=false
       ;;
     q)
-      test_flag=false
-      build_flag=true
-      debug_build=false
       quick_build=true
+      build_flag=true
+      test_flag=false
       ;;
     t)
-      test_flag=true
       build_flag=false
-      quick_build=true
+      test_flag=true
       ;;
     \?)
       echo "Invalid option: -$OPTARG" >&2
