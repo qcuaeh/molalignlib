@@ -79,10 +79,10 @@ subroutine assign_atoms( &
 
    integer, dimension(natom0) :: offset, blkid, invatomperm
    integer, dimension(natom0, natom0) :: order01
-   real(wp), dimension(natom0, natom0) :: d01
-
    integer :: nbond0, bonds0(2, maxcoord*natom0)
    integer :: nbond1, bonds1(2, maxcoord*natom1)
+   logical, dimension(natom0, natom0) :: adjmat00, adjmat01
+   real(wp), dimension(natom0, natom0) :: d01
 
    ! Set error code to 0 by default
 
@@ -242,21 +242,30 @@ subroutine assign_atoms( &
 
    invatomperm = inverseperm(permlist(:, 1))
 
+   adjmat00 = adjmat0
+   adjmat01 = adjmat1
+
    do i = 1, natom0
-      do j = 1, natom0
-         if (adjmat0(i, j) &
-            .neqv. adjmat1(permlist(i, 1), permlist(j, 1)) &
-         ) then
+      do j = i + 1, natom0
+         if (adjmat00(i, j) .neqv. adjmat01(permlist(i, 1), permlist(j, 1))) then
             adjmat0(i, j) = .false.
+            adjmat0(j, i) = .false.
             adjmat1(permlist(i, 1), permlist(j, 1)) = .false.
+            adjmat1(permlist(j, 1), permlist(i, 1)) = .false.
             h = blkid(i)
             do k = offset(h) + 1, offset(h) + blksz0(h)
                if (sum((coords0(:, i) - coords1(:, k))**2) &
                   < sum((coords0(:, i) - coords1(:, permlist(i, 1)))**2) &
                ) then
 !                  print *, i, permlist(i, 1), invatomperm(k)
-                  adjmat0(invatomperm(k), :) = .false.
-                  adjmat1(k, :) = .false.
+                  adjmat0(invatomperm(k), j) = .false.
+                  adjmat0(j, invatomperm(k)) = .false.
+                  adjmat1(k, j) = .false.
+                  adjmat1(j, k) = .false.
+!                  adjmat0(invatomperm(k), :) = .false.
+!                  adjmat0(:, invatomperm(k)) = .false.
+!                  adjmat1(k, :) = .false.
+!                  adjmat1(:, k) = .false.
                end if
             end do
          end if
