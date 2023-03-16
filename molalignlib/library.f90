@@ -240,8 +240,6 @@ subroutine assign_atoms( &
       blkid(offset(h)+1:offset(h)+blksz0(h)) = h
    end do
 
-   invatomperm = inverseperm(permlist(:, 1))
-
    adjmat00 = adjmat0
    adjmat01 = adjmat1
 
@@ -254,14 +252,14 @@ subroutine assign_atoms( &
             adjmat1(permlist(j, 1), permlist(i, 1)) = .false.
             h = blkid(i)
             do k = offset(h) + 1, offset(h) + blksz0(h)
-               if (sum((coords0(:, i) - coords1(:, k))**2) &
+               if (sum((coords0(:, i) - coords1(:, permlist(k, 1)))**2) &
                   < sum((coords0(:, i) - coords1(:, permlist(i, 1)))**2) &
                ) then
 !                  print *, i, permlist(i, 1), invatomperm(k)
-                  adjmat0(invatomperm(k), j) = .false.
-                  adjmat0(j, invatomperm(k)) = .false.
-                  adjmat1(k, j) = .false.
-                  adjmat1(j, k) = .false.
+                  adjmat0(k, j) = .false.
+                  adjmat0(j, k) = .false.
+                  adjmat1(permlist(k, 1), permlist(j, 1)) = .false.
+                  adjmat1(permlist(j, 1), permlist(k, 1)) = .false.
 !                  adjmat0(invatomperm(k), :) = .false.
 !                  adjmat0(:, invatomperm(k)) = .false.
 !                  adjmat1(k, :) = .false.
