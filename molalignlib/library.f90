@@ -54,16 +54,16 @@ subroutine assign_atoms( &
    error)
 
    integer, intent(in) :: natom0, natom1
-   integer, dimension(:), intent(in) :: znums0, znums1
-   integer, dimension(:), intent(in) :: types0, types1
+   integer, dimension(:), intent(inout) :: znums0, znums1
+   integer, dimension(:), intent(inout) :: types0, types1
    logical, dimension(:, :), intent(inout) :: adjmat0, adjmat1
-   real(wp), dimension(:, :), intent(in) :: coords0, coords1
-   real(wp), dimension(:), intent(in) :: weights0, weights1
+   real(wp), dimension(:, :), intent(inout) :: coords0, coords1
+   real(wp), dimension(:), intent(inout) :: weights0, weights1
    integer, dimension(:, :), intent(inout) :: permlist
    integer, dimension(:), intent(inout) :: countlist
    integer, intent(out) :: nrec, error
 
-   integer :: i, j
+   integer :: h, i, j, k, l
    integer :: nblk0, nblk1
    integer :: neqv0, neqv1
    integer, dimension(:), allocatable :: blkid0, blkid1
@@ -76,6 +76,13 @@ subroutine assign_atoms( &
    integer, dimension(:), allocatable :: eqvsz0, eqvsz1
    real(wp), dimension(:), allocatable :: blkwt0, blkwt1
    real(wp) :: center0(3), center1(3)
+
+   integer, dimension(natom0) :: offset, blkid, invatomperm
+   integer, dimension(natom0, natom0) :: order01
+   real(wp), dimension(natom0, natom0) :: d01
+
+   integer :: nbond0, bonds0(2, maxcoord*natom0)
+   integer :: nbond1, bonds1(2, maxcoord*natom1)
 
    ! Set error code to 0 by default
 
@@ -173,6 +180,36 @@ subroutine assign_atoms( &
 
    ! Remap atoms to minimize distance and difference
 
+!   call optimize_assignment( &
+!      natom0, &
+!      nblk0, &
+!      blksz0, &
+!      blkwt0, &
+!      neqv0, &
+!      eqvsz0, &
+!      centered(natom0, coords0(:, atomorder0), center0), &
+!      adjmat0(atomorder0, atomorder0), &
+!      neqv1, &
+!      eqvsz1, &
+!      centered(natom1, coords1(:, atomorder1), center1), &
+!      adjmat1(atomorder1, atomorder1), &
+!      permlist, &
+!      countlist, &
+!      nrec)
+
+   znums0 = znums0(atomorder0)
+   znums1 = znums1(atomorder1)
+   types0 = types0(atomorder0)
+   types1 = types1(atomorder1)
+   weights0 = weights0(atomorder0)
+   weights1 = weights1(atomorder1)
+   coords0 = coords0(:, atomorder0)
+   coords1 = coords1(:, atomorder1)
+   adjmat0 = adjmat0(atomorder0, atomorder0)
+   adjmat1 = adjmat1(atomorder1, atomorder1)
+   call translate(natom0, coords0, -center0)
+   call translate(natom1, coords1, -center1)
+
    call optimize_assignment( &
       natom0, &
       nblk0, &
@@ -180,21 +217,84 @@ subroutine assign_atoms( &
       blkwt0, &
       neqv0, &
       eqvsz0, &
-      centered(natom0, coords0(:, atomorder0), center0), &
-      adjmat0(atomorder0, atomorder0), &
+      coords0, &
+      adjmat0, &
       neqv1, &
       eqvsz1, &
-      centered(natom1, coords1(:, atomorder1), center1), &
-      adjmat1(atomorder1, atomorder1), &
+      coords1, &
+      adjmat1, &
       permlist, &
       countlist, &
       nrec)
 
+   call rotate(natom1, coords1, &
+      rotquat2rotmat(leastrotquat(natom0, weights0, coords0, coords1, permlist(:, 1))) &
+   )
+
+   offset(1) = 0
+   do h = 1, nblk0 - 1
+      offset(h+1) = offset(h) + blksz0(h)
+   end do
+
+   do h = 1, nblk0
+      blkid(offset(h)+1:offset(h)+blksz0(h)) = h
+   end do
+
+   invatomperm = inverseperm(permlist(:, 1))
+
+   do i = 1, natom0
+      do j = 1, natom0
+         if (adjmat0(i, j) &
+            .neqv. adjmat1(permlist(i, 1), permlist(j, 1)) &
+         ) then
+            adjmat0(i, j) = .false.
+            adjmat1(permlist(i, 1), permlist(j, 1)) = .false.
+            h = blkid(i)
+            do k = offset(h) + 1, offset(h) + blksz0(h)
+               if (sum((coords0(:, i) - coords1(:, k))**2) &
+                  < sum((coords0(:, i) - coords1(:, permlist(i, 1)))**2) &
+               ) then
+!                  print *, i, permlist(i, 1), invatomperm(k)
+                  adjmat0(invatomperm(k), :) = .false.
+                  adjmat1(k, :) = .false.
+               end if
+            end do
+         end if
+      end do
+   end do
+
+   call optimize_assignment( &
+      natom0, &
+      nblk0, &
+      blksz0, &
+      blkwt0, &
+      neqv0, &
+      eqvsz0, &
+      coords0, &
+      adjmat0, &
+      neqv1, &
+      eqvsz1, &
+      coords1, &
+      adjmat1, &
+      permlist, &
+      countlist, &
+      nrec)
+
+   ! Print coordinates with internal order
+
+   open(unit=99, file='ordered.mol2', action='write', status='replace')
+   call adjmat2bonds(natom0, adjmat0, nbond0, bonds0)
+!   call adjmat2bonds(natom1, adjmat1, nbond1, bonds1)
+   call adjmat2bonds(natom1, adjmat1(permlist(:, 1), permlist(:, 1)), nbond1, bonds1)
+   call writemol2(99, 'coords0', natom0, znums0, coords0, nbond0, bonds0)
+!   call writemol2(99, 'coords1', natom1, znums1, coords1, nbond1, bonds1)
+   call writemol2(99, 'coords1', natom1, znums1(permlist(:, 1)), coords1(:, permlist(:, 1)), nbond1, bonds1)
+
    ! Reorder back to original atom ordering
 
-   do i = 1, nrec
-      permlist(:, i) = atomorder1(permlist(backorder0, i))
-   end do
+!   do i = 1, nrec
+!      permlist(:, i) = atomorder1(permlist(backorder0, i))
+!   end do
 
 end subroutine
 
