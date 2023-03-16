@@ -69,6 +69,27 @@ subroutine adjmat2list(natom, adjmat, nadj, adjlist)
 
 end subroutine
 
+subroutine adjmat2bonds(natom, adjmat, nbond, bonds)
+   integer, intent(in) :: natom
+   logical, dimension(:, :), intent(in) :: adjmat
+   integer, intent(out) :: nbond
+   integer, dimension(:, :), intent(out) :: bonds
+   integer :: i, j
+
+   nbond = 0
+
+   do i = 1, natom
+      do j = i + 1, natom
+         if (adjmat(i, j)) then
+            nbond = nbond + 1
+            bonds(1, nbond) = i
+            bonds(2, nbond) = j
+         end if
+      end do
+   end do
+
+end subroutine
+
 subroutine adjlist2bonds(natom, nadj, adjlist, nbond, bonds)
    integer, intent(in) :: natom
    integer, dimension(:), intent(in) :: nadj
