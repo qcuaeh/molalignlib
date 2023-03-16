@@ -77,9 +77,6 @@ subroutine assign_atoms( &
    real(wp), dimension(:), allocatable :: blkwt0, blkwt1
    real(wp) :: center0(3), center1(3)
 
-!  integer :: nbond0, bonds0(2, maxcoord*natom0)
-!  integer :: nbond1, bonds1(2, maxcoord*natom1)
-
    ! Set error code to 0 by default
 
    error = 0
@@ -192,44 +189,6 @@ subroutine assign_atoms( &
       permlist, &
       countlist, &
       nrec)
-
-   do i = 1, natom0
-      do j = i + 1, natom0
-         if (adjmat0(atomorder0(i), atomorder0(j)) .neqv. &
-            adjmat1(atomorder1(permlist(i, 1)), atomorder1(permlist(j, 1)))) then
-            adjmat0(atomorder0(i), atomorder0(j)) = .false.
-            adjmat0(atomorder0(j), atomorder0(i)) = .false.
-            adjmat1(atomorder1(permlist(i, 1)), atomorder1(permlist(j, 1))) = .false.
-            adjmat1(atomorder1(permlist(j, 1)), atomorder1(permlist(i, 1))) = .false.
-         end if
-      end do
-   end do
-
-   call optimize_assignment( &
-      natom0, &
-      nblk0, &
-      blksz0, &
-      blkwt0, &
-      neqv0, &
-      eqvsz0, &
-      centered(natom0, coords0(:, atomorder0), center0), &
-      adjmat0(atomorder0, atomorder0), &
-      neqv1, &
-      eqvsz1, &
-      centered(natom1, coords1(:, atomorder1), center1), &
-      adjmat1(atomorder1, atomorder1), &
-      permlist, &
-      countlist, &
-      nrec)
-
-   ! Print coordinates with internal order
-!  open(unit=99, file='ordered.mol2', action='write', status='replace')
-!  call adjmat2list(natom0, adjmat0(atomorder0, atomorder0), nadj0, adjlist0)
-!  call adjmat2list(natom1, adjmat1(atomorder1, atomorder1), nadj1, adjlist1)
-!  call adjlist2bonds(natom0, nadj0, adjlist0, nbond0, bonds0)
-!  call adjlist2bonds(natom1, nadj1, adjlist1, nbond1, bonds1)
-!  call writemol2(99, 'coords0', natom0, znums0(atomorder0), coords0(:, atomorder0), nbond0, bonds0)
-!  call writemol2(99, 'coords1', natom1, znums1(atomorder1), coords1(:, atomorder1), nbond1, bonds1)
 
    ! Reorder back to original atom ordering
 

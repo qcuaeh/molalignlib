@@ -18,6 +18,7 @@ module fileio
 use stdio
 use readmol
 use writemol
+use adjacency
 
 implicit none
 
@@ -107,16 +108,7 @@ subroutine writefile(unit, fmtout, title, natom, znums, coords, adjmat)
    character(*), intent(in) :: title, fmtout
    integer :: i, j, nbond, bonds(2, natom*maxcoord)
 
-   nbond = 0
-   do i = 1, natom
-      do j = i + 1, natom
-         if (adjmat(i, j)) then
-            nbond = nbond + 1
-            bonds(1, nbond) = i
-            bonds(2, nbond) = j
-         end if
-      end do
-   end do
+   call adjmat2bonds(natom, adjmat, nbond, bonds)
 
    select case (fmtout)
    case ('xyz')
