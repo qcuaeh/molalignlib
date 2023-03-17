@@ -51,7 +51,7 @@ program molalign
    real(wp) :: rmsd, travec(3), rotmat(3, 3)
    real(wp), allocatable, dimension(:) :: weights0, weights1
    real(wp), allocatable, dimension(:, :) :: coords0, coords1, aligned1
-   logical :: sort_flag, mirror_flag, stdin_flag, stdout_flag
+   logical :: sort_flag, stdin_flag, stdout_flag
    logical, dimension(:, :), allocatable :: adjmat0, adjmat1
 
    procedure(f_realint), pointer :: weight_func
@@ -75,9 +75,12 @@ program molalign
    maxcount = 10
    maxlevel = 10
    maxcoord = 16
+   nreac = 0
+
    bias_tol = 0.35
    bias_scale = 1.e3
    bias_ratio = 0.5
+
    pathout = 'aligned.xyz'
 
    weight_func => unity
@@ -124,6 +127,9 @@ program molalign
          call readoptarg(arg, maxrec)
       case ('-out')
          call readoptarg(arg, pathout)
+      case ('-r')
+         nreac = nreac + 1
+         call readoptarg(arg, reacatom(nreac))
       case ('-stdin')
          stdin_flag = .true.
          call readoptarg(arg, fmtin0)
@@ -162,10 +168,6 @@ program molalign
 
    call readfile(read_unit0, fmtin0, title0, natom0, labels0, coords0, adjmat0)
    call readfile(read_unit1, fmtin1, title1, natom1, labels1, coords1, adjmat1)
-
-   if (mirror_flag) then
-      coords1(1, :) = -coords1(1, :)
-   end if
 
    ! Allocate arrays
 
