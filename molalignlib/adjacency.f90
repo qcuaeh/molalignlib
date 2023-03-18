@@ -110,11 +110,11 @@ subroutine adjlist2bonds(natom, nadj, adjlist, nbond, bonds)
 
 end subroutine
 
-function adjacencydiff(natom, adjmat0, adjmat1, atomperm) result(diff)
+function adjacencydiff(natom, adjmat0, adjmat1, mapping) result(diff)
 ! Purpose: Check if two graphs are equal.
 ! Return the number of differences between graphs.
    integer, intent(in) :: natom
-   integer, dimension(:), intent(in) :: atomperm
+   integer, dimension(:), intent(in) :: mapping
    logical, dimension(:, :), intent(in) :: adjmat0, adjmat1
    integer diff
 
@@ -126,18 +126,18 @@ function adjacencydiff(natom, adjmat0, adjmat1, atomperm) result(diff)
 
    do i = 1, natom
       do j = i + 1, natom
-         if (adjmat0(i, j) .neqv. adjmat1(atomperm(i), atomperm(j))) then
+         if (adjmat0(i, j) .neqv. adjmat1(mapping(i), mapping(j))) then
             diff = diff + 1
-!                print *, i, j, adjmat0(i, j), adjmat1(atomperm(i), atomperm(j))
+!                print *, i, j, adjmat0(i, j), adjmat1(mapping(i), mapping(j))
          end if
       end do
    end do
 
 end function
 
-function adjacencydelta(nadj0, adjlist0, adjmat1, atomperm, k, l) result(delta)
+function adjacencydelta(nadj0, adjlist0, adjmat1, mapping, k, l) result(delta)
    integer, intent(in) :: k, l
-   integer, dimension(:), intent(in) :: atomperm, nadj0
+   integer, dimension(:), intent(in) :: mapping, nadj0
    integer, dimension(:, :), intent(in) :: adjlist0
    logical, dimension(:, :), intent(in) :: adjmat1
    integer i, nkk, nkl, nll, nlk, delta
@@ -147,8 +147,8 @@ function adjacencydelta(nadj0, adjlist0, adjmat1, atomperm, k, l) result(delta)
 
    do i = 1, nadj0(k)
       if (adjlist0(i, k) /= l) then
-         if (adjmat1(atomperm(k), atomperm(adjlist0(i, k)))) nkk = nkk + 1
-         if (adjmat1(atomperm(l), atomperm(adjlist0(i, k)))) nkl = nkl + 1
+         if (adjmat1(mapping(k), mapping(adjlist0(i, k)))) nkk = nkk + 1
+         if (adjmat1(mapping(l), mapping(adjlist0(i, k)))) nkl = nkl + 1
       end if
    end do
 
@@ -157,15 +157,15 @@ function adjacencydelta(nadj0, adjlist0, adjmat1, atomperm, k, l) result(delta)
 
    do i = 1, nadj0(l)
       if (adjlist0(i, l) /= k) then
-         if (adjmat1(atomperm(l), atomperm(adjlist0(i, l)))) nll = nll + 1
-         if (adjmat1(atomperm(k), atomperm(adjlist0(i, l)))) nlk = nlk + 1
+         if (adjmat1(mapping(l), mapping(adjlist0(i, l)))) nll = nll + 1
+         if (adjmat1(mapping(k), mapping(adjlist0(i, l)))) nlk = nlk + 1
       end if
    end do
 
-!        dkk = nadj0(k) + nadj1(atomperm(k)) - 2*nkk
-!        dll = nadj0(l) + nadj1(atomperm(l)) - 2*nll
-!        dkl = nadj0(k) + nadj1(atomperm(l)) - 2*nkl
-!        dlk = nadj0(l) + nadj1(atomperm(k)) - 2*nlk
+!        dkk = nadj0(k) + nadj1(mapping(k)) - 2*nkk
+!        dll = nadj0(l) + nadj1(mapping(l)) - 2*nll
+!        dkl = nadj0(k) + nadj1(mapping(l)) - 2*nkl
+!        dlk = nadj0(l) + nadj1(mapping(k)) - 2*nlk
 !        delta = dkl + dlk - dkk - dll
 
    ! Notice that dkl + dlk - dkk - dll == 2*(nkk + nll - nkl - nlk)

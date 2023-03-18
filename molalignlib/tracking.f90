@@ -10,18 +10,19 @@ public getmolfrags
 
 contains
 
-subroutine getmolfrags (natom, nadj, adjlist, nblk, blksz, &
-                  neqv, eqvsz, nfrag, fragroot, fragid)
+subroutine getmolfrags (natom, nadj, adjlist, nblk, blklen, &
+                  neqv, eqvlen, nfrag, fragroot)
 
    integer, intent(in) :: natom, nblk, neqv
-   integer, dimension(:), intent(in) :: nadj, blksz, eqvsz
+   integer, dimension(:), intent(in) :: nadj, blklen, eqvlen
    integer, dimension(:, :), intent(in) :: adjlist
-   integer, intent(out) :: nfrag, fragroot(natom), fragid(natom)
+   integer, intent(out) :: nfrag, fragroot(natom)
 
    integer :: h, n, f, firstn, prevn, offset
-   integer, dimension(natom) :: blkid
-   integer, dimension(natom) :: eqvid
    integer, dimension(natom) :: order
+   integer, dimension(natom) :: blkidx
+   integer, dimension(natom) :: eqvidx
+   integer, dimension(natom) :: fragid
    integer, dimension(natom) :: fragsize
    integer, dimension(natom,natom) :: fragind, fragblock, fragequiv, fragcoord
    logical :: track(natom), printInfo = .false.
@@ -32,16 +33,16 @@ subroutine getmolfrags (natom, nadj, adjlist, nblk, blksz, &
 
    offset = 0
    do h = 1, nblk
-      blkid(offset+1:offset+blksz(h)) = h
-      offset = offset + blksz(h)
+      blkidx(offset+1:offset+blklen(h)) = h
+      offset = offset + blklen(h)
    end do
 
    ! set atoms equivalence indices
 
    offset = 0
    do h = 1, neqv
-      eqvid(offset+1:offset+eqvsz(h)) = h
-      offset = offset + eqvsz(h)
+      eqvidx(offset+1:offset+eqvlen(h)) = h
+      offset = offset + eqvlen(h)
    end do
 
    ! initialization
@@ -87,7 +88,7 @@ subroutine getmolfrags (natom, nadj, adjlist, nblk, blksz, &
       end do
    end if
 
-   ! sorts sequentially by blksz, eqvsz, and nadj for each fragment
+   ! sorts sequentially by blklen, eqvlen, and nadj for each fragment
    order = [ (n, n = 1, natom) ]
    do f = 1, nfrag
       firstn = fragsize(f)
@@ -138,8 +139,8 @@ contains
       fragsize(nfrag) = fragsize(nfrag) + 1
       fragid(n) = nfrag
       fragind(fragsize(nfrag),nfrag) = n
-      fragblock(fragsize(nfrag),nfrag) = blksz(blkid(n))
-      fragequiv(fragsize(nfrag),nfrag) = eqvsz(eqvid(n))
+      fragblock(fragsize(nfrag),nfrag) = blklen(blkidx(n))
+      fragequiv(fragsize(nfrag),nfrag) = eqvlen(eqvidx(n))
       fragcoord(fragsize(nfrag),nfrag) = nadj(n)
       
       do i = 1, nadj(n)

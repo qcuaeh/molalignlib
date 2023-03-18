@@ -1,17 +1,17 @@
-subroutine vdwcrossbias(natom, nblk, blksz, blkz, nadj0, adjlist0, &
+subroutine vdwcrossbias(natom, nblk, blklen, blkz, nadj0, adjlist0, &
    nadj1, adjlist1, coords0, coords1, biasmat)
 ! Purpose: Generate the adjacency matrix
 
     integer, intent(in) :: natom, nblk
     integer, dimension(:), intent(in) :: nadj0, nadj1
-    integer, dimension(:), intent(in) :: blksz, blkz
+    integer, dimension(:), intent(in) :: blklen, blkz
     integer, dimension(:, :), intent(in) :: adjlist0, adjlist1
     real(wp), dimension(:, :), intent(in) :: coords0, coords1
     real(wp), dimension(:, :), intent(out) :: biasmat
 
     real(wp) :: atomdist
     integer :: h, i, j, k, n, offset2, offset
-    integer, dimension(natom) :: blkid
+    integer, dimension(natom) :: blkidx
     integer, dimension(nblk, natom) :: n0, n1
     real(wp), dimension(natom) :: radii
     real(wp), dimension(natom, natom) :: d0, d1
@@ -22,16 +22,16 @@ subroutine vdwcrossbias(natom, nblk, blksz, blkz, nadj0, adjlist0, &
 
    offset = 0
    do h = 1, nblk
-      blkid(offset+1:offset+blksz(h)) = h
-      radii(offset+1:offset+blksz(h)) = covrad(blkz(h)) + 1.0*(vdwrad(blkz(h)) - covrad(blkz(h)))
-      offset = offset + blksz(h)
+      blkidx(offset+1:offset+blklen(h)) = h
+      radii(offset+1:offset+blklen(h)) = covrad(blkz(h)) + 1.0*(vdwrad(blkz(h)) - covrad(blkz(h)))
+      offset = offset + blklen(h)
    end do
 
     do i = 1, natom
         offset = 0
         do h = 1, nblk
             k = 0
-            do j = offset + 1, offset + blksz(h)
+            do j = offset + 1, offset + blklen(h)
                 if (j /= i) then
                     k = k + 1
                     atomdist = sqrt(sum((coords0(:, i) - coords0(:, j))**2))
@@ -41,7 +41,7 @@ subroutine vdwcrossbias(natom, nblk, blksz, blkz, nadj0, adjlist0, &
             if (k > 1) then
                 call sort(d0(:, i), offset+1, offset+k)
             end if
-            offset = offset + blksz(h)
+            offset = offset + blklen(h)
         end do
     end do
 
@@ -49,7 +49,7 @@ subroutine vdwcrossbias(natom, nblk, blksz, blkz, nadj0, adjlist0, &
         offset = 0
         do h = 1, nblk
             k = 0
-            do j = offset + 1, offset + blksz(h)
+            do j = offset + 1, offset + blklen(h)
                 if (j /= i) then
                     k = k + 1
                     atomdist = sqrt(sum((coords1(:, i) - coords1(:, j))**2))
@@ -59,7 +59,7 @@ subroutine vdwcrossbias(natom, nblk, blksz, blkz, nadj0, adjlist0, &
             if (k > 1) then
                 call sort(d1(:, i), offset+1, offset+k)
             end if
-            offset = offset + blksz(h)
+            offset = offset + blklen(h)
         end do
     end do
 
@@ -70,19 +70,19 @@ subroutine vdwcrossbias(natom, nblk, blksz, blkz, nadj0, adjlist0, &
 
     do i = 1, natom
        do k = 1, nadj0(i)
-          n0(blkid(adjlist0(k, i)), i) = n0(blkid(adjlist0(k, i)), i) + 1
+          n0(blkidx(adjlist0(k, i)), i) = n0(blkidx(adjlist0(k, i)), i) + 1
        end do
     end do
 
     do i = 1, natom
        do k = 1, nadj1(i)
-          n1(blkid(adjlist1(k, i)), i) = n1(blkid(adjlist1(k, i)), i) + 1
+          n1(blkidx(adjlist1(k, i)), i) = n1(blkidx(adjlist1(k, i)), i) + 1
        end do
     end do
 
     do h = 1, nblk
-        do i = offset + 1, offset + blksz(h)
-            do j = offset + 1, offset + blksz(h)
+        do i = offset + 1, offset + blklen(h)
+            do j = offset + 1, offset + blklen(h)
 
                 offset2 = 0
 
@@ -98,13 +98,13 @@ subroutine vdwcrossbias(natom, nblk, blksz, blkz, nadj0, adjlist0, &
                             biasmat(i, j) = bias_scale**2
                         end if
                     end if
-                    offset2 = offset2 + blksz(k)
+                    offset2 = offset2 + blklen(k)
                 end do
 
             end do
         end do
 
-        offset = offset + blksz(h)
+        offset = offset + blklen(h)
 
     end do
 
@@ -112,19 +112,19 @@ subroutine vdwcrossbias(natom, nblk, blksz, blkz, nadj0, adjlist0, &
 
 end subroutine
 
-subroutine mixedcrossbias(natom, nblk, blksz, nadj0, adjlist0, &
+subroutine mixedcrossbias(natom, nblk, blklen, nadj0, adjlist0, &
    nadj1, adjlist1, coords0, coords1, biasmat)
 ! Purpose: Generate the adjacency matrix
 
     integer, intent(in) :: natom, nblk
     integer, dimension(:), intent(in) :: nadj0, nadj1
-    integer, dimension(:), intent(in) :: blksz
+    integer, dimension(:), intent(in) :: blklen
     integer, dimension(:, :), intent(in) :: adjlist0, adjlist1
     real(wp), dimension(:, :), intent(in) :: coords0, coords1
     real(wp), dimension(:, :), intent(out) :: biasmat
 
     integer :: h, i, j, k, n, offset2, offset
-    integer, dimension(natom) :: blkid
+    integer, dimension(natom) :: blkidx
     integer, dimension(nblk, natom) :: n0, n1
     real(wp), dimension(natom, natom) :: d0, d1
 
@@ -134,15 +134,15 @@ subroutine mixedcrossbias(natom, nblk, blksz, nadj0, adjlist0, &
 
    offset = 0
    do h = 1, nblk
-      blkid(offset+1:offset+blksz(h)) = h
-      offset = offset + blksz(h)
+      blkidx(offset+1:offset+blklen(h)) = h
+      offset = offset + blklen(h)
    end do
 
     do i = 1, natom
         offset = 0
         do h = 1, nblk
             k = 0
-            do j = offset + 1, offset + blksz(h)
+            do j = offset + 1, offset + blklen(h)
                 if (j /= i) then
                     k = k + 1
                     d0(offset+k, i) = sum((coords0(:, i) - coords0(:, j))**2)
@@ -151,7 +151,7 @@ subroutine mixedcrossbias(natom, nblk, blksz, nadj0, adjlist0, &
             if (k > 1) then
                 call sort(d0(:, i), offset+1, offset+k)
             end if
-            offset = offset + blksz(h)
+            offset = offset + blklen(h)
         end do
     end do
 
@@ -159,7 +159,7 @@ subroutine mixedcrossbias(natom, nblk, blksz, nadj0, adjlist0, &
         offset = 0
         do h = 1, nblk
             k = 0
-            do j = offset + 1, offset + blksz(h)
+            do j = offset + 1, offset + blklen(h)
                 if (j /= i) then
                     k = k + 1
                     d1(offset+k, i) = sum((coords1(:, i) - coords1(:, j))**2)
@@ -168,7 +168,7 @@ subroutine mixedcrossbias(natom, nblk, blksz, nadj0, adjlist0, &
             if (k > 1) then
                 call sort(d1(:, i), offset+1, offset+k)
             end if
-            offset = offset + blksz(h)
+            offset = offset + blklen(h)
         end do
     end do
 
@@ -179,19 +179,19 @@ subroutine mixedcrossbias(natom, nblk, blksz, nadj0, adjlist0, &
 
     do i = 1, natom
        do k = 1, nadj0(i)
-          n0(blkid(adjlist0(k, i)), i) = n0(blkid(adjlist0(k, i)), i) + 1
+          n0(blkidx(adjlist0(k, i)), i) = n0(blkidx(adjlist0(k, i)), i) + 1
        end do
     end do
 
     do i = 1, natom
        do k = 1, nadj1(i)
-          n1(blkid(adjlist1(k, i)), i) = n1(blkid(adjlist1(k, i)), i) + 1
+          n1(blkidx(adjlist1(k, i)), i) = n1(blkidx(adjlist1(k, i)), i) + 1
        end do
     end do
 
     do h = 1, nblk
-        do i = offset + 1, offset + blksz(h)
-            do j = offset + 1, offset + blksz(h)
+        do i = offset + 1, offset + blklen(h)
+            do j = offset + 1, offset + blklen(h)
 
                 offset2 = 0
 
@@ -203,13 +203,13 @@ subroutine mixedcrossbias(natom, nblk, blksz, nadj0, adjlist0, &
 !                        print *, i, j, ':', d0(offset2+1:offset2+n0(k, i), i), '/', d0(offset2+n0(k, i)+1:offset2+n1(k, j), i)
                         biasmat(i, j) = bias_scale*sum(d0(offset2+1:offset2+n1(k, j), i))/n1(k, j)
                     end if
-                    offset2 = offset2 + blksz(k)
+                    offset2 = offset2 + blklen(k)
                 end do
 
             end do
         end do
 
-        offset = offset + blksz(h)
+        offset = offset + blklen(h)
 
     end do
 

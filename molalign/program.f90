@@ -40,7 +40,7 @@ program molalign
    integer, allocatable, dimension(:) :: znums0, znums1
    integer, allocatable, dimension(:) :: types0, types1
    integer, allocatable, dimension(:) :: countlist
-   integer, allocatable, dimension(:, :) :: permlist
+   integer, allocatable, dimension(:, :) :: maplist
    character(:), allocatable :: arg
    character(:), allocatable :: pathin1, pathin2, pathout
    character(:), allocatable :: fmtin, fmtin0, fmtin1, fmtout
@@ -175,7 +175,7 @@ program molalign
    allocate(types0(natom0), types1(natom1))
    allocate(weights0(natom0), weights1(natom1))
    allocate(aligned1(3, natom1))
-   allocate(permlist(natom0, maxrec))
+   allocate(maplist(natom0, maxrec))
    allocate(countlist(maxrec))
 
    ! Get atomic numbers, types and weights
@@ -229,7 +229,7 @@ program molalign
          weights1, &
          coords1, &
          adjmat1, &
-         permlist, &
+         maplist, &
          countlist, &
          nrec, &
          error)
@@ -245,19 +245,19 @@ program molalign
             weights0, &
             coords0, &
             natom1, &
-            znums1(permlist(:, i)), &
-            types1(permlist(:, i)), &
-            weights1(permlist(:, i)), &
-            coords1(:, permlist(:, i)), &
+            znums1(maplist(:, i)), &
+            types1(maplist(:, i)), &
+            weights1(maplist(:, i)), &
+            coords1(:, maplist(:, i)), &
             travec, &
             rotmat, &
             error)
 
          if (error /= 0) stop
 
-         adjd = adjacencydiff(natom0, adjmat0, adjmat1, permlist(:, i))
+         adjd = adjacencydiff(natom0, adjmat0, adjmat1, maplist(:, i))
          aligned1 = translated(natom1, rotated(natom1, coords1, rotmat), travec)
-         rmsd = sqrt(squaredist(natom0, weights0, coords0, aligned1, permlist(:, i))/sum(weights0))
+         rmsd = sqrt(squaredist(natom0, weights0, coords0, aligned1, maplist(:, i))/sum(weights0))
 
          if (i == 1) then
             if (bond_flag) write (output_unit, '(a)') 'Optimized AdjD = ' // intstr(adjd)
@@ -265,8 +265,8 @@ program molalign
             call writefile(write_unit, fmtout, 'Reference', natom0, znums0, coords0, adjmat0)
          end if
 
-         call writefile(write_unit, fmtout, 'RMSD ' // realstr(rmsd, 4), natom1, znums1(permlist(:, i)), &
-            aligned1(:, permlist(:, i)), adjmat1(permlist(:, i), permlist(:, i)))
+         call writefile(write_unit, fmtout, 'RMSD ' // realstr(rmsd, 4), natom1, znums1(maplist(:, i)), &
+            aligned1(:, maplist(:, i)), adjmat1(maplist(:, i), maplist(:, i)))
 
       end do
 
