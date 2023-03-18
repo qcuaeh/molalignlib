@@ -79,7 +79,7 @@ subroutine assign_atoms( &
    real(wp), dimension(:), allocatable :: blkwt0, blkwt1
    real(wp) :: center0(3), center1(3)
 
-   integer, dimension(natom0) :: offset, blkid
+   integer, dimension(natom0) :: offset, blkid, atomap
    integer, dimension(natom0, natom0) :: order01
    integer :: nbond0, bonds0(2, maxcoord*natom0)
    integer :: nbond1, bonds1(2, maxcoord*natom1)
@@ -254,46 +254,34 @@ subroutine assign_atoms( &
    adjmat00 = adjmat0
    adjmat01 = adjmat1
 
+   atomap = permlist(:, 1)
+
    do i = 1, natom0
       do j = 1, natom0
-         if (adjmat00(i, j) .neqv. adjmat01(permlist(i, 1), permlist(j, 1))) then
-            print *, i, j
+         if (adjmat00(i, j) .neqv. adjmat01(atomap(i), atomap(j))) then
             adjmat0(i, j) = .false.
-            adjmat0(j, i) = .false.
-            adjmat1(permlist(i, 1), permlist(j, 1)) = .false.
-            adjmat1(permlist(j, 1), permlist(i, 1)) = .false.
+            adjmat1(atomap(i), atomap(j)) = .false.
+            do l = 1, nreac
+               adjmat0(i, reacatom(l)) = .false.
+               adjmat0(reacatom(l), i) = .false.
+               adjmat1(atomap(i), atomap(reacatom(l))) = .false.
+               adjmat1(atomap(reacatom(l)), atomap(i)) = .false.
+            end  do
             h = blkid(i)
             do k = offset(h) + 1, offset(h) + blksz0(h)
-               if (sum((coords0(:, i) - coords1(:, permlist(k, 1)))**2) &
-!                  < sum((coords0(:, i) - coords1(:, permlist(i, 1)))**2) &
-                  < 2.0 &
+               if (sum((coords0(:, i) - coords1(:, atomap(k)))**2) < 2.0 &
+                  .or. sum((coords0(:, k) - coords1(:, atomap(i)))**2) < 2.0 &
                ) then
-!                  print *, i, permlist(i, 1), permlist(k, 1)
+!                  print *, '<', i, atomap(i), k, atomap(k)
                   adjmat0(k, j) = .false.
                   adjmat0(j, k) = .false.
-                  adjmat1(permlist(k, 1), permlist(j, 1)) = .false.
-                  adjmat1(permlist(j, 1), permlist(k, 1)) = .false.
+                  adjmat1(atomap(k), atomap(j)) = .false.
+                  adjmat1(atomap(j), atomap(k)) = .false.
                   do l = 1, nreac
                      adjmat0(k, reacatom(l)) = .false.
                      adjmat0(reacatom(l), k) = .false.
-                     adjmat1(permlist(k, 1), permlist(reacatom(l), 1)) = .false.
-                     adjmat1(permlist(reacatom(l), 1), permlist(k, 1)) = .false.
-                  end  do
-               end if
-               if (sum((coords0(:, k) - coords1(:, permlist(i, 1)))**2) &
-!                  < sum((coords0(:, i) - coords1(:, permlist(i, 1)))**2) &
-                  < 2.0 &
-               ) then
-!                  print *, i, permlist(i, 1), permlist(k, 1)
-                  adjmat0(k, j) = .false.
-                  adjmat0(j, k) = .false.
-                  adjmat1(permlist(k, 1), permlist(j, 1)) = .false.
-                  adjmat1(permlist(j, 1), permlist(k, 1)) = .false.
-                  do l = 1, nreac
-                     adjmat0(k, reacatom(l)) = .false.
-                     adjmat0(reacatom(l), k) = .false.
-                     adjmat1(permlist(k, 1), permlist(reacatom(l), 1)) = .false.
-                     adjmat1(permlist(reacatom(l), 1), permlist(k, 1)) = .false.
+                     adjmat1(atomap(k), atomap(reacatom(l))) = .false.
+                     adjmat1(atomap(reacatom(l)), atomap(k)) = .false.
                   end  do
                end if
             end do
