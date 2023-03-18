@@ -7,7 +7,8 @@ toarray() {
 }
 
 clean_build() {
-   $quick_build && return
+   $fresh_build || return 0
+   fresh_build=false
    if test -d build; then
       pushd build >/dev/null
       for file in *.f90 *.mod *.o; do
@@ -20,7 +21,6 @@ clean_build() {
 compile() {
    $build_flag || return 0
    clean_build
-   pic=false
    toarray std_flags
    toarray pic_flags
    toarray optim_flags
@@ -153,21 +153,21 @@ while IFS= read -r line; do
    declare -- "$var"="$value"
 done < <(grep -v -e^# -e^$ ./build.env)
 
-test_flag=true
 build_flag=true
+fresh_build=true
 debug_build=false
-quick_build=false
+test_flag=true
 
-while getopts ":tqd" opt; do
+while getopts ":dqt" opt; do
   case $opt in
     d)
-      debug_build=true
       build_flag=true
+      debug_build=true
       test_flag=false
       ;;
     q)
-      quick_build=true
       build_flag=true
+      fresh_build=false
       test_flag=false
       ;;
     t)

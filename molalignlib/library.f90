@@ -77,7 +77,7 @@ subroutine assign_atoms( &
    integer, dimension(:), allocatable :: eqvidx0, eqvidx1
    integer, dimension(:), allocatable :: eqvlen0, eqvlen1
    real(wp), dimension(:), allocatable :: blkwgt0, blkwgt1
-   real(wp) :: center0(3), center1(3)
+   real(wp) :: travec0(3), travec1(3)
 
    integer, dimension(natom0) :: offset, blkidx, mapping
    integer, dimension(natom0, natom0) :: order01
@@ -173,14 +173,59 @@ subroutine assign_atoms( &
 
    ! Calculate centroids
 
-   center0 = centroid(natom0, weights0, coords0)
-   center1 = centroid(natom1, weights1, coords1)
+   travec0 = -centroid(natom0, weights0, coords0)
+   travec1 = -centroid(natom1, weights1, coords1)
 
    ! Initialize random number generator
 
    call initialize_random()
 
-!   ! Remap atoms to minimize distance and difference
+   ! Remap atoms to minimize distance and difference
+
+   call optimize_assignment( &
+      natom0, &
+      nblk0, &
+      blklen0, &
+      blkwgt0, &
+      neqv0, &
+      eqvlen0, &
+      translated(natom0, coords0(:, atomorder0), travec0), &
+      adjmat0(atomorder0, atomorder0), &
+      neqv1, &
+      eqvlen1, &
+      translated(natom1, coords1(:, atomorder1), travec1), &
+      adjmat1(atomorder1, atomorder1), &
+      maplist, &
+      countlist, &
+      nrec)
+
+   ! Reorder back to original atom ordering
+
+   do i = 1, nrec
+      maplist(:, i) = atomorder1(maplist(backorder0, i))
+   end do
+
+!   znums0 = znums0(atomorder0)
+!   znums1 = znums1(atomorder1)
+!   types0 = types0(atomorder0)
+!   types1 = types1(atomorder1)
+!   weights0 = weights0(atomorder0)
+!   weights1 = weights1(atomorder1)
+!   coords0 = coords0(:, atomorder0)
+!   coords1 = coords1(:, atomorder1)
+!   adjmat0 = adjmat0(atomorder0, atomorder0)
+!   adjmat1 = adjmat1(atomorder1, atomorder1)
+!
+!   ! Mirror coordinates
+!
+!   if (mirror_flag) then
+!      coords1(1, :) = -coords1(1, :)
+!   end if
+!
+!   ! Translate to center of mass
+!
+!   call translate(natom0, coords0, travec0)
+!   call translate(natom1, coords1, travec1)
 !
 !   call optimize_assignment( &
 !      natom0, &
@@ -189,138 +234,91 @@ subroutine assign_atoms( &
 !      blkwgt0, &
 !      neqv0, &
 !      eqvlen0, &
-!      centered(natom0, coords0(:, atomorder0), center0), &
-!      adjmat0(atomorder0, atomorder0), &
+!      coords0, &
+!      adjmat0, &
 !      neqv1, &
 !      eqvlen1, &
-!      centered(natom1, coords1(:, atomorder1), center1), &
-!      adjmat1(atomorder1, atomorder1), &
+!      coords1, &
+!      adjmat1, &
 !      maplist, &
 !      countlist, &
 !      nrec)
 !
-!   ! Reorder back to original atom ordering
+!   mapping = maplist(:, 1)
 !
-!   do i = 1, nrec
-!      maplist(:, i) = atomorder1(maplist(backorder0, i))
+!   call rotate(natom1, coords1, leastrotquat(natom0, weights0, coords0, coords1, mapping))
+!
+!   offset(1) = 0
+!   do h = 1, nblk0 - 1
+!      offset(h+1) = offset(h) + blklen0(h)
 !   end do
-
-   znums0 = znums0(atomorder0)
-   znums1 = znums1(atomorder1)
-   types0 = types0(atomorder0)
-   types1 = types1(atomorder1)
-   weights0 = weights0(atomorder0)
-   weights1 = weights1(atomorder1)
-   coords0 = coords0(:, atomorder0)
-   coords1 = coords1(:, atomorder1)
-   adjmat0 = adjmat0(atomorder0, atomorder0)
-   adjmat1 = adjmat1(atomorder1, atomorder1)
-
-   ! Mirror coordinates
-
-   if (mirror_flag) then
-      coords1(1, :) = -coords1(1, :)
-   end if
-
-   ! Translate to center of mass
-
-   call translate(natom0, coords0, -center0)
-   call translate(natom1, coords1, -center1)
-
-   call optimize_assignment( &
-      natom0, &
-      nblk0, &
-      blklen0, &
-      blkwgt0, &
-      neqv0, &
-      eqvlen0, &
-      coords0, &
-      adjmat0, &
-      neqv1, &
-      eqvlen1, &
-      coords1, &
-      adjmat1, &
-      maplist, &
-      countlist, &
-      nrec)
-
-   call rotate(natom1, coords1, &
-      rotquat2rotmat(leastrotquat(natom0, weights0, coords0, coords1, maplist(:, 1))) &
-   )
-
-   offset(1) = 0
-   do h = 1, nblk0 - 1
-      offset(h+1) = offset(h) + blklen0(h)
-   end do
-
-   do h = 1, nblk0
-      blkidx(offset(h)+1:offset(h)+blklen0(h)) = h
-   end do
-
-   adjmat00 = adjmat0
-   adjmat01 = adjmat1
-
-   mapping = maplist(:, 1)
-
-   do i = 1, natom0
-      do j = 1, natom0
-         if (adjmat00(i, j) .neqv. adjmat01(mapping(i), mapping(j))) then
-            adjmat0(i, j) = .false.
-            adjmat1(mapping(i), mapping(j)) = .false.
-            do l = 1, nreac
-               adjmat0(i, reacatom(l)) = .false.
-               adjmat0(reacatom(l), i) = .false.
-               adjmat1(mapping(i), mapping(reacatom(l))) = .false.
-               adjmat1(mapping(reacatom(l)), mapping(i)) = .false.
-            end  do
-            h = blkidx(i)
-            do k = offset(h) + 1, offset(h) + blklen0(h)
-               if (sum((coords0(:, i) - coords1(:, mapping(k)))**2) < 2.0 &
-                  .or. sum((coords0(:, k) - coords1(:, mapping(i)))**2) < 2.0 &
-               ) then
-!                  print *, '<', i, mapping(i), k, mapping(k)
-                  adjmat0(k, j) = .false.
-                  adjmat0(j, k) = .false.
-                  adjmat1(mapping(k), mapping(j)) = .false.
-                  adjmat1(mapping(j), mapping(k)) = .false.
-                  do l = 1, nreac
-                     adjmat0(k, reacatom(l)) = .false.
-                     adjmat0(reacatom(l), k) = .false.
-                     adjmat1(mapping(k), mapping(reacatom(l))) = .false.
-                     adjmat1(mapping(reacatom(l)), mapping(k)) = .false.
-                  end  do
-               end if
-            end do
-         end if
-      end do
-   end do
-
-   call optimize_assignment( &
-      natom0, &
-      nblk0, &
-      blklen0, &
-      blkwgt0, &
-      neqv0, &
-      eqvlen0, &
-      coords0, &
-      adjmat0, &
-      neqv1, &
-      eqvlen1, &
-      coords1, &
-      adjmat1, &
-      maplist, &
-      countlist, &
-      nrec)
-
-   ! Print coordinates with internal order
-
-   open(unit=99, file='ordered.mol2', action='write', status='replace')
-   call adjmat2bonds(natom0, adjmat0, nbond0, bonds0)
-!   call adjmat2bonds(natom1, adjmat1, nbond1, bonds1)
-   call adjmat2bonds(natom1, adjmat1(maplist(:, 1), maplist(:, 1)), nbond1, bonds1)
-   call writemol2(99, 'coords0', natom0, znums0, coords0, nbond0, bonds0)
-!   call writemol2(99, 'coords1', natom1, znums1, coords1, nbond1, bonds1)
-   call writemol2(99, 'coords1', natom1, znums1(maplist(:, 1)), coords1(:, maplist(:, 1)), nbond1, bonds1)
+!
+!   do h = 1, nblk0
+!      blkidx(offset(h)+1:offset(h)+blklen0(h)) = h
+!   end do
+!
+!   adjmat00 = adjmat0
+!   adjmat01 = adjmat1
+!
+!   do i = 1, natom0
+!      do j = 1, natom0
+!         if (adjmat00(i, j) .neqv. adjmat01(mapping(i), mapping(j))) then
+!            adjmat0(i, j) = .false.
+!            adjmat1(mapping(i), mapping(j)) = .false.
+!            do l = 1, nreac
+!               adjmat0(i, reacatom(l)) = .false.
+!               adjmat0(reacatom(l), i) = .false.
+!               adjmat1(mapping(i), mapping(reacatom(l))) = .false.
+!               adjmat1(mapping(reacatom(l)), mapping(i)) = .false.
+!            end  do
+!            h = blkidx(i)
+!            do k = offset(h) + 1, offset(h) + blklen0(h)
+!               if (sum((coords0(:, i) - coords1(:, mapping(k)))**2) < 2.0 &
+!                  .or. sum((coords0(:, k) - coords1(:, mapping(i)))**2) < 2.0 &
+!               ) then
+!!                  print *, '<', i, mapping(i), k, mapping(k)
+!                  adjmat0(k, j) = .false.
+!                  adjmat0(j, k) = .false.
+!                  adjmat1(mapping(k), mapping(j)) = .false.
+!                  adjmat1(mapping(j), mapping(k)) = .false.
+!                  do l = 1, nreac
+!                     adjmat0(k, reacatom(l)) = .false.
+!                     adjmat0(reacatom(l), k) = .false.
+!                     adjmat1(mapping(k), mapping(reacatom(l))) = .false.
+!                     adjmat1(mapping(reacatom(l)), mapping(k)) = .false.
+!                  end  do
+!               end if
+!            end do
+!         end if
+!      end do
+!   end do
+!
+!   call optimize_assignment( &
+!      natom0, &
+!      nblk0, &
+!      blklen0, &
+!      blkwgt0, &
+!      neqv0, &
+!      eqvlen0, &
+!      coords0, &
+!      adjmat0, &
+!      neqv1, &
+!      eqvlen1, &
+!      coords1, &
+!      adjmat1, &
+!      maplist, &
+!      countlist, &
+!      nrec)
+!
+!   ! Print coordinates with internal order
+!
+!   open(unit=99, file='ordered.mol2', action='write', status='replace')
+!   call adjmat2bonds(natom0, adjmat0, nbond0, bonds0)
+!!   call adjmat2bonds(natom1, adjmat1, nbond1, bonds1)
+!   call adjmat2bonds(natom1, adjmat1(maplist(:, 1), maplist(:, 1)), nbond1, bonds1)
+!   call writemol2(99, 'coords0', natom0, znums0, coords0, nbond0, bonds0)
+!!   call writemol2(99, 'coords1', natom1, znums1, coords1, nbond1, bonds1)
+!   call writemol2(99, 'coords1', natom1, znums1(maplist(:, 1)), coords1(:, maplist(:, 1)), nbond1, bonds1)
 
 end subroutine
 
@@ -346,9 +344,8 @@ subroutine align_atoms( &
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
    real(wp), dimension(:), intent(in) :: weights0, weights1
    real(wp), intent(out) :: travec(3), rotmat(3, 3)
+   real(wp) :: travec0(3), travec1(3), rotquat(4)
    integer, intent(out) :: error
-   real(wp) :: center0(3), center1(3)
-   real(wp) :: aligned1(3, natom1)
 
    ! Set error code to 0 by default
 
@@ -396,25 +393,24 @@ subroutine align_atoms( &
 
    ! Calculate centroids
 
-   center0 = centroid(natom0, weights0, coords0)
-   center1 = centroid(natom1, weights1, coords1)
+   travec0 = -centroid(natom0, weights0, coords0)
+   travec1 = -centroid(natom1, weights1, coords1)
 
    ! Calculate optimal rotation matrix
 
-   rotmat = rotquat2rotmat(leastrotquat( &
+   rotquat = leastrotquat( &
       natom0, &
       weights0, &
-      centered(natom0, coords0, center0), &
-      centered(natom1, coords1, center1), &
-      identityperm(natom0)))
+      translated(natom0, coords0, travec0), &
+      translated(natom1, coords1, travec1), &
+      identityperm(natom0) &
+   )
+
+   rotmat = rotquat2rotmat(rotquat)
 
    ! Calculate optimal translation vector
 
-   travec = center0 - matmul(rotmat, center1)
-
-   ! Calculate RMSD
-
-   aligned1 = translated(natom1, rotated(natom1, coords1, rotmat), travec)
+   travec = matmul(rotmat, travec1) - travec0
 
 end subroutine
 
