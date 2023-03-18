@@ -23,10 +23,10 @@ use sorting
 implicit none
 
 abstract interface
-   subroutine bias_func_proc(natom, nblk, blksz, nadj0, adjlist0, nadj1, adjlist1, coords0, coords1, biasmat)
+   subroutine bias_func_proc(natom, nblk, blklen, nadj0, adjlist0, nadj1, adjlist1, coords0, coords1, biasmat)
       use kinds
       integer, intent(in) :: natom, nblk
-      integer, dimension(:), intent(in) :: blksz
+      integer, dimension(:), intent(in) :: blklen
       integer, dimension(:), intent(in) :: nadj0, nadj1
       integer, dimension(:, :), intent(in) :: adjlist0, adjlist1
       real(wp), dimension(:, :), intent(in) :: coords0, coords1
@@ -41,11 +41,11 @@ procedure(bias_func_proc), pointer :: bias_func
 
 contains
 
-subroutine nocrossbias(natom, nblk, blksz, nadj0, adjlist0, nadj1, adjlist1, coords0, coords1, biasmat)
+subroutine nocrossbias(natom, nblk, blklen, nadj0, adjlist0, nadj1, adjlist1, coords0, coords1, biasmat)
 ! Purpose: Set biases from sorted neighbors' distances equivalence
 
    integer, intent(in) :: natom, nblk
-   integer, dimension(:), intent(in) :: blksz
+   integer, dimension(:), intent(in) :: blklen
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
    integer, dimension(:), intent(in) :: nadj0, nadj1
    integer, dimension(:, :), intent(in) :: adjlist0, adjlist1
@@ -56,21 +56,21 @@ subroutine nocrossbias(natom, nblk, blksz, nadj0, adjlist0, nadj1, adjlist1, coo
    offset = 0
 
    do h = 1, nblk
-      do i = offset + 1, offset + blksz(h)
-         do j = offset + 1, offset + blksz(h)
+      do i = offset + 1, offset + blklen(h)
+         do j = offset + 1, offset + blklen(h)
             biasmat(i, j) = 0
          end do
       end do
-      offset = offset + blksz(h)
+      offset = offset + blklen(h)
    end do
 
 end subroutine
 
-subroutine sndcrossbias(natom, nblk, blksz, nadj0, adjlist0, nadj1, adjlist1, coords0, coords1, biasmat)
+subroutine sndcrossbias(natom, nblk, blklen, nadj0, adjlist0, nadj1, adjlist1, coords0, coords1, biasmat)
 ! Purpose: Set biases from sorted neighbors' distances equivalence
 
    integer, intent(in) :: natom, nblk
-   integer, dimension(:), intent(in) :: blksz
+   integer, dimension(:), intent(in) :: blklen
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
    integer, dimension(:), intent(in) :: nadj0, nadj1
    integer, dimension(:, :), intent(in) :: adjlist0, adjlist1
@@ -84,30 +84,30 @@ subroutine sndcrossbias(natom, nblk, blksz, nadj0, adjlist0, nadj1, adjlist1, co
    do i = 1, natom
       offset = 0
       do h = 1, nblk
-         do j = offset + 1, offset + blksz(h)
+         do j = offset + 1, offset + blklen(h)
             d0(j, i) = sqrt(sum((coords0(:, j) - coords0(:, i))**2))
          end do
-         call sort(d0(:, i), offset + 1, offset + blksz(h))
-         offset = offset + blksz(h)
+         call sort(d0(:, i), offset + 1, offset + blklen(h))
+         offset = offset + blklen(h)
       end do
    end do
 
    do i = 1, natom
       offset = 0
       do h = 1, nblk
-         do j = offset + 1, offset + blksz(h)
+         do j = offset + 1, offset + blklen(h)
             d1(j, i) = sqrt(sum((coords1(:, j) - coords1(:, i))**2))
          end do
-         call sort(d1(:, i), offset + 1, offset + blksz(h))
-         offset = offset + blksz(h)
+         call sort(d1(:, i), offset + 1, offset + blklen(h))
+         offset = offset + blklen(h)
       end do
    end do
 
    offset = 0
 
    do h = 1, nblk
-      do i = offset + 1, offset + blksz(h)
-         do j = offset + 1, offset + blksz(h)
+      do i = offset + 1, offset + blklen(h)
+         do j = offset + 1, offset + blklen(h)
             if (all(abs(d1(:, j) - d0(:, i)) < bias_tol)) then
                biasmat(i, j) = 0
             else
@@ -115,16 +115,16 @@ subroutine sndcrossbias(natom, nblk, blksz, nadj0, adjlist0, nadj1, adjlist1, co
             end if
          end do
       end do
-      offset = offset + blksz(h)
+      offset = offset + blklen(h)
    end do
 
 end subroutine
 
-subroutine mnacrossbias(natom, nblk, blksz, nadj0, adjlist0, nadj1, adjlist1, coords0, coords1, biasmat)
+subroutine mnacrossbias(natom, nblk, blklen, nadj0, adjlist0, nadj1, adjlist1, coords0, coords1, biasmat)
 ! Purpose: Set biases from sorted distances to neighbors equivalence
 
    integer, intent(in) :: natom, nblk
-   integer, dimension(:), intent(in) :: blksz
+   integer, dimension(:), intent(in) :: blklen
    integer, dimension(:), intent(in) :: nadj0, nadj1
    integer, dimension(:, :), intent(in) :: adjlist0, adjlist1
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
@@ -138,19 +138,19 @@ subroutine mnacrossbias(natom, nblk, blksz, nadj0, adjlist0, nadj1, adjlist1, co
 
    offset = 0
    do h = 1, nblk
-      intype0(offset+1:offset+blksz(h)) = h
-      intype1(offset+1:offset+blksz(h)) = h
-      offset = offset + blksz(h)
+      intype0(offset+1:offset+blklen(h)) = h
+      intype1(offset+1:offset+blklen(h)) = h
+      offset = offset + blklen(h)
    end do
 
    offset = 0
    do h = 1, nblk
-      do i = offset + 1, offset + blksz(h)
-         do j = offset + 1, offset + blksz(h)
+      do i = offset + 1, offset + blklen(h)
+         do j = offset + 1, offset + blklen(h)
             biasmat(i, j) = 0
          end do
       end do
-      offset = offset + blksz(h)
+      offset = offset + blklen(h)
    end do
 
    do
@@ -167,14 +167,14 @@ subroutine mnacrossbias(natom, nblk, blksz, nadj0, adjlist0, nadj1, adjlist1, co
       offset = 0
 
       do h = 1, nblk
-         do i = offset + 1, offset + blksz(h)
-            do j = offset + 1, offset + blksz(h)
+         do i = offset + 1, offset + blklen(h)
+            do j = offset + 1, offset + blklen(h)
                if (lev >= 1 .and. outype0(i) /= outype1(j)) then
                   biasmat(i, j) = biasmat(i, j) + bias_scale**2*bias_ratio**(lev - 1)
                end if
             end do
          end do
-         offset = offset + blksz(h)
+         offset = offset + blklen(h)
       end do
 
       if (all(outype0 == intype0) .and. all((outype1 == intype1))) exit

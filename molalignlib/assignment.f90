@@ -41,40 +41,39 @@ contains
 subroutine optimize_assignment( &
    natom, &
    nblk, &
-   blksz, &
-   blkwt, &
+   blklen, &
+   blkwgt, &
    neqv0, &
-   eqvsz0, &
+   eqvlen0, &
    coords0, &
    adjmat0, &
    neqv1, &
-   eqvsz1, &
+   eqvlen1, &
    coords1, &
    adjmat1, &
-   permlist, &
+   maplist, &
    countlist, &
    nrec)
 
    integer, intent(in) :: natom, nblk, neqv0, neqv1
-   integer, dimension(:), intent(in) :: blksz
-   integer, dimension(:), intent(in) :: eqvsz0, eqvsz1
-   real(wp), dimension(:), intent(in) :: blkwt
+   integer, dimension(:), intent(in) :: blklen
+   integer, dimension(:), intent(in) :: eqvlen0, eqvlen1
+   real(wp), dimension(:), intent(in) :: blkwgt
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
    logical, dimension(:, :), intent(in) :: adjmat0, adjmat1
-   integer, intent(out) :: permlist(:, :)
+   integer, intent(out) :: maplist(:, :)
    integer, intent(out) :: countlist(:)
    integer, intent(out) :: nrec
 
    logical visited, overflow
    integer :: nfrag0, nfrag1
    integer irec, mrec, ntrial, nstep, steps
-   integer, dimension(natom) :: atomperm, auxperm
+   integer, dimension(natom) :: mapping, auxperm
    integer :: adjd, recadjd(maxrec)
    integer, dimension(natom) :: nadj0, nadj1
    integer, dimension(maxcoord, natom) :: adjlist0, adjlist1
    integer, dimension(natom) :: neqvnei0, neqvnei1
-   integer, dimension(maxcoord, natom) :: eqvneisz0, eqvneisz1
-   integer, dimension(natom) :: fragid0, fragid1
+   integer, dimension(maxcoord, natom) :: eqvneilen0, eqvneilen1
    integer, dimension(natom) :: fragroot0, fragroot1
    integer :: h, offset
    real(wp) :: rmsd, olddist, newdist, totalrot
@@ -88,8 +87,8 @@ subroutine optimize_assignment( &
 
    offset = 0
    do h = 1, nblk
-      weights(offset+1:offset+blksz(h)) = blkwt(h)
-      offset = offset + blksz(h)
+      weights(offset+1:offset+blklen(h)) = blkwgt(h)
+      offset = offset + blklen(h)
    end do
 
    ! Recalculate adjacency lists
@@ -99,32 +98,32 @@ subroutine optimize_assignment( &
 
    ! Group equivalent neighbors
 
-   call groupeqvnei(natom, neqv0, eqvsz0, nadj0, adjlist0, neqvnei0, eqvneisz0)
-   call groupeqvnei(natom, neqv1, eqvsz1, nadj1, adjlist1, neqvnei1, eqvneisz1)
+   call groupeqvnei(natom, neqv0, eqvlen0, nadj0, adjlist0, neqvnei0, eqvneilen0)
+   call groupeqvnei(natom, neqv1, eqvlen1, nadj1, adjlist1, neqvnei1, eqvneilen1)
 
    ! Detect fagments and starting atoms
 
-   call getmolfrags(natom, nadj0, adjlist0, nblk, blksz, neqv0, eqvsz0, nfrag0, fragroot0, fragid0)
-   call getmolfrags(natom, nadj1, adjlist1, nblk, blksz, neqv1, eqvsz1, nfrag1, fragroot1, fragid1)
+   call getmolfrags(natom, nadj0, adjlist0, nblk, blklen, neqv0, eqvlen0, nfrag0, fragroot0)
+   call getmolfrags(natom, nadj1, adjlist1, nblk, blklen, neqv1, eqvlen1, nfrag1, fragroot1)
 
    ! Calculate biases
 
-   call bias_func(natom, nblk, blksz, nadj0, adjlist0, nadj1, adjlist1, coords0, coords1, biasmat)
+   call bias_func(natom, nblk, blklen, nadj0, adjlist0, nadj1, adjlist1, coords0, coords1, biasmat)
 
    ! Print biases
 
 !   offset = 0
 !   do h = 1, nblk0
-!      do i = offset+1, offset+blksz(h)
+!      do i = offset+1, offset+blklen(h)
 !         write (output_unit, '(i0,":")', advance='no') i
-!         do j = offset+1, offset+blksz(h)
+!         do j = offset+1, offset+blklen(h)
 !            if (biasmat(i, j) == 0) then
 !               write (output_unit, '(1x,i0)', advance='no') j
 !            end if
 !         end do
 !         print *
 !      end do
-!      offset = offset + blksz(h)
+!      offset = offset + blklen(h)
 !   end do
 
    ! Initialize loop variables
@@ -151,8 +150,8 @@ subroutine optimize_assignment( &
 
    ! Minimize the euclidean distance
 
-      call minatomperm(natom, coords0, workcoords1, nblk, blksz, blkwt, biasmat, atomperm, olddist)
-      rotquat = leastrotquat(natom, weights, coords0, workcoords1, atomperm)
+      call minatomperm(natom, coords0, workcoords1, nblk, blklen, blkwgt, biasmat, mapping, olddist)
+      rotquat = leastrotquat(natom, weights, coords0, workcoords1, mapping)
       prodquat = rotquat
       totalrot = rotangle(rotquat)
       call rotate(natom, workcoords1, rotquat)
@@ -160,9 +159,9 @@ subroutine optimize_assignment( &
       steps = 1
 
       do while (iter_flag)
-         olddist = squaredist(natom, weights, coords0, workcoords1, atomperm) + biasdist(natom, weights, biasmat, atomperm)
-         call minatomperm(natom, coords0, workcoords1, nblk, blksz, blkwt, biasmat, auxperm, newdist)
-         if (all(auxperm == atomperm)) exit
+         olddist = squaredist(natom, weights, coords0, workcoords1, mapping) + biasdist(natom, weights, biasmat, mapping)
+         call minatomperm(natom, coords0, workcoords1, nblk, blklen, blkwgt, biasmat, auxperm, newdist)
+         if (all(auxperm == mapping)) exit
          if (newdist > olddist) then
             write (error_unit, '(a)') 'newdist is larger than olddist!'
 !            print *, olddist, newdist
@@ -171,7 +170,7 @@ subroutine optimize_assignment( &
          prodquat = quatmul(rotquat, prodquat)
          call rotate(natom, workcoords1, rotquat)
          totalrot = totalrot + rotangle(rotquat)
-         atomperm = auxperm
+         mapping = auxperm
          steps = steps + 1
       end do
 
@@ -179,23 +178,23 @@ subroutine optimize_assignment( &
 
       if (back_flag) then
 
-         call minadjdiff(natom, weights, nblk, blksz, coords0, nadj0, adjlist0, adjmat0, neqv0, &
-            eqvsz0, workcoords1, nadj1, adjlist1, adjmat1, neqv1, eqvsz1, atomperm, nfrag0, fragroot0)
+         call minadjdiff(natom, weights, nblk, blklen, coords0, nadj0, adjlist0, adjmat0, neqv0, &
+            eqvlen0, workcoords1, nadj1, adjlist1, adjmat1, neqv1, eqvlen1, mapping, nfrag0, fragroot0)
 
-         call eqvatomperm(natom, weights, coords0, adjmat0, adjlist0, neqv0, eqvsz0, &
-            neqvnei0, eqvneisz0, workcoords1, adjmat1, atomperm, nfrag0, fragroot0)
+         call eqvatomperm(natom, weights, coords0, adjmat0, adjlist0, neqv0, eqvlen0, &
+            neqvnei0, eqvneilen0, workcoords1, adjmat1, mapping, nfrag0, fragroot0)
 
       end if
 
-      adjd = adjacencydiff(natom, adjmat0, adjmat1, atomperm)
-      rmsd = sqrt(leastsquaredist(natom, weights, coords0, coords1, atomperm)/sum(weights))
+      adjd = adjacencydiff(natom, adjmat0, adjmat1, mapping)
+      rmsd = sqrt(leastsquaredist(natom, weights, coords0, coords1, mapping)/sum(weights))
 
-      ! Check for new best permlist
+      ! Check for new best maplist
 
       visited = .false.
 
       do irec = 1, nrec
-         if (all(atomperm == permlist(:, irec))) then
+         if (all(mapping == maplist(:, irec))) then
             countlist(irec) = countlist(irec) + 1
             avgsteps(irec) = avgsteps(irec) + (steps - avgsteps(irec))/countlist(irec)
             avgrealrot(irec) = avgrealrot(irec) + (rotangle(prodquat) - avgrealrot(irec))/countlist(irec)
@@ -227,7 +226,7 @@ subroutine optimize_assignment( &
                avgsteps(irec) = avgsteps(irec - 1)
                avgrealrot(irec) = avgrealrot(irec - 1)
                avgtotalrot(irec) = avgtotalrot(irec - 1)
-               permlist(:, irec) = permlist(:, irec - 1)
+               maplist(:, irec) = maplist(:, irec - 1)
             end do
             countlist(mrec) = 1
             recrmsd(mrec) = rmsd
@@ -235,7 +234,7 @@ subroutine optimize_assignment( &
             avgsteps(mrec) = steps
             avgrealrot(mrec) = rotangle(prodquat)
             avgtotalrot(mrec) = totalrot
-            permlist(:, mrec) = atomperm
+            maplist(:, mrec) = mapping
          end if
       end if
 
@@ -249,20 +248,20 @@ subroutine optimize_assignment( &
 end subroutine
 
 ! Find best correspondence between points sets with fixed orientation
-subroutine minatomperm(natom, coords0, coords1, nblk, blksz, blkwt, biasmat, atomperm, totdist)
+subroutine minatomperm(natom, coords0, coords1, nblk, blklen, blkwgt, biasmat, mapping, totdist)
 
 ! nblk: Number of block atoms
-! blksz: Number of atoms in each block
-! atomperm: Map between correspondent points in the adjmat
+! blklen: Number of atoms in each block
+! mapping: Map between correspondent points in the adjmat
 ! offset: First element of current block
 
    integer, intent(in) :: natom, nblk
-   integer, dimension(:), intent(in) :: blksz
-   real(wp), dimension(:), intent(in) :: blkwt
+   integer, dimension(:), intent(in) :: blklen
+   real(wp), dimension(:), intent(in) :: blkwgt
    real(wp), dimension(:, :), intent(in) :: coords0
    real(wp), dimension(:, :), intent(in) :: coords1
    real(wp), dimension(:, :), intent(in) :: biasmat
-   integer, dimension(:), intent(out) :: atomperm
+   integer, dimension(:), intent(out) :: mapping
    real(wp), intent(out) :: totdist
 
    integer :: h, offset
@@ -275,11 +274,11 @@ subroutine minatomperm(natom, coords0, coords1, nblk, blksz, blkwt, biasmat, ato
    totdist = 0
 
    do h = 1, nblk
-      call minperm(blksz(h), coords0(:, offset+1:offset+blksz(h)), coords1(:, offset+1:offset+blksz(h)), &
-         biasmat(offset+1:offset+blksz(h), offset+1:offset+blksz(h)), perm, dist)
-      atomperm(offset+1:offset+blksz(h)) = perm(:blksz(h)) + offset
-      totdist = totdist + blkwt(h)*dist
-      offset = offset + blksz(h)
+      call minperm(blklen(h), coords0(:, offset+1:offset+blklen(h)), coords1(:, offset+1:offset+blklen(h)), &
+         biasmat(offset+1:offset+blklen(h), offset+1:offset+blklen(h)), perm, dist)
+      mapping(offset+1:offset+blklen(h)) = perm(:blklen(h)) + offset
+      totdist = totdist + blkwgt(h)*dist
+      offset = offset + blklen(h)
    end do
 
 end subroutine

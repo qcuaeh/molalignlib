@@ -27,16 +27,16 @@ implicit none
 
 contains
 
-subroutine groupblocks(natom, znums, types, weights, nblk, blksz, blkwt, blkid)
+subroutine groupblocks(natom, znums, types, weights, nblk, blklen, blkwgt, blkidx)
 ! Purpose: Group atoms by atomic numbers and types
    integer, intent(in) :: natom
    integer, dimension(:), intent(in) :: znums
    integer, dimension(:), intent(in) :: types
    real(wp), dimension(:), intent(in) :: weights
    integer, intent(out) :: nblk
-   integer, dimension(:), intent(out) :: blksz
-   real(wp), dimension(:), intent(out) :: blkwt
-   integer, dimension(:), intent(out) :: blkid
+   integer, dimension(:), intent(out) :: blklen
+   real(wp), dimension(:), intent(out) :: blkwgt
+   integer, dimension(:), intent(out) :: blkidx
 
    integer :: i, j
    logical :: remaining(natom)
@@ -54,17 +54,17 @@ subroutine groupblocks(natom, znums, types, weights, nblk, blksz, blkwt, blkid)
    do i = 1, natom
       if (remaining(i)) then
          nblk = nblk + 1
-         blksz(nblk) = 1
+         blklen(nblk) = 1
          blkznum(nblk) = znums(i)
          blktype(nblk) = types(i)
-         blkwt(nblk) = weights(i)
-         blkid(i) = nblk
+         blkwgt(nblk) = weights(i)
+         blkidx(i) = nblk
          do j = i + 1, natom
             if (remaining(i)) then
                if (znums(j) == znums(i) .and. types(j) == types(i)) then
                   if (weights(j) == weights(i)) then
-                     blkid(j) = nblk
-                     blksz(nblk) = blksz(nblk) + 1
+                     blkidx(j) = nblk
+                     blklen(nblk) = blklen(nblk) + 1
                      remaining(j) = .false.
                   else
                      ! Abort if there are inconsistent weights
@@ -80,23 +80,23 @@ subroutine groupblocks(natom, znums, types, weights, nblk, blksz, blkwt, blkid)
    ! Order blocks by atomic type
 
    blkorder(:nblk) = sortorder(blktype, nblk)
-   blksz(:nblk) = blksz(blkorder(:nblk))
+   blklen(:nblk) = blklen(blkorder(:nblk))
    blkorder(:nblk) = inverseperm(blkorder(:nblk))
-   blkid = blkorder(blkid)
+   blkidx = blkorder(blkidx)
 
    ! Order blocks by atomic number
 
    blkorder(:nblk) = sortorder(blkznum, nblk)
-   blksz(:nblk) = blksz(blkorder(:nblk))
+   blklen(:nblk) = blklen(blkorder(:nblk))
    blkorder(:nblk) = inverseperm(blkorder(:nblk))
-   blkid = blkorder(blkid)
+   blkidx = blkorder(blkidx)
 
    ! Order blocks by block size
 
-!   blkorder(:nblk) = sortorder(blksz, nblk)
-!   blksz(:nblk) = blksz(blkorder(:nblk))
+!   blkorder(:nblk) = sortorder(blklen, nblk)
+!   blklen(:nblk) = blklen(blkorder(:nblk))
 !   blkorder(:nblk) = inverseperm(blkorder(:nblk))
-!   blkid = blkorder(blkid)
+!   blkidx = blkorder(blkidx)
 
 end subroutine
 
@@ -149,28 +149,28 @@ subroutine groupbytype(nelem, elements, types, groupid, ngroup, groupsize)
 
 end subroutine
 
-subroutine groupeqvnei(natom, neqv, eqvsz, nadj, adjlist, neqvnei, eqvneisz)
+subroutine groupeqvnei(natom, neqv, eqvlen, nadj, adjlist, neqvnei, eqvneilen)
 ! Purpose: Categorize atoms by eqtypes
    integer, intent(in) :: natom, neqv
-   integer, dimension(:), intent(in) :: nadj, eqvsz
+   integer, dimension(:), intent(in) :: nadj, eqvlen
    integer, dimension(:, :), intent(inout) :: adjlist
    integer, dimension(:), intent(out) :: neqvnei
-   integer, dimension(:, :), intent(out) :: eqvneisz
+   integer, dimension(:, :), intent(out) :: eqvneilen
 
    integer i, h, offset
-   integer :: eqvid(natom)
+   integer :: eqvidx(natom)
    integer, dimension(maxcoord) :: adjeqvid, reorder
 
    ! assing equivalence group
 
    offset = 0
    do h = 1, neqv
-      eqvid(offset+1:offset+eqvsz(h)) = h
-      offset = offset + eqvsz(h)
+      eqvidx(offset+1:offset+eqvlen(h)) = h
+      offset = offset + eqvlen(h)
    end do
 
    do i = 1, natom
-      call groupbytype(nadj(i), adjlist(:, i), eqvid, adjeqvid, neqvnei(i), eqvneisz(:, i))
+      call groupbytype(nadj(i), adjlist(:, i), eqvidx, adjeqvid, neqvnei(i), eqvneilen(:, i))
       reorder(:nadj(i)) = sortorder(adjeqvid, nadj(i))
       adjlist(:nadj(i), i) = adjlist(reorder(:nadj(i)), i)
    end do
@@ -179,8 +179,8 @@ subroutine groupeqvnei(natom, neqv, eqvsz, nadj, adjlist, neqvnei, eqvneisz)
 !        print '(a, 1x, i0, 1x, a)', '--------------', i, '--------------'
 !        offset = 0
 !        do j = 1, neqvnei(i)
-!            print *, adjlist(offset+1:offset+eqvneisz(j, i), i)
-!            offset = offset + eqvneisz(j, i)
+!            print *, adjlist(offset+1:offset+eqvneilen(j, i), i)
+!            offset = offset + eqvneilen(j, i)
 !         end do
 !    end do
 
@@ -264,14 +264,14 @@ subroutine getmnatypes(natom, nin, intype, nadj, adjlist, nout, outype, outsize,
 
 end subroutine
 
-subroutine groupequiv(natom, nblk, blkid, nadj, adjlist, neqv, eqvsz, eqvid)
+subroutine groupequiv(natom, nblk, blkidx, nadj, adjlist, neqv, eqvlen, eqvidx)
 ! Group atoms by MNA at infinite lavel
    integer, intent(in) :: natom, nblk
    integer, dimension(:), intent(in) :: nadj
-   integer, dimension(:), intent(in) :: blkid
+   integer, dimension(:), intent(in) :: blkidx
    integer, dimension(:, :), intent(in) :: adjlist
-   integer, dimension(:), intent(out) :: eqvid
-   integer, dimension(:), intent(out) :: eqvsz
+   integer, dimension(:), intent(out) :: eqvidx
+   integer, dimension(:), intent(out) :: eqvlen
 
    integer i, nin, neqv
    integer, dimension(natom) :: intype, grouporder, uptype, basetype
@@ -279,28 +279,28 @@ subroutine groupequiv(natom, nblk, blkid, nadj, adjlist, neqv, eqvsz, eqvid)
    ! Determine MNA types iteratively
 
    nin = nblk
-   intype = blkid
+   intype = blkidx
    basetype = [(i, i=1, natom)]
 
    do
 
-      call getmnatypes(natom, nin, intype, nadj, adjlist, neqv, eqvid, eqvsz, uptype)
+      call getmnatypes(natom, nin, intype, nadj, adjlist, neqv, eqvidx, eqvlen, uptype)
       basetype(:neqv) = basetype(uptype(:neqv))
 
-      if (all(eqvid == intype)) exit
+      if (all(eqvidx == intype)) exit
 
       nin = neqv
-      intype = eqvid
+      intype = eqvidx
 
    end do
 
    grouporder(:neqv) = sortorder(basetype, neqv)
-   eqvsz(:neqv) = eqvsz(grouporder(:neqv))
+   eqvlen(:neqv) = eqvlen(grouporder(:neqv))
    grouporder(:neqv) = inverseperm(grouporder(:neqv))
-   eqvid = grouporder(eqvid)
+   eqvidx = grouporder(eqvidx)
 
 !    do i = 1, natom
-!        print *, i, elsym(znum(i)), eqvid(i)
+!        print *, i, elsym(znum(i)), eqvidx(i)
 !    end do
 
 end subroutine

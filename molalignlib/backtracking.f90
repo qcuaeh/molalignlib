@@ -15,28 +15,28 @@ public eqvatomperm
 
 contains
 
-subroutine minadjdiff (natom, weights, nblk, blksz, coords0, nadj0, adjlist0, adjmat0, neqv0, &
-   eqvsz0, coords1, nadj1, adjlist1, adjmat1, neqv1, eqvsz1, atomperm, nfrag0, fragroot0)
+subroutine minadjdiff (natom, weights, nblk, blklen, coords0, nadj0, adjlist0, adjmat0, neqv0, &
+   eqvlen0, coords1, nadj1, adjlist1, adjmat1, neqv1, eqvlen1, mapping, nfrag0, fragroot0)
 ! Purpose: Find best correspondence between points of graphs
 
    integer, intent(in) :: natom, nblk, neqv0, neqv1
-   integer, dimension(:), intent(in) :: blksz, nadj0, nadj1
+   integer, dimension(:), intent(in) :: blklen, nadj0, nadj1
    integer, dimension(:, :), intent(in) :: adjlist0, adjlist1
-   integer, dimension(:), intent(in) :: eqvsz0, eqvsz1
+   integer, dimension(:), intent(in) :: eqvlen0, eqvlen1
    real(wp), dimension(:), intent(in) :: weights
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
    logical, dimension(:, :), intent(in) :: adjmat0, adjmat1
-   integer, dimension(:), intent(inout) :: atomperm
+   integer, dimension(:), intent(inout) :: mapping
    integer, intent(in) :: nfrag0
    integer, dimension(:), intent(in) :: fragroot0
 
    logical, parameter :: printInfo = .false.
 
-   integer blkid(natom)
+   integer blkidx(natom)
    integer h, i, offset, moldiff
    integer ntrack, track(natom)
    integer unmapping(natom)
-   integer, dimension(natom) :: eqvid0, eqvid1
+   integer, dimension(natom) :: eqvidx0, eqvidx1
    logical tracked(natom)
    real(wp) moldist
 
@@ -44,31 +44,31 @@ subroutine minadjdiff (natom, weights, nblk, blksz, coords0, nadj0, adjlist0, ad
 
    offset = 0
    do h = 1, nblk
-      blkid(offset+1:offset+blksz(h)) = h
-      offset = offset + blksz(h)
+      blkidx(offset+1:offset+blklen(h)) = h
+      offset = offset + blklen(h)
    end do
 
    ! set atoms equivalence indices
 
    offset = 0
    do h = 1, neqv0
-      eqvid0(offset+1:offset+eqvsz0(h)) = h
-      offset = offset + eqvsz0(h)
+      eqvidx0(offset+1:offset+eqvlen0(h)) = h
+      offset = offset + eqvlen0(h)
    end do
 
    offset = 0
    do h = 1, neqv1
-      eqvid1(offset+1:offset+eqvsz1(h)) = h
-      offset = offset + eqvsz1(h)
+      eqvidx1(offset+1:offset+eqvlen1(h)) = h
+      offset = offset + eqvlen1(h)
    end do
 
    !  initialization
 
    ntrack = 0
    tracked(:) = .false.
-   unmapping = inverseperm(atomperm)
-   moldiff = adjacencydiff (natom, adjmat0, adjmat1, atomperm)
-   moldist = squaredist (natom, weights, coords0, coords1, atomperm)
+   unmapping = inverseperm(mapping)
+   moldiff = adjacencydiff (natom, adjmat0, adjmat1, mapping)
+   moldist = squaredist (natom, weights, coords0, coords1, mapping)
 
    if ( printInfo ) then
       print '(a,1x,i0)', "moldiff:", moldiff
@@ -76,18 +76,18 @@ subroutine minadjdiff (natom, weights, nblk, blksz, coords0, nadj0, adjlist0, ad
    end if
 
    do i = 1, nfrag0
-      call recursive_backtrack (fragroot0(i), atomperm, unmapping, tracked, moldiff, moldist, ntrack, track)
+      call recursive_backtrack (fragroot0(i), mapping, unmapping, tracked, moldiff, moldist, ntrack, track)
 !        print *, ntrack
    end do
 
    if ( printInfo ) then
       print '(a,1x,i0)', "countFrag:", nfrag0
-      print '(a,1x,i0,1x,i0)', "moldiff:", adjacencydiff (natom, adjmat0, adjmat1, atomperm), moldiff
-      print '(a,1x,f0.4,1x,f0.4)', "moldist:", squaredist (natom, weights, coords0, coords1, atomperm), moldist
+      print '(a,1x,i0,1x,i0)', "moldiff:", adjacencydiff (natom, adjmat0, adjmat1, mapping), moldiff
+      print '(a,1x,f0.4,1x,f0.4)', "moldist:", squaredist (natom, weights, coords0, coords1, mapping), moldist
    end if
 
-!    if (adjacencydiff (natom, adjmat0, adjmat1, atomperm) /= moldiff) then
-!        print '(a,x,i0,x,i0)', "moldiff:", adjacencydiff (natom, adjmat0, adjmat1, atomperm), moldiff
+!    if (adjacencydiff (natom, adjmat0, adjmat1, mapping) /= moldiff) then
+!        print '(a,x,i0,x,i0)', "moldiff:", adjacencydiff (natom, adjmat0, adjmat1, mapping), moldiff
 !    end if
 
    contains    
@@ -181,7 +181,7 @@ subroutine minadjdiff (natom, weights, nblk, blksz, coords0, nadj0, adjlist0, ad
          if (.not. tracked(mismatches0(i))) then
             do j = 1, nmismatch1
                if (.not. matched1(j)) then
-                  if (blkid(mismatches0(i)) == blkid(mismatches1(j))) then
+                  if (blkidx(mismatches0(i)) == blkidx(mismatches1(j))) then
 
                      ntrack_branch = ntrack
                      track_branch(:) = track(:)
@@ -216,8 +216,8 @@ subroutine minadjdiff (natom, weights, nblk, blksz, coords0, nadj0, adjlist0, ad
                         moldiff_branch < moldiff &
                         .and. ( &
                            ( &
-                              eqvid0(mismatches0(i)) == eqvid0(unmapping(mismatches1(j))) &
-                              .and. eqvid1(mapping(mismatches0(i))) == eqvid1(mismatches1(j)) &
+                              eqvidx0(mismatches0(i)) == eqvidx0(unmapping(mismatches1(j))) &
+                              .and. eqvidx1(mapping(mismatches0(i))) == eqvidx1(mismatches1(j)) &
                            ) &
                            .or. moldist_branch < moldist &
                         ) &
@@ -253,14 +253,14 @@ subroutine minadjdiff (natom, weights, nblk, blksz, coords0, nadj0, adjlist0, ad
 
 end subroutine
 
-subroutine eqvatomperm (natom, weights, coords, adjmat, adjlist, neqv, eqvsz, &
-   neqvnei, eqvneisz, refcoords, refadjmat, atomperm, nfrag, fragroot)
+subroutine eqvatomperm (natom, weights, coords, adjmat, adjlist, neqv, eqvlen, &
+   neqvnei, eqvneilen, refcoords, refadjmat, mapping, nfrag, fragroot)
 ! Purpose: Find best correspondence between points of graphs
 
    integer, intent(in) :: natom, neqv
-   integer, dimension(:), intent(in) :: eqvsz, neqvnei
-   integer, dimension(:, :), intent(in) :: adjlist, eqvneisz
-   integer, dimension(:), intent(inout) :: atomperm
+   integer, dimension(:), intent(in) :: eqvlen, neqvnei
+   integer, dimension(:, :), intent(in) :: adjlist, eqvneilen
+   integer, dimension(:), intent(inout) :: mapping
    real(wp), dimension(:), intent(in) :: weights
    real(wp), dimension(:, :), intent(in) :: coords, refcoords
    logical, dimension(:, :), intent(in) :: adjmat, refadjmat
@@ -268,7 +268,7 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlist, neqv, eqvsz, &
    integer, dimension(:), intent(in) :: fragroot
 
    integer :: unmap(natom), track(natom)
-   integer, dimension(natom) :: eqvos, eqvid
+   integer, dimension(natom) :: eqvos, eqvidx
    integer :: permcount, h, i, n, diff, fragcount, ntrack
    logical :: tracked(natom), held(natom)
    real(wp) :: dist
@@ -279,19 +279,19 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlist, neqv, eqvsz, &
 
    eqvos(1) = 0
    do h = 1, neqv - 1
-      eqvos(h+1) = eqvos(h) + eqvsz(h)
+      eqvos(h+1) = eqvos(h) + eqvlen(h)
    end do
 
    ! set atoms equivalence indices
 
    do h = 1, neqv
-      eqvid(eqvos(h)+1:eqvos(h)+eqvsz(h)) = h
+      eqvidx(eqvos(h)+1:eqvos(h)+eqvlen(h)) = h
    end do
 
    ! print equiv types
 
 !   do i = 1, natom
-!      print *, i, eqvid(i)
+!      print *, i, eqvidx(i)
 !   end do
 
    ! print equiv neighbors
@@ -299,8 +299,8 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlist, neqv, eqvsz, &
 !   do i = 1, natom
 !      offset = 0
 !      do h = 1, neqvnei(i)
-!         print *, i, ':', adjlist(offset+1:offset+eqvneisz(h, i), i)
-!         offset = offset + eqvneisz(h, i)
+!         print *, i, ':', adjlist(offset+1:offset+eqvneilen(h, i), i)
+!         offset = offset + eqvneilen(h, i)
 !      end do
 !   end do
 
@@ -317,19 +317,19 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlist, neqv, eqvsz, &
 !        if ( tracked(i) ) then
 !            i = i + 1
 !        else
-!            call recursive_permut (i, atomperm, tracked, held, 0, 0)
+!            call recursive_permut (i, mapping, tracked, held, 0, 0)
 !            i = 1   ! restart loop to find unconnected, untracked atoms
 !            fragcount = fragcount + 1
 !        end if
 !    end do
 
    do i = 1, nfrag
-      call recursive_permut (fragroot(i), atomperm, tracked, held, ntrack, track)
+      call recursive_permut (fragroot(i), mapping, tracked, held, ntrack, track)
 !        print *, ntrack
    end do
 
 !   print '(a,i0)', "Natoms: ", natom
-!   print '(a,f8.4)', "dist: ", sqrt(leastsquaredist (natom, weights, coords, refcoords, atomperm)/sum(weights))
+!   print '(a,f8.4)', "dist: ", sqrt(leastsquaredist (natom, weights, coords, refcoords, mapping)/sum(weights))
 !   print '(a,i0)', "permcount: ", permcount
 !   print '(a,i0)', "fragcount: ", fragcount
 
@@ -343,14 +343,14 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlist, neqv, eqvsz, &
       integer meqvnei, equiva(natom), equivb(natom)
       integer h, i, offset, first, last
 
-      first = eqvos(eqvid(nodea)) + 1
-      last = eqvos(eqvid(nodea)) + eqvsz(eqvid(nodea))
+      first = eqvos(eqvidx(nodea)) + 1
+      last = eqvos(eqvidx(nodea)) + eqvlen(eqvidx(nodea))
       held(first:last) = .true.
       offset = 0
       do h = 1, neqvnei(nodea)
          ! find not tracked neighbors in group
          meqvnei = 0
-         do i = 1, eqvneisz(h, nodea)
+         do i = 1, eqvneilen(h, nodea)
             if (.not. held(adjlist(offset+i, nodea))) then 
                meqvnei = meqvnei + 1
                equiva(meqvnei) = adjlist(offset+meqvnei, nodea)
@@ -365,7 +365,7 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlist, neqv, eqvsz, &
                   mapping, locked_c)
             end if
          end do
-         offset = offset + eqvneisz(h, nodea)
+         offset = offset + eqvneilen(h, nodea)
       end do
    end subroutine recursive_remap
 
@@ -397,8 +397,8 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlist, neqv, eqvsz, &
       track(ntrack) = node
 
       ! reserves atoms with the same type as n
-      first = eqvos(eqvid(node)) + 1
-      last = eqvos(eqvid(node)) + eqvsz(eqvid(node))
+      first = eqvos(eqvidx(node)) + 1
+      last = eqvos(eqvidx(node)) + eqvlen(eqvidx(node))
       held(first:last) = .true.
 
       offset = 0
@@ -406,7 +406,7 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlist, neqv, eqvsz, &
       do h = 1, neqvnei(node)
          ! find not tracked neighbors in group
          meqvnei = 0
-         do i = 1, eqvneisz(h, node)
+         do i = 1, eqvneilen(h, node)
             if (.not. tracked(adjlist(offset+i, node)) &
                .and. .not. held(adjlist(offset+i, node))) then
                meqvnei = meqvnei + 1
@@ -482,7 +482,7 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlist, neqv, eqvsz, &
                                 locked_c, ntrack, track)
             end do
          end if
-         offset = offset + eqvneisz(h, node)
+         offset = offset + eqvneilen(h, node)
       end do
    end subroutine
 

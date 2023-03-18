@@ -19,6 +19,7 @@ clean_build() {
 
 compile() {
    $build_flag || return 0
+   clean_build
    pic=false
    toarray std_flags
    toarray pic_flags
@@ -191,7 +192,6 @@ fi
 case $target in
 prog)
    # Build program
-   clean_build
    pic_build=false
    compile molalignlib
    compile molalign
@@ -203,7 +203,6 @@ prog)
    ;;
 lib)
    # Build dynamic library
-   clean_build
    pic_build=true
    compile molalignlib
    make_lib molalignlib
@@ -211,7 +210,6 @@ lib)
    ;;
 pyext)
    # Build python extension module
-   clean_build
    pic_build=true
    compile molalignlib
    make_pyext molalignlibext

@@ -29,78 +29,78 @@ public leastrotquat
 
 contains
 
-real(wp) function biasdist(natom, weights, biasmat, atomperm) result(dist)
+real(wp) function biasdist(natom, weights, biasmat, mapping) result(dist)
    integer, intent(in) :: natom
    real(wp), dimension(:), intent(in) :: weights
    real(wp), dimension(:, :), intent(in) :: biasmat
-   integer, dimension(:), intent(in) :: atomperm
+   integer, dimension(:), intent(in) :: mapping
    integer :: i
 
    dist = 0
 
    do i = 1, natom
-      dist = dist + weights(i)*biasmat(i, atomperm(i))
+      dist = dist + weights(i)*biasmat(i, mapping(i))
    end do
 
 end function
 
-real(wp) function squaredist(natom, weights, coords0, coords1, atomperm) result(dist)
+real(wp) function squaredist(natom, weights, coords0, coords1, mapping) result(dist)
    integer, intent(in) :: natom
-   integer, dimension(:), intent(in) :: atomperm
+   integer, dimension(:), intent(in) :: mapping
    real(wp), dimension(:), intent(in) :: weights
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
 
-   dist = sum(weights(1:natom)*sum((coords0(:, 1:natom) - coords1(:, atomperm(1:natom)))**2, dim=1))
+   dist = sum(weights(1:natom)*sum((coords0(:, 1:natom) - coords1(:, mapping(1:natom)))**2, dim=1))
 
 end function
 
-real(wp) function leastsquaredist(natom, weights, coords0, coords1, atomperm) result(dist)
+real(wp) function leastsquaredist(natom, weights, coords0, coords1, mapping) result(dist)
 ! Purpose: Calculate least square distance from eigenvalues
     integer, intent(in) :: natom
-    integer, dimension(:), intent(in) :: atomperm
+    integer, dimension(:), intent(in) :: mapping
     real(wp), dimension(:), intent(in) :: weights
     real(wp), dimension(:, :), intent(in) :: coords0, coords1
     real(wp) eigmat(4, 4), eigval(4)
 
-    call kearsleymat(natom, weights, coords0, coords1, atomperm, eigmat)
+    call kearsleymat(natom, weights, coords0, coords1, mapping, eigmat)
     call syeval4(eigmat, eigval)
     dist = max(eigval(1), 0._wp)
 
 end function
 
-!real(wp) function leastsquaredist(natom, weights, coords0, coords1, atomperm) result(dist)
+!real(wp) function leastsquaredist(natom, weights, coords0, coords1, mapping) result(dist)
 !! Purpose: Calculate least square distance from aligned coordinates
 !   integer, intent(in) :: natom
-!   integer, dimension(:), intent(in) :: atomperm
+!   integer, dimension(:), intent(in) :: mapping
 !   real(wp), dimension(:), intent(in) :: weights
 !   real(wp), dimension(:, :), intent(in) :: coords0, coords1
 !   real(wp) :: eigmat(4, 4), eigval(4)
 !
-!   call kearsleymat(natom, weights, coords0, coords1, atomperm, eigmat)
+!   call kearsleymat(natom, weights, coords0, coords1, mapping, eigmat)
 !   call syevec4(eigmat, eigval)
-!   dist = squaredist(natom, weights, coords0, rotated(natom, coords1, eigmat(:, 1)), atomperm)
+!   dist = squaredist(natom, weights, coords0, rotated(natom, coords1, eigmat(:, 1)), mapping)
 !
 !end function
 
-function leastrotquat(natom, weights, coords0, coords1, atomperm) result(quat)
+function leastrotquat(natom, weights, coords0, coords1, mapping) result(quat)
 ! Purpose: Calculate rotation quaternion which minimzes the square distance
    integer, intent(in) :: natom
-   integer, dimension(:), intent(in) :: atomperm
+   integer, dimension(:), intent(in) :: mapping
    real(wp), dimension(:), intent(in) :: weights
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
    real(wp) :: quat(4), eigmat(4, 4), eigval(4)
 
-   call kearsleymat(natom, weights, coords0, coords1, atomperm, eigmat)
+   call kearsleymat(natom, weights, coords0, coords1, mapping, eigmat)
    call syevec4(eigmat, eigval)
    quat = eigmat(:, 1)
 
 end function
 
-subroutine kearsleymat(natom, weights, coords0, coords1, atomperm, eigmat)
+subroutine kearsleymat(natom, weights, coords0, coords1, mapping, eigmat)
 ! Purpose: Find the best orientation by least squares minimization
 ! Reference: Acta Cryst. (1989). A45, 208-210
    integer, intent(in) :: natom
-   integer, dimension(:), intent(in) :: atomperm
+   integer, dimension(:), intent(in) :: mapping
    real(wp), dimension(:), intent(in) :: weights
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
 
@@ -110,8 +110,8 @@ subroutine kearsleymat(natom, weights, coords0, coords1, atomperm, eigmat)
    eigmat = 0
 
    do i = 1, natom
-      p(:, i) = coords0(:, i) + coords1(:, atomperm(i))
-      q(:, i) = coords0(:, i) - coords1(:, atomperm(i))
+      p(:, i) = coords0(:, i) + coords1(:, mapping(i))
+      q(:, i) = coords0(:, i) - coords1(:, mapping(i))
    end do
 
 ! Calculate uppercase diagonal elements of the matrix

@@ -50,7 +50,7 @@ subroutine assign_atoms( &
    weights1, &
    coords1, &
    adjmat1, &
-   permlist, &
+   maplist, &
    countlist, &
    nrec, &
    error)
@@ -61,25 +61,25 @@ subroutine assign_atoms( &
    logical, dimension(:, :), intent(inout) :: adjmat0, adjmat1
    real(wp), dimension(:, :), intent(inout) :: coords0, coords1
    real(wp), dimension(:), intent(inout) :: weights0, weights1
-   integer, dimension(:, :), intent(inout) :: permlist
+   integer, dimension(:, :), intent(inout) :: maplist
    integer, dimension(:), intent(inout) :: countlist
    integer, intent(out) :: nrec, error
 
    integer :: h, i, j, k, l
    integer :: nblk0, nblk1
    integer :: neqv0, neqv1
-   integer, dimension(:), allocatable :: blkid0, blkid1
-   integer, dimension(:), allocatable :: blksz0, blksz1
+   integer, dimension(:), allocatable :: blkidx0, blkidx1
+   integer, dimension(:), allocatable :: blklen0, blklen1
    integer, dimension(:), allocatable :: atomorder0, atomorder1
    integer, dimension(:), allocatable :: backorder0, backorder1
    integer, dimension(:), allocatable :: nadj0, nadj1
    integer, dimension(:, :), allocatable :: adjlist0, adjlist1
-   integer, dimension(:), allocatable :: eqvid0, eqvid1
-   integer, dimension(:), allocatable :: eqvsz0, eqvsz1
-   real(wp), dimension(:), allocatable :: blkwt0, blkwt1
+   integer, dimension(:), allocatable :: eqvidx0, eqvidx1
+   integer, dimension(:), allocatable :: eqvlen0, eqvlen1
+   real(wp), dimension(:), allocatable :: blkwgt0, blkwgt1
    real(wp) :: center0(3), center1(3)
 
-   integer, dimension(natom0) :: offset, blkid, atomap
+   integer, dimension(natom0) :: offset, blkidx, mapping
    integer, dimension(natom0, natom0) :: order01
    integer :: nbond0, bonds0(2, maxcoord*natom0)
    integer :: nbond1, bonds1(2, maxcoord*natom1)
@@ -114,13 +114,13 @@ subroutine assign_atoms( &
 
    allocate(atomorder0(natom0), atomorder1(natom1))
    allocate(backorder0(natom0), backorder1(natom1))
-   allocate(blkid0(natom0), blkid1(natom1))
-   allocate(blksz0(natom0), blksz1(natom1))
-   allocate(blkwt0(natom0), blkwt1(natom1))
+   allocate(blkidx0(natom0), blkidx1(natom1))
+   allocate(blklen0(natom0), blklen1(natom1))
+   allocate(blkwgt0(natom0), blkwgt1(natom1))
    allocate(nadj0(natom0), nadj1(natom1))
    allocate(adjlist0(maxcoord, natom0), adjlist1(maxcoord, natom1))
-   allocate(eqvid0(natom0), eqvid1(natom1))
-   allocate(eqvsz0(natom0), eqvsz1(natom1))
+   allocate(eqvidx0(natom0), eqvidx1(natom1))
+   allocate(eqvlen0(natom0), eqvlen1(natom1))
 
    ! Calculate adjacency lists
 
@@ -129,18 +129,18 @@ subroutine assign_atoms( &
 
    ! Group atoms by label
 
-   call groupblocks(natom0, znums0, types0, weights0, nblk0, blksz0, blkwt0, blkid0)
-   call groupblocks(natom1, znums1, types1, weights1, nblk1, blksz1, blkwt1, blkid1)
+   call groupblocks(natom0, znums0, types0, weights0, nblk0, blklen0, blkwgt0, blkidx0)
+   call groupblocks(natom1, znums1, types1, weights1, nblk1, blklen1, blkwgt1, blkidx1)
 
    ! Group atoms by NMA at infinite level
 
-   call groupequiv(natom0, nblk0, blkid0, nadj0, adjlist0, neqv0, eqvsz0, eqvid0)
-   call groupequiv(natom1, nblk1, blkid1, nadj1, adjlist1, neqv1, eqvsz1, eqvid1)
+   call groupequiv(natom0, nblk0, blkidx0, nadj0, adjlist0, neqv0, eqvlen0, eqvidx0)
+   call groupequiv(natom1, nblk1, blkidx1, nadj1, adjlist1, neqv1, eqvlen1, eqvidx1)
 
    ! Get atom order
 
-   atomorder0 = sortorder(eqvid0, natom0)
-   atomorder1 = sortorder(eqvid1, natom1)
+   atomorder0 = sortorder(eqvidx0, natom0)
+   atomorder1 = sortorder(eqvidx1, natom1)
 
    ! Get inverse atom order
 
@@ -180,24 +180,30 @@ subroutine assign_atoms( &
 
    call initialize_random()
 
-   ! Remap atoms to minimize distance and difference
-
+!   ! Remap atoms to minimize distance and difference
+!
 !   call optimize_assignment( &
 !      natom0, &
 !      nblk0, &
-!      blksz0, &
-!      blkwt0, &
+!      blklen0, &
+!      blkwgt0, &
 !      neqv0, &
-!      eqvsz0, &
+!      eqvlen0, &
 !      centered(natom0, coords0(:, atomorder0), center0), &
 !      adjmat0(atomorder0, atomorder0), &
 !      neqv1, &
-!      eqvsz1, &
+!      eqvlen1, &
 !      centered(natom1, coords1(:, atomorder1), center1), &
 !      adjmat1(atomorder1, atomorder1), &
-!      permlist, &
+!      maplist, &
 !      countlist, &
 !      nrec)
+!
+!   ! Reorder back to original atom ordering
+!
+!   do i = 1, nrec
+!      maplist(:, i) = atomorder1(maplist(backorder0, i))
+!   end do
 
    znums0 = znums0(atomorder0)
    znums1 = znums1(atomorder1)
@@ -224,64 +230,64 @@ subroutine assign_atoms( &
    call optimize_assignment( &
       natom0, &
       nblk0, &
-      blksz0, &
-      blkwt0, &
+      blklen0, &
+      blkwgt0, &
       neqv0, &
-      eqvsz0, &
+      eqvlen0, &
       coords0, &
       adjmat0, &
       neqv1, &
-      eqvsz1, &
+      eqvlen1, &
       coords1, &
       adjmat1, &
-      permlist, &
+      maplist, &
       countlist, &
       nrec)
 
    call rotate(natom1, coords1, &
-      rotquat2rotmat(leastrotquat(natom0, weights0, coords0, coords1, permlist(:, 1))) &
+      rotquat2rotmat(leastrotquat(natom0, weights0, coords0, coords1, maplist(:, 1))) &
    )
 
    offset(1) = 0
    do h = 1, nblk0 - 1
-      offset(h+1) = offset(h) + blksz0(h)
+      offset(h+1) = offset(h) + blklen0(h)
    end do
 
    do h = 1, nblk0
-      blkid(offset(h)+1:offset(h)+blksz0(h)) = h
+      blkidx(offset(h)+1:offset(h)+blklen0(h)) = h
    end do
 
    adjmat00 = adjmat0
    adjmat01 = adjmat1
 
-   atomap = permlist(:, 1)
+   mapping = maplist(:, 1)
 
    do i = 1, natom0
       do j = 1, natom0
-         if (adjmat00(i, j) .neqv. adjmat01(atomap(i), atomap(j))) then
+         if (adjmat00(i, j) .neqv. adjmat01(mapping(i), mapping(j))) then
             adjmat0(i, j) = .false.
-            adjmat1(atomap(i), atomap(j)) = .false.
+            adjmat1(mapping(i), mapping(j)) = .false.
             do l = 1, nreac
                adjmat0(i, reacatom(l)) = .false.
                adjmat0(reacatom(l), i) = .false.
-               adjmat1(atomap(i), atomap(reacatom(l))) = .false.
-               adjmat1(atomap(reacatom(l)), atomap(i)) = .false.
+               adjmat1(mapping(i), mapping(reacatom(l))) = .false.
+               adjmat1(mapping(reacatom(l)), mapping(i)) = .false.
             end  do
-            h = blkid(i)
-            do k = offset(h) + 1, offset(h) + blksz0(h)
-               if (sum((coords0(:, i) - coords1(:, atomap(k)))**2) < 2.0 &
-                  .or. sum((coords0(:, k) - coords1(:, atomap(i)))**2) < 2.0 &
+            h = blkidx(i)
+            do k = offset(h) + 1, offset(h) + blklen0(h)
+               if (sum((coords0(:, i) - coords1(:, mapping(k)))**2) < 2.0 &
+                  .or. sum((coords0(:, k) - coords1(:, mapping(i)))**2) < 2.0 &
                ) then
-!                  print *, '<', i, atomap(i), k, atomap(k)
+!                  print *, '<', i, mapping(i), k, mapping(k)
                   adjmat0(k, j) = .false.
                   adjmat0(j, k) = .false.
-                  adjmat1(atomap(k), atomap(j)) = .false.
-                  adjmat1(atomap(j), atomap(k)) = .false.
+                  adjmat1(mapping(k), mapping(j)) = .false.
+                  adjmat1(mapping(j), mapping(k)) = .false.
                   do l = 1, nreac
                      adjmat0(k, reacatom(l)) = .false.
                      adjmat0(reacatom(l), k) = .false.
-                     adjmat1(atomap(k), atomap(reacatom(l))) = .false.
-                     adjmat1(atomap(reacatom(l)), atomap(k)) = .false.
+                     adjmat1(mapping(k), mapping(reacatom(l))) = .false.
+                     adjmat1(mapping(reacatom(l)), mapping(k)) = .false.
                   end  do
                end if
             end do
@@ -292,17 +298,17 @@ subroutine assign_atoms( &
    call optimize_assignment( &
       natom0, &
       nblk0, &
-      blksz0, &
-      blkwt0, &
+      blklen0, &
+      blkwgt0, &
       neqv0, &
-      eqvsz0, &
+      eqvlen0, &
       coords0, &
       adjmat0, &
       neqv1, &
-      eqvsz1, &
+      eqvlen1, &
       coords1, &
       adjmat1, &
-      permlist, &
+      maplist, &
       countlist, &
       nrec)
 
@@ -311,16 +317,10 @@ subroutine assign_atoms( &
    open(unit=99, file='ordered.mol2', action='write', status='replace')
    call adjmat2bonds(natom0, adjmat0, nbond0, bonds0)
 !   call adjmat2bonds(natom1, adjmat1, nbond1, bonds1)
-   call adjmat2bonds(natom1, adjmat1(permlist(:, 1), permlist(:, 1)), nbond1, bonds1)
+   call adjmat2bonds(natom1, adjmat1(maplist(:, 1), maplist(:, 1)), nbond1, bonds1)
    call writemol2(99, 'coords0', natom0, znums0, coords0, nbond0, bonds0)
 !   call writemol2(99, 'coords1', natom1, znums1, coords1, nbond1, bonds1)
-   call writemol2(99, 'coords1', natom1, znums1(permlist(:, 1)), coords1(:, permlist(:, 1)), nbond1, bonds1)
-
-   ! Reorder back to original atom ordering
-
-!   do i = 1, nrec
-!      permlist(:, i) = atomorder1(permlist(backorder0, i))
-!   end do
+   call writemol2(99, 'coords1', natom1, znums1(maplist(:, 1)), coords1(:, maplist(:, 1)), nbond1, bonds1)
 
 end subroutine
 

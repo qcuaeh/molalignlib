@@ -118,8 +118,8 @@ def assign_atoms(
     else:
         weights0 = np.ones(natom0, dtype=np.float64)
         weights1 = np.ones(natom1, dtype=np.float64)
-#    permlist = np.empty((records, natom0), dtype=np.int32).T
-    permlist = np.empty((natom0, records), dtype=np.int32, order='F')
+#    maplist = np.empty((records, natom0), dtype=np.int32).T
+    maplist = np.empty((natom0, records), dtype=np.int32, order='F')
     countlist = np.empty(records, dtype=np.int32)
     nrec, error = \
         molalignlibext.library.assign_atoms(
@@ -135,12 +135,12 @@ def assign_atoms(
             weights1,
             coords1,
             adjmat1,
-            permlist,
+            maplist,
             countlist,
         )
     if error:
         raise RuntimeError('Assignment failed')
-    return [Assignment(countlist[i], permlist[:, i] - 1) for i in range(nrec)]
+    return [Assignment(countlist[i], maplist[:, i] - 1) for i in range(nrec)]
 
 def align_to(self, other, massweighted=None):
     if not isinstance(other, Atoms):
