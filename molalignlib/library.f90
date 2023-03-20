@@ -295,19 +295,19 @@ subroutine assign_atoms( &
          countlist, &
          nrec)
 
-      ! Print coordinates with internal order
-
-      mapping = maplist(:, 1)
-      call rotate(natom1, workcoords1, leastrotquat(natom0, workweights0, workcoords0, workcoords1, mapping))
-      open(unit=99, file='aligned_debug.mol2', action='write', status='replace')
-      call adjmat2bonds(natom0, workadjmat0, nbond0, bonds0)
-      call adjmat2bonds(natom1, workadjmat1, nbond1, bonds1)
-!      call adjmat2bonds(natom1, workadjmat1(mapping, mapping), nbond1, bonds1)
-      call writemol2(99, 'coords0', natom0, workznums0, workcoords0, nbond0, bonds0)
-      call writemol2(99, 'coords1', natom1, workznums1, workcoords1, nbond1, bonds1)
-!      call writemol2(99, 'coords1', natom1, workznums1(mapping), workcoords1(:, mapping), nbond1, bonds1)
-
    end if
+
+   ! Print coordinates with internal order
+
+   mapping = maplist(:, 1)
+   call rotate(natom1, workcoords1, leastrotquat(natom0, workweights0, workcoords0, workcoords1, mapping))
+   open(unit=99, file='aligned_debug.mol2', action='write', status='replace')
+   call adjmat2bonds(natom0, workadjmat0, nbond0, bonds0)
+   call adjmat2bonds(natom1, workadjmat1, nbond1, bonds1)
+!   call adjmat2bonds(natom1, workadjmat1(mapping, mapping), nbond1, bonds1)
+   call writemol2(99, 'coords0', natom0, workznums0, workcoords0, nbond0, bonds0)
+   call writemol2(99, 'coords1', natom1, workznums1, workcoords1, nbond1, bonds1)
+!   call writemol2(99, 'coords1', natom1, workznums1(mapping), workcoords1(:, mapping), nbond1, bonds1)
 
    ! Reorder back to original atom ordering
 
