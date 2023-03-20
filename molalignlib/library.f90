@@ -56,24 +56,29 @@ subroutine assign_atoms( &
    error)
 
    integer, intent(in) :: natom0, natom1
-   integer, dimension(:), intent(inout) :: znums0, znums1
-   integer, dimension(:), intent(inout) :: types0, types1
-   logical, dimension(:, :), intent(inout) :: adjmat0, adjmat1
-   real(wp), dimension(:, :), intent(inout) :: coords0, coords1
-   real(wp), dimension(:), intent(inout) :: weights0, weights1
+   integer, dimension(:), intent(in) :: znums0, znums1
+   integer, dimension(:), intent(in) :: types0, types1
+   logical, dimension(:, :), intent(in) :: adjmat0, adjmat1
+   real(wp), dimension(:), intent(in) :: weights0, weights1
+   real(wp), dimension(:, :), intent(in) :: coords0, coords1
    integer, dimension(:, :), intent(inout) :: maplist
    integer, dimension(:), intent(inout) :: countlist
    integer, intent(out) :: nrec, error
 
+   integer :: workznums0(natom0), workznums1(natom1)
+   integer :: worktypes0(natom0), worktypes1(natom1)
+   logical :: workadjmat0(natom0, natom0), workadjmat1(natom1, natom1)
+   real(wp) :: workweights0(natom0), workweights1(natom1)
+   real(wp) :: workcoords0(3, natom0), workcoords1(3, natom1)
+
    integer :: h, i, j, k, l
-   integer :: nblk0, nblk1
-   integer :: neqv0, neqv1
+   integer :: nblk0, nblk1, neqv0, neqv1
+   integer, dimension(:), allocatable :: nadj0, nadj1
+   integer, dimension(:, :), allocatable :: adjlist0, adjlist1
    integer, dimension(:), allocatable :: blkidx0, blkidx1
    integer, dimension(:), allocatable :: blklen0, blklen1
    integer, dimension(:), allocatable :: atomorder0, atomorder1
    integer, dimension(:), allocatable :: backorder0, backorder1
-   integer, dimension(:), allocatable :: nadj0, nadj1
-   integer, dimension(:, :), allocatable :: adjlist0, adjlist1
    integer, dimension(:), allocatable :: eqvidx0, eqvidx1
    integer, dimension(:), allocatable :: eqvlen0, eqvlen1
    real(wp), dimension(:), allocatable :: blkwgt0, blkwgt1
@@ -83,7 +88,6 @@ subroutine assign_atoms( &
    integer, dimension(natom0, natom0) :: order01
    integer :: nbond0, bonds0(2, maxcoord*natom0)
    integer :: nbond1, bonds1(2, maxcoord*natom1)
-   logical, dimension(natom0, natom0) :: adjmat00, adjmat01
    real(wp), dimension(natom0, natom0) :: d01
 
    ! Set error code to 0 by default
@@ -171,16 +175,38 @@ subroutine assign_atoms( &
       return
    end if
 
+   workznums0 = znums0(atomorder0)
+   workznums1 = znums1(atomorder1)
+   worktypes0 = types0(atomorder0)
+   worktypes1 = types1(atomorder1)
+   workweights0 = weights0(atomorder0)
+   workweights1 = weights1(atomorder1)
+   workcoords0 = coords0(:, atomorder0)
+   workcoords1 = coords1(:, atomorder1)
+   workadjmat0 = adjmat0(atomorder0, atomorder0)
+   workadjmat1 = adjmat1(atomorder1, atomorder1)
+
+   ! Mirror coordinates
+
+   if (mirror_flag) then
+      workcoords1(1, :) = -workcoords1(1, :)
+   end if
+
    ! Calculate centroids
 
-   travec0 = -centroid(natom0, weights0, coords0)
-   travec1 = -centroid(natom1, weights1, coords1)
+   travec0 = -centroid(natom0, workweights0, workcoords0)
+   travec1 = -centroid(natom1, workweights1, workcoords1)
+
+   ! Center coordinates at the centroids
+
+   call translate(natom0, workcoords0, travec0)
+   call translate(natom1, workcoords1, travec1)
 
    ! Initialize random number generator
 
    call initialize_random()
 
-   ! Remap atoms to minimize distance and difference
+   ! Optimize the assignment to minimize AdjD/RMSD
 
    call optimize_assignment( &
       natom0, &
@@ -189,15 +215,96 @@ subroutine assign_atoms( &
       blkwgt0, &
       neqv0, &
       eqvlen0, &
-      translated(natom0, coords0(:, atomorder0), travec0), &
-      adjmat0(atomorder0, atomorder0), &
+      workcoords0, &
+      workadjmat0, &
       neqv1, &
       eqvlen1, &
-      translated(natom1, coords1(:, atomorder1), travec1), &
-      adjmat1(atomorder1, atomorder1), &
+      workcoords1, &
+      workadjmat1, &
       maplist, &
       countlist, &
       nrec)
+
+   if (bond_flag) then
+
+      mapping = maplist(:, 1)
+
+      call rotate(natom1, workcoords1, leastrotquat(natom0, workweights0, workcoords0, workcoords1, mapping))
+
+      offset(1) = 0
+      do h = 1, nblk0 - 1
+         offset(h+1) = offset(h) + blklen0(h)
+      end do
+
+      do h = 1, nblk0
+         blkidx(offset(h)+1:offset(h)+blklen0(h)) = h
+      end do
+
+      ! Remove conflicting bonds
+
+      do i = 1, natom0
+         do j = 1, natom0
+            if (adjmat0(i, j) .neqv. adjmat1(mapping(i), mapping(j))) then
+               workadjmat0(i, j) = .false.
+               workadjmat1(mapping(i), mapping(j)) = .false.
+               do l = 1, nreac
+                  workadjmat0(i, reacatom(l)) = .false.
+                  workadjmat0(reacatom(l), i) = .false.
+                  workadjmat1(mapping(i), mapping(reacatom(l))) = .false.
+                  workadjmat1(mapping(reacatom(l)), mapping(i)) = .false.
+               end  do
+               h = blkidx(i)
+               do k = offset(h) + 1, offset(h) + blklen0(h)
+                  if (sum((coords0(:, i) - coords1(:, mapping(k)))**2) < 2.0 &
+                     .or. sum((coords0(:, k) - coords1(:, mapping(i)))**2) < 2.0 &
+                  ) then
+   !                  print *, '<', i, mapping(i), k, mapping(k)
+                     workadjmat0(k, j) = .false.
+                     workadjmat0(j, k) = .false.
+                     workadjmat1(mapping(k), mapping(j)) = .false.
+                     workadjmat1(mapping(j), mapping(k)) = .false.
+                     do l = 1, nreac
+                        workadjmat0(k, reacatom(l)) = .false.
+                        workadjmat0(reacatom(l), k) = .false.
+                        workadjmat1(mapping(k), mapping(reacatom(l))) = .false.
+                        workadjmat1(mapping(reacatom(l)), mapping(k)) = .false.
+                     end  do
+                  end if
+               end do
+            end if
+         end do
+      end do
+
+      ! Optimize the assignment to minimize AdjD/RMSD
+
+      call optimize_assignment( &
+         natom0, &
+         nblk0, &
+         blklen0, &
+         blkwgt0, &
+         neqv0, &
+         eqvlen0, &
+         workcoords0, &
+         workadjmat0, &
+         neqv1, &
+         eqvlen1, &
+         workcoords1, &
+         workadjmat1, &
+         maplist, &
+         countlist, &
+         nrec)
+
+      ! Print coordinates with internal order
+
+      open(unit=99, file='ordered.mol2', action='write', status='replace')
+      call adjmat2bonds(natom0, workadjmat0, nbond0, bonds0)
+   !   call adjmat2bonds(natom1, workadjmat1, nbond1, bonds1)
+      call adjmat2bonds(natom1, workadjmat1(maplist(:, 1), maplist(:, 1)), nbond1, bonds1)
+      call writemol2(99, 'coords0', natom0, workznums0, workcoords0, nbond0, bonds0)
+   !   call writemol2(99, 'coords1', natom1, workznums1, workcoords1, nbond1, bonds1)
+      call writemol2(99, 'coords1', natom1, workznums1(maplist(:, 1)), workcoords1(:, maplist(:, 1)), nbond1, bonds1)
+
+   end if
 
    ! Reorder back to original atom ordering
 
@@ -205,125 +312,10 @@ subroutine assign_atoms( &
       maplist(:, i) = atomorder1(maplist(backorder0, i))
    end do
 
-!   znums0 = znums0(atomorder0)
-!   znums1 = znums1(atomorder1)
-!   types0 = types0(atomorder0)
-!   types1 = types1(atomorder1)
-!   weights0 = weights0(atomorder0)
-!   weights1 = weights1(atomorder1)
-!   coords0 = coords0(:, atomorder0)
-!   coords1 = coords1(:, atomorder1)
-!   adjmat0 = adjmat0(atomorder0, atomorder0)
-!   adjmat1 = adjmat1(atomorder1, atomorder1)
-!
-!   ! Mirror coordinates
-!
-!   if (mirror_flag) then
-!      coords1(1, :) = -coords1(1, :)
-!   end if
-!
-!   ! Translate to center of mass
-!
-!   call translate(natom0, coords0, travec0)
-!   call translate(natom1, coords1, travec1)
-!
-!   call optimize_assignment( &
-!      natom0, &
-!      nblk0, &
-!      blklen0, &
-!      blkwgt0, &
-!      neqv0, &
-!      eqvlen0, &
-!      coords0, &
-!      adjmat0, &
-!      neqv1, &
-!      eqvlen1, &
-!      coords1, &
-!      adjmat1, &
-!      maplist, &
-!      countlist, &
-!      nrec)
-!
-!   mapping = maplist(:, 1)
-!
-!   call rotate(natom1, coords1, leastrotquat(natom0, weights0, coords0, coords1, mapping))
-!
-!   offset(1) = 0
-!   do h = 1, nblk0 - 1
-!      offset(h+1) = offset(h) + blklen0(h)
-!   end do
-!
-!   do h = 1, nblk0
-!      blkidx(offset(h)+1:offset(h)+blklen0(h)) = h
-!   end do
-!
-!   adjmat00 = adjmat0
-!   adjmat01 = adjmat1
-!
-!   do i = 1, natom0
-!      do j = 1, natom0
-!         if (adjmat00(i, j) .neqv. adjmat01(mapping(i), mapping(j))) then
-!            adjmat0(i, j) = .false.
-!            adjmat1(mapping(i), mapping(j)) = .false.
-!            do l = 1, nreac
-!               adjmat0(i, reacatom(l)) = .false.
-!               adjmat0(reacatom(l), i) = .false.
-!               adjmat1(mapping(i), mapping(reacatom(l))) = .false.
-!               adjmat1(mapping(reacatom(l)), mapping(i)) = .false.
-!            end  do
-!            h = blkidx(i)
-!            do k = offset(h) + 1, offset(h) + blklen0(h)
-!               if (sum((coords0(:, i) - coords1(:, mapping(k)))**2) < 2.0 &
-!                  .or. sum((coords0(:, k) - coords1(:, mapping(i)))**2) < 2.0 &
-!               ) then
-!!                  print *, '<', i, mapping(i), k, mapping(k)
-!                  adjmat0(k, j) = .false.
-!                  adjmat0(j, k) = .false.
-!                  adjmat1(mapping(k), mapping(j)) = .false.
-!                  adjmat1(mapping(j), mapping(k)) = .false.
-!                  do l = 1, nreac
-!                     adjmat0(k, reacatom(l)) = .false.
-!                     adjmat0(reacatom(l), k) = .false.
-!                     adjmat1(mapping(k), mapping(reacatom(l))) = .false.
-!                     adjmat1(mapping(reacatom(l)), mapping(k)) = .false.
-!                  end  do
-!               end if
-!            end do
-!         end if
-!      end do
-!   end do
-!
-!   call optimize_assignment( &
-!      natom0, &
-!      nblk0, &
-!      blklen0, &
-!      blkwgt0, &
-!      neqv0, &
-!      eqvlen0, &
-!      coords0, &
-!      adjmat0, &
-!      neqv1, &
-!      eqvlen1, &
-!      coords1, &
-!      adjmat1, &
-!      maplist, &
-!      countlist, &
-!      nrec)
-!
-!   ! Print coordinates with internal order
-!
-!   open(unit=99, file='ordered.mol2', action='write', status='replace')
-!   call adjmat2bonds(natom0, adjmat0, nbond0, bonds0)
-!!   call adjmat2bonds(natom1, adjmat1, nbond1, bonds1)
-!   call adjmat2bonds(natom1, adjmat1(maplist(:, 1), maplist(:, 1)), nbond1, bonds1)
-!   call writemol2(99, 'coords0', natom0, znums0, coords0, nbond0, bonds0)
-!!   call writemol2(99, 'coords1', natom1, znums1, coords1, nbond1, bonds1)
-!   call writemol2(99, 'coords1', natom1, znums1(maplist(:, 1)), coords1(:, maplist(:, 1)), nbond1, bonds1)
-
 end subroutine
 
-! Align atoms0 and atoms1
 subroutine align_atoms( &
+! Purpose: Align atoms0 and atoms1
    natom0, &
    znums0, &
    types0, &
