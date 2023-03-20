@@ -215,11 +215,8 @@ subroutine minadjdiff (natom, weights, nblk, blklen, coords0, nadj0, adjlist0, a
                      if ( &
                         moldiff_branch < moldiff &
                         .and. ( &
-                           ( &
-                              eqvidx0(mismatches0(i)) == eqvidx0(unmapping(mismatches1(j))) &
-                              .and. eqvidx1(mapping(mismatches0(i))) == eqvidx1(mismatches1(j)) &
-                           ) &
-                           .or. moldist_branch < moldist &
+                           eqvidx0(mismatches0(i)) == eqvidx0(unmapping(mismatches1(j))) &
+                           .and. eqvidx1(mapping(mismatches0(i))) == eqvidx1(mismatches1(j)) &
                         ) &
                      ) then
                         ntrack = ntrack_branch
