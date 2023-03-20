@@ -39,7 +39,7 @@ contains
 ! Assign atoms0 and atoms1
 subroutine assign_atoms( &
    natom0, &
-   znums0,  &
+   znums0, &
    types0, &
    weights0, &
    coords0, &
@@ -68,10 +68,11 @@ subroutine assign_atoms( &
    integer :: workznums0(natom0), workznums1(natom1)
    integer :: worktypes0(natom0), worktypes1(natom1)
    logical :: workadjmat0(natom0, natom0), workadjmat1(natom1, natom1)
+   logical :: backadjmat0(natom0, natom0), backadjmat1(natom1, natom1)
    real(wp) :: workweights0(natom0), workweights1(natom1)
    real(wp) :: workcoords0(3, natom0), workcoords1(3, natom1)
 
-   integer :: h, i, j, k, l
+   integer :: h, i, j, k
    integer :: nblk0, nblk1, neqv0, neqv1
    integer, dimension(:), allocatable :: nadj0, nadj1
    integer, dimension(:, :), allocatable :: adjlist0, adjlist1
@@ -175,6 +176,8 @@ subroutine assign_atoms( &
       return
    end if
 
+   ! Reorder data arrays
+
    workznums0 = znums0(atomorder0)
    workznums1 = znums1(atomorder1)
    worktypes0 = types0(atomorder0)
@@ -227,10 +230,6 @@ subroutine assign_atoms( &
 
    if (bond_flag) then
 
-      mapping = maplist(:, 1)
-
-      call rotate(natom1, workcoords1, leastrotquat(natom0, workweights0, workcoords0, workcoords1, mapping))
-
       offset(1) = 0
       do h = 1, nblk0 - 1
          offset(h+1) = offset(h) + blklen0(h)
@@ -240,35 +239,37 @@ subroutine assign_atoms( &
          blkidx(offset(h)+1:offset(h)+blklen0(h)) = h
       end do
 
-      ! Remove conflicting bonds
+      mapping = maplist(:, 1)
+
+      ! Align coordinates
+
+      call rotate(natom1, workcoords1, leastrotquat(natom0, workweights0, workcoords0, workcoords1, mapping))
+
+      ! Remove reactive bonds
+
+      backadjmat0 = workadjmat0
+      backadjmat1 = workadjmat1
 
       do i = 1, natom0
-         do j = 1, natom0
-            if (adjmat0(i, j) .neqv. adjmat1(mapping(i), mapping(j))) then
-               workadjmat0(i, j) = .false.
-               workadjmat1(mapping(i), mapping(j)) = .false.
-               do l = 1, nreac
-                  workadjmat0(i, reacatom(l)) = .false.
-                  workadjmat0(reacatom(l), i) = .false.
-                  workadjmat1(mapping(i), mapping(reacatom(l))) = .false.
-                  workadjmat1(mapping(reacatom(l)), mapping(i)) = .false.
-               end  do
+         do j = i + 1, natom0
+            if (backadjmat0(i, j) .neqv. backadjmat1(mapping(i), mapping(j))) then
+               call removereacbond(i, j, natom0, workznums0, workadjmat0, workadjmat1, mapping)
                h = blkidx(i)
                do k = offset(h) + 1, offset(h) + blklen0(h)
-                  if (sum((coords0(:, i) - coords1(:, mapping(k)))**2) < 2.0 &
-                     .or. sum((coords0(:, k) - coords1(:, mapping(i)))**2) < 2.0 &
+                  if (sum((workcoords0(:, i) - workcoords1(:, mapping(k)))**2) < 2.0 &
+                     .or. sum((workcoords0(:, k) - workcoords1(:, mapping(i)))**2) < 2.0 &
                   ) then
-   !                  print *, '<', i, mapping(i), k, mapping(k)
-                     workadjmat0(k, j) = .false.
-                     workadjmat0(j, k) = .false.
-                     workadjmat1(mapping(k), mapping(j)) = .false.
-                     workadjmat1(mapping(j), mapping(k)) = .false.
-                     do l = 1, nreac
-                        workadjmat0(k, reacatom(l)) = .false.
-                        workadjmat0(reacatom(l), k) = .false.
-                        workadjmat1(mapping(k), mapping(reacatom(l))) = .false.
-                        workadjmat1(mapping(reacatom(l)), mapping(k)) = .false.
-                     end  do
+!                     print *, '<', j, mapping(j), k, mapping(k)
+                     call removereacbond(k, j, natom0, workznums0, workadjmat0, workadjmat1, mapping)
+                  end if
+               end do
+               h = blkidx(j)
+               do k = offset(h) + 1, offset(h) + blklen0(h)
+                  if (sum((workcoords0(:, j) - workcoords1(:, mapping(k)))**2) < 2.0 &
+                     .or. sum((workcoords0(:, k) - workcoords1(:, mapping(j)))**2) < 2.0 &
+                  ) then
+!                     print *, '>', i, mapping(i), k, mapping(k)
+                     call removereacbond(i, k, natom0, workznums0, workadjmat0, workadjmat1, mapping)
                   end if
                end do
             end if
@@ -296,13 +297,15 @@ subroutine assign_atoms( &
 
       ! Print coordinates with internal order
 
-      open(unit=99, file='ordered.mol2', action='write', status='replace')
+      mapping = maplist(:, 1)
+      call rotate(natom1, workcoords1, leastrotquat(natom0, workweights0, workcoords0, workcoords1, mapping))
+      open(unit=99, file='aligned_debug.mol2', action='write', status='replace')
       call adjmat2bonds(natom0, workadjmat0, nbond0, bonds0)
-   !   call adjmat2bonds(natom1, workadjmat1, nbond1, bonds1)
-      call adjmat2bonds(natom1, workadjmat1(maplist(:, 1), maplist(:, 1)), nbond1, bonds1)
+      call adjmat2bonds(natom1, workadjmat1, nbond1, bonds1)
+!      call adjmat2bonds(natom1, workadjmat1(mapping, mapping), nbond1, bonds1)
       call writemol2(99, 'coords0', natom0, workznums0, workcoords0, nbond0, bonds0)
-   !   call writemol2(99, 'coords1', natom1, workznums1, workcoords1, nbond1, bonds1)
-      call writemol2(99, 'coords1', natom1, workznums1(maplist(:, 1)), workcoords1(:, maplist(:, 1)), nbond1, bonds1)
+      call writemol2(99, 'coords1', natom1, workznums1, workcoords1, nbond1, bonds1)
+!      call writemol2(99, 'coords1', natom1, workznums1(mapping), workcoords1(:, mapping), nbond1, bonds1)
 
    end if
 
@@ -403,6 +406,61 @@ subroutine align_atoms( &
    ! Calculate optimal translation vector
 
    travec = matmul(rotmat, travec1) - travec0
+
+end subroutine
+
+subroutine removereacbond(i, j, natom, znums, adjmat0, adjmat1, mapping)
+! Purpose: Remove reactive bonds
+   integer, intent(in) :: i, j, natom
+   integer, dimension(:), intent(in) :: znums
+   logical, dimension(:, :), intent(inout) :: adjmat0, adjmat1
+   integer, dimension(:), intent(in) :: mapping
+
+   integer :: k
+   integer, dimension(natom) :: nadj0, nadj1
+   integer, dimension(maxcoord, natom) :: adjlist0, adjlist1
+
+   ! Calculate adjacency lists
+
+   call adjmat2list(natom, adjmat0, nadj0, adjlist0)
+   call adjmat2list(natom, adjmat1, nadj1, adjlist1)
+
+   adjmat0(i, j) = .false.
+   adjmat0(j, i) = .false.
+   adjmat1(mapping(i), mapping(j)) = .false.
+   adjmat1(mapping(j), mapping(i)) = .false.
+   if (znums(i) == 1) then
+      do k = 1, nadj0(i)
+         if (znums(adjlist0(k, i)) == 7 .or. znums(adjlist0(k, i)) == 8) then
+            adjmat0(i, adjlist0(k, i)) = .false.
+            adjmat0(adjlist0(k, i), i) = .false.
+         end if
+      end do
+   end if
+   if (znums(i) == 1) then
+      do k = 1, nadj1(i)
+         if (znums(adjlist1(k, i)) == 7 .or. znums(adjlist1(k, i)) == 8) then
+            adjmat1(mapping(i), mapping(adjlist1(k, i))) = .false.
+            adjmat1(mapping(adjlist1(k, i)), mapping(i)) = .false.
+         end if
+      end do
+   end if
+   if (znums(j) == 1) then
+      do k = 1, nadj0(j)
+         if (znums(adjlist0(k, j)) == 7 .or. znums(adjlist0(k, j)) == 8) then
+            adjmat0(j, adjlist0(k, j)) = .false.
+            adjmat0(adjlist0(k, j), j) = .false.
+         end if
+      end do
+   end if
+   if (znums(j) == 1) then
+      do k = 1, nadj1(j)
+         if (znums(adjlist1(k, j)) == 7 .or. znums(adjlist1(k, j)) == 8) then
+            adjmat1(mapping(j), mapping(adjlist1(k, j))) = .false.
+            adjmat1(mapping(adjlist1(k, j)), mapping(j)) = .false.
+         end if
+      end do
+   end if
 
 end subroutine
 
