@@ -125,17 +125,17 @@ subroutine setmnacrossbias(natom, nblk, blklen, coords0, coords1, equivmat, bias
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
    integer, dimension(:, :), intent(in) :: equivmat
    real(wp), dimension(:, :), intent(out) :: biasmat
+   integer :: h, i, j, offset, maxequiv
 
-   integer :: h, i, j, offset, level, nin, nout
-   integer, dimension(natom) :: intype0, intype1, outype0, outype1
-
-   level = 0
-   nin = nblk
+   maxequiv = 0
 
    offset = 0
    do h = 1, nblk
-      intype0(offset+1:offset+blklen(h)) = h
-      intype1(offset+1:offset+blklen(h)) = h
+      do i = offset + 1, offset + blklen(h)
+         do j = offset + 1, offset + blklen(h)
+            maxequiv = max(maxequiv, equivmat(i, j))
+         end do
+      end do
       offset = offset + blklen(h)
    end do
 
@@ -143,7 +143,8 @@ subroutine setmnacrossbias(natom, nblk, blklen, coords0, coords1, equivmat, bias
    do h = 1, nblk
       do i = offset + 1, offset + blklen(h)
          do j = offset + 1, offset + blklen(h)
-            biasmat(i, j) = bias_scale**2*bias_ratio**(equivmat(i, j))
+!            biasmat(i, j) = bias_scale**2*bias_ratio**(equivmat(i, j))
+            biasmat(i, j) = bias_scale**2*(maxequiv - equivmat(i, j))
          end do
       end do
       offset = offset + blklen(h)
