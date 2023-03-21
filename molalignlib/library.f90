@@ -31,8 +31,6 @@ use writemol
 use biasing
 
 implicit none
-integer :: nreac
-integer, dimension(100) :: reacatom 
 
 contains
 

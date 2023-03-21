@@ -68,18 +68,14 @@ program molalign
    test_flag = .false.
    stats_flag = .false.
    mirror_flag = .false.
-   maxlvl_flag = .false.
    back_flag = .false.
 
    maxrec = 1
    maxcount = 10
-   maxlevel = 10
    maxcoord = 16
-   nreac = 0
 
    bias_tol = 0.35
    bias_scale = 1.e3
-   bias_ratio = 0.5
 
    pathout = 'aligned.xyz'
 
@@ -120,16 +116,10 @@ program molalign
          call readoptarg(arg, bias_tol)
       case ('-scale')
          call readoptarg(arg, bias_scale)
-      case ('-level')
-         maxlvl_flag = .true.
-         call readoptarg(arg, maxlevel)
       case ('-rec')
          call readoptarg(arg, maxrec)
       case ('-out')
          call readoptarg(arg, pathout)
-      case ('-r')
-         nreac = nreac + 1
-         call readoptarg(arg, reacatom(nreac))
       case ('-stdin')
          stdin_flag = .true.
          call readoptarg(arg, fmtin0)
