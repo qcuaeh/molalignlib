@@ -65,6 +65,7 @@ subroutine optimize_assignment( &
    integer, intent(out) :: countlist(:)
    integer, intent(out) :: nrec
 
+   integer :: h, offset
    logical visited, overflow
    integer :: nfrag0, nfrag1
    integer irec, mrec, ntrial, nstep, steps
@@ -75,7 +76,7 @@ subroutine optimize_assignment( &
    integer, dimension(natom) :: neqvnei0, neqvnei1
    integer, dimension(maxcoord, natom) :: eqvneilen0, eqvneilen1
    integer, dimension(natom) :: fragroot0, fragroot1
-   integer :: h, offset
+   integer :: equivmat(natom, natom)
    real(wp) :: rmsd, olddist, newdist, totalrot
    real(wp), dimension(4) :: rotquat, prodquat
    real(wp), dimension(maxrec) :: recrmsd, avgsteps, avgtotalrot, avgrealrot
@@ -96,7 +97,7 @@ subroutine optimize_assignment( &
    call adjmat2list(natom, adjmat0, nadj0, adjlist0)
    call adjmat2list(natom, adjmat1, nadj1, adjlist1)
 
-   ! Group equivalent neighbors
+   ! Group MNA equivalent neighbors
 
    call groupeqvnei(natom, neqv0, eqvlen0, nadj0, adjlist0, neqvnei0, eqvneilen0)
    call groupeqvnei(natom, neqv1, eqvlen1, nadj1, adjlist1, neqvnei1, eqvneilen1)
@@ -106,9 +107,13 @@ subroutine optimize_assignment( &
    call getmolfrags(natom, nadj0, adjlist0, nblk, blklen, neqv0, eqvlen0, nfrag0, fragroot0)
    call getmolfrags(natom, nadj1, adjlist1, nblk, blklen, neqv1, eqvlen1, nfrag1, fragroot1)
 
+   ! Calculate MNA cross equivalence matrix
+
+   call getmnacrossequiv(natom, nblk, blklen, nadj0, adjlist0, nadj1, adjlist1, equivmat)
+
    ! Calculate biases
 
-   call bias_func(natom, nblk, blklen, nadj0, adjlist0, nadj1, adjlist1, coords0, coords1, biasmat)
+   call setcrossbias(natom, nblk, blklen, coords0, coords1, equivmat, biasmat)
 
    ! Print biases
 
