@@ -36,7 +36,7 @@ end interface
 real(wp) :: bias_tol
 real(wp) :: bias_scale
 real(wp) :: bias_ratio
-procedure(bias_func_proc), pointer :: setcrossbias
+procedure(bias_func_proc), pointer :: calcbiasmat
 
 contains
 
@@ -56,7 +56,7 @@ subroutine setnocrossbias(natom, nblk, blklen, coords0, coords1, equivmat, biasm
    do h = 1, nblk
       do i = offset + 1, offset + blklen(h)
          do j = offset + 1, offset + blklen(h)
-            biasmat(i, j) = 0
+            biasmat(j, i) = 0
          end do
       end do
       offset = offset + blklen(h)
@@ -106,9 +106,9 @@ subroutine setsndcrossbias(natom, nblk, blklen, coords0, coords1, equivmat, bias
       do i = offset + 1, offset + blklen(h)
          do j = offset + 1, offset + blklen(h)
             if (all(abs(d1(:, j) - d0(:, i)) < bias_tol)) then
-               biasmat(i, j) = 0
+               biasmat(j, i) = 0
             else
-               biasmat(i, j) = bias_scale**2
+               biasmat(j, i) = bias_scale**2
             end if
          end do
       end do
@@ -133,7 +133,7 @@ subroutine setmnacrossbias(natom, nblk, blklen, coords0, coords1, equivmat, bias
    do h = 1, nblk
       do i = offset + 1, offset + blklen(h)
          do j = offset + 1, offset + blklen(h)
-            maxequiv = max(maxequiv, equivmat(i, j))
+            maxequiv = max(maxequiv, equivmat(j, i))
          end do
       end do
       offset = offset + blklen(h)
@@ -143,8 +143,8 @@ subroutine setmnacrossbias(natom, nblk, blklen, coords0, coords1, equivmat, bias
    do h = 1, nblk
       do i = offset + 1, offset + blklen(h)
          do j = offset + 1, offset + blklen(h)
-!            biasmat(i, j) = bias_scale**2*bias_ratio**(equivmat(i, j))
-            biasmat(i, j) = bias_scale**2*(maxequiv - equivmat(i, j))
+!            biasmat(j, i) = bias_scale**2*bias_ratio**(equivmat(j, i))
+            biasmat(j, i) = bias_scale**2*(maxequiv - equivmat(j, i))
          end do
       end do
       offset = offset + blklen(h)

@@ -36,7 +36,7 @@ subroutine minperm(n, p, q, pq, perm, dist)
 
    do i = 1, n
       do j = 1, n
-         c(i, j) = sum((p(:, i) - q(:, j))**2) + pq(i, j)
+         c(i, j) = sum((p(:, i) - q(:, j))**2) + pq(j, i)
       end do
    end do
 

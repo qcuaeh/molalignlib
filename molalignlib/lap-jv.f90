@@ -91,17 +91,17 @@ subroutine minperm(n, p, q, pq, perm, dist)
    sz8 = m*n
    n8 = n
 
-   do i = 0,n
+   do i = 0, n
       first(i+1) = i*m + 1
    end do
 
    if (m .eq. n) then
 
 !  Compute the full matrix...
-      do i = 1,n
+      do i = 1, n
          k = first(i) - 1
-         do j = 1,n
-            cc(k+j) = int((sum((p(:,i) - q(:,j))**2) + pq(i,j))*scale, int64)
+         do j = 1, n
+            cc(k+j) = int((sum((p(:, i) - q(:, j))**2) + pq(j, i))*scale, int64)
             kk(k+j) = j
 !            write(*,*) i, j, '-->', cc(k+j)
          end do
@@ -114,12 +114,12 @@ subroutine minperm(n, p, q, pq, perm, dist)
 !  This runs slower than the next heap algorithm.
 
 !      cc(1:m*n) = huge(1_int64)
-!      do i = 1,n
+!      do i = 1, n
 !         k = first(i) - 1
-!         do j = 1,n
-!            d = int((sum((p(:,i) - q(:,j))**2) + pq(i,j))*scale, int64)
+!         do j = 1, n
+!            d = int((sum((p(:, i) - q(:, j))**2) + pq(j, i))*scale, int64)
 !            if (d > cc(k+m)) cycle
-!            do j1 = m,2,-1
+!            do j1 = m, 2, -1
 !               if (d > cc(k+j1-1)) exit
 !               cc(k+j1) = cc(k+j1-1)
 !               kk(k+j1) = kk(k+j1-1)
@@ -135,10 +135,10 @@ subroutine minperm(n, p, q, pq, perm, dist)
 !  efficient to use quick-select instead... (This is definately
 !  true in the limit of infinite systems.)
 
-      do i = 1,n
+      do i = 1, n
          k = first(i) - 1
-         do j = 1,m
-            cc(k+j) = int((sum((p(:,i) - q(:,j))**2) + pq(i,j))*scale, int64)
+         do j = 1, m
+            cc(k+j) = int((sum((p(:, i) - q(:, j))**2) + pq(j, i))*scale, int64)
             kk(k+j) = j
             l = j
 10             if (l .le. 1) goto 11
@@ -154,7 +154,7 @@ subroutine minperm(n, p, q, pq, perm, dist)
                goto 10
             end if
 11       end do
-         do j = m+1,n
+         do j = m+1, n
             d = int((sum((p(:,i) - q(:,j))**2) + pq(i,j))*scale, int64)
             if (d .lt. cc(k+1)) then
                cc(k+1) = d
@@ -203,7 +203,7 @@ subroutine minperm(n, p, q, pq, perm, dist)
 !   If initial guess correct, deduce solution distance
 !   which is not done in jovosap
       h = 0
-      do i = 1,n
+      do i = 1, n
          j = first(i)
 30       if (j.gt.n*maxnei) then
             write (error_unit, '(a)') 'Error: Assignment failed'
@@ -218,8 +218,8 @@ subroutine minperm(n, p, q, pq, perm, dist)
    end if
 
 !  Test if perm is a valid permutation
-   do i = 1,n
-      do j = 1,n
+   do i = 1, n
+      do j = 1, n
          if (perm(j) == i) exit
       end do
       if (j == n + 1) then

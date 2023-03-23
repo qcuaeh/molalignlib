@@ -6,11 +6,11 @@ use stdio
 use sorting
 implicit none
 private
-public getmolfrags
+public findmolfrags
 
 contains
 
-subroutine getmolfrags (natom, nadj, adjlist, nblk, blklen, &
+subroutine findmolfrags (natom, nadj, adjlist, nblk, blklen, &
                   neqv, eqvlen, nfrag, fragroot)
 
    integer, intent(in) :: natom, nblk, neqv
@@ -178,6 +178,6 @@ contains
       end do
    end function invsort
 
-end subroutine getmolfrags
+end subroutine findmolfrags
 
 end module
