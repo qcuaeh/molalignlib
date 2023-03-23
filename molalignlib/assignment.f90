@@ -108,12 +108,12 @@ subroutine optimize_assignment( &
 
    ! Detect fagments and starting atoms
 
-   call getmolfrags(natom, nadj0, adjlist0, nblk, blklen, neqv0, eqvlen0, nfrag0, fragroot0)
-   call getmolfrags(natom, nadj1, adjlist1, nblk, blklen, neqv1, eqvlen1, nfrag1, fragroot1)
+   call findmolfrags(natom, nadj0, adjlist0, nblk, blklen, neqv0, eqvlen0, nfrag0, fragroot0)
+   call findmolfrags(natom, nadj1, adjlist1, nblk, blklen, neqv1, eqvlen1, nfrag1, fragroot1)
 
-   ! Calculate MNA cross equivalence matrix
+   ! Calculate MNA equivalence matrix
 
-   call getmnacrossequiv(natom, nblk, blklen, nadj0, adjlist0, nadj1, adjlist1, equivmat)
+   call calcequivmat(natom, nblk, blklen, nadj0, adjlist0, nadj1, adjlist1, equivmat)
 
    ! Print equivalence matrix
 
@@ -127,9 +127,9 @@ subroutine optimize_assignment( &
 !      print *
 !   end do
 
-   ! Calculate biases
+   ! Calculate bias matrix
 
-   call setcrossbias(natom, nblk, blklen, coords0, coords1, equivmat, biasmat)
+   call calcbiasmat(natom, nblk, blklen, coords0, coords1, equivmat, biasmat)
 
    ! Print biases
 

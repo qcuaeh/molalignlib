@@ -96,12 +96,12 @@ subroutine assign_atoms( &
 
    if (bias_flag) then
       if (bond_flag) then
-         setcrossbias => setmnacrossbias
+         calcbiasmat => setmnacrossbias
       else
-         setcrossbias => setsndcrossbias
+         calcbiasmat => setsndcrossbias
       end if
    else
-      setcrossbias => setnocrossbias
+      calcbiasmat => setnocrossbias
    end if
 
    ! Abort if molecules have different number of atoms

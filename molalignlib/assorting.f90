@@ -263,7 +263,7 @@ subroutine groupequiv(natom, nblk, blkidx, nadj, adjlist, neqv, eqvlen, eqvidx)
 
 end subroutine
 
-subroutine getmnacrossequiv(natom, nblk, blklen, nadj0, adjlist0, nadj1, adjlist1, equivmat)
+subroutine calcequivmat(natom, nblk, blklen, nadj0, adjlist0, nadj1, adjlist1, equivmat)
 ! Purpose: Calculate the maximum common MNA level for all atom cross assignments
 
    integer, intent(in) :: natom, nblk
@@ -289,7 +289,7 @@ subroutine getmnacrossequiv(natom, nblk, blklen, nadj0, adjlist0, nadj1, adjlist
    do h = 1, nblk
       do i = offset + 1, offset + blklen(h)
          do j = offset + 1, offset + blklen(h)
-            equivmat(i, j) = 0
+            equivmat(j, i) = 0
          end do
       end do
       offset = offset + blklen(h)
@@ -307,7 +307,7 @@ subroutine getmnacrossequiv(natom, nblk, blklen, nadj0, adjlist0, nadj1, adjlist
          do i = offset + 1, offset + blklen(h)
             do j = offset + 1, offset + blklen(h)
                if (outype0(i) == outype1(j)) then
-                  equivmat(i, j) = level
+                  equivmat(j, i) = level
                end if
             end do
          end do
