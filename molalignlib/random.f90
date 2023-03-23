@@ -36,16 +36,16 @@ abstract interface
    end subroutine
 end interface
 
-interface randnum
-   procedure randnum_sp
-   procedure randnum_dp
+interface randnum01
+   procedure randnum01_sp
+   procedure randnum01_dp
 end interface
 
-procedure(f_sp), pointer :: randnum_sp
-procedure(f_dp), pointer :: randnum_dp
+procedure(f_sp), pointer :: randnum01_sp
+procedure(f_dp), pointer :: randnum01_dp
 
 private
-public rand3
+public randarray
 public shuffle
 public initialize_random
 
@@ -67,14 +67,14 @@ subroutine initialize_random()
    integer :: unit, stat
 
    if (test_flag) then
-!      randnum_sp => random_number_sp
-!      randnum_dp => random_number_dp
-      randnum_sp => real_uni01_sp
-      randnum_dp => real_uni01_dp
+!      randnum01_sp => random_number_sp
+!      randnum01_dp => random_number_dp
+      randnum01_sp => real_uni01_sp
+      randnum01_dp => real_uni01_dp
       call rnglib_init()
    else
-      randnum_sp => random_number_sp
-      randnum_dp => random_number_dp
+      randnum01_sp => random_number_sp
+      randnum01_dp => random_number_dp
       call random_seed(size=n)
       allocate(seed(n))
       ! First try if the OS provides a random number generator
@@ -92,11 +92,12 @@ subroutine initialize_random()
 
 end subroutine initialize_random
 
-function rand3() result(x)
+function randarray(n)
+   integer, intent(in) :: n
+   real(wp) :: randarray(n)
    integer :: i
-   real(wp) :: x(3)
-   do i = 1, 3
-      call randnum(x(i))
+   do i = 1, n
+      call randnum01(randarray(i))
    end do
 end function
 
@@ -107,7 +108,7 @@ subroutine shuffle(array, n)
    real :: x
    do k = 1, 2
       do i = 1, n
-         call randnum(x)
+         call randnum01(x)
          j = floor(n*x) + 1
          temp = array(j)
          array(j) = array(i)
