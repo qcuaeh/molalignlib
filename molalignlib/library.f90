@@ -87,7 +87,6 @@ subroutine assign_atoms( &
    integer, dimension(natom0, natom0) :: order01
    integer :: nbond0, bonds0(2, maxcoord*natom0)
    integer :: nbond1, bonds1(2, maxcoord*natom1)
-   real(wp), dimension(natom0, natom0) :: d01
 
    ! Set error code to 0 by default
 
@@ -226,7 +225,8 @@ subroutine assign_atoms( &
       countlist, &
       nrec)
 
-   if (bond_flag) then
+!   if (bond_flag) then
+   if (.false.) then
 
       offset(1) = 0
       do h = 1, nblk0 - 1

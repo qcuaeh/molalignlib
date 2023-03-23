@@ -84,6 +84,10 @@ subroutine optimize_assignment( &
    real(wp) :: workcoords1(3, natom)
    real(wp) :: weights(natom)
 
+   integer i, n
+   real(wp), dimension(3, natom) :: randcoords0, randcoords1
+   integer :: votes(natom, natom)
+
    ! Assign id's and weights to atoms
 
    offset = 0
@@ -111,6 +115,18 @@ subroutine optimize_assignment( &
 
    call getmnacrossequiv(natom, nblk, blklen, nadj0, adjlist0, nadj1, adjlist1, equivmat)
 
+   ! Print equivalence matrix
+
+!   offset = 0
+!   do h = 1, nblk
+!      print *, h
+!      do i = offset + 1, offset + blklen(h)
+!         print '(100(1x, i3))', equivmat(offset+1:offset+blklen(h), i)
+!      end do
+!      offset = offset + blklen(h)
+!      print *
+!   end do
+
    ! Calculate biases
 
    call setcrossbias(natom, nblk, blklen, coords0, coords1, equivmat, biasmat)
@@ -131,6 +147,31 @@ subroutine optimize_assignment( &
 !      offset = offset + blklen(h)
 !   end do
 
+   ! Calculate assignment frequencies
+
+!   votes(:, :) = 0
+!   do n = 1, 100
+!      do i = 1, natom
+!         randcoords0(:, i) = randarray(3)
+!         randcoords1(:, i) = randarray(3)
+!      end do
+!      call minatomperm(natom, randcoords0, randcoords1, nblk, blklen, blkwgt, biasmat, mapping, olddist)
+!      print *, adjacencydiff(natom, adjmat0, adjmat1, mapping)
+!      do i = 1, natom
+!         votes(mapping(i), i) = votes(mapping(i), i) + 1
+!      end do
+!   end do
+!   print *
+!   offset = 0
+!   do h = 1, nblk
+!      print *, h
+!      do i = offset + 1, offset + blklen(h)
+!         print '(100(1x, i3))', votes(offset+1:offset+blklen(h), i)
+!      end do
+!      offset = offset + blklen(h)
+!      print *
+!   end do
+
    ! Initialize loop variables
 
    nrec = 0
@@ -145,15 +186,15 @@ subroutine optimize_assignment( &
 
       ntrial = ntrial + 1
 
-   ! Work with a copy of coords1
+      ! Work with a copy of coords1
 
       workcoords1 = coords1
 
-   ! Aply a random rotation to workcoords1
+      ! Aply a random rotation to workcoords1
 
-      call rotate(natom, workcoords1, genrotquat(rand3()))
+      call rotate(natom, workcoords1, genrotquat(randarray(3)))
 
-   ! Minimize the euclidean distance
+      ! Minimize the euclidean distance
 
       call minatomperm(natom, coords0, workcoords1, nblk, blklen, blkwgt, biasmat, mapping, olddist)
       rotquat = leastrotquat(natom, weights, coords0, workcoords1, mapping)
