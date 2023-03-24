@@ -16,32 +16,114 @@
 
 module lap
 use kinds
+use bounds
+use biasing
 
 implicit none
 
 contains
 
-subroutine minatomperm(natom, coords0, coords1, nblk, blklen, blkwgt, biasmat, mapping, totdist)
+subroutine mapatoms(natom, nblk, blklen, blkwgt, nadjblk, adjblklen, adjlist0, coords0, adjlist1, &
+      coords1, equivmat, mapping, mapdist)
 ! Find best correspondence between points sets with fixed orientation
    integer, intent(in) :: natom, nblk
    integer, dimension(:), intent(in) :: blklen
    real(wp), dimension(:), intent(in) :: blkwgt
-   real(wp), dimension(:, :), intent(in) :: coords0
-   real(wp), dimension(:, :), intent(in) :: coords1
-   real(wp), dimension(:, :), intent(in) :: biasmat
+   integer, dimension(:), intent(in) :: nadjblk
+   integer, dimension(:, :), intent(in) :: adjblklen
+   integer, dimension(:, :), intent(in) :: adjlist0, adjlist1
+   real(wp), dimension(:, :), intent(in) :: coords0, coords1
+   integer, dimension(:, :), intent(in) :: equivmat
    integer, dimension(:), intent(out) :: mapping
-   real(wp), intent(out) :: totdist
+   real(wp), intent(out) :: mapdist
 
-   integer :: h, i, j, offset
-   integer, dimension(natom) :: perm
-!   real(wp) c(n, n) ! Causes allocation errors
+   integer :: h, i, j, offset, level
+   real(wp) :: totdist, totweight
+   real(wp) :: weights(natom)
+!   real(wp) costs(natom, natom) ! Causes allocation errors
    real(wp), allocatable :: costs(:, :)
-   real(wp) :: dist
-
    allocate(costs(natom, natom))
 
    offset = 0
-   totdist = 0
+   do h = 1, nblk
+      weights(offset+1:offset+blklen(h)) = blkwgt(h)
+      offset = offset + blklen(h)
+   end do
+
+   offset = 0
+   mapdist = 0
+   do h = 1, nblk
+      do i = offset + 1, offset + blklen(h)
+         do j = offset + 1, offset + blklen(h)
+            level = 0
+            totdist = 0
+            totweight = 0
+            call recursivemap(i, j, level, equivmat(j, i), nadjblk, adjblklen, weights, adjlist0, &
+               coords0, adjlist1, coords1, totdist, totweight)
+            costs = bias_scale**2*equivmat(j, i) + totdist/totweight
+         end do
+      end do
+      call minperm(blklen(h), offset, blkwgt(h), costs, mapping, mapdist)
+      offset = offset + 1
+   end do
+
+end subroutine
+
+recursive subroutine recursivemap(i, j, level, maxlevel, nadjblk, adjblklen, weights, adjlist0, coords0, &
+      adjlist1, coords1, totdist, totweight)
+   integer, intent(in) :: i, j, maxlevel
+   integer, dimension(:), intent(in) :: nadjblk
+   integer, dimension(:, :), intent(in) :: adjblklen
+   real(wp), dimension(:), intent(in) :: weights
+   integer, dimension(:, :), intent(in) :: adjlist0, adjlist1
+   real(wp), dimension(:, :), intent(in) :: coords0, coords1
+   integer, intent(inout) :: level
+   real(wp), intent(out) :: totdist, totweight
+
+   integer :: h, k, l, offset
+   integer :: mapping(maxcoord)
+   real(wp) distmat(maxcoord, maxcoord)
+   real(wp) :: mapdist
+
+   totdist = totdist + sum((coords0(:, i) - coords1(:, j))**2)
+   totweight = totweight + weights(i)
+   if (level < maxlevel) then
+      level = level + 1
+      offset = 0
+      do h = 1, nadjblk(i)
+         do k = offset + 1, offset + adjblklen(h, i)
+            do l = offset + 1, offset + adjblklen(h, i)
+               distmat(k, l) = sum((coords0(:, adjlist0(k, i)) - coords1(:, adjlist1(l, j)))**2)
+            end do
+         end do
+         call minperm(adjblklen(h, i), offset, 0._wp, distmat, mapping, mapdist)
+         do k = offset + 1, offset + adjblklen(h, i)
+            call recursivemap(adjlist0(k, i), adjlist1(mapping(k), j), level, maxlevel, nadjblk, adjblklen, &
+               weights, adjlist0, coords0, adjlist1, coords1, totdist, totweight)
+         end do
+         offset = offset + adjblklen(h, i)
+      end do
+   end if
+
+end subroutine
+
+subroutine minatomperm(natom, coords0, coords1, nblk, blklen, blkwgt, biasmat, mapping, mapdist)
+! Find best correspondence between points sets with fixed orientation
+   integer, intent(in) :: natom, nblk
+   integer, dimension(:), intent(in) :: blklen
+   real(wp), dimension(:), intent(in) :: blkwgt
+   real(wp), dimension(:, :), intent(in) :: coords0, coords1
+   real(wp), dimension(:, :), intent(in) :: biasmat
+   integer, dimension(:), intent(out) :: mapping
+   real(wp), intent(out) :: mapdist
+
+   integer :: h, i, j, offset
+!   real(wp) costs(natom, natom) ! Causes allocation errors
+   real(wp), allocatable :: costs(:, :)
+   allocate(costs(natom, natom))
+
+   offset = 0
+   mapdist = 0
 
    do h = 1, nblk
       do i = offset + 1, offset + blklen(h)
@@ -49,21 +131,23 @@ subroutine minatomperm(natom, coords0, coords1, nblk, blklen, blkwgt, biasmat, m
             costs(i, j) = sum((coords0(:, i) - coords1(:, j))**2) + biasmat(j, i)
          end do
       end do
-      call minperm(blklen(h), offset, costs, mapping, dist)
-      totdist = totdist + blkwgt(h)*dist
+      call minperm(blklen(h), offset, blkwgt(h), costs, mapping, mapdist)
       offset = offset + blklen(h)
    end do
 
 end subroutine
 
-subroutine minperm(n, os, costs, perm, dist)
+subroutine minperm(n, os, weight, costs, perm, dist)
    integer, intent(in) :: n, os
+   real(wp), intent(in) :: weight
    real(wp), intent(inout) :: costs(:, :)
    integer, intent(out) :: perm(:)
    real(wp), intent(out) :: dist
+   real(wp) :: totcost
 
-   call assndx(1, costs(os+1:, os+1:), n, n, perm(os+1:), dist)
+   call assndx(1, costs(os+1:, os+1:), n, n, perm(os+1:), totcost)
    perm(os+1:os+n) = perm(os+1:os+n) + os
+   dist = dist + weight*totcost
 
 end subroutine
 
