@@ -8,13 +8,13 @@ linear.f90
 rnglib.f90
 subset.f90
 chemdata.f90
-#lap-jv.f90
-lap-hun.f90
+chemutils.f90
 random.f90
 sorting.f90
-biasing.f90
 printing.f90
-chemutils.f90
+biasing.f90
+#lap-jv.f90
+lap-hun.f90
 assorting.f90
 translation.f90
 rotation.f90

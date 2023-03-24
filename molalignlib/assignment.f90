@@ -73,8 +73,8 @@ subroutine optimize_assignment( &
    integer :: adjd, recadjd(maxrec)
    integer, dimension(natom) :: nadj0, nadj1
    integer, dimension(maxcoord, natom) :: adjlist0, adjlist1
-   integer, dimension(natom) :: nblknei0, nblknei1
-   integer, dimension(maxcoord, natom) :: blkneilen0, blkneilen1
+   integer, dimension(natom) :: nadjblk0, nadjblk1
+   integer, dimension(maxcoord, natom) :: adjblklen0, adjblklen1
    integer, dimension(natom) :: neqvnei0, neqvnei1
    integer, dimension(maxcoord, natom) :: eqvneilen0, eqvneilen1
    integer, dimension(natom) :: fragroot0, fragroot1
@@ -105,8 +105,8 @@ subroutine optimize_assignment( &
 
    ! Group neighbors by type
 
-   call groupneighbors(natom, nblk, blklen, nadj0, adjlist0, nblknei0, blkneilen0)
-   call groupneighbors(natom, nblk, blklen, nadj1, adjlist1, nblknei1, blkneilen1)
+   call groupneighbors(natom, nblk, blklen, nadj0, adjlist0, nadjblk0, adjblklen0)
+   call groupneighbors(natom, nblk, blklen, nadj1, adjlist1, nadjblk1, adjblklen1)
 
    ! Group neighbors by MNA
 
@@ -204,6 +204,8 @@ subroutine optimize_assignment( &
       ! Minimize the euclidean distance
 
       call minatomperm(natom, coords0, workcoords1, nblk, blklen, blkwgt, biasmat, mapping, olddist)
+!      call mapatoms(natom, nblk, blklen, blkwgt, nadjblk0, adjblklen0, adjlist0, coords0, adjlist1, &
+!         coords1, equivmat, mapping, olddist)
       rotquat = leastrotquat(natom, weights, coords0, workcoords1, mapping)
       prodquat = rotquat
       totalrot = rotangle(rotquat)
@@ -214,6 +216,8 @@ subroutine optimize_assignment( &
       do while (iter_flag)
          olddist = squaredist(natom, weights, coords0, workcoords1, mapping) + biasdist(natom, weights, biasmat, mapping)
          call minatomperm(natom, coords0, workcoords1, nblk, blklen, blkwgt, biasmat, auxperm, newdist)
+!         call mapatoms(natom, nblk, blklen, blkwgt, nadjblk0, adjblklen0, adjlist0, coords0, adjlist1, &
+!            coords1, equivmat, mapping, newdist)
          if (all(auxperm == mapping)) exit
          if (newdist > olddist) then
             write (error_unit, '(a)') 'newdist is larger than olddist!'
