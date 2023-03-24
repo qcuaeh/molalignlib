@@ -129,15 +129,15 @@ subroutine assign_atoms( &
    call adjmat2list(natom0, adjmat0, nadj0, adjlist0)
    call adjmat2list(natom1, adjmat1, nadj1, adjlist1)
 
-   ! Group atoms by label
+   ! Group atoms by type
 
-   call groupblocks(natom0, znums0, types0, weights0, nblk0, blklen0, blkwgt0, blkidx0)
-   call groupblocks(natom1, znums1, types1, weights1, nblk1, blklen1, blkwgt1, blkidx1)
+   call groupatoms(natom0, znums0, types0, weights0, nblk0, blklen0, blkwgt0, blkidx0)
+   call groupatoms(natom1, znums1, types1, weights1, nblk1, blklen1, blkwgt1, blkidx1)
 
-   ! Group atoms by NMA at infinite level
+   ! Group atoms by MNA
 
-   call groupequiv(natom0, nblk0, blkidx0, nadj0, adjlist0, neqv0, eqvlen0, eqvidx0)
-   call groupequiv(natom1, nblk1, blkidx1, nadj1, adjlist1, neqv1, eqvlen1, eqvidx1)
+   call groupequivatoms(natom0, nblk0, blkidx0, nadj0, adjlist0, neqv0, eqvlen0, eqvidx0)
+   call groupequivatoms(natom1, nblk1, blkidx1, nadj1, adjlist1, neqv1, eqvlen1, eqvidx1)
 
    ! Get atom order
 

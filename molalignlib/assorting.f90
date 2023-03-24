@@ -27,7 +27,7 @@ implicit none
 
 contains
 
-subroutine groupblocks(natom, znums, types, weights, nblk, blklen, blkwgt, blkidx)
+subroutine groupatoms(natom, znums, types, weights, nblk, blklen, blkwgt, blkidx)
 ! Purpose: Group atoms by atomic numbers and types
    integer, intent(in) :: natom
    integer, dimension(:), intent(in) :: znums
@@ -149,7 +149,7 @@ subroutine groupbytype(nelem, elements, types, groupid, ngroup, groupsize)
 
 end subroutine
 
-subroutine groupeqvnei(natom, neqv, eqvlen, nadj, adjlist, neqvnei, eqvneilen)
+subroutine groupneighbors(natom, neqv, eqvlen, nadj, adjlist, neqvnei, eqvneilen)
 ! Purpose: Categorize atoms by eqtypes
    integer, intent(in) :: natom, neqv
    integer, dimension(:), intent(in) :: nadj, eqvlen
@@ -222,7 +222,7 @@ subroutine getmnatypes(natom, nin, intype, nadj, adjlist, nout, outype, outsize,
 
 end subroutine
 
-subroutine groupequiv(natom, nblk, blkidx, nadj, adjlist, neqv, eqvlen, eqvidx)
+subroutine groupequivatoms(natom, nblk, blkidx, nadj, adjlist, neqv, eqvlen, eqvidx)
 ! Group atoms by MNA at infinite lavel
    integer, intent(in) :: natom, nblk
    integer, dimension(:), intent(in) :: nadj
