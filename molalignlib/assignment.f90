@@ -300,40 +300,4 @@ subroutine optimize_assignment( &
 
 end subroutine
 
-! Find best correspondence between points sets with fixed orientation
-subroutine minatomperm(natom, coords0, coords1, nblk, blklen, blkwgt, biasmat, mapping, totdist)
-
-! nblk: Number of block atoms
-! blklen: Number of atoms in each block
-! mapping: Map between correspondent points in the adjmat
-! offset: First element of current block
-
-   integer, intent(in) :: natom, nblk
-   integer, dimension(:), intent(in) :: blklen
-   real(wp), dimension(:), intent(in) :: blkwgt
-   real(wp), dimension(:, :), intent(in) :: coords0
-   real(wp), dimension(:, :), intent(in) :: coords1
-   real(wp), dimension(:, :), intent(in) :: biasmat
-   integer, dimension(:), intent(out) :: mapping
-   real(wp), intent(out) :: totdist
-
-   integer :: h, offset
-   integer, dimension(natom) :: perm
-   real(wp) :: dist
-
-   ! Fill distance matrix for each block
-
-   offset = 0
-   totdist = 0
-
-   do h = 1, nblk
-      call minperm(blklen(h), coords0(:, offset+1:offset+blklen(h)), coords1(:, offset+1:offset+blklen(h)), &
-         biasmat(offset+1:offset+blklen(h), offset+1:offset+blklen(h)), perm, dist)
-      mapping(offset+1:offset+blklen(h)) = perm(:blklen(h)) + offset
-      totdist = totdist + blkwgt(h)*dist
-      offset = offset + blklen(h)
-   end do
-
-end subroutine
-
 end module

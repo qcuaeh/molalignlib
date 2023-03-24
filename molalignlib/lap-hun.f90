@@ -21,32 +21,53 @@ implicit none
 
 contains
 
-subroutine minperm(n, p, q, pq, perm, dist)
+subroutine minatomperm(natom, coords0, coords1, nblk, blklen, blkwgt, biasmat, mapping, totdist)
+! Find best correspondence between points sets with fixed orientation
+   integer, intent(in) :: natom, nblk
+   integer, dimension(:), intent(in) :: blklen
+   real(wp), dimension(:), intent(in) :: blkwgt
+   real(wp), dimension(:, :), intent(in) :: coords0
+   real(wp), dimension(:, :), intent(in) :: coords1
+   real(wp), dimension(:, :), intent(in) :: biasmat
+   integer, dimension(:), intent(out) :: mapping
+   real(wp), intent(out) :: totdist
 
-   integer, intent(in) :: n
-   real(wp), intent(in) :: p(3, n), q(3, n)
-   real(wp), intent(in) :: pq(n, n)
-   integer, intent(out) :: perm(n)
-   real(wp), intent(out) :: dist
+   integer :: h, i, j, offset
+   integer, dimension(natom) :: perm
+!   real(wp) c(n, n) ! Causes allocation errors
+   real(wp), allocatable :: costs(:, :)
+   real(wp) :: dist
 
-   integer :: i, j
-!  real(wp) c(n, n)
-   real(wp), allocatable :: c(:, :)
-   allocate(c(n, n))
+   allocate(costs(natom, natom))
 
-   do i = 1, n
-      do j = 1, n
-         c(i, j) = sum((p(:, i) - q(:, j))**2) + pq(j, i)
+   offset = 0
+   totdist = 0
+
+   do h = 1, nblk
+      do i = offset + 1, offset + blklen(h)
+         do j = offset + 1, offset + blklen(h)
+            costs(i, j) = sum((coords0(:, i) - coords1(:, j))**2) + biasmat(j, i)
+         end do
       end do
+      call minperm(blklen(h), offset, costs, mapping, dist)
+      totdist = totdist + blkwgt(h)*dist
+      offset = offset + blklen(h)
    end do
-
-   call assndx(1, c, n, n, perm, dist)
 
 end subroutine
 
+subroutine minperm(n, os, costs, perm, dist)
+   integer, intent(in) :: n, os
+   real(wp), intent(inout) :: costs(:, :)
+   integer, intent(out) :: perm(:)
+   real(wp), intent(out) :: dist
+
+   call assndx(1, costs(os+1:, os+1:), n, n, perm(os+1:), dist)
+   perm(os+1:os+n) = perm(os+1:os+n) + os
+
+end subroutine
 
 subroutine assndx(mode, a, n, m, k, sum)
-
 !https://wp.csiro.au/alanmiller/assndx.f90
 ! Code converted using TO_F90 by Alan Miller
 ! Date: 2002-03-06  Time: 08:36:31
