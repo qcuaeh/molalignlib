@@ -73,6 +73,8 @@ subroutine optimize_assignment( &
    integer :: adjd, recadjd(maxrec)
    integer, dimension(natom) :: nadj0, nadj1
    integer, dimension(maxcoord, natom) :: adjlist0, adjlist1
+   integer, dimension(natom) :: nblknei0, nblknei1
+   integer, dimension(maxcoord, natom) :: blkneilen0, blkneilen1
    integer, dimension(natom) :: neqvnei0, neqvnei1
    integer, dimension(maxcoord, natom) :: eqvneilen0, eqvneilen1
    integer, dimension(natom) :: fragroot0, fragroot1
@@ -101,10 +103,15 @@ subroutine optimize_assignment( &
    call adjmat2list(natom, adjmat0, nadj0, adjlist0)
    call adjmat2list(natom, adjmat1, nadj1, adjlist1)
 
-   ! Group MNA equivalent neighbors
+   ! Group neighbors by type
 
-   call groupeqvnei(natom, neqv0, eqvlen0, nadj0, adjlist0, neqvnei0, eqvneilen0)
-   call groupeqvnei(natom, neqv1, eqvlen1, nadj1, adjlist1, neqvnei1, eqvneilen1)
+   call groupneighbors(natom, nblk, blklen, nadj0, adjlist0, nblknei0, blkneilen0)
+   call groupneighbors(natom, nblk, blklen, nadj1, adjlist1, nblknei1, blkneilen1)
+
+   ! Group neighbors by MNA
+
+   call groupneighbors(natom, neqv0, eqvlen0, nadj0, adjlist0, neqvnei0, eqvneilen0)
+   call groupneighbors(natom, neqv1, eqvlen1, nadj1, adjlist1, neqvnei1, eqvneilen1)
 
    ! Detect fagments and starting atoms
 
