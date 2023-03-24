@@ -11,7 +11,7 @@ subroutine mapatoms(natom, coords0, coords1, nadj0, adjlist0, nadj1, adjlist1, e
                      distmat(k, l) = sum((coords0(:, adjlist0(k)) - coords1(:, adjlist1(l)))**2)
                   end do
                end do
-               call minperm(distmat, goffset, blkneilen0(k), mapping, dist)
+               call minperm(blkneilen0(k), goffset, distmat, mapping, dist)
                goffset = goffset + blkneilen0(k)
             end do
          end do
@@ -20,5 +20,3 @@ subroutine mapatoms(natom, coords0, coords1, nadj0, adjlist0, nadj1, adjlist1, e
    end do
 
 end subroutine
-
-
