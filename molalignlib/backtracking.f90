@@ -251,12 +251,12 @@ subroutine minadjdiff (natom, weights, nblk, blklen, coords0, nadj0, adjlist0, a
 end subroutine
 
 subroutine eqvatomperm (natom, weights, coords, adjmat, adjlist, neqv, eqvlen, &
-   neqvnei, eqvneilen, refcoords, refadjmat, mapping, nfrag, fragroot)
+   nadjeqv, adjeqvlen, refcoords, refadjmat, mapping, nfrag, fragroot)
 ! Purpose: Find best correspondence between points of graphs
 
    integer, intent(in) :: natom, neqv
-   integer, dimension(:), intent(in) :: eqvlen, neqvnei
-   integer, dimension(:, :), intent(in) :: adjlist, eqvneilen
+   integer, dimension(:), intent(in) :: eqvlen, nadjeqv
+   integer, dimension(:, :), intent(in) :: adjlist, adjeqvlen
    integer, dimension(:), intent(inout) :: mapping
    real(wp), dimension(:), intent(in) :: weights
    real(wp), dimension(:, :), intent(in) :: coords, refcoords
@@ -295,9 +295,9 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlist, neqv, eqvlen, &
 
 !   do i = 1, natom
 !      offset = 0
-!      do h = 1, neqvnei(i)
-!         print *, i, ':', adjlist(offset+1:offset+eqvneilen(h, i), i)
-!         offset = offset + eqvneilen(h, i)
+!      do h = 1, nadjeqv(i)
+!         print *, i, ':', adjlist(offset+1:offset+adjeqvlen(h, i), i)
+!         offset = offset + adjeqvlen(h, i)
 !      end do
 !   end do
 
@@ -344,10 +344,10 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlist, neqv, eqvlen, &
       last = eqvos(eqvidx(nodea)) + eqvlen(eqvidx(nodea))
       held(first:last) = .true.
       offset = 0
-      do h = 1, neqvnei(nodea)
+      do h = 1, nadjeqv(nodea)
          ! find not tracked neighbors in group
          meqvnei = 0
-         do i = 1, eqvneilen(h, nodea)
+         do i = 1, adjeqvlen(h, nodea)
             if (.not. held(adjlist(offset+i, nodea))) then 
                meqvnei = meqvnei + 1
                equiva(meqvnei) = adjlist(offset+meqvnei, nodea)
@@ -362,7 +362,7 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlist, neqv, eqvlen, &
                   mapping, locked_c)
             end if
          end do
-         offset = offset + eqvneilen(h, nodea)
+         offset = offset + adjeqvlen(h, nodea)
       end do
    end subroutine recursive_remap
 
@@ -400,10 +400,10 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlist, neqv, eqvlen, &
 
       offset = 0
       ! run over groups of atoms with equivalent type
-      do h = 1, neqvnei(node)
+      do h = 1, nadjeqv(node)
          ! find not tracked neighbors in group
          meqvnei = 0
-         do i = 1, eqvneilen(h, node)
+         do i = 1, adjeqvlen(h, node)
             if (.not. tracked(adjlist(offset+i, node)) &
                .and. .not. held(adjlist(offset+i, node))) then
                meqvnei = meqvnei + 1
@@ -479,7 +479,7 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlist, neqv, eqvlen, &
                                 locked_c, ntrack, track)
             end do
          end if
-         offset = offset + eqvneilen(h, node)
+         offset = offset + adjeqvlen(h, node)
       end do
    end subroutine
 
