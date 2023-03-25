@@ -80,7 +80,6 @@ subroutine assign_atoms( &
    integer, dimension(:), allocatable :: backorder0, backorder1
    integer, dimension(:), allocatable :: eqvidx0, eqvidx1
    integer, dimension(:), allocatable :: eqvlen0, eqvlen1
-   real(wp), dimension(:), allocatable :: blkwgt0, blkwgt1
    real(wp) :: travec0(3), travec1(3)
 
    integer, dimension(natom0) :: offset, blkidx, mapping
@@ -118,7 +117,6 @@ subroutine assign_atoms( &
    allocate(backorder0(natom0), backorder1(natom1))
    allocate(blkidx0(natom0), blkidx1(natom1))
    allocate(blklen0(natom0), blklen1(natom1))
-   allocate(blkwgt0(natom0), blkwgt1(natom1))
    allocate(nadj0(natom0), nadj1(natom1))
    allocate(adjlist0(maxcoord, natom0), adjlist1(maxcoord, natom1))
    allocate(eqvidx0(natom0), eqvidx1(natom1))
@@ -131,8 +129,8 @@ subroutine assign_atoms( &
 
    ! Group atoms by type
 
-   call groupatoms(natom0, znums0, types0, weights0, nblk0, blklen0, blkwgt0, blkidx0)
-   call groupatoms(natom1, znums1, types1, weights1, nblk1, blklen1, blkwgt1, blkidx1)
+   call groupatoms(natom0, znums0, types0, weights0, nblk0, blklen0, blkidx0)
+   call groupatoms(natom1, znums1, types1, weights1, nblk1, blklen1, blkidx1)
 
    ! Group atoms by MNA
 
@@ -212,7 +210,6 @@ subroutine assign_atoms( &
       natom0, &
       nblk0, &
       blklen0, &
-      blkwgt0, &
       neqv0, &
       eqvlen0, &
       workcoords0, &
@@ -221,12 +218,12 @@ subroutine assign_atoms( &
       eqvlen1, &
       workcoords1, &
       workadjmat1, &
+      workweights0, &
       maplist, &
       countlist, &
       nrec)
 
-!   if (bond_flag) then
-   if (.false.) then
+   if (bond_flag) then
 
       offset(1) = 0
       do h = 1, nblk0 - 1
@@ -280,7 +277,6 @@ subroutine assign_atoms( &
          natom0, &
          nblk0, &
          blklen0, &
-         blkwgt0, &
          neqv0, &
          eqvlen0, &
          workcoords0, &
@@ -289,6 +285,7 @@ subroutine assign_atoms( &
          eqvlen1, &
          workcoords1, &
          workadjmat1, &
+         workweights0, &
          maplist, &
          countlist, &
          nrec)

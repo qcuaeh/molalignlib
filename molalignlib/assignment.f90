@@ -42,7 +42,6 @@ subroutine optimize_assignment( &
    natom, &
    nblk, &
    blklen, &
-   blkwgt, &
    neqv0, &
    eqvlen0, &
    coords0, &
@@ -51,6 +50,7 @@ subroutine optimize_assignment( &
    eqvlen1, &
    coords1, &
    adjmat1, &
+   weights, &
    maplist, &
    countlist, &
    nrec)
@@ -58,9 +58,9 @@ subroutine optimize_assignment( &
    integer, intent(in) :: natom, nblk, neqv0, neqv1
    integer, dimension(:), intent(in) :: blklen
    integer, dimension(:), intent(in) :: eqvlen0, eqvlen1
-   real(wp), dimension(:), intent(in) :: blkwgt
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
    logical, dimension(:, :), intent(in) :: adjmat0, adjmat1
+   real(wp), dimension(:), intent(in) :: weights
    integer, intent(out) :: maplist(:, :)
    integer, intent(out) :: countlist(:)
    integer, intent(out) :: nrec
@@ -69,34 +69,25 @@ subroutine optimize_assignment( &
    logical visited, overflow
    integer :: nfrag0, nfrag1
    integer irec, mrec, ntrial, nstep, steps
-   integer, dimension(natom) :: mapping, auxperm
+   integer, dimension(natom) :: mapping, newmapping
    integer :: adjd, recadjd(maxrec)
    integer, dimension(natom) :: nadj0, nadj1
    integer, dimension(maxcoord, natom) :: adjlist0, adjlist1
    integer, dimension(natom) :: nadjblk0, nadjblk1
    integer, dimension(maxcoord, natom) :: adjblklen0, adjblklen1
-   integer, dimension(natom) :: neqvnei0, neqvnei1
-   integer, dimension(maxcoord, natom) :: eqvneilen0, eqvneilen1
+   integer, dimension(natom) :: nadjeqv0, nadjeqv1
+   integer, dimension(maxcoord, natom) :: adjeqvlen0, adjeqvlen1
    integer, dimension(natom) :: fragroot0, fragroot1
    integer :: equivmat(natom, natom)
-   real(wp) :: rmsd, olddist, newdist, totalrot
+   real(wp) :: rmsd, mapdist, newmapdist, totalrot
    real(wp), dimension(4) :: rotquat, prodquat
    real(wp), dimension(maxrec) :: recrmsd, avgsteps, avgtotalrot, avgrealrot
    real(wp) :: biasmat(natom, natom)
    real(wp) :: workcoords1(3, natom)
-   real(wp) :: weights(natom)
 
-   integer i, n
-   real(wp), dimension(3, natom) :: randcoords0, randcoords1
-   integer :: votes(natom, natom)
-
-   ! Assign id's and weights to atoms
-
-   offset = 0
-   do h = 1, nblk
-      weights(offset+1:offset+blklen(h)) = blkwgt(h)
-      offset = offset + blklen(h)
-   end do
+!   integer i, n
+!   real(wp), dimension(3, natom) :: randcoords0, randcoords1
+!   integer :: votes(natom, natom)
 
    ! Recalculate adjacency lists
 
@@ -110,8 +101,8 @@ subroutine optimize_assignment( &
 
    ! Group neighbors by MNA
 
-   call groupneighbors(natom, neqv0, eqvlen0, nadj0, adjlist0, neqvnei0, eqvneilen0)
-   call groupneighbors(natom, neqv1, eqvlen1, nadj1, adjlist1, neqvnei1, eqvneilen1)
+   call groupneighbors(natom, neqv0, eqvlen0, nadj0, adjlist0, nadjeqv0, adjeqvlen0)
+   call groupneighbors(natom, neqv1, eqvlen1, nadj1, adjlist1, nadjeqv1, adjeqvlen1)
 
    ! Detect fagments and starting atoms
 
@@ -162,7 +153,7 @@ subroutine optimize_assignment( &
 !         randcoords0(:, i) = randarray(3)
 !         randcoords1(:, i) = randarray(3)
 !      end do
-!      call minatomperm(natom, randcoords0, randcoords1, nblk, blklen, blkwgt, biasmat, mapping, olddist)
+!      call minatomperm(natom, randcoords0, randcoords1, nblk, blklen, biasmat, mapping)
 !      print *, adjacencydiff(natom, adjmat0, adjmat1, mapping)
 !      do i = 1, natom
 !         votes(mapping(i), i) = votes(mapping(i), i) + 1
@@ -203,9 +194,9 @@ subroutine optimize_assignment( &
 
       ! Minimize the euclidean distance
 
-      call minatomperm(natom, coords0, workcoords1, nblk, blklen, blkwgt, biasmat, mapping, olddist)
-!      call mapatoms(natom, nblk, blklen, blkwgt, nadjblk0, adjblklen0, adjlist0, coords0, adjlist1, &
-!         coords1, equivmat, mapping, olddist)
+      call minatomperm(natom, coords0, workcoords1, nblk, blklen, biasmat, mapping)
+!      call mapatoms(natom, nblk, blklen, nadjblk0, adjblklen0, adjlist0, coords0, adjlist1, &
+!         coords1, weights, equivmat, mapping)
       rotquat = leastrotquat(natom, weights, coords0, workcoords1, mapping)
       prodquat = rotquat
       totalrot = rotangle(rotquat)
@@ -214,20 +205,23 @@ subroutine optimize_assignment( &
       steps = 1
 
       do while (iter_flag)
-         olddist = squaredist(natom, weights, coords0, workcoords1, mapping) + biasdist(natom, weights, biasmat, mapping)
-         call minatomperm(natom, coords0, workcoords1, nblk, blklen, blkwgt, biasmat, auxperm, newdist)
-!         call mapatoms(natom, nblk, blklen, blkwgt, nadjblk0, adjblklen0, adjlist0, coords0, adjlist1, &
-!            coords1, equivmat, mapping, newdist)
-         if (all(auxperm == mapping)) exit
-         if (newdist > olddist) then
-            write (error_unit, '(a)') 'newdist is larger than olddist!'
-!            print *, olddist, newdist
+         mapdist = squaredist(natom, weights, coords0, workcoords1, mapping) &
+            + biasdist(natom, weights, biasmat, mapping)
+         call minatomperm(natom, coords0, workcoords1, nblk, blklen, biasmat, newmapping)
+!         call mapatoms(natom, nblk, blklen, nadjblk0, adjblklen0, adjlist0, coords0, adjlist1, &
+!            coords1, weights, equivmat, mapping)
+         newmapdist = squaredist(natom, weights, coords0, workcoords1, newmapping) &
+            + biasdist(natom, weights, biasmat, newmapping)
+         if (all(newmapping == mapping)) exit
+         if (newmapdist > mapdist) then
+            write (error_unit, '(a)') 'newmapdist is larger than mapdist!'
+!            print *, mapdist, newmapdist
          end if
-         rotquat = leastrotquat(natom, weights, coords0, workcoords1, auxperm)
+         rotquat = leastrotquat(natom, weights, coords0, workcoords1, newmapping)
          prodquat = quatmul(rotquat, prodquat)
          call rotate(natom, workcoords1, rotquat)
          totalrot = totalrot + rotangle(rotquat)
-         mapping = auxperm
+         mapping = newmapping
          steps = steps + 1
       end do
 
@@ -239,7 +233,7 @@ subroutine optimize_assignment( &
             eqvlen0, workcoords1, nadj1, adjlist1, adjmat1, neqv1, eqvlen1, mapping, nfrag0, fragroot0)
 
          call eqvatomperm(natom, weights, coords0, adjmat0, adjlist0, neqv0, eqvlen0, &
-            neqvnei0, eqvneilen0, workcoords1, adjmat1, mapping, nfrag0, fragroot0)
+            nadjeqv0, adjeqvlen0, workcoords1, adjmat1, mapping, nfrag0, fragroot0)
 
       end if
 

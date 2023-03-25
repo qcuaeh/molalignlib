@@ -39,7 +39,7 @@ real(wp) function biasdist(natom, weights, biasmat, mapping) result(dist)
    dist = 0
 
    do i = 1, natom
-      dist = dist + weights(i)*biasmat(i, mapping(i))
+      dist = dist + weights(i)*biasmat(mapping(i), i)
    end do
 
 end function

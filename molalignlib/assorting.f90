@@ -27,7 +27,7 @@ implicit none
 
 contains
 
-subroutine groupatoms(natom, znums, types, weights, nblk, blklen, blkwgt, blkidx)
+subroutine groupatoms(natom, znums, types, weights, nblk, blklen, blkidx)
 ! Purpose: Group atoms by atomic numbers and types
    integer, intent(in) :: natom
    integer, dimension(:), intent(in) :: znums
@@ -35,7 +35,6 @@ subroutine groupatoms(natom, znums, types, weights, nblk, blklen, blkwgt, blkidx
    real(wp), dimension(:), intent(in) :: weights
    integer, intent(out) :: nblk
    integer, dimension(:), intent(out) :: blklen
-   real(wp), dimension(:), intent(out) :: blkwgt
    integer, dimension(:), intent(out) :: blkidx
 
    integer :: i, j
@@ -57,7 +56,6 @@ subroutine groupatoms(natom, znums, types, weights, nblk, blklen, blkwgt, blkidx
          blklen(nblk) = 1
          blkznum(nblk) = znums(i)
          blktype(nblk) = types(i)
-         blkwgt(nblk) = weights(i)
          blkidx(i) = nblk
          do j = i + 1, natom
             if (remaining(i)) then
@@ -149,13 +147,13 @@ subroutine groupbytype(nelem, elements, types, groupid, ngroup, groupsize)
 
 end subroutine
 
-subroutine groupneighbors(natom, neqv, eqvlen, nadj, adjlist, neqvnei, eqvneilen)
+subroutine groupneighbors(natom, neqv, eqvlen, nadj, adjlist, nadjeqv, adjeqvlen)
 ! Purpose: Categorize atoms by eqtypes
    integer, intent(in) :: natom, neqv
    integer, dimension(:), intent(in) :: nadj, eqvlen
    integer, dimension(:, :), intent(inout) :: adjlist
-   integer, dimension(:), intent(out) :: neqvnei
-   integer, dimension(:, :), intent(out) :: eqvneilen
+   integer, dimension(:), intent(out) :: nadjeqv
+   integer, dimension(:, :), intent(out) :: adjeqvlen
 
    integer i, h, offset
    integer :: eqvidx(natom)
@@ -170,7 +168,7 @@ subroutine groupneighbors(natom, neqv, eqvlen, nadj, adjlist, neqvnei, eqvneilen
    end do
 
    do i = 1, natom
-      call groupbytype(nadj(i), adjlist(:, i), eqvidx, adjeqvid, neqvnei(i), eqvneilen(:, i))
+      call groupbytype(nadj(i), adjlist(:, i), eqvidx, adjeqvid, nadjeqv(i), adjeqvlen(:, i))
       reorder(:nadj(i)) = sortorder(adjeqvid, nadj(i))
       adjlist(:nadj(i), i) = adjlist(reorder(:nadj(i)), i)
    end do
@@ -178,9 +176,9 @@ subroutine groupneighbors(natom, neqv, eqvlen, nadj, adjlist, neqvnei, eqvneilen
 !    do i = 1, natom
 !        print '(a, 1x, i0, 1x, a)', '--------------', i, '--------------'
 !        offset = 0
-!        do j = 1, neqvnei(i)
-!            print *, adjlist(offset+1:offset+eqvneilen(j, i), i)
-!            offset = offset + eqvneilen(j, i)
+!        do j = 1, nadjeqv(i)
+!            print *, adjlist(offset+1:offset+adjeqvlen(j, i), i)
+!            offset = offset + adjeqvlen(j, i)
 !         end do
 !    end do
 
