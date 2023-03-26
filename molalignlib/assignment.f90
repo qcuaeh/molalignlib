@@ -205,18 +205,10 @@ subroutine optimize_assignment( &
       steps = 1
 
       do while (iter_flag)
-         mapdist = squaredist(natom, weights, coords0, workcoords1, mapping) &
-            + biasdist(natom, weights, biasmat, mapping)
          call minatomperm(natom, coords0, workcoords1, nblk, blklen, biasmat, newmapping)
 !         call mapatoms(natom, nblk, blklen, nadjblk0, adjblklen0, adjlist0, coords0, adjlist1, &
 !            coords1, weights, equivmat, mapping)
-         newmapdist = squaredist(natom, weights, coords0, workcoords1, newmapping) &
-            + biasdist(natom, weights, biasmat, newmapping)
          if (all(newmapping == mapping)) exit
-         if (newmapdist > mapdist) then
-            write (error_unit, '(a)') 'newmapdist is larger than mapdist!'
-!            print *, mapdist, newmapdist
-         end if
          rotquat = leastrotquat(natom, weights, coords0, workcoords1, newmapping)
          prodquat = quatmul(rotquat, prodquat)
          call rotate(natom, workcoords1, rotquat)
