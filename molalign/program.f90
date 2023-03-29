@@ -58,17 +58,18 @@ program molalign
 
    ! Set default options
 
+   test_flag = .false.
    sort_flag = .false.
    iter_flag = .false.
    bias_flag = .false.
    bond_flag = .false.
+   back_flag = .false.
+   react_flag = .false.
+   stats_flag = .false.
    trial_flag = .false.
    stdin_flag = .false.
    stdout_flag = .false.
-   test_flag = .false.
-   stats_flag = .false.
    mirror_flag = .false.
-   back_flag = .false.
 
    maxrec = 1
    maxcount = 10
@@ -103,6 +104,7 @@ program molalign
          bias_flag = .true.
       case ('-bond')
          bond_flag = .true.
+         react_flag = .true.
          print_stats => print_stats_diff
       case ('-mass')
          weight_func => stdmass
