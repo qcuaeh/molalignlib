@@ -222,7 +222,7 @@ subroutine assign_atoms( &
       countlist, &
       nrec)
 
-   if (bond_flag) then
+   if (react_flag) then
 
       offset(1) = 0
       do h = 1, nblk0 - 1
