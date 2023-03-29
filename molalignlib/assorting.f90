@@ -261,19 +261,22 @@ subroutine groupequivatoms(natom, nblk, blkidx, nadj, adjlist, neqv, eqvlen, eqv
 
 end subroutine
 
-subroutine calcequivmat(natom, nblk, blklen, nadj0, adjlist0, nadj1, adjlist1, equivmat)
+subroutine calcequivmat(natom, nblk, blklen, nadj0, adjlist0, nadjmna0, adjmnalen0, &
+   nadj1, adjlist1, nadjmna1, adjmnalen1, equivmat)
 ! Purpose: Calculate the maximum common MNA level for all atom cross assignments
-
    integer, intent(in) :: natom, nblk
    integer, dimension(:), intent(in) :: blklen
    integer, dimension(:), intent(in) :: nadj0, nadj1
-   integer, dimension(:, :), intent(in) :: adjlist0, adjlist1
+   integer, dimension(:, :), intent(inout) :: adjlist0, adjlist1
+   integer, dimension(:, :), intent(out) :: nadjmna0, nadjmna1
+   integer, dimension(:, :, :), intent(out) :: adjmnalen0, adjmnalen1
    integer, dimension(:, :), intent(out) :: equivmat
 
    integer :: h, i, j, offset, level, nin, nout
    integer, dimension(natom) :: intype0, intype1, outype0, outype1
+   integer, dimension(maxcoord) :: indices, reorder
 
-   level = 0
+   level = 1
    nin = nblk
 
    offset = 0
@@ -283,28 +286,13 @@ subroutine calcequivmat(natom, nblk, blklen, nadj0, adjlist0, nadj1, adjlist1, e
       offset = offset + blklen(h)
    end do
 
-   offset = 0
-   do h = 1, nblk
-      do i = offset + 1, offset + blklen(h)
-         do j = offset + 1, offset + blklen(h)
-            equivmat(j, i) = 0
-         end do
-      end do
-      offset = offset + blklen(h)
-   end do
-
    do
-
-      level = level + 1
-
-      call getmnacrosstypes(natom, nin, intype0, nadj0, adjlist0, intype1, nadj1, adjlist1, &
-         nout, outype0, outype1)
 
       offset = 0
       do h = 1, nblk
          do i = offset + 1, offset + blklen(h)
             do j = offset + 1, offset + blklen(h)
-               if (outype0(i) == outype1(j)) then
+               if (intype0(i) == intype1(j)) then
                   equivmat(j, i) = level
                end if
             end do
@@ -312,11 +300,27 @@ subroutine calcequivmat(natom, nblk, blklen, nadj0, adjlist0, nadj1, adjlist1, e
          offset = offset + blklen(h)
       end do
 
+      do i = 1, natom
+         call groupbytype(nadj0(i), adjlist0(:, i), intype0, indices, nadjmna0(i, level), adjmnalen0(:, i, level))
+         reorder(:nadj0(i)) = sortorder(indices, nadj0(i))
+         adjlist0(:nadj0(i), i) = adjlist0(reorder(:nadj0(i)), i)
+      end do
+
+      do i = 1, natom
+         call groupbytype(nadj1(i), adjlist1(:, i), intype1, indices, nadjmna1(i, level), adjmnalen1(:, i, level))
+         reorder(:nadj1(i)) = sortorder(indices, nadj1(i))
+         adjlist1(:nadj1(i), i) = adjlist1(reorder(:nadj1(i)), i)
+      end do
+
+      call getmnacrosstypes(natom, nin, intype0, nadj0, adjlist0, intype1, nadj1, adjlist1, &
+         nout, outype0, outype1)
+
       if (all(outype0 == intype0) .and. all((outype1 == intype1))) exit
 
       nin = nout
       intype0 = outype0
       intype1 = outype1
+      level = level + 1
 
    end do
 

@@ -65,7 +65,6 @@ subroutine optimize_assignment( &
    integer, intent(out) :: countlist(:)
    integer, intent(out) :: nrec
 
-   integer :: h, offset
    logical visited, overflow
    integer :: nfrag0, nfrag1
    integer irec, mrec, ntrial, nstep, steps
@@ -73,19 +72,19 @@ subroutine optimize_assignment( &
    integer :: adjd, recadjd(maxrec)
    integer, dimension(natom) :: nadj0, nadj1
    integer, dimension(maxcoord, natom) :: adjlist0, adjlist1
-   integer, dimension(natom) :: nadjblk0, nadjblk1
-   integer, dimension(maxcoord, natom) :: adjblklen0, adjblklen1
+   integer, dimension(natom, maxlevel) :: nadjmna0, nadjmna1
+   integer, dimension(maxcoord, natom, maxlevel) :: adjmnalen0, adjmnalen1
    integer, dimension(natom) :: nadjeqv0, nadjeqv1
    integer, dimension(maxcoord, natom) :: adjeqvlen0, adjeqvlen1
    integer, dimension(natom) :: fragroot0, fragroot1
    integer :: equivmat(natom, natom)
-   real(wp) :: rmsd, mapdist, newmapdist, totalrot
+   real(wp) :: rmsd, totalrot
    real(wp), dimension(4) :: rotquat, prodquat
    real(wp), dimension(maxrec) :: recrmsd, avgsteps, avgtotalrot, avgrealrot
    real(wp) :: biasmat(natom, natom)
    real(wp) :: workcoords1(3, natom)
 
-!   integer i, n
+!   integer h, i, n, offset
 !   real(wp), dimension(3, natom) :: randcoords0, randcoords1
 !   integer :: votes(natom, natom)
 
@@ -96,13 +95,35 @@ subroutine optimize_assignment( &
 
    ! Group neighbors by type
 
-   call groupneighbors(natom, nblk, blklen, nadj0, adjlist0, nadjblk0, adjblklen0)
-   call groupneighbors(natom, nblk, blklen, nadj1, adjlist1, nadjblk1, adjblklen1)
+!   call groupneighbors(natom, nblk, blklen, nadj0, adjlist0, nadjmna0, adjmnalen0)
+!   call groupneighbors(natom, nblk, blklen, nadj1, adjlist1, nadjmna1, adjmnalen1)
 
    ! Group neighbors by MNA
 
    call groupneighbors(natom, neqv0, eqvlen0, nadj0, adjlist0, nadjeqv0, adjeqvlen0)
    call groupneighbors(natom, neqv1, eqvlen1, nadj1, adjlist1, nadjeqv1, adjeqvlen1)
+
+   ! Print adjacency lists
+
+!   do i = 1, natom
+!      offset = 0
+!      do h = 1, nadjmna0(i)
+!         do k = offset + 1, offset + adjmnalen0(h, i)
+!            print *, i, h, adjlist0(k, i)
+!         end do
+!         offset = offset + adjmnalen0(h, i)
+!      end do
+!   end do
+!
+!   do i = 1, natom
+!      offset = 0
+!      do h = 1, nadjmna1(i)
+!         do k = offset + 1, offset + adjmnalen1(h, i)
+!            print *, i, h, adjlist1(k, i)
+!         end do
+!         offset = offset + adjmnalen1(h, i)
+!      end do
+!   end do
 
    ! Detect fagments and starting atoms
 
@@ -111,7 +132,8 @@ subroutine optimize_assignment( &
 
    ! Calculate MNA equivalence matrix
 
-   call calcequivmat(natom, nblk, blklen, nadj0, adjlist0, nadj1, adjlist1, equivmat)
+   call calcequivmat(natom, nblk, blklen, nadj0, adjlist0, nadjmna0, adjmnalen0, nadj1, adjlist1, &
+      nadjmna1, adjmnalen1, equivmat)
 
    ! Print equivalence matrix
 
@@ -195,8 +217,8 @@ subroutine optimize_assignment( &
       ! Minimize the euclidean distance
 
       call minatomperm(natom, coords0, workcoords1, nblk, blklen, biasmat, mapping)
-!      call mapatoms(natom, nblk, blklen, nadjblk0, adjblklen0, adjlist0, coords0, adjlist1, &
-!         coords1, weights, equivmat, mapping)
+!      call mapatoms(natom, nblk, blklen, nadjmna0, adjmnalen0, adjlist0, coords0, &
+!         nadjmna1, adjmnalen1, adjlist1, coords1, weights, equivmat, mapping)
       rotquat = leastrotquat(natom, weights, coords0, workcoords1, mapping)
       prodquat = rotquat
       totalrot = rotangle(rotquat)
@@ -206,8 +228,8 @@ subroutine optimize_assignment( &
 
       do while (iter_flag)
          call minatomperm(natom, coords0, workcoords1, nblk, blklen, biasmat, newmapping)
-!         call mapatoms(natom, nblk, blklen, nadjblk0, adjblklen0, adjlist0, coords0, adjlist1, &
-!            coords1, weights, equivmat, mapping)
+!         call mapatoms(natom, nblk, blklen, nadjmna0, adjmnalen0, adjlist0, coords0, &
+!            nadjmna1, adjmnalen1, adjlist1, coords1, weights, equivmat, mapping)
          if (all(newmapping == mapping)) exit
          rotquat = leastrotquat(natom, weights, coords0, workcoords1, newmapping)
          prodquat = quatmul(rotquat, prodquat)

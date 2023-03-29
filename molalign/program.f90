@@ -73,6 +73,7 @@ program molalign
    maxrec = 1
    maxcount = 10
    maxcoord = 16
+   maxlevel = 16
 
    bias_tol = 0.35
    bias_scale = 1.e3

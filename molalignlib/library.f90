@@ -83,7 +83,6 @@ subroutine assign_atoms( &
    real(wp) :: travec0(3), travec1(3)
 
    integer, dimension(natom0) :: offset, blkidx, mapping
-   integer, dimension(natom0, natom0) :: order01
    integer :: nbond0, bonds0(2, maxcoord*natom0)
    integer :: nbond1, bonds1(2, maxcoord*natom1)
 
