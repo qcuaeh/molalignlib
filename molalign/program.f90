@@ -100,7 +100,7 @@ program molalign
       case ('-back')
          back_flag = .true.
       case ('-fast')
-!         iter_flag = .true.
+         iter_flag = .true.
          bias_flag = .true.
       case ('-bond')
          bond_flag = .true.
