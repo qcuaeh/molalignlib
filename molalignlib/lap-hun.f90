@@ -23,14 +23,14 @@ implicit none
 
 contains
 
-subroutine mapatoms(natom, nblk, blklen, nadjmna0, adjmnalen0, adjlist0, coords0, &
-   nadjmna1, adjmnalen1, adjlist1, coords1, weights, equivmat, mapping)
+subroutine mapneiatoms(natom, nblk, blklen, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
+   nadjmna1, adjmnalen1, adjmnalist1, coords1, weights, equivmat, mapping)
 ! Find best correspondence between points sets with fixed orientation
    integer, intent(in) :: natom, nblk
    integer, dimension(:), intent(in) :: blklen
    integer, dimension(:, :), intent(in) :: nadjmna0, nadjmna1
    integer, dimension(:, :, :), intent(in) :: adjmnalen0, adjmnalen1
-   integer, dimension(:, :), intent(in) :: adjlist0, adjlist1
+   integer, dimension(:, :, :), intent(in) :: adjmnalist0, adjmnalist1
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
    real(wp), dimension(:), intent(in) :: weights
    integer, dimension(:, :), intent(in) :: equivmat
@@ -51,23 +51,23 @@ subroutine mapatoms(natom, nblk, blklen, nadjmna0, adjmnalen0, adjlist0, coords0
             totweight = 0
             mapped0(:) = .false.
             mapped1(:) = .false.
-            call recursivemap(i, j, 1, equivmat(j, i), nadjmna0, adjmnalen0, adjlist0, coords0, &
-               nadjmna1, adjmnalen1, adjlist1, coords1, weights, totdist, totweight, mapped0, mapped1)
-            costs = bias_scale**2*equivmat(j, i) + totdist/totweight
+            call recursivemap(i, j, 1, equivmat(j, i), nadjmna0, adjmnalen0, adjmnalist0, coords0, &
+               nadjmna1, adjmnalen1, adjmnalist1, coords1, weights, totdist, totweight, mapped0, mapped1)
+            costs(i, j) = bias_scale**2*(maxlevel - equivmat(j, i)) + totdist/totweight
          end do
       end do
       call offminperm(blklen(h), offset, costs, mapping)
-      offset = offset + 1
+      offset = offset + blklen(h)
    end do
 
 end subroutine
 
-recursive subroutine recursivemap(i, j, level, maxlevel, nadjmna0, adjmnalen0, adjlist0, coords0, &
-      nadjmna1, adjmnalen1, adjlist1, coords1, weights, totdist, totweight, mapped0, mapped1)
+recursive subroutine recursivemap(i, j, level, maxlevel, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
+      nadjmna1, adjmnalen1, adjmnalist1, coords1, weights, totdist, totweight, mapped0, mapped1)
    integer, intent(in) :: i, j, level, maxlevel
    integer, dimension(:, :), intent(in) :: nadjmna0, nadjmna1
    integer, dimension(:, :, :), intent(in) :: adjmnalen0, adjmnalen1
-   integer, dimension(:, :), intent(in) :: adjlist0, adjlist1
+   integer, dimension(:, :, :), intent(in) :: adjmnalist0, adjmnalist1
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
    real(wp), dimension(:), intent(in) :: weights
    real(wp), intent(out) :: totdist, totweight
@@ -77,49 +77,57 @@ recursive subroutine recursivemap(i, j, level, maxlevel, nadjmna0, adjmnalen0, a
    integer, dimension(maxcoord) :: mapping, index0, index1
    real(wp) :: distmat(maxcoord, maxcoord)
 
-   print *, '>>>', i, j, ':', level, maxlevel - level
+!   print *, '>>>', i, j, ':', level, maxlevel - level
+!!   print *, i, ':', adjmnalist0(:4, i, maxlevel - level)
+!!   print *, j, ':', adjmnalist1(:4, j, maxlevel - level)
    mapped0(i) = .true.
    mapped1(j) = .true.
-   totdist = totdist + sum((coords0(:, i) - coords1(:, j))**2)
+   totdist = totdist + weights(i)*sum((coords0(:, i) - coords1(:, j))**2)
    totweight = totweight + weights(i)
    if (level < maxlevel) then
       offset = 0
-      print *, 'num:', nadjmna0(i, maxlevel - level), &
-         nadjmna0(i, maxlevel - level) == nadjmna1(j, maxlevel - level)
+!      print *, 'num:', nadjmna0(i, maxlevel - level), &
+!         nadjmna0(i, maxlevel - level) == nadjmna1(j, maxlevel - level)
       do h = 1, nadjmna0(i, maxlevel - level)
-         print *, 'len:', adjmnalen0(h, i, maxlevel - level), &
-            adjmnalen0(h, i, maxlevel - level) == adjmnalen1(h, j, maxlevel - level)
+!         print *, 'len:', adjmnalen0(h, i, maxlevel - level), &
+!            adjmnalen0(h, i, maxlevel - level) == adjmnalen1(h, j, maxlevel - level)
          m = 0
          do k = offset + 1, offset + adjmnalen0(h, i, maxlevel - level)
-            if (.not. mapped0(adjlist0(k, i))) then
+            if (.not. mapped0(adjmnalist0(k, i, maxlevel - level))) then
+!!               print *, 'not mapped0:', adjmnalist0(k, i, maxlevel - level)
                m = m + 1
-               index0(m) = adjlist0(k, i)
+               index0(m) = adjmnalist0(k, i, maxlevel - level)
                n = 0
-               do l = offset + 1, offset + adjmnalen0(h, i, maxlevel - level)
-                  if (.not. mapped1(adjlist1(l, j))) then
+               do l = offset + 1, offset + adjmnalen1(h, j, maxlevel - level)
+                  if (.not. mapped1(adjmnalist1(l, j, maxlevel - level))) then
+!!                     print *, 'not mapped1:', adjmnalist1(l, j, maxlevel - level)
                      n = n + 1
-                     index1(n) = adjlist1(l, j)
+                     index1(n) = adjmnalist1(l, j, maxlevel - level)
                      distmat(m, n) = sum((coords0(:, index0(m)) - coords1(:, index1(n)))**2)
+!!                  else
+!!                     print *, 'mapped1:', adjmnalist1(l, j, maxlevel - level)
                   end if
                end do
+!!            else
+!!               print *, 'mapped0:', adjmnalist0(k, i, maxlevel - level)
             end if
          end do
          if (m > 0) then
             call minperm(m, distmat, mapping)
+            do n = 1, m
+               call recursivemap(index0(n), index1(mapping(n)), level + 1, maxlevel, &
+                  nadjmna0, adjmnalen0, adjmnalist0, coords0, nadjmna1, adjmnalen1, adjmnalist1, coords1, &
+                  weights, totdist, totweight, mapped0, mapped1)
+            end do
          end if
-         do n = 1, m
-            call recursivemap(index0(n), index1(mapping(n)), level + 1, maxlevel, &
-               nadjmna0, adjmnalen0, adjlist0, coords0, nadjmna1, adjmnalen1, adjlist1, coords1, &
-               weights, totdist, totweight, mapped0, mapped1)
-         end do
          offset = offset + adjmnalen0(h, i, maxlevel - level)
       end do
    end if
-   print *, '<<<'
+!   print *, '<<<'
 
 end subroutine
 
-subroutine minatomperm(natom, coords0, coords1, nblk, blklen, biasmat, mapping)
+subroutine mapatoms(natom, coords0, coords1, nblk, blklen, biasmat, mapping)
 ! Find best correspondence between points sets with fixed orientation
    integer, intent(in) :: natom, nblk
    integer, dimension(:), intent(in) :: blklen

@@ -74,6 +74,7 @@ subroutine optimize_assignment( &
    integer, dimension(maxcoord, natom) :: adjlist0, adjlist1
    integer, dimension(natom, maxlevel) :: nadjmna0, nadjmna1
    integer, dimension(maxcoord, natom, maxlevel) :: adjmnalen0, adjmnalen1
+   integer, dimension(maxcoord, natom, maxlevel) :: adjmnalist0, adjmnalist1
    integer, dimension(natom) :: nadjeqv0, nadjeqv1
    integer, dimension(maxcoord, natom) :: adjeqvlen0, adjeqvlen1
    integer, dimension(natom) :: fragroot0, fragroot1
@@ -132,8 +133,8 @@ subroutine optimize_assignment( &
 
    ! Calculate MNA equivalence matrix
 
-   call calcequivmat(natom, nblk, blklen, nadj0, adjlist0, nadjmna0, adjmnalen0, nadj1, adjlist1, &
-      nadjmna1, adjmnalen1, equivmat)
+   call calcequivmat(natom, nblk, blklen, nadj0, adjlist0, nadjmna0, adjmnalen0, adjmnalist0, &
+      nadj1, adjlist1, nadjmna1, adjmnalen1, adjmnalist1, equivmat)
 
    ! Print equivalence matrix
 
@@ -175,7 +176,7 @@ subroutine optimize_assignment( &
 !         randcoords0(:, i) = randarray(3)
 !         randcoords1(:, i) = randarray(3)
 !      end do
-!      call minatomperm(natom, randcoords0, randcoords1, nblk, blklen, biasmat, mapping)
+!      call mapatoms(natom, randcoords0, randcoords1, nblk, blklen, biasmat, mapping)
 !      print *, adjacencydiff(natom, adjmat0, adjmat1, mapping)
 !      do i = 1, natom
 !         votes(mapping(i), i) = votes(mapping(i), i) + 1
@@ -216,9 +217,9 @@ subroutine optimize_assignment( &
 
       ! Minimize the euclidean distance
 
-!      call minatomperm(natom, coords0, workcoords1, nblk, blklen, biasmat, mapping)
-      call mapatoms(natom, nblk, blklen, nadjmna0, adjmnalen0, adjlist0, coords0, &
-         nadjmna1, adjmnalen1, adjlist1, coords1, weights, equivmat, mapping)
+      call mapatoms(natom, coords0, workcoords1, nblk, blklen, biasmat, mapping)
+!      call mapneiatoms(natom, nblk, blklen, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
+!         nadjmna1, adjmnalen1, adjmnalist1, coords1, weights, equivmat, mapping)
       rotquat = leastrotquat(natom, weights, coords0, workcoords1, mapping)
       prodquat = rotquat
       totalrot = rotangle(rotquat)
@@ -227,9 +228,9 @@ subroutine optimize_assignment( &
       steps = 1
 
       do while (iter_flag)
-         call minatomperm(natom, coords0, workcoords1, nblk, blklen, biasmat, newmapping)
-!         call mapatoms(natom, nblk, blklen, nadjmna0, adjmnalen0, adjlist0, coords0, &
-!            nadjmna1, adjmnalen1, adjlist1, coords1, weights, equivmat, mapping)
+         call mapatoms(natom, coords0, workcoords1, nblk, blklen, biasmat, newmapping)
+!         call mapneiatoms(natom, nblk, blklen, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
+!            nadjmna1, adjmnalen1, adjmnalist1, coords1, weights, equivmat, newmapping)
          if (all(newmapping == mapping)) exit
          rotquat = leastrotquat(natom, weights, coords0, workcoords1, newmapping)
          prodquat = quatmul(rotquat, prodquat)
