@@ -216,9 +216,9 @@ subroutine optimize_assignment( &
 
       ! Minimize the euclidean distance
 
-      call minatomperm(natom, coords0, workcoords1, nblk, blklen, biasmat, mapping)
-!      call mapatoms(natom, nblk, blklen, nadjmna0, adjmnalen0, adjlist0, coords0, &
-!         nadjmna1, adjmnalen1, adjlist1, coords1, weights, equivmat, mapping)
+!      call minatomperm(natom, coords0, workcoords1, nblk, blklen, biasmat, mapping)
+      call mapatoms(natom, nblk, blklen, nadjmna0, adjmnalen0, adjlist0, coords0, &
+         nadjmna1, adjmnalen1, adjlist1, coords1, weights, equivmat, mapping)
       rotquat = leastrotquat(natom, weights, coords0, workcoords1, mapping)
       prodquat = rotquat
       totalrot = rotangle(rotquat)

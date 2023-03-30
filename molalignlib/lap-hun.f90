@@ -36,7 +36,8 @@ subroutine mapatoms(natom, nblk, blklen, nadjmna0, adjmnalen0, adjlist0, coords0
    integer, dimension(:, :), intent(in) :: equivmat
    integer, dimension(:), intent(out) :: mapping
 
-   integer :: h, i, j, offset, level
+   integer :: h, i, j, offset
+   logical, dimension(natom) :: mapped0, mapped1
    real(wp) :: totdist, totweight
 !   real(wp) :: costs(natom, natom) ! Causes allocation errors
    real(wp), allocatable :: costs(:, :)
@@ -48,19 +49,21 @@ subroutine mapatoms(natom, nblk, blklen, nadjmna0, adjmnalen0, adjlist0, coords0
          do j = offset + 1, offset + blklen(h)
             totdist = 0
             totweight = 0
+            mapped0(:) = .false.
+            mapped1(:) = .false.
             call recursivemap(i, j, 1, equivmat(j, i), nadjmna0, adjmnalen0, adjlist0, coords0, &
-               nadjmna1, adjmnalen1, adjlist1, coords1, weights, totdist, totweight)
+               nadjmna1, adjmnalen1, adjlist1, coords1, weights, totdist, totweight, mapped0, mapped1)
             costs = bias_scale**2*equivmat(j, i) + totdist/totweight
          end do
       end do
-      call minperm(blklen(h), offset, costs, mapping)
+      call offminperm(blklen(h), offset, costs, mapping)
       offset = offset + 1
    end do
 
 end subroutine
 
 recursive subroutine recursivemap(i, j, level, maxlevel, nadjmna0, adjmnalen0, adjlist0, coords0, &
-      nadjmna1, adjmnalen1, adjlist1, coords1, weights, totdist, totweight)
+      nadjmna1, adjmnalen1, adjlist1, coords1, weights, totdist, totweight, mapped0, mapped1)
    integer, intent(in) :: i, j, level, maxlevel
    integer, dimension(:, :), intent(in) :: nadjmna0, nadjmna1
    integer, dimension(:, :, :), intent(in) :: adjmnalen0, adjmnalen1
@@ -68,30 +71,51 @@ recursive subroutine recursivemap(i, j, level, maxlevel, nadjmna0, adjmnalen0, a
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
    real(wp), dimension(:), intent(in) :: weights
    real(wp), intent(out) :: totdist, totweight
+   logical, dimension(:), intent(inout) :: mapped0, mapped1
 
-   integer :: h, k, l, offset
-   integer :: mapping(maxcoord)
+   integer :: h, k, l, m, n, offset
+   integer, dimension(maxcoord) :: mapping, index0, index1
    real(wp) :: distmat(maxcoord, maxcoord)
 
+   print *, '>>>', i, j, ':', level, maxlevel - level
+   mapped0(i) = .true.
+   mapped1(j) = .true.
    totdist = totdist + sum((coords0(:, i) - coords1(:, j))**2)
    totweight = totweight + weights(i)
    if (level < maxlevel) then
       offset = 0
+      print *, 'num:', nadjmna0(i, maxlevel - level), &
+         nadjmna0(i, maxlevel - level) == nadjmna1(j, maxlevel - level)
       do h = 1, nadjmna0(i, maxlevel - level)
+         print *, 'len:', adjmnalen0(h, i, maxlevel - level), &
+            adjmnalen0(h, i, maxlevel - level) == adjmnalen1(h, j, maxlevel - level)
+         m = 0
          do k = offset + 1, offset + adjmnalen0(h, i, maxlevel - level)
-            do l = offset + 1, offset + adjmnalen0(h, i, maxlevel - level)
-               distmat(k, l) = sum((coords0(:, adjlist0(k, i)) - coords1(:, adjlist1(l, j)))**2)
-            end do
+            if (.not. mapped0(adjlist0(k, i))) then
+               m = m + 1
+               index0(m) = adjlist0(k, i)
+               n = 0
+               do l = offset + 1, offset + adjmnalen0(h, i, maxlevel - level)
+                  if (.not. mapped1(adjlist1(l, j))) then
+                     n = n + 1
+                     index1(n) = adjlist1(l, j)
+                     distmat(m, n) = sum((coords0(:, index0(m)) - coords1(:, index1(n)))**2)
+                  end if
+               end do
+            end if
          end do
-         call minperm(adjmnalen0(h, i, maxlevel - level), offset, distmat, mapping)
-         do k = offset + 1, offset + adjmnalen0(h, i, maxlevel - level)
-            call recursivemap(adjlist0(k, i), adjlist1(mapping(k), j), level + 1, maxlevel, &
+         if (m > 0) then
+            call minperm(m, distmat, mapping)
+         end if
+         do n = 1, m
+            call recursivemap(index0(n), index1(mapping(n)), level + 1, maxlevel, &
                nadjmna0, adjmnalen0, adjlist0, coords0, nadjmna1, adjmnalen1, adjlist1, coords1, &
-               weights, totdist, totweight)
+               weights, totdist, totweight, mapped0, mapped1)
          end do
          offset = offset + adjmnalen0(h, i, maxlevel - level)
       end do
    end if
+   print *, '<<<'
 
 end subroutine
 
@@ -115,13 +139,13 @@ subroutine minatomperm(natom, coords0, coords1, nblk, blklen, biasmat, mapping)
             costs(i, j) = sum((coords0(:, i) - coords1(:, j))**2) + biasmat(j, i)
          end do
       end do
-      call minperm(blklen(h), offset, costs, mapping)
+      call offminperm(blklen(h), offset, costs, mapping)
       offset = offset + blklen(h)
    end do
 
 end subroutine
 
-subroutine minperm(n, os, costs, perm)
+subroutine offminperm(n, os, costs, perm)
    integer, intent(in) :: n, os
    real(wp), intent(inout) :: costs(:, :)
    integer, intent(out) :: perm(:)
@@ -129,6 +153,16 @@ subroutine minperm(n, os, costs, perm)
 
    call assndx(1, costs(os+1:, os+1:), n, n, perm(os+1:), dummy)
    perm(os+1:os+n) = perm(os+1:os+n) + os
+
+end subroutine
+
+subroutine minperm(n, costs, mapping)
+   integer, intent(in) :: n
+   real(wp), intent(inout) :: costs(:, :)
+   integer, intent(out) :: mapping(:)
+   real(wp) :: dummy
+
+   call assndx(1, costs, n, n, mapping, dummy)
 
 end subroutine
 

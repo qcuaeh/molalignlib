@@ -100,11 +100,11 @@ program molalign
       case ('-back')
          back_flag = .true.
       case ('-fast')
-         iter_flag = .true.
+!         iter_flag = .true.
          bias_flag = .true.
       case ('-bond')
          bond_flag = .true.
-         react_flag = .true.
+!         react_flag = .true.
          print_stats => print_stats_diff
       case ('-mass')
          weight_func => stdmass
