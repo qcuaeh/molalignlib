@@ -73,7 +73,7 @@ integer, parameter, private :: mtype_cluster=1, &   ! homoatomic cluster
 
 type atom
     integer :: id, pos, atype
-    character(len=max_namelen) :: label
+    character(len=wl) :: label
     real(wp), dimension(3) :: coord
     character(2) :: elsym
     real(wp) :: covrad, vdwrad, stdmass
@@ -85,7 +85,7 @@ type molecule
     integer :: mtype, natom, nbond
     character(len=ll) :: title
     real(wp), dimension(:,:), pointer, allocatable :: coord
-    character(len=max_namelen), dimension(:), pointer, allocatable :: label
+    character(len=wl), dimension(:), pointer, allocatable :: label
     integer, dimension(:,:), pointer, allocatable :: bonds
     type(atom), dimension(:), pointer, allocatable :: atom
 end type molecule
@@ -98,4 +98,10 @@ subroutine new_molecule (mol, mtype)
     mol%mtype=mtype
 end subroutine new_molecule
 
-end module 
+subroutine read_xyz (mol, filename)
+
+end subroutine read_xyz
+
+end module
+
+
