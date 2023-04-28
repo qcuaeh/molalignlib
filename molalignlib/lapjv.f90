@@ -1,24 +1,6 @@
-! MolAlignLib
-! Copyright (C) 2022 José M. Vásquez
-
-! This program is free software: you can redistribute it and/or modify
-! it under the terms of the GNU General Public License as published by
-! the Free Software Foundation, either version 3 of the License, or
-! (at your option) any later version.
-
-! This program is distributed in the hope that it will be useful,
-! but WITHOUT ANY WARRANTY; without even the implied warranty of
-! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-! GNU General Public License for more details.
-
-! You should have received a copy of the GNU General Public License
-! along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-module lap
-use stdio
+module lapjv
 use kinds
-use iso_fortran_env, only: int64
-
+use stdio
 implicit none
 
 contains
@@ -155,7 +137,7 @@ subroutine minperm(n, p, q, pq, perm, dist)
             end if
 11       end do
          do j = m+1, n
-            d = int((sum((p(:,i) - q(:,j))**2) + pq(i,j))*scale, int64)
+            d = int((sum((p(:, i) - q(:, j))**2) + pq(j, i))*scale, int64)
             if (d .lt. cc(k+1)) then
                cc(k+1) = d
                kk(k+1) = j
@@ -205,7 +187,7 @@ subroutine minperm(n, p, q, pq, perm, dist)
       h = 0
       do i = 1, n
          j = first(i)
-30       if (j.gt.n*maxnei) then
+30       if (j .gt. n*maxnei) then
             write (error_unit, '(a)') 'Error: Assignment failed'
             stop
          end if
@@ -496,6 +478,7 @@ subroutine jovosap(n,sz,cc,kk,first,x,y,u,v,h)
    end do
 
 1000 return
+
 end subroutine
 
 end module

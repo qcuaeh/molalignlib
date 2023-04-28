@@ -23,7 +23,7 @@ use sorting
 implicit none
 
 abstract interface
-   subroutine bias_func_proc(natom, nblk, blklen, coords0, coords1, equivmat, biasmat)
+   subroutine proc_setcrossbias(natom, nblk, blklen, coords0, coords1, equivmat, biasmat)
       use kinds
       integer, intent(in) :: natom, nblk
       integer, dimension(:), intent(in) :: blklen
@@ -36,11 +36,13 @@ end interface
 real(wp) :: bias_tol
 real(wp) :: bias_scale
 real(wp) :: bias_ratio
-procedure(bias_func_proc), pointer :: calcbiasmat
+
+procedure(proc_setcrossbias), pointer :: setcrossbias
+procedure(proc_setcrossbias), pointer :: mapsetcrossbias
 
 contains
 
-subroutine setnocrossbias(natom, nblk, blklen, coords0, coords1, equivmat, biasmat)
+subroutine setcrossbias_none(natom, nblk, blklen, coords0, coords1, equivmat, biasmat)
 ! Purpose: Set biases from sorted neighbors' distances equivalence
 
    integer, intent(in) :: natom, nblk
@@ -64,7 +66,7 @@ subroutine setnocrossbias(natom, nblk, blklen, coords0, coords1, equivmat, biasm
 
 end subroutine
 
-subroutine setsndcrossbias(natom, nblk, blklen, coords0, coords1, equivmat, biasmat)
+subroutine setcrossbias_rd(natom, nblk, blklen, coords0, coords1, equivmat, biasmat)
 ! Purpose: Set biases from sorted neighbors' distances equivalence
 
    integer, intent(in) :: natom, nblk
@@ -117,7 +119,7 @@ subroutine setsndcrossbias(natom, nblk, blklen, coords0, coords1, equivmat, bias
 
 end subroutine
 
-subroutine setmnacrossbias(natom, nblk, blklen, coords0, coords1, equivmat, biasmat)
+subroutine setcrossbias_mna(natom, nblk, blklen, coords0, coords1, equivmat, biasmat)
 ! Purpose: Set biases from sorted distances to neighbors equivalence
 
    integer, intent(in) :: natom, nblk
