@@ -26,6 +26,7 @@ use rotation
 use translation
 use adjacency
 use alignment
+use remapping
 use assignment
 use writemol
 use biasing
@@ -90,16 +91,22 @@ subroutine assign_atoms( &
 
    error = 0
 
-   !  Select bias function
+   !  Select assignment algorithm
+
+   if (bond_flag) then
+      mapatoms => mapatoms_bonded
+      mapsetcrossbias => setcrossbias_mna
+   else
+      mapatoms => mapatoms_free
+      mapsetcrossbias => setcrossbias_rd
+   end if
+
+   ! Select bias function
 
    if (bias_flag) then
-      if (bond_flag) then
-         calcbiasmat => setmnacrossbias
-      else
-         calcbiasmat => setsndcrossbias
-      end if
+      setcrossbias => mapsetcrossbias
    else
-      calcbiasmat => setnocrossbias
+      setcrossbias => setcrossbias_none
    end if
 
    ! Abort if molecules have different number of atoms

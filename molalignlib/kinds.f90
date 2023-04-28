@@ -1,4 +1,5 @@
 module kinds
+use iso_fortran_env, only: int64
 
 integer, parameter :: sp = 4 ! Single precision
 integer, parameter :: dp = 8 ! Double precision

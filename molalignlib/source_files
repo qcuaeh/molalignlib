@@ -13,8 +13,9 @@ random.f90
 sorting.f90
 printing.f90
 biasing.f90
-#lap-jv.f90
-lap-hun.f90
+lapkm.f90
+lapjv.f90
+assignment.f90
 assorting.f90
 translation.f90
 rotation.f90
@@ -22,7 +23,7 @@ adjacency.f90
 alignment.f90
 tracking.f90
 backtracking.f90
-assignment.f90
+remapping.f90
 readmol.f90
 writemol.f90
 library.f90
