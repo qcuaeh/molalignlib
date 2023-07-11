@@ -19,6 +19,7 @@ use stdio
 use readmol
 use writemol
 use adjacency
+use moltypes
 
 implicit none
 
@@ -64,39 +65,20 @@ subroutine open2write(filename, unit)
 
 end subroutine
 
-subroutine readfile(unit, fmtin, title, natom, labels, coords, adjmat)
+subroutine readfile(unit, fmtin, mol)
    integer, intent(in) :: unit
    character(*), intent(in) :: fmtin
-   integer, intent(out) :: natom
-   character(:), allocatable, intent(out) :: title
-   character(*), dimension(:), allocatable, intent(out) :: labels
-   real(wp), dimension(:, :), allocatable, intent(out) :: coords
-   logical, dimension(:, :), allocatable, intent(out) :: adjmat
-
-   integer i
-   integer, allocatable :: nbond
-   integer, allocatable :: bonds(:, :)
-   
-   nbond = 0
+   type(Molecule), intent(out) :: mol
 
    select case (fmtin)
    case ('xyz')
-      call readxyz(unit, title, natom, labels, coords)
+      call readxyz(unit, mol)
    case ('mol2')
-      call readmol2(unit, title, natom, labels, coords, nbond, bonds)
+      call readmol2(unit, mol)
    case default
       write (error_unit, '(a,1x,a)') 'Invalid format:', fmtin
       stop
    end select
-
-   allocate(adjmat(natom, natom))
-
-   adjmat(:, :) = .false.
-
-   do i = 1, nbond
-      adjmat(bonds(1, i), bonds(2, i)) = .true.
-      adjmat(bonds(2, i), bonds(1, i)) = .true.
-   end do
 
 end subroutine
 
@@ -106,7 +88,10 @@ subroutine writefile(unit, fmtout, title, natom, znums, coords, adjmat)
    real(wp), dimension(:, :), intent(in) :: coords
    logical, dimension(:, :), intent(in) :: adjmat
    character(*), intent(in) :: title, fmtout
-   integer :: i, j, nbond, bonds(2, natom*maxcoord)
+
+   integer :: i, j
+   integer :: nbond
+   integer :: bonds(2, natom*maxcoord)
 
    call adjmat2bonds(natom, adjmat, nbond, bonds)
 

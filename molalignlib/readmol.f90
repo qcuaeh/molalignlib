@@ -19,31 +19,35 @@ use stdio
 use bounds
 use strutils
 use chemdata
+use moltypes
 
 implicit none
 
 contains
 
-subroutine readxyz(unit, title, natom, labels, coords)
+subroutine readxyz(unit, mol)
    integer, intent(in) :: unit
-   integer, intent(out) :: natom
-   real(wp), dimension(:, :), allocatable, intent(out) :: coords
-   character(*), dimension(:), allocatable, intent(out) :: labels
-   character(:), allocatable, intent(out) :: title
+   type(Molecule), intent(out) :: mol
    character(ll) :: buffer
 
    integer :: i
 
-   read (unit, *, end=99) natom
+   read (unit, *, end=99) mol%natom
+   mol%nbond = 0
 
-   allocate(labels(natom), coords(3, natom))
+   allocate(mol%atoms(mol%natom))
 
    read (unit, '(a)', end=99) buffer
-   title = trim(buffer)
+   mol%title = trim(buffer)
 
-   do i = 1, natom
-      read (unit, *, end=99) labels(i), coords(:, i)
+   do i = 1, mol%natom
+      read (unit, *, end=99) buffer, mol%atoms(i)%coords(:)
+      mol%atoms(i)%label = buffer
    end do
+
+   allocate(mol%adjmat(mol%natom, mol%natom))
+
+   mol%adjmat(:, :) = .false.
 
    return
 
@@ -53,13 +57,9 @@ subroutine readxyz(unit, title, natom, labels, coords)
 
 end subroutine
 
-subroutine readmol2(unit, title, natom, labels, coords, nbond, bonds)
+subroutine readmol2(unit, mol)
    integer, intent(in) :: unit
-   integer, intent(out) :: natom, nbond
-   integer, dimension(:, :), allocatable, intent(out) :: bonds
-   real(wp), dimension(:, :), allocatable, intent(out) :: coords
-   character(*), dimension(:), allocatable, intent(out) :: labels
-   character(:), allocatable, intent(out) :: title
+   type(Molecule), intent(out) :: mol
    character(ll) :: buffer
    integer :: i, id
 
@@ -69,19 +69,20 @@ subroutine readmol2(unit, title, natom, labels, coords, nbond, bonds)
    end do
 
    read (unit, '(a)', end=99) buffer
-   title = trim(buffer)
-   read (unit, *, end=99) natom, nbond
+   mol%title = trim(buffer)
+   read (unit, *, end=99) mol%natom, mol%nbond
 
-   allocate(labels(natom), coords(3, natom))
-   allocate(bonds(2, nbond))
+   allocate(mol%atoms(mol%natom))
+   allocate(mol%bonds(mol%nbond))
 
    do
       read (unit, '(a)', end=99) buffer
       if (buffer == '@<TRIPOS>ATOM') exit
    end do
 
-   do i = 1, natom
-      read (unit, *, end=99) id, labels(i), coords(:,i)
+   do i = 1, mol%natom
+      read (unit, *, end=99) id, buffer, mol%atoms(i)%coords(:)
+      mol%atoms(i)%label = buffer
    end do
 
    do
@@ -89,8 +90,17 @@ subroutine readmol2(unit, title, natom, labels, coords, nbond, bonds)
       if (buffer == '@<TRIPOS>BOND') exit
    end do
 
-   do i = 1, nbond
-      read (unit, *, end=99) id, bonds(:,i)
+   do i = 1, mol%nbond
+      read (unit, *, end=99) id, mol%bonds(i)%atom1, mol%bonds(i)%atom2, mol%bonds(i)%order
+   end do
+
+   allocate(mol%adjmat(mol%natom, mol%natom))
+
+   mol%adjmat(:, :) = .false.
+
+   do i = 1, mol%nbond
+      mol%adjmat(mol%bonds(i)%atom1, mol%bonds(i)%atom2) = .true.
+      mol%adjmat(mol%bonds(i)%atom2, mol%bonds(i)%atom1) = .true.
    end do
 
    return

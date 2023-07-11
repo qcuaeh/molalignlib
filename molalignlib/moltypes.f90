@@ -1,6 +1,21 @@
-module molecule
+module moltypes
+use kinds
 implicit none
 private
+
+type :: Atom
+   character(:), allocatable :: label
+   integer :: znum
+   integer :: type
+   real(wp) :: weight
+   real(wp) :: coords(3)
+end type
+
+type :: Bond
+   integer :: atom1
+   integer :: atom2
+   character(2) :: order
+end type
 
 type, public :: Block
    integer :: nblk
@@ -9,19 +24,13 @@ type, public :: Block
    integer, allocatable :: nblkoff
 end type
 
-type :: Atom
-   character(:), allocatable :: label
-   integer, allocatable :: znum
-   integer, allocatable :: type
-   real(wp), allocatable :: weight
-   real(wp), allocatable :: coords
-end type
-
 type, public :: Molecule
    integer :: natom
+   integer :: nbond
    character(:), allocatable :: title
    type(Atom), allocatable :: atoms(:)
-   logical, allocatable :: adjmat(:)
+   type(Bond), allocatable :: bonds(:)
+   logical, allocatable :: adjmat(:, :)
 contains
    procedure :: reorder => atoms_reorder
 end type
@@ -29,7 +38,7 @@ end type
 contains
 
 subroutine atoms_reorder(this, order)
-   class(Atoms), intent(in) :: this
+   class(Molecule), intent(inout) :: this
    integer, intent(in) :: order(:)
 
    this%atoms = this%atoms(order(1:this%natom))

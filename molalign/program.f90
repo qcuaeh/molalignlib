@@ -30,6 +30,7 @@ program molalign
    use library
    use fileio
    use argparse
+   use moltypes
 
    implicit none
 
@@ -53,6 +54,7 @@ program molalign
    real(wp), allocatable, dimension(:, :) :: coords0, coords1, aligned1
    logical :: sort_flag, stdin_flag, stdout_flag
    logical, dimension(:, :), allocatable :: adjmat0, adjmat1
+   type(Molecule) :: mol0, mol1
 
    procedure(f_realint), pointer :: weight_func
 
@@ -159,8 +161,31 @@ program molalign
 
    ! Read coordinates
 
-   call readfile(read_unit0, fmtin0, title0, natom0, labels0, coords0, adjmat0)
-   call readfile(read_unit1, fmtin1, title1, natom1, labels1, coords1, adjmat1)
+   call readfile(read_unit0, fmtin0, mol0)
+   call readfile(read_unit1, fmtin1, mol1)
+
+   allocate(labels0(mol0%natom), coords0(3, mol0%natom), adjmat0(mol0%natom, mol0%natom))
+   allocate(labels1(mol1%natom), coords1(3, mol1%natom), adjmat1(mol1%natom, mol1%natom))
+
+   title0 = mol0%title
+   natom0 = mol0%natom
+!   labels0 = mol0%get_labels()
+!   coords0 = mol0%get_coords()
+   do i = 1, mol0%natom
+      labels0(i) = mol0%atoms(i)%label
+      coords0(:, i) = mol0%atoms(i)%coords(:)
+   end do
+   adjmat0 = mol0%adjmat
+
+   title1 = mol1%title
+   natom1 = mol1%natom
+!   labels1 = mol1%get_labels()
+!   coords1 = mol1%get_coords()
+   do i = 1, mol1%natom
+      labels1(i) = mol1%atoms(i)%label
+      coords1(:, i) = mol1%atoms(i)%coords(:)
+   end do
+   adjmat1 = mol1%adjmat
 
    ! Allocate arrays
 
