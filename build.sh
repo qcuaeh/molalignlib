@@ -119,7 +119,7 @@ runtests() {
    for file in "$testdir"/*.out; do
       name=$(basename "$file")
       echo -n Running test ${name%.out}...
-      if diff -bB <("$executable" "$testdir/${name%.out}.xyz" "$@" 2>&1) "$file" > /dev/null; then
+      if diff -bB <("$executable" "$testdir/${name%.out}.xyz" "$@" 2>&1) "$file"; then
           echo \ passed
       else
           echo \ failed
