@@ -169,22 +169,14 @@ program molalign
 
    title0 = mol0%title
    natom0 = mol0%natom
-!   labels0 = mol0%get_labels()
-!   coords0 = mol0%get_coords()
-   do i = 1, mol0%natom
-      labels0(i) = mol0%atoms(i)%label
-      coords0(:, i) = mol0%atoms(i)%coords(:)
-   end do
+   labels0 = mol0%get_labels()
+   coords0 = mol0%get_coords()
    adjmat0 = mol0%adjmat
 
    title1 = mol1%title
    natom1 = mol1%natom
-!   labels1 = mol1%get_labels()
-!   coords1 = mol1%get_coords()
-   do i = 1, mol1%natom
-      labels1(i) = mol1%atoms(i)%label
-      coords1(:, i) = mol1%atoms(i)%coords(:)
-   end do
+   labels1 = mol1%get_labels()
+   coords1 = mol1%get_coords()
    adjmat1 = mol1%adjmat
 
    ! Allocate arrays
