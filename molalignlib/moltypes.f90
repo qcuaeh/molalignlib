@@ -33,8 +33,11 @@ type, public :: Molecule
    logical, allocatable :: adjmat(:, :)
 contains
    procedure :: reorder => atoms_reorder
-   procedure :: get_labels => atoms_get_labels
+   procedure :: get_znums => atoms_get_znums
+   procedure :: get_types => atoms_get_types
+   procedure :: get_weights => atoms_get_weights
    procedure :: get_coords => atoms_get_coords
+   procedure :: get_labels => atoms_get_labels
 end type
 
 contains
@@ -48,13 +51,35 @@ subroutine atoms_reorder(self, order)
 
 end subroutine
 
-function atoms_get_labels(self) result(labels)
+function atoms_get_znums(self) result(znums)
    class(Molecule), intent(in) :: self
-   character(wl), dimension(self%natom) :: labels
+   integer, dimension(self%natom) :: znums
    integer i
 
    do i = 1, self%natom
-      labels(i) = self%atoms(i)%label
+      znums(i) = self%atoms(i)%znum
+   end do
+
+end function
+
+function atoms_get_types(self) result(types)
+   class(Molecule), intent(in) :: self
+   integer, dimension(self%natom) :: types
+   integer i
+
+   do i = 1, self%natom
+      types(i) = self%atoms(i)%type
+   end do
+
+end function
+
+function atoms_get_weights(self) result(weights)
+   class(Molecule), intent(in) :: self
+   real(wp), dimension(self%natom) :: weights
+   integer i
+
+   do i = 1, self%natom
+      weights(i) = self%atoms(i)%weight
    end do
 
 end function
@@ -66,6 +91,17 @@ function atoms_get_coords(self) result(coords)
 
    do i = 1, self%natom
       coords(:, i) = self%atoms(i)%coords
+   end do
+
+end function
+
+function atoms_get_labels(self) result(labels)
+   class(Molecule), intent(in) :: self
+   character(wl), dimension(self%natom) :: labels
+   integer i
+
+   do i = 1, self%natom
+      labels(i) = self%atoms(i)%label
    end do
 
 end function

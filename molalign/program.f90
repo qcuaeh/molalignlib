@@ -36,25 +36,18 @@ program molalign
 
    integer :: i
    integer :: nrec, error
-   integer :: natom0, natom1
    integer :: read_unit0, read_unit1, write_unit
-   integer, allocatable, dimension(:) :: znums0, znums1
-   integer, allocatable, dimension(:) :: types0, types1
    integer, allocatable, dimension(:) :: countlist
    integer, allocatable, dimension(:, :) :: maplist
    character(:), allocatable :: arg
    character(:), allocatable :: pathin1, pathin2, pathout
    character(:), allocatable :: fmtin, fmtin0, fmtin1, fmtout
-   character(:), allocatable :: title0, title1
    character(ll) :: posargs(2)
-   character(wl), allocatable, dimension(:) :: labels0, labels1
    integer :: adjd
    real(wp) :: rmsd, travec(3), rotmat(3, 3)
-   real(wp), allocatable, dimension(:) :: weights0, weights1
-   real(wp), allocatable, dimension(:, :) :: coords0, coords1, aligned1
+   real(wp), allocatable, dimension(:, :) :: aligned1
    logical :: sort_flag, stdin_flag, stdout_flag
-   logical, dimension(:, :), allocatable :: adjmat0, adjmat1
-   type(Molecule) :: mol0, mol1
+   type(Molecule) :: mol0, mol1, mol1aux
 
    procedure(f_realint), pointer :: weight_func
 
@@ -164,40 +157,22 @@ program molalign
    call readfile(read_unit0, fmtin0, mol0)
    call readfile(read_unit1, fmtin1, mol1)
 
-   allocate(labels0(mol0%natom), coords0(3, mol0%natom), adjmat0(mol0%natom, mol0%natom))
-   allocate(labels1(mol1%natom), coords1(3, mol1%natom), adjmat1(mol1%natom, mol1%natom))
-
-   title0 = mol0%title
-   natom0 = mol0%natom
-   labels0 = mol0%get_labels()
-   coords0 = mol0%get_coords()
-   adjmat0 = mol0%adjmat
-
-   title1 = mol1%title
-   natom1 = mol1%natom
-   labels1 = mol1%get_labels()
-   coords1 = mol1%get_coords()
-   adjmat1 = mol1%adjmat
-
    ! Allocate arrays
 
-   allocate(znums0(natom0), znums1(natom1))
-   allocate(types0(natom0), types1(natom1))
-   allocate(weights0(natom0), weights1(natom1))
-   allocate(aligned1(3, natom1))
-   allocate(maplist(natom0, maxrec))
+   allocate(aligned1(3, mol1%natom))
+   allocate(maplist(mol0%natom, maxrec))
    allocate(countlist(maxrec))
 
    ! Get atomic numbers, types and weights
 
-   do i = 1, natom0
-      call readlabel(labels0(i), znums0(i), types0(i))
-      weights0(i) = weight_func(znums0(i))
+   do i = 1, mol0%natom
+      call readlabel(mol0%atoms(i)%label, mol0%atoms(i)%znum, mol0%atoms(i)%type)
+      mol0%atoms(i)%weight = weight_func(mol0%atoms(i)%znum)
    end do
 
-   do i = 1, natom1
-      call readlabel(labels1(i), znums1(i), types1(i))
-      weights1(i) = weight_func(znums1(i))
+   do i = 1, mol1%natom
+      call readlabel(mol1%atoms(i)%label, mol1%atoms(i)%znum, mol1%atoms(i)%type)
+      mol1%atoms(i)%weight = weight_func(mol1%atoms(i)%znum)
    end do
 
    if (stdout_flag) then
@@ -215,11 +190,11 @@ program molalign
    ! Get adjacency matrices and lists
 
    if (bond_flag) then
-      call getadjmat(natom0, coords0, znums0, adjmat0)
-      call getadjmat(natom1, coords1, znums1, adjmat1)
+      call getadjmat(mol0%natom, mol0%get_coords(), mol0%get_znums(), mol0%adjmat)
+      call getadjmat(mol1%natom, mol1%get_coords(), mol1%get_znums(), mol1%adjmat)
    else
-      adjmat0(:, :) = .false.
-      adjmat1(:, :) = .false.
+      mol0%adjmat = .false.
+      mol1%adjmat = .false.
    end if
 
    ! Sort atoms to minimize MSD
@@ -227,18 +202,18 @@ program molalign
    if (sort_flag) then
 
       call assign_atoms( &
-         natom0, &
-         znums0, &
-         types0, &
-         weights0, &
-         coords0, &
-         adjmat0, &
-         natom1, &
-         znums1, &
-         types1, &
-         weights1, &
-         coords1, &
-         adjmat1, &
+         mol0%natom, &
+         mol0%get_znums(), &
+         mol0%get_types(), &
+         mol0%get_weights(), &
+         mol0%get_coords(), &
+         mol0%adjmat, &
+         mol1%natom, &
+         mol1%get_znums(), &
+         mol1%get_types(), &
+         mol1%get_weights(), &
+         mol1%get_coords(), &
+         mol1%adjmat, &
          maplist, &
          countlist, &
          nrec, &
@@ -246,37 +221,42 @@ program molalign
 
       if (error /= 0) stop
 
+      mol1aux = mol1
+
       do i = 1, nrec
 
+         mol1 = mol1aux
+         call mol1%reorder(maplist(:, i))
+
          call align_atoms( &
-            natom0, &
-            znums0, &
-            types0, &
-            weights0, &
-            coords0, &
-            natom1, &
-            znums1(maplist(:, i)), &
-            types1(maplist(:, i)), &
-            weights1(maplist(:, i)), &
-            coords1(:, maplist(:, i)), &
+            mol0%natom, &
+            mol0%get_znums(), &
+            mol0%get_types(), &
+            mol0%get_weights(), &
+            mol0%get_coords(), &
+            mol1%natom, &
+            mol1%get_znums(), &
+            mol1%get_types(), &
+            mol1%get_weights(), &
+            mol1%get_coords(), &
             travec, &
             rotmat, &
             error)
 
          if (error /= 0) stop
 
-         adjd = adjacencydiff(natom0, adjmat0, adjmat1, maplist(:, i))
-         aligned1 = translated(natom1, rotated(natom1, coords1, rotmat), travec)
-         rmsd = sqrt(squaredist(natom0, weights0, coords0, aligned1, maplist(:, i))/sum(weights0))
+         adjd = adjacencydiff(mol0%natom, mol0%adjmat, mol1%adjmat, identityperm(mol0%natom))
+         aligned1 = translated(mol1%natom, rotated(mol1%natom, mol1%get_coords(), rotmat), travec)
+         rmsd = sqrt(squaredist(mol0%natom, mol0%get_weights(), mol0%get_coords(), aligned1, identityperm(mol0%natom)) &
+            / sum(mol0%get_weights()))
 
          if (i == 1) then
             if (bond_flag) write (output_unit, '(a)') 'Optimized AdjD = ' // intstr(adjd)
             write (output_unit, '(a)') 'Optimized RMSD = ' // realstr(rmsd, 4)
-            call writefile(write_unit, fmtout, 'Reference', natom0, znums0, coords0, adjmat0)
+            call writefile(write_unit, fmtout, 'Reference', mol0%natom, mol0%get_znums(), mol0%get_coords(), mol0%adjmat)
          end if
 
-         call writefile(write_unit, fmtout, 'RMSD ' // realstr(rmsd, 4), natom1, znums1(maplist(:, i)), &
-            aligned1(:, maplist(:, i)), adjmat1(maplist(:, i), maplist(:, i)))
+         call writefile(write_unit, fmtout, 'RMSD ' // realstr(rmsd, 4), mol1%natom, mol1%get_znums(), aligned1, mol1%adjmat)
 
       end do
 
@@ -285,30 +265,31 @@ program molalign
       ! Align atoms to minimize RMSD
 
       call align_atoms( &
-         natom0, &
-         znums0, &
-         types0, &
-         weights0, &
-         coords0, &
-         natom1, &
-         znums1, &
-         types1, &
-         weights1, &
-         coords1, &
+         mol0%natom, &
+         mol0%get_znums(), &
+         mol0%get_types(), &
+         mol0%get_weights(), &
+         mol0%get_coords(), &
+         mol1%natom, &
+         mol1%get_znums(), &
+         mol1%get_types(), &
+         mol1%get_weights(), &
+         mol1%get_coords(), &
          travec, &
          rotmat, &
          error)
 
       if (error /= 0) stop
 
-      adjd = adjacencydiff(natom0, adjmat0, adjmat1, identityperm(natom0))
-      aligned1 = translated(natom1, rotated(natom1, coords1, rotmat), travec)
-      rmsd = sqrt(squaredist(natom0, weights0, coords0, aligned1, identityperm(natom0))/sum(weights0))
+      adjd = adjacencydiff(mol0%natom, mol0%adjmat, mol1%adjmat, identityperm(mol0%natom))
+      aligned1 = translated(mol1%natom, rotated(mol1%natom, mol1%get_coords(), rotmat), travec)
+      rmsd = sqrt(squaredist(mol0%natom, mol0%get_weights(), mol0%get_coords(), aligned1, identityperm(mol0%natom)) &
+         / sum(mol0%get_weights()))
 
       if (bond_flag) write (output_unit, '(a)') 'AdjD = ' // intstr(adjd)
       write (output_unit, '(a)') 'RMSD = ' // realstr(rmsd, 4)
-      call writefile(write_unit, fmtout, 'Reference', natom0, znums0, coords0, adjmat0)
-      call writefile(write_unit, fmtout, 'RMSD ' // realstr(rmsd, 4), natom1, znums1, aligned1, adjmat1)
+      call writefile(write_unit, fmtout, 'Reference', mol0%natom, mol0%get_znums(), mol0%get_coords(), mol0%adjmat)
+      call writefile(write_unit, fmtout, 'RMSD ' // realstr(rmsd, 4), mol1%natom, mol1%get_znums(), aligned1, mol1%adjmat)
 
    end if
 
