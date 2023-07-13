@@ -1,5 +1,10 @@
 module moltypes
 use kinds
+use discrete
+use rotation
+use translation
+use adjacency
+use alignment
 implicit none
 private
 
@@ -32,22 +37,60 @@ type, public :: Molecule
    type(Bond), allocatable :: bonds(:)
    logical, allocatable :: adjmat(:, :)
 contains
-   procedure :: reorder => atoms_reorder
    procedure :: get_znums => atoms_get_znums
    procedure :: get_types => atoms_get_types
    procedure :: get_weights => atoms_get_weights
    procedure :: get_coords => atoms_get_coords
    procedure :: get_labels => atoms_get_labels
+   procedure :: set_coords => atoms_set_coords
+   procedure :: rmsdto => atoms_rmsdto
+   procedure :: adjdto => atoms_adjdto
+   procedure :: rotate => atoms_rotate
+   procedure :: translate => atoms_translate
+   procedure :: permutate => atoms_permutate
 end type
 
 contains
 
-subroutine atoms_reorder(self, order)
+function atoms_rmsdto(self, other) result(rmsd)
+   class(Molecule), intent(in) :: self, other
+   real(wp) :: rmsd
+
+   rmsd = sqrt(squaredist(self%natom, self%get_weights(), self%get_coords(), other%get_coords(), identityperm(self%natom)) &
+        / sum(self%get_weights()))
+
+end function
+
+function atoms_adjdto(self, other) result(adjd)
+   class(Molecule), intent(in) :: self, other
+   integer :: adjd
+
+   adjd = adjacencydiff(self%natom, self%adjmat, other%adjmat, identityperm(self%natom))
+
+end function
+
+subroutine atoms_permutate(self, order)
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: order(:)
 
    self%atoms = self%atoms(order(1:self%natom))
    self%adjmat = self%adjmat(order(1:self%natom), order(1:self%natom))
+
+end subroutine
+
+subroutine atoms_rotate(self, rotmat)
+   class(Molecule), intent(inout) :: self
+   real(wp), intent(in) :: rotmat(3, 3)
+
+   call self%set_coords(rotated(self%natom, self%get_coords(), rotmat))
+
+end subroutine
+
+subroutine atoms_translate(self, travec)
+   class(Molecule), intent(inout) :: self
+   real(wp), intent(in) :: travec(3)
+
+   call self%set_coords(translated(self%natom, self%get_coords(), travec))
 
 end subroutine
 
@@ -94,6 +137,17 @@ function atoms_get_coords(self) result(coords)
    end do
 
 end function
+
+subroutine atoms_set_coords(self, coords)
+   class(Molecule), intent(inout) :: self
+   real(wp), dimension(3, self%natom), intent(in) :: coords
+   integer i
+
+   do i = 1, self%natom
+      self%atoms(i)%coords = coords(:, i)
+   end do
+
+end subroutine
 
 function atoms_get_labels(self) result(labels)
    class(Molecule), intent(in) :: self

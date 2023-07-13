@@ -9,7 +9,6 @@
 Random trials = 93
 Minimization steps = 99
 Visited local minima > 5
-Optimized RMSD = 0.0754
 10
 Reference
 Li     -0.112679      1.154350     -0.194840
@@ -82,3 +81,4 @@ Li      0.044790      0.145605      0.797043
 Li     -0.871040     -0.051090      0.077228
 Li     -0.283357      0.765012      0.133654
 Li      0.232543     -0.204548     -0.239873
+Optimized RMSD = 0.0754

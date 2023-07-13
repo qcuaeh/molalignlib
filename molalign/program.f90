@@ -43,11 +43,11 @@ program molalign
    character(:), allocatable :: pathin1, pathin2, pathout
    character(:), allocatable :: fmtin, fmtin0, fmtin1, fmtout
    character(ll) :: posargs(2)
-   integer :: adjd
-   real(wp) :: rmsd, travec(3), rotmat(3, 3)
-   real(wp), allocatable, dimension(:, :) :: aligned1
+   real(wp) :: travec(3), rotmat(3, 3)
    logical :: sort_flag, stdin_flag, stdout_flag
-   type(Molecule) :: mol0, mol1, mol1aux
+   type(Molecule) :: mol0, mol1, mol1back
+   integer :: adjd, minadjd
+   real(wp) :: rmsd, minrmsd
 
    procedure(f_realint), pointer :: weight_func
 
@@ -159,7 +159,6 @@ program molalign
 
    ! Allocate arrays
 
-   allocate(aligned1(3, mol1%natom))
    allocate(maplist(mol0%natom, maxrec))
    allocate(countlist(maxrec))
 
@@ -221,12 +220,16 @@ program molalign
 
       if (error /= 0) stop
 
-      mol1aux = mol1
+      mol0%title = 'Reference'
+      call writefile(write_unit, fmtout, mol0)
+      mol1back = mol1
+      minrmsd = 10.0*mol0%natom
+      minadjd = maxcoord*mol0%natom
 
       do i = 1, nrec
 
-         mol1 = mol1aux
-         call mol1%reorder(maplist(:, i))
+         mol1 = mol1back
+         call mol1%permutate(maplist(:, i))
 
          call align_atoms( &
             mol0%natom, &
@@ -245,20 +248,20 @@ program molalign
 
          if (error /= 0) stop
 
-         adjd = adjacencydiff(mol0%natom, mol0%adjmat, mol1%adjmat, identityperm(mol0%natom))
-         aligned1 = translated(mol1%natom, rotated(mol1%natom, mol1%get_coords(), rotmat), travec)
-         rmsd = sqrt(squaredist(mol0%natom, mol0%get_weights(), mol0%get_coords(), aligned1, identityperm(mol0%natom)) &
-            / sum(mol0%get_weights()))
+         call mol1%rotate(rotmat)
+         call mol1%translate(travec)
 
-         if (i == 1) then
-            if (bond_flag) write (output_unit, '(a)') 'Optimized AdjD = ' // intstr(adjd)
-            write (output_unit, '(a)') 'Optimized RMSD = ' // realstr(rmsd, 4)
-            call writefile(write_unit, fmtout, 'Reference', mol0%natom, mol0%get_znums(), mol0%get_coords(), mol0%adjmat)
-         end if
-
-         call writefile(write_unit, fmtout, 'RMSD ' // realstr(rmsd, 4), mol1%natom, mol1%get_znums(), aligned1, mol1%adjmat)
+         rmsd = mol1%rmsdto(mol0)
+         minrmsd = min(rmsd, minrmsd)
+         adjd = mol1%adjdto(mol0)
+         minadjd = min(adjd, minadjd)
+         mol1%title = 'RMSD ' // realstr(rmsd, 4)
+         call writefile(write_unit, fmtout, mol1)
 
       end do
+
+      if (bond_flag) write (output_unit, '(a)') 'Optimized AdjD = ' // intstr(minadjd)
+      write (output_unit, '(a)') 'Optimized RMSD = ' // realstr(minrmsd, 4)
 
    else
 
@@ -281,15 +284,13 @@ program molalign
 
       if (error /= 0) stop
 
-      adjd = adjacencydiff(mol0%natom, mol0%adjmat, mol1%adjmat, identityperm(mol0%natom))
-      aligned1 = translated(mol1%natom, rotated(mol1%natom, mol1%get_coords(), rotmat), travec)
-      rmsd = sqrt(squaredist(mol0%natom, mol0%get_weights(), mol0%get_coords(), aligned1, identityperm(mol0%natom)) &
-         / sum(mol0%get_weights()))
+      call mol1%rotate(rotmat)
+      call mol1%translate(travec)
 
-      if (bond_flag) write (output_unit, '(a)') 'AdjD = ' // intstr(adjd)
-      write (output_unit, '(a)') 'RMSD = ' // realstr(rmsd, 4)
-      call writefile(write_unit, fmtout, 'Reference', mol0%natom, mol0%get_znums(), mol0%get_coords(), mol0%adjmat)
-      call writefile(write_unit, fmtout, 'RMSD ' // realstr(rmsd, 4), mol1%natom, mol1%get_znums(), aligned1, mol1%adjmat)
+      if (bond_flag) write (output_unit, '(a)') 'AdjD = ' // intstr(mol1%adjdto(mol0))
+      write (output_unit, '(a)') 'RMSD = ' // realstr(mol1%rmsdto(mol0), 4)
+      call writefile(write_unit, fmtout, mol0)
+      call writefile(write_unit, fmtout, mol1)
 
    end if
 
