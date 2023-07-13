@@ -7,7 +7,6 @@
 Random trials = 16
 Minimization steps = 130
 Visited local minima = 3
-Optimized RMSD = 0.1010
 120
 Reference
 Zn      0.555880      1.691923     -1.680753
@@ -496,3 +495,4 @@ Zn     -0.841245      0.945410      0.650270
 Zn     -0.443137      0.093319      1.952524
 Zn     -0.360509      0.775820     -2.399066
 Zn     -1.196942     -1.304327      1.395539
+Optimized RMSD = 0.1010

@@ -9,7 +9,6 @@
 Random trials = 104
 Minimization steps = 106
 Visited local minima > 5
-Optimized RMSD = 0.1000
 13
 Reference
 Cl      0.000000      0.000000      0.995000
@@ -100,3 +99,4 @@ Ar     -0.001966      0.016215     -4.634144
 Ar     -0.383910      3.542456      0.164376
 Ar      0.378858     -3.311024     -2.831414
 Ar     -1.765254     -3.113061      0.211008
+Optimized RMSD = 0.1000

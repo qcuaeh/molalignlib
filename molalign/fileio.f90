@@ -82,24 +82,27 @@ subroutine readfile(unit, fmtin, mol)
 
 end subroutine
 
-subroutine writefile(unit, fmtout, title, natom, znums, coords, adjmat)
-   integer, intent(in) :: unit, natom
-   integer, dimension(:), intent(in) :: znums
-   real(wp), dimension(:, :), intent(in) :: coords
-   logical, dimension(:, :), intent(in) :: adjmat
-   character(*), intent(in) :: title, fmtout
+subroutine writefile(unit, fmtout, mol)
+!   integer, intent(in) :: unit, natom
+!   integer, dimension(:), intent(in) :: znums
+!   real(wp), dimension(:, :), intent(in) :: coords
+!   logical, dimension(:, :), intent(in) :: adjmat
+!   character(*), intent(in) :: title, fmtout
+   integer, intent(in) :: unit
+   character(*), intent(in) :: fmtout
+   type(Molecule), intent(in) :: mol
 
    integer :: i, j
    integer :: nbond
-   integer :: bonds(2, natom*maxcoord)
+   integer :: bonds(2, mol%natom*maxcoord)
 
-   call adjmat2bonds(natom, adjmat, nbond, bonds)
+   call adjmat2bonds(mol%natom, mol%adjmat, nbond, bonds)
 
    select case (fmtout)
    case ('xyz')
-      call writexyz(unit, title, natom, znums, coords)
+      call writexyz(unit, mol%title, mol%natom, mol%get_znums(), mol%get_coords())
    case ('mol2')
-      call writemol2(unit, title, natom, znums, coords, nbond, bonds)
+      call writemol2(unit, mol%title, mol%natom, mol%get_znums(), mol%get_coords(), nbond, bonds)
    case default
       write (error_unit, '(a,1x,a)') 'Invalid format:', fmtout
       stop

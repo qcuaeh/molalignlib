@@ -9,7 +9,6 @@
 Random trials = 104
 Minimization steps = 327
 Visited local minima > 5
-Optimized RMSD = 0.0999
 201
 Reference
 Pd     14.555120     12.500063     14.465922
@@ -1228,3 +1227,4 @@ Au     12.534310      8.347353      8.578238
 Au      8.544504     12.543646      4.615406
 Au      8.377607     12.462136     12.485610
 Au      4.425292      8.479074     12.534288
+Optimized RMSD = 0.0999
