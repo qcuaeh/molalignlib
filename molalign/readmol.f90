@@ -51,14 +51,13 @@ subroutine open2read(filepath, unit, fileext)
 
 end subroutine
 
-subroutine readfile(unit, fmtin, title, natom, labels, coords, adjmat)
+subroutine readfile(unit, fmtin, title, natom, labels, coords)
    integer, intent(in) :: unit
    character(*), intent(in) :: fmtin
    integer, intent(out) :: natom
    character(:), allocatable, intent(out) :: title
    character(*), dimension(:), allocatable, intent(out) :: labels
    real(wp), dimension(:, :), allocatable, intent(out) :: coords
-   logical, dimension(:, :), allocatable, intent(out) :: adjmat
 
    integer i
    integer, allocatable :: nbond
@@ -75,15 +74,6 @@ subroutine readfile(unit, fmtin, title, natom, labels, coords, adjmat)
       write (error_unit, '(a,1x,a)') 'Invalid format:', fmtin
       stop
    end select
-
-   allocate(adjmat(natom, natom))
-
-   adjmat(:, :) = .false.
-
-   do i = 1, nbond
-      adjmat(bonds(1, i), bonds(2, i)) = .true.
-      adjmat(bonds(2, i), bonds(1, i)) = .true.
-   end do
 
 end subroutine
 
