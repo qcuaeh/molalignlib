@@ -1,122 +1,120 @@
-**MolAlignLib** is a Fortran and Python library based on random rotations and quasi-local RMSD minimizations to align rigid
-molecules and clusters. The details of the method can be found in publication [[1]](#1).
+![graphical abstract](abstract.png) 
 
-![graphical abstract](abstract.png)
+**MolAlignLib** is a Fortran and Python library based on random rotations and quasi-local
+RMSD minimizations to align rigid molecules and clusters. The details of the method can be
+found in publication [[1]](#1).
 
 Before installing
 -----------------
 
-You will need gfortran and LAPACK to build the program from source.
-It is recommended to install them with your package manager:
+If you can't or don't want to install stuff on your computer you can try
+[MolAlignLib on Binder](https://mybinder.org/v2/gh/qcuaeh/molalignlib.git/HEAD?labpath=examples/example1.ipynb).
 
-in RHEL, Fedora, etc. use *yum*
+To build the native executable you only need a Fortran 2008 compiler and LAPACK.
 
-    yum install gcc-gfortran lapack-devel
+To install the python module you will need GFortran 4.8 or higher, LAPACK, Python 3.6 or
+higher, *NumPy* and *ASE*. The easiest way to install the required packages is with your
+distro's package manager:
 
-or in Debian, Ubuntu, etc. use *apt*
+#### RHEL, Centos, Fedora, etc.
 
-    apt install gfortran liblapack-dev
+    yum install git python3 python3-pip gcc-gfortran lapack-devel
 
-Build from source 
------------------
+#### Debian, Ubuntu, Mint, etc.
+
+    apt install git python3 python3-pip gfortran liblapack-dev
+
+Build the native executable
+---------------------------
 
 Clone the repository:
 
     git clone https://github.com/qcuaeh/molalignlib.git
 
-then enter the cloned directory, edit the *build.env* file to suit your system, and run:
+then enter the cloned directory, edit the *build.env* file to suit your system and run:
 
     ./build.sh
 
 It will create the *molalign* executable inside the *build* directory.
 
-The library also has Python interface, to install it run:
+or install the python module
+----------------------------
 
-    python3 setup.py install --user
+Simply run:
 
-It will compile and install the *molalign* Python script and the *molalignlib* Python module in your path.
+    pip3 install git+https://github.com/qcuaeh/molalignlib.git
 
-or install with pip
--------------------
-
-You can also install the library with *pip*:
-
-    pip3 install molalignlib
-
-It will install the *molalign* Python script and the *molalignlib* Python module in your system path.
-
-or try on Binder
-----------------
-
-You can try the Python interface without installing anything:
-
-* [Open example1.ipynb on Binder](https://mybinder.org/v2/gh/qcuaeh/molalignlib.git/HEAD?labpath=examples/example1.ipynb)
+It will install *NumPy*, *ASE* and *MolAlignLib* in your site packages and the *molalign* script in your path.
 
 Program options
 ---------------
 
-These options are supported by both, the native executable and the python script:
+#### Options supported by the native executable and the python script
 
-<code>-sort</code>&nbsp; Reorder the atoms to minimize the RMSD.  
-<code>-trials <em>N</em></code>&nbsp;  Set maximum number of trials to *N*.  
-<code>-fast</code>&nbsp; Enable biasing and iterative minimization steps.  
+<code>-sort</code>&nbsp; Reorder atoms to minimize the RMSD.  
+<code>-fast</code>&nbsp; Prune assignments that surpass the displacement tolerance.  
+<code>-tol <em>TOL</em></code>&nbsp; Set the displacement tolerance to *TOL* (defaults to 0.35 Å).  
+<code>-out <em>NAME</em></code>&nbsp; Set the output file name to *NAME* (defaults to aligned.xyz).  
 <code>-count <em>N</em></code>&nbsp; Set the count threshold to *N* (defaults to 10).  
-<code>-tol <em>TOL</em></code>&nbsp; Set the biasing tolerance to *TOL* (defaults to 0.35 Å).  
-<code>-out <em>NAME</em></code>&nbsp; Set the output file name to *NAME* (defaults to *aligned.xyz*).  
+<code>-trials <em>N</em></code>&nbsp; Set the maximum number of trials to *N*.  
 <code>-rec <em>N</em></code>&nbsp; Record up to *N* assignments (defaults to 1).  
 <code>-stats</code>&nbsp; Print detailed stats of the calculation.  
 <code>-test</code>&nbsp; Use a fixed random seed for testing.  
 <code>-mirror</code>&nbsp; Reflect aligned coordinates.  
 <code>-mass</code>&nbsp; Use mass weighted RMSD.  
 
-These options are only supported by the native executable:
+#### Options only supported by the native executable
 
-<code>-live</code>&nbsp; Show progress in real time.  
+<code>-live</code>&nbsp; Print stats in real time (if stats are enabled).  
 <code>-stdin <em>EXT</em></code>&nbsp; Read coordinates from standard input in *EXT* format.  
 <code>-stdout <em>EXT</em></code>&nbsp; Write coordinates to standard output in *EXT* format.  
- 
-The native executable only supports the *xyz* and *mol2* formats, while the python script supports many more.
-Note that the format is determined from the file extension when reading from or writing to a file.
 
 Basic usage
 -----------
 
 The syntax of the command is:
 
-    molalign [option[s]] file [file]
+    molalign [option[s]] file1 file2
 
-If only a file is specified, two sets of coordinates will be read from the file. If two files are specified, a single
-set of coordinates will be read from each file.
+The coordinates in file2 will be aligned to the coordinates in file1. If there is
+more than one set of coordinates in a file, only the first one will be read. The native
+executable only reads *xyz* and *mol2* files while the python script reads all the file
+formats supported by *ASE*.
 
-To align the atoms without reordering, run the command without options. To reorder and align the atoms run the
-command with the `-sort` option.
+* To align the atoms without reordering, run the command without options.
+
+* To reorder the atoms to minimize the RMSD run the command with the `-sort` option.
 
 Advanced usage
 --------------
 
-When reodering is performed, the computation time can be greatly reduced with the `-fast` option. However, the assignment
-can fail if the clusters are too different. In such cases use the `-tol` option to increase the tolerance to a value larger
-than the maximum expected displacement of the atoms.
+When reordering is performed the computation can take a lot of time to complete but it
+can be greatly speeded up with the `-fast` option. This option prunes assignments that
+surpass the displacement tolerance, but if any of the actual atom displacements are larger
+than this tolerance then the assignment will fail, or, if they are very close, the
+assignment could be suboptimal. In such cases adjust the displacement tolerance to a larger value with the `-tol` option.
 
-By default a threshold of 10 counts is used to stop the computation, but it can be adjusted with the `-count` option.
-Lower thresholds reduce the computation time but increase the probability of obtaining suboptimal results.
+The count threshold is used to decide if the procedure is converged. A threshold of 10 
+counts is used by default, which works fine for almost all cases, but you can change it
+with the `-count` option. To avoid too long computations you can set a maximum number of
+random trials with the `-trials` option, the computation will be aborted if it is reach
+before the count threshold.
 
-To avoid too long computations use the `-trials` option to stop the calculation when the number of trials reaches the
-specified limit, regardless of the count threshold.
+The algorithm always explores multiple possible assignments, but only the best one is
+recorded by default. To record additional assignments use the `-rec` option. To print the
+stats of the computation use the `-trials` option, but notice that they will be different
+on each repeated run due to the use of randomized random seeds.
 
-The algorithm always explores multiple possible assignments, but only the best one is recorded by default. Use the `-rec`
-option to record and print more than one assignment.
-
-Examples
---------
+Command line examples
+---------------------
 
 For small atom displacements the default tolerance is enough:
 
     ./build/molalign examples/Co138_0.xyz examples/Co138_1.xyz -sort -fast
-    Optimized RMSD = 0.0506
+    0.0506
     
     ./build/molalign examples/Co138_0.xyz examples/Co138_2.xyz -sort -fast
-    Optimized RMSD = 0.0977
+    0.0977
 
 but for atom displacements larger than the tolerance the assignment will fail:
 
@@ -126,11 +124,11 @@ but for atom displacements larger than the tolerance the assignment will fail:
 Increasing the tolerance will fix the problem but the calculation will slow down:
 
     ./build/molalign examples/Co138_0.xyz examples/Co138_3.xyz -sort -fast -tol 0.7
-    Optimized RMSD = 0.1973
+    0.1973
 
-Sometimes there is more than one optimal assignment due to symmetry:
+Printing multiple alignments and stats can be useful to identify rotational symmetric clusters:
 
-    ./build/molalign examples/Co138_0.xyz examples/Co138_1.xyz -sort -fast -stats -rec 5
+    ./build/molalign examples/Co138_0.xyz examples/Co138_1.xyz -sort -fast -rec 5 -stats
      Map    Count    Steps     Total      Real       RMSD
     -----------------------------------------------------
        1       10     10.0      74.4      54.5     0.0506
@@ -142,11 +140,25 @@ Sometimes there is more than one optimal assignment due to symmetry:
     Random trials = 81
     Minimization steps = 706
     Visited local minima > 5
-    Optimized RMSD = 0.0506
 
-Note:
-Due to the use of different random seeds, the stats will be different on each run, but the optimized RMSD should be always
-the same.
+There are three different assignments with the same RMSD indicating that the cluster
+has three fold symmetry. Notice that the three optimal symmetric assignments are visited
+multiple times while the suboptimal ones are visited only once.
+
+Python examples
+---------------
+
+Minimize the RMSD between two Cobalt clusters:
+
+    from ase.io import read
+    from molalignlib import assign_atoms
+    atoms0 = read('Co138_0.xyz')
+    atoms1 = read('Co138_1.xyz')
+    assignment = assign_atoms(atoms0, atoms1)
+    atoms2 = atoms1[assignment.order]
+    atoms2.align_to(atoms0)
+
+*MolAlignLib* uses *ASE* to read and write atomic coordinates.
 
 References
 ----------

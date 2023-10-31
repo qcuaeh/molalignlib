@@ -37,24 +37,14 @@ subroutine open2write(filename, unit)
 
 end subroutine
 
-subroutine writefile(unit, fmtout, title, natom, znums, coords, adjmat)
+subroutine writefile(unit, fmtout, title, natom, znums, coords)
    integer, intent(in) :: unit, natom
    integer, dimension(:), intent(in) :: znums
    real(wp), dimension(:, :), intent(in) :: coords
-   logical, dimension(:, :), intent(in) :: adjmat
    character(*), intent(in) :: title, fmtout
    integer :: i, j, nbond, bonds(2, natom*maxcoord)
 
    nbond = 0
-   do i = 1, natom
-      do j = i + 1, natom
-         if (adjmat(i, j)) then
-            nbond = nbond + 1
-            bonds(1, nbond) = i
-            bonds(2, nbond) = j
-         end if
-      end do
-   end do
 
    select case (fmtout)
    case ('xyz')
