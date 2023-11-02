@@ -21,9 +21,10 @@ use bounds
 use random
 use sorting
 use discrete
-use assorting
+use moltypes
 use rotation
 use translation
+use assorting
 use adjacency
 use alignment
 use remapping
@@ -464,5 +465,22 @@ subroutine removereacbond(i, j, natom, znums, adjmat0, adjmat1, mapping)
    end if
 
 end subroutine
+
+function get_rmsd(mol0, mol1) result(rmsd)
+   class(Molecule), intent(in) :: mol0, mol1
+   real(wp) :: rmsd
+
+   rmsd = sqrt(squaredist(mol0%natom, mol0%get_weights(), mol0%get_coords(), mol1%get_coords(), identityperm(mol0%natom)) &
+        / sum(mol0%get_weights()))
+
+end function
+
+function get_adjd(mol0, mol1) result(adjd)
+   class(Molecule), intent(in) :: mol0, mol1
+   integer :: adjd
+
+   adjd = adjacencydiff(mol0%natom, mol0%adjmat, mol1%adjmat, identityperm(mol0%natom))
+
+end function
 
 end module
