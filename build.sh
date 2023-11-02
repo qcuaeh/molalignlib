@@ -2,7 +2,7 @@
 shopt -s nullglob
 unalias -a
 
-toarray() {
+to_array() {
    IFS=\  read -r -a "$1" <<< "${!1}"
 }
 
@@ -21,11 +21,11 @@ clean_build() {
 compile() {
    $build_flag || return 0
    clean_build
-   toarray std_flags
-   toarray pic_flags
-   toarray optim_flags
-   toarray debug_flags
-   srcdir=$topdir/$1
+   to_array std_flags
+   to_array pic_flags
+   to_array optim_flags
+   to_array debug_flags
+   srcdir=$rootdir/$1
    if test ! -d "$srcdir"; then
       echo Error: $srcdir does not exist
       exit 1
@@ -74,7 +74,6 @@ make_prog() {
    pushd "$buildir" > /dev/null
    "$F90" -o "$1" "${obj_files[@]}" -llapack
    popd > /dev/null
-   echo Done
 }
 
 make_lib() {
@@ -87,7 +86,6 @@ make_lib() {
    pushd "$buildir" >/dev/null
    "$F90" -shared -o "$1.so" "${obj_files[@]}" -llapack
    popd >/dev/null
-   echo Done
 }
 
 make_pyext() {
@@ -105,28 +103,29 @@ make_pyext() {
    "$F2PY" -h "$1.pyf" -m "$1" --overwrite-signature "${f2py_files[@]}" --quiet
    "$F2PY" -c "$1.pyf" --fcompiler=gnu95 --link-lapack "${obj_files[@]}" --quiet
    popd >/dev/null
-   echo Done
 }
 
 runtests() {
    $test_flag || return 0
-   testdir=$topdir/$1
-   shift
    if test -z "$executable"; then
       echo Error: executable is not set
       exit 1
    fi
-   for file in "$testdir"/*.out; do
-      name=$(basename "$file")
-      echo -n Running test ${name%.out}...
-      if diff -bB <("$executable" "$testdir/${name%.out}.xyz" "$@" 2>&1) "$file"; then
-          echo \ passed
+   testset=$1
+   shift
+   for file in "$testdir/$testset"/*.out; do
+      testname=$(basename "$file" .out)
+      echo -n "Running test $testset/$testname... "
+#      "$executable" -stdin xyz -stdout xyz -test -stats "$@" < "$testdir/$testset/$testname.xyz" 2>&1 > "$file"
+      if diff -bB <("$executable" -stdin xyz -stdout xyz -test -stats "$@" < "$testdir/$testset/$testname.xyz" 2>&1) "$file"; then
+         echo ok
       else
-          echo \ failed
+         echo failed
       fi
    done
-   echo Done
 }
+
+rootdir=$(dirname "$(readlink -e "$0")")
 
 if test ! -e ./build.env; then
    echo Error: build.env does not exist
@@ -136,8 +135,8 @@ elif test ! -f ./build.env; then
    exit 1
 fi
 
-topdir=$(dirname "$(readlink -e "$0")")
-buildir=$topdir/build
+buildir=$rootdir/build
+testdir=$rootdir/tests
 
 if test ! -e "$buildir"; then
    mkdir "$buildir"
@@ -197,23 +196,21 @@ prog)
    compile molalign
    make_prog molalign
    # Run tests
-#   runtests tests/jcim.2c01187/0.05 -test -stats -stdout xyz -rec 5 -sort -fast -tol 0.17
-   runtests tests/jcim.2c01187/0.1 -test -stats -stdout xyz -rec 5 -sort -fast -tol 0.35
-#   runtests tests/jcim.2c01187/0.2 -test -stats -stdout xyz -rec 5 -sort -fast -tol 0.69
+   runtests jcim.2c01187/0.05 -rec 5 -sort -fast -tol 0.17
+   runtests jcim.2c01187/0.1 -rec 5 -sort -fast -tol 0.35
+   runtests jcim.2c01187/0.2 -rec 5 -sort -fast -tol 0.69
    ;;
 lib)
    # Build dynamic library
    pic_build=true
    compile molalignlib
    make_lib molalignlib
-   echo
    ;;
 pyext)
    # Build python extension module
    pic_build=true
    compile molalignlib
    make_pyext molalignlibext
-   echo
    ;;
 *)
    echo Unknown target $target
