@@ -41,7 +41,7 @@ program molalign
    integer, allocatable, dimension(:, :) :: maplist
    character(:), allocatable :: arg
    character(:), allocatable :: pathin1, pathin2, pathout
-   character(:), allocatable :: fmtin, fmtin0, fmtin1, fmtout
+   character(:), allocatable :: fmtin0, fmtin1, fmtstdin, fmtout
    character(ll) :: posargs(2)
    real(wp) :: travec(3), rotmat(3, 3)
    logical :: sort_flag, stdin_flag, stdout_flag
@@ -120,8 +120,7 @@ program molalign
          call readoptarg(arg, pathout)
       case ('-stdin')
          stdin_flag = .true.
-         call readoptarg(arg, fmtin0)
-         call readoptarg(arg, fmtin1)
+         call readoptarg(arg, fmtstdin)
       case ('-stdout')
          stdout_flag = .true.
          call readoptarg(arg, fmtout)
@@ -132,23 +131,26 @@ program molalign
    end do
 
    if (stdin_flag) then
+      fmtin0 = fmtstdin
+      fmtin1 = fmtstdin
       read_unit0 = input_unit
       read_unit1 = input_unit
    else
       select case (ipos)
       case (0)
-         write (error_unit, '(a)') 'Error: No file paths were specified'
+         write (error_unit, '(a)') 'Error: Missing arguments'
          stop
       case (1)
-         pathin1 = trim(posargs(1))
-         call open2read(pathin1, read_unit0, fmtin0)
-         read_unit1 = read_unit0
-         fmtin1 = fmtin0
+         write (error_unit, '(a)') 'Error: Too few arguments'
+         stop
       case (2)
          pathin1 = trim(posargs(1))
          pathin2 = trim(posargs(2))
          call open2read(pathin1, read_unit0, fmtin0)
          call open2read(pathin2, read_unit1, fmtin1)
+      case default
+         write (error_unit, '(a)') 'Error: Too many arguments'
+         stop
       end select
    end if
 
