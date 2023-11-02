@@ -32,6 +32,9 @@ end interface
 
 procedure(print_stats_proc), pointer :: print_stats
 
+character(*), parameter :: line1 = '-------------------------------------------'
+character(*), parameter :: line2 = '--------------------------------------------------'
+
 contains
 
 subroutine print_stats_dist(nrec, matches, avgsteps, avgtotalrot, avgrealrot, recadjd, recrmsd)
@@ -39,14 +42,13 @@ subroutine print_stats_dist(nrec, matches, avgsteps, avgtotalrot, avgrealrot, re
    integer, dimension(:), intent(in) :: matches, recadjd
    real(wp), dimension(:), intent(in) :: avgsteps, avgtotalrot, avgrealrot, recrmsd
    integer :: irec
-   write (output_unit, '(1x,a,4x,a,4x,a,5x,a,6x,a,7x,a)') 'Map', 'Count', 'Steps', 'Total', 'Real', 'RMSD'
-   write (output_unit, '(a)') '-----------------------------------------------------'
+   write (output_unit, '(1x,a,4x,a,4x,a,5x,a,7x,a)') 'Map', 'Count', 'Steps', 'Angle', 'RMSD'
+   write (output_unit, '(a)') line1
    do irec = 1, nrec
-      write (output_unit, '(i4,3x,i6,5x,f4.1,5x,f5.1,5x,f5.1,3x,f8.4)') &
-         irec, matches(irec), avgsteps(irec), 90./asin(1.)*avgtotalrot(irec), 90./asin(1.)*avgrealrot(irec), &
-         recrmsd(irec)
+      write (output_unit, '(i4,3x,i6,5x,f4.1,5x,f5.1,3x,f8.4)') &
+         irec, matches(irec), avgsteps(irec), 90./asin(1.)*avgrealrot(irec), recrmsd(irec)
    end do
-   write (output_unit, '(a)') '-----------------------------------------------------'
+   write (output_unit, '(a)') line1
 end subroutine
 
 subroutine print_stats_diff(nrec, matches, avgsteps, avgtotalrot, avgrealrot, recadjd, recrmsd)
@@ -54,14 +56,13 @@ subroutine print_stats_diff(nrec, matches, avgsteps, avgtotalrot, avgrealrot, re
    integer, dimension(:), intent(in) :: matches, recadjd
    real(wp), dimension(:), intent(in) :: avgsteps, avgtotalrot, avgrealrot, recrmsd
    integer :: irec
-   write (output_unit, '(1x,a,4x,a,4x,a,5x,a,6x,a,3x,a,7x,a)') 'Map', 'Count', 'Steps', 'Total', 'Real', 'AdjD', 'RMSD'
-   write (output_unit, '(a)') '------------------------------------------------------------'
+   write (output_unit, '(1x,a,4x,a,4x,a,5x,a,3x,a,7x,a)') 'Map', 'Count', 'Steps', 'Angle', 'AdjD', 'RMSD'
+   write (output_unit, '(a)') line2
    do irec = 1, nrec
-      write (output_unit, '(i4,3x,i6,5x,f4.1,5x,f5.1,5x,f5.1,3x,i4,3x,f8.4)') &
-         irec, matches(irec), avgsteps(irec), 90./asin(1.)*avgtotalrot(irec), 90./asin(1.)*avgrealrot(irec), &
-         recadjd(irec), recrmsd(irec)
+      write (output_unit, '(i4,3x,i6,5x,f4.1,5x,f5.1,3x,i4,3x,f8.4)') &
+         irec, matches(irec), avgsteps(irec), 90./asin(1.)*avgrealrot(irec), recadjd(irec), recrmsd(irec)
    end do
-   write (output_unit, '(a)') '------------------------------------------------------------'
+   write (output_unit, '(a)') line2
 end subroutine
 
 subroutine print_final_stats(overflow, maxrec, nrec, ntrial, nstep)

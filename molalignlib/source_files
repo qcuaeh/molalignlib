@@ -27,4 +27,4 @@ backtracking.f90
 remapping.f90
 readmol.f90
 writemol.f90
-library.f90
+molalignlib.f90

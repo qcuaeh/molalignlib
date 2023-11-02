@@ -43,31 +43,12 @@ contains
    procedure :: get_coords => atoms_get_coords
    procedure :: get_labels => atoms_get_labels
    procedure :: set_coords => atoms_set_coords
-   procedure :: rmsdto => atoms_rmsdto
-   procedure :: adjdto => atoms_adjdto
    procedure :: rotate => atoms_rotate
    procedure :: translate => atoms_translate
    procedure :: permutate => atoms_permutate
 end type
 
 contains
-
-function atoms_rmsdto(self, other) result(rmsd)
-   class(Molecule), intent(in) :: self, other
-   real(wp) :: rmsd
-
-   rmsd = sqrt(squaredist(self%natom, self%get_weights(), self%get_coords(), other%get_coords(), identityperm(self%natom)) &
-        / sum(self%get_weights()))
-
-end function
-
-function atoms_adjdto(self, other) result(adjd)
-   class(Molecule), intent(in) :: self, other
-   integer :: adjd
-
-   adjd = adjacencydiff(self%natom, self%adjmat, other%adjmat, identityperm(self%natom))
-
-end function
 
 subroutine atoms_permutate(self, order)
    class(Molecule), intent(inout) :: self
