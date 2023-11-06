@@ -44,7 +44,7 @@ character(:), allocatable :: fmtin0, fmtin1, fmtstdin, fmtout
 character(ll) :: posargs(2)
 real(wp) :: travec(3), rotmat(3, 3)
 logical :: sort_flag, stdin_flag, stdout_flag
-type(Molecule) :: mol0, mol1, backmol1
+type(Molecule) :: mol0, mol1, auxmol
 integer :: adjd, minadjd
 real(wp) :: rmsd, minrmsd
 
@@ -224,13 +224,13 @@ if (sort_flag) then
 !      mol0%title = 'Reference'
 !      call writefile(write_unit, fmtout, mol0)
 
-   backmol1 = mol1
+   auxmol = mol1
    minrmsd = huge(rmsd)
    minadjd = huge(adjd)
 
    do i = 1, nrec
 
-      mol1 = backmol1
+      mol1 = auxmol
       call mol1%permutate(maplist(:, i))
 
       call align_atoms( &

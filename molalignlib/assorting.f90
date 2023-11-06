@@ -157,7 +157,7 @@ subroutine groupneighbors(natom, neqv, eqvlen, nadj, adjlist, nadjeqv, adjeqvlen
 
    integer i, h, offset
    integer :: eqvidx(natom)
-   integer, dimension(maxcoord) :: adjeqvid, reorder
+   integer, dimension(maxcoord) :: adjeqvid, atomorder
 
    ! assing equivalence group
 
@@ -169,8 +169,8 @@ subroutine groupneighbors(natom, neqv, eqvlen, nadj, adjlist, nadjeqv, adjeqvlen
 
    do i = 1, natom
       call groupbytype(nadj(i), adjlist(:, i), eqvidx, adjeqvid, nadjeqv(i), adjeqvlen(:, i))
-      reorder(:nadj(i)) = sortorder(adjeqvid, nadj(i))
-      adjlist(:nadj(i), i) = adjlist(reorder(:nadj(i)), i)
+      atomorder(:nadj(i)) = sortorder(adjeqvid, nadj(i))
+      adjlist(:nadj(i), i) = adjlist(atomorder(:nadj(i)), i)
    end do
 
 !    do i = 1, natom
@@ -275,7 +275,7 @@ subroutine calcequivmat(natom, nblk, blklen, nadj0, adjlist0, nadjmna0, adjmnale
 
    integer :: h, i, j, offset, level, nin, nout
    integer, dimension(natom) :: intype0, intype1, outype0, outype1
-   integer, dimension(maxcoord) :: indices, reorder
+   integer, dimension(maxcoord) :: indices, atomorder
 
    level = 1
    nin = nblk
@@ -303,14 +303,14 @@ subroutine calcequivmat(natom, nblk, blklen, nadj0, adjlist0, nadjmna0, adjmnale
 
       do i = 1, natom
          call groupbytype(nadj0(i), adjlist0(:, i), intype0, indices, nadjmna0(i, level), adjmnalen0(:, i, level))
-         reorder(:nadj0(i)) = sortorder(indices, nadj0(i))
-         adjmnalist0(:nadj0(i), i, level) = adjlist0(reorder(:nadj0(i)), i)
+         atomorder(:nadj0(i)) = sortorder(indices, nadj0(i))
+         adjmnalist0(:nadj0(i), i, level) = adjlist0(atomorder(:nadj0(i)), i)
       end do
 
       do i = 1, natom
          call groupbytype(nadj1(i), adjlist1(:, i), intype1, indices, nadjmna1(i, level), adjmnalen1(:, i, level))
-         reorder(:nadj1(i)) = sortorder(indices, nadj1(i))
-         adjmnalist1(:nadj1(i), i, level) = adjlist1(reorder(:nadj1(i)), i)
+         atomorder(:nadj1(i)) = sortorder(indices, nadj1(i))
+         adjmnalist1(:nadj1(i), i, level) = adjlist1(atomorder(:nadj1(i)), i)
       end do
 
       call getmnacrosstypes(natom, nin, intype0, nadj0, adjlist0, intype1, nadj1, adjlist1, &
