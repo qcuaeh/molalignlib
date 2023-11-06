@@ -38,7 +38,7 @@ def assign_atoms(
     trials = None,
     # dummy arguments
     file = None,
-    sort = None,
+    remap = None,
     mass = None,
     mirror = None,
     out = None,

@@ -3,7 +3,7 @@ shopt -s nullglob
 unalias -a
 
 to_array() {
-   IFS=\  read -r -a "$1" <<< "${!1}"
+   IFS=\  read -r -a "$1_array" <<< "${!1}"
 }
 
 clean_build() {
@@ -31,14 +31,14 @@ compile() {
       exit 1
    fi
    pushd "$buildir" >/dev/null
-   flags=("${std_flags[@]}")
+   flags=("${std_flags_array[@]}")
    if $pic_build; then
-      flags+=("${pic_flags[@]}")
+      flags+=("${pic_flags_array[@]}")
    fi
    if $debug_build; then
-      flags+=("${debug_flags[@]}")
+      flags+=("${debug_flags_array[@]}")
    else
-      flags+=("${optim_flags[@]}")
+      flags+=("${optim_flags_array[@]}")
    fi
    while IFS= read -r srcfile; do
       prefix=${srcfile%.*}

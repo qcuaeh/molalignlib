@@ -43,7 +43,7 @@ character(:), allocatable :: pathin1, pathin2, pathout
 character(:), allocatable :: fmtin0, fmtin1, fmtstdin, fmtout
 character(ll) :: posargs(2)
 real(wp) :: travec(3), rotmat(3, 3)
-logical :: sort_flag, stdin_flag, stdout_flag
+logical :: remap_flag, stdin_flag, stdout_flag
 type(Molecule) :: mol0, mol1, auxmol
 integer :: adjd, minadjd
 real(wp) :: rmsd, minrmsd
@@ -63,7 +63,7 @@ trial_flag = .false.
 stdin_flag = .false.
 stdout_flag = .false.
 mirror_flag = .false.
-sort_flag = .false.
+remap_flag = .false.
 
 maxrec = 1
 maxcount = 10
@@ -90,7 +90,7 @@ do while (getarg(arg))
    case ('-test')
       test_flag = .true.
    case ('-sort')
-      sort_flag = .true.
+      remap_flag = .true.
    case ('-back')
       back_flag = .true.
    case ('-fast')
@@ -199,7 +199,7 @@ end if
 
 ! Sort atoms to minimize MSD
 
-if (sort_flag) then
+if (remap_flag) then
 
    call assign_atoms( &
       mol0%natom, &
@@ -260,8 +260,9 @@ if (sort_flag) then
 
    end do
 
-!      write (output_unit, '(a)') istr(minadjd)
-   write (output_unit, '(a)') rstr(minrmsd, 4)
+   if (.not. stats_flag) then
+      write (output_unit, '(a,1x,a)') istr(minadjd), rstr(minrmsd, 4)
+   end if
 
 else
 

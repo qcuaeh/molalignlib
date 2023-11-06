@@ -62,7 +62,7 @@ Program options
 
 #### Options supported by the native executable and the python script
 
-<code>-sort</code>&nbsp; Reorder atoms to minimize the RMSD.  
+<code>-sort</code>&nbsp; Remap atoms to optimize the RMSD.  
 <code>-fast</code>&nbsp; Prune assignments that surpass the displacement tolerance.  
 <code>-bond</code>&nbsp; Prioritize assignments that minimize bonding differences.  
 <code>-tol <em>TOL</em></code>&nbsp; Set the displacement tolerance to *TOL* (defaults to 0.35 Å).  
@@ -95,14 +95,15 @@ more than one set of coordinates in a file, only the first one will be read. The
 executable only reads *xyz* and *mol2* files while the python script reads all the file
 formats supported by *ASE*.
 
-* To align the atoms without reordering, run the command without options.
+* Running the command without options will align the atoms without reordering.
 
-* To reorder the atoms to minimize the RMSD run the command with the `-sort` option.
+* Running the command with the `-sort` option will remap the atoms to minimize the
+RMSD and the aligned coordinates will be written in the optimal mapping order.
 
 Advanced usage
 --------------
 
-When reordering is performed the computation can take a lot of time to complete but
+When remapping is performed the computation can take a lot of time to complete but
 can be considerably speeded up with the `-fast` option which enables pruning of any
 assignment that surpass the displacement tolerance. However, if the atom displacements
 are larger than this tolerance, the assignment will fail, or, if they are very close,
@@ -189,7 +190,7 @@ mol0 = read('Co138_0.xyz')
 mol1 = read('Co138_1.xyz')
 # Find optimal assignment
 assignment = assign_atoms(mol0, mol1, fast=True)
-# Reorder mol1 with the optimal assignment
+# Remap mol1 with the optimal assignment
 mol1 = mol1[assignment.order]
 # Align mol1 to mol0 (returns RMSD)
 mol1.align_to(mol0)
