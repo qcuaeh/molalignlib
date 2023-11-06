@@ -18,8 +18,8 @@ import numpy as np
 import molalignlibext
 from ase import Atoms
 
-#print(molalignlibext.library.align_atoms.__doc__)
-#print(molalignlibext.library.assign_atoms.__doc__)
+#print(molalignlibext.molalignlib.align_atoms.__doc__)
+#print(molalignlibext.molalignlib.assign_atoms.__doc__)
 
 class Assignment:
     def __init__(self, count, order):
@@ -104,7 +104,7 @@ def assign_atoms(
     permlist = np.empty((natom0, maxrec), dtype=np.int32, order='F')
     countlist = np.empty(maxrec, dtype=np.int32)
     nrec, error = \
-        molalignlibext.library.assign_atoms(
+        molalignlibext.molalignlib.assign_atoms(
             natom0,
             znums0,
             types0,
@@ -141,7 +141,7 @@ def align_to(self, other):
     molalignlibext.bounds.natom0 = natom0
     molalignlibext.bounds.natom1 = natom1
     travec, rotmat, error = \
-        molalignlibext.library.align_atoms(
+        molalignlibext.molalignlib.align_atoms(
             natom0,
             znums0,
             types0,

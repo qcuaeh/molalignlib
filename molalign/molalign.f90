@@ -29,7 +29,7 @@ use discrete
 use fileio
 use argparse
 use moltypes
-use library
+use molalignlib
 
 implicit none
 
