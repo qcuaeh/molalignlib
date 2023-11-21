@@ -261,7 +261,11 @@ if (remap_flag) then
    end do
 
    if (.not. stats_flag) then
-      write (output_unit, '(a,1x,a)') istr(minadjd), rstr(minrmsd, 4)
+      if (bond_flag) then
+         write (output_unit, '(a,1x,a)') istr(minadjd), rstr(minrmsd, 4)
+      else
+         write (output_unit, '(a,1x,a)') rstr(minrmsd, 4)
+      end if
    end if
 
 else
