@@ -27,11 +27,11 @@ implicit none
 
 contains
 
-subroutine groupatoms(natom, znums, types, weights, nblk, blklen, blkidx)
+subroutine groupatoms(natom, znums, ztypes, weights, nblk, blklen, blkidx)
 ! Purpose: Group atoms by atomic numbers and types
    integer, intent(in) :: natom
    integer, dimension(:), intent(in) :: znums
-   integer, dimension(:), intent(in) :: types
+   integer, dimension(:), intent(in) :: ztypes
    real(wp), dimension(:), intent(in) :: weights
    integer, intent(out) :: nblk
    integer, dimension(:), intent(out) :: blklen
@@ -55,11 +55,11 @@ subroutine groupatoms(natom, znums, types, weights, nblk, blklen, blkidx)
          nblk = nblk + 1
          blklen(nblk) = 1
          blkznum(nblk) = znums(i)
-         blktype(nblk) = types(i)
+         blktype(nblk) = ztypes(i)
          blkidx(i) = nblk
          do j = i + 1, natom
             if (remaining(i)) then
-               if (znums(j) == znums(i) .and. types(j) == types(i)) then
+               if (znums(j) == znums(i) .and. ztypes(j) == ztypes(i)) then
                   if (weights(j) == weights(i)) then
                      blkidx(j) = nblk
                      blklen(nblk) = blklen(nblk) + 1
@@ -99,7 +99,7 @@ subroutine groupatoms(natom, znums, types, weights, nblk, blklen, blkidx)
 end subroutine
 
 subroutine groupbytype(nelem, elements, types, groupid, ngroup, groupsize)
-! Purpose: Categorize atoms by typess
+! Purpose: Categorize atoms by types
     integer, intent(in) :: nelem
     integer, intent(out) :: ngroup
     integer, dimension(:), intent(in) :: types, elements
@@ -221,7 +221,7 @@ subroutine getmnatypes(natom, nin, intype, nadj, adjlist, nout, outype, outsize,
 end subroutine
 
 subroutine groupequivatoms(natom, nblk, blkidx, nadj, adjlist, neqv, eqvlen, eqvidx)
-! Group atoms by MNA at infinite lavel
+! Group atoms by MNA type at infinite level
    integer, intent(in) :: natom, nblk
    integer, dimension(:), intent(in) :: nadj
    integer, dimension(:), intent(in) :: blkidx

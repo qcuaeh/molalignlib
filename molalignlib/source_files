@@ -12,7 +12,7 @@ rotation.f90
 translation.f90
 adjacency.f90
 alignment.f90
-moltypes.f90
+types.f90
 rnglib.f90
 subset.f90
 random.f90

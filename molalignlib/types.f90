@@ -1,4 +1,4 @@
-module moltypes
+module types
 use kinds
 use discrete
 use rotation
@@ -37,20 +37,36 @@ type, public :: Molecule
    type(Bond), allocatable :: bonds(:)
    logical, allocatable :: adjmat(:, :)
 contains
-   procedure :: get_znums => atoms_get_znums
-   procedure :: get_types => atoms_get_types
-   procedure :: get_weights => atoms_get_weights
-   procedure :: get_coords => atoms_get_coords
-   procedure :: get_labels => atoms_get_labels
-   procedure :: set_coords => atoms_set_coords
-   procedure :: rotate => atoms_rotate
-   procedure :: translate => atoms_translate
-   procedure :: permutate => atoms_permutate
+   procedure :: get_znums => get_znums
+   procedure :: get_ztypes => get_ztypes
+   procedure :: get_weights => get_weights
+   procedure :: get_coords => get_coords
+   procedure :: get_labels => get_labels
+   procedure :: set_coords => set_coords
+   procedure :: rotate_coords => rotate_coords
+   procedure :: translate_coords => translate_coords
+   procedure :: permutate_atoms => permutate_atoms
 end type
 
 contains
 
-subroutine atoms_permutate(self, order)
+subroutine rotate_coords(self, rotmat)
+   class(Molecule), intent(inout) :: self
+   real(wp), intent(in) :: rotmat(3, 3)
+
+   call self%set_coords(rotated(self%natom, self%get_coords(), rotmat))
+
+end subroutine
+
+subroutine translate_coords(self, travec)
+   class(Molecule), intent(inout) :: self
+   real(wp), intent(in) :: travec(3)
+
+   call self%set_coords(translated(self%natom, self%get_coords(), travec))
+
+end subroutine
+
+subroutine permutate_atoms(self, order)
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: order(:)
 
@@ -59,23 +75,7 @@ subroutine atoms_permutate(self, order)
 
 end subroutine
 
-subroutine atoms_rotate(self, rotmat)
-   class(Molecule), intent(inout) :: self
-   real(wp), intent(in) :: rotmat(3, 3)
-
-   call self%set_coords(rotated(self%natom, self%get_coords(), rotmat))
-
-end subroutine
-
-subroutine atoms_translate(self, travec)
-   class(Molecule), intent(inout) :: self
-   real(wp), intent(in) :: travec(3)
-
-   call self%set_coords(translated(self%natom, self%get_coords(), travec))
-
-end subroutine
-
-function atoms_get_znums(self) result(znums)
+function get_znums(self) result(znums)
    class(Molecule), intent(in) :: self
    integer, dimension(self%natom) :: znums
    integer i
@@ -86,18 +86,18 @@ function atoms_get_znums(self) result(znums)
 
 end function
 
-function atoms_get_types(self) result(types)
+function get_ztypes(self) result(ztypes)
    class(Molecule), intent(in) :: self
-   integer, dimension(self%natom) :: types
+   integer, dimension(self%natom) :: ztypes
    integer i
 
    do i = 1, self%natom
-      types(i) = self%atoms(i)%type
+      ztypes(i) = self%atoms(i)%type
    end do
 
 end function
 
-function atoms_get_weights(self) result(weights)
+function get_weights(self) result(weights)
    class(Molecule), intent(in) :: self
    real(wp), dimension(self%natom) :: weights
    integer i
@@ -108,7 +108,7 @@ function atoms_get_weights(self) result(weights)
 
 end function
 
-function atoms_get_coords(self) result(coords)
+function get_coords(self) result(coords)
    class(Molecule), intent(in) :: self
    real(wp), dimension(3, self%natom) :: coords
    integer i
@@ -119,7 +119,7 @@ function atoms_get_coords(self) result(coords)
 
 end function
 
-subroutine atoms_set_coords(self, coords)
+subroutine set_coords(self, coords)
    class(Molecule), intent(inout) :: self
    real(wp), dimension(3, self%natom), intent(in) :: coords
    integer i
@@ -130,7 +130,7 @@ subroutine atoms_set_coords(self, coords)
 
 end subroutine
 
-function atoms_get_labels(self) result(labels)
+function get_labels(self) result(labels)
    class(Molecule), intent(in) :: self
    character(wl), dimension(self%natom) :: labels
    integer i

@@ -65,7 +65,7 @@ subroutine dsyeval4(a, w)
    real(dp), intent(out) :: w(4)
    integer :: info
    real(dp) work(25)
-   call dsyev('N', 'U', 4, a, size(a, dim=1), w, work, 25, info)
+   call dsyev('N', 'U', 4, a, 4, w, work, 25, info)
 end subroutine
 
 subroutine ssyevec4(a, w)
@@ -73,7 +73,7 @@ subroutine ssyevec4(a, w)
    real(sp), intent(out) :: w(4)
    integer :: info
    real(sp) work(25)
-   call ssyev('V', 'U', 4, a, size(a, dim=1), w, work, 25, info)
+   call ssyev('V', 'U', 4, a, 4, w, work, 25, info)
 end subroutine
 
 subroutine dsyevec4(a, w)
@@ -81,7 +81,7 @@ subroutine dsyevec4(a, w)
    real(dp), intent(out) :: w(4)
    integer :: info
    real(dp) work(25)
-   call dsyev('V', 'U', 4, a, size(a, dim=1), w, work, 25, info)
+   call dsyev('V', 'U', 4, a, 4, w, work, 25, info)
 end subroutine
 
 end module

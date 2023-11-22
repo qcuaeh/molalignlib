@@ -17,11 +17,11 @@
 module molalignlib
 use stdio
 use kinds
+use types
 use bounds
 use random
 use sorting
 use discrete
-use moltypes
 use rotation
 use translation
 use assorting
@@ -162,10 +162,10 @@ subroutine assign_atoms( &
       return
    end if
 
-   ! Abort if there are conflicting types
+   ! Abort if there are conflicting atomic types
 
    if (any(types0(atomorder0) /= types1(atomorder1))) then
-      write (error_unit, '(a)') 'Error: There are conflicting atom types'
+      write (error_unit, '(a)') 'Error: There are conflicting atomic types'
       error = 1
       return
    end if
@@ -372,18 +372,18 @@ subroutine align_atoms( &
       return
    end if
 
-   ! Abort if there are conflicting types
+   ! Abort if there are conflicting atomic types
 
    if (any(sorted(types0, natom0) /= sorted(types1, natom1))) then
-      write (error_unit, '(a)') 'Error: There are conflicting atom types'
+      write (error_unit, '(a)') 'Error: There are conflicting atomic types'
       error = 1
       return
    end if
 
-   ! Abort if types are not ordered
+   ! Abort if atomic types are not ordered
 
    if (any(types0 /= types1)) then
-      write (error_unit, '(a)') 'Error: The atom types are not in the same order'
+      write (error_unit, '(a)') 'Error: Atomic types are not in the same order'
       error = 1
       return
    end if

@@ -16,10 +16,10 @@
 
 module readmol
 use stdio
+use types
 use bounds
 use strutils
 use chemdata
-use moltypes
 
 implicit none
 

@@ -16,6 +16,7 @@
 
 program molalign
 use kinds
+use types
 use flags
 use bounds
 use printing
@@ -28,7 +29,6 @@ use adjacency
 use discrete
 use fileio
 use argparse
-use moltypes
 use molalignlib
 
 implicit none
@@ -204,13 +204,13 @@ if (remap_flag) then
    call assign_atoms( &
       mol0%natom, &
       mol0%get_znums(), &
-      mol0%get_types(), &
+      mol0%get_ztypes(), &
       mol0%get_weights(), &
       mol0%get_coords(), &
       mol0%adjmat, &
       mol1%natom, &
       mol1%get_znums(), &
-      mol1%get_types(), &
+      mol1%get_ztypes(), &
       mol1%get_weights(), &
       mol1%get_coords(), &
       mol1%adjmat, &
@@ -231,25 +231,25 @@ if (remap_flag) then
    do i = 1, nrec
 
       mol1 = auxmol
-      call mol1%permutate(maplist(:, i))
+      call mol1%permutate_atoms(maplist(:, i))
 
       call align_atoms( &
          mol0%natom, &
          mol0%get_znums(), &
-         mol0%get_types(), &
+         mol0%get_ztypes(), &
          mol0%get_weights(), &
          mol0%get_coords(), &
          mol1%natom, &
          mol1%get_znums(), &
-         mol1%get_types(), &
+         mol1%get_ztypes(), &
          mol1%get_weights(), &
          mol1%get_coords(), &
          travec, &
          rotmat, &
          error)
 
-      call mol1%rotate(rotmat)
-      call mol1%translate(travec)
+      call mol1%rotate_coords(rotmat)
+      call mol1%translate_coords(travec)
 
       rmsd = get_rmsd(mol0, mol1)
       adjd = get_adjd(mol0, mol1)
@@ -275,12 +275,12 @@ else
    call align_atoms( &
       mol0%natom, &
       mol0%get_znums(), &
-      mol0%get_types(), &
+      mol0%get_ztypes(), &
       mol0%get_weights(), &
       mol0%get_coords(), &
       mol1%natom, &
       mol1%get_znums(), &
-      mol1%get_types(), &
+      mol1%get_ztypes(), &
       mol1%get_weights(), &
       mol1%get_coords(), &
       travec, &
@@ -289,8 +289,8 @@ else
 
    if (error /= 0) stop
 
-   call mol1%rotate(rotmat)
-   call mol1%translate(travec)
+   call mol1%rotate_coords(rotmat)
+   call mol1%translate_coords(travec)
 
    rmsd = get_rmsd(mol0, mol1)
    adjd = get_adjd(mol0, mol1)

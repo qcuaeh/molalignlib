@@ -16,10 +16,10 @@
 
 module fileio
 use stdio
+use types
 use readmol
 use writemol
 use adjacency
-use moltypes
 
 implicit none
 
