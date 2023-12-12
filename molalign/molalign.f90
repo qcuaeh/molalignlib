@@ -44,7 +44,7 @@ character(:), allocatable :: fmtin0, fmtin1, fmtstdin, fmtout
 character(ll) :: posargs(2)
 real(wp) :: travec(3), rotmat(3, 3)
 logical :: remap_flag, stdin_flag, stdout_flag
-type(Molecule) :: mol0, mol1, auxmol
+type(Molecule) :: mol0, mol1, auxmol0, auxmol1
 integer :: adjd, minadjd
 real(wp) :: rmsd, minrmsd
 
@@ -201,19 +201,12 @@ end if
 
 if (remap_flag) then
 
+   auxmol0 = mol0
+   auxmol1 = mol1
+
    call assign_atoms( &
-      mol0%natom, &
-      mol0%get_znums(), &
-      mol0%get_ztypes(), &
-      mol0%get_weights(), &
-      mol0%get_coords(), &
-      mol0%adjmat, &
-      mol1%natom, &
-      mol1%get_znums(), &
-      mol1%get_ztypes(), &
-      mol1%get_weights(), &
-      mol1%get_coords(), &
-      mol1%adjmat, &
+      auxmol0, &
+      auxmol1, &
       maplist, &
       countlist, &
       nrec, &
@@ -224,26 +217,18 @@ if (remap_flag) then
 !      mol0%title = 'Reference'
 !      call writefile(write_unit, fmtout, mol0)
 
-   auxmol = mol1
+   auxmol1 = mol1
    minrmsd = huge(rmsd)
    minadjd = huge(adjd)
 
    do i = 1, nrec
 
-      mol1 = auxmol
+      mol1 = auxmol1
       call mol1%permutate_atoms(maplist(:, i))
 
       call align_atoms( &
-         mol0%natom, &
-         mol0%get_znums(), &
-         mol0%get_ztypes(), &
-         mol0%get_weights(), &
-         mol0%get_coords(), &
-         mol1%natom, &
-         mol1%get_znums(), &
-         mol1%get_ztypes(), &
-         mol1%get_weights(), &
-         mol1%get_coords(), &
+         mol0, &
+         mol1, &
          travec, &
          rotmat, &
          error)
@@ -273,16 +258,8 @@ else
    ! Align atoms to minimize RMSD
 
    call align_atoms( &
-      mol0%natom, &
-      mol0%get_znums(), &
-      mol0%get_ztypes(), &
-      mol0%get_weights(), &
-      mol0%get_coords(), &
-      mol1%natom, &
-      mol1%get_znums(), &
-      mol1%get_ztypes(), &
-      mol1%get_weights(), &
-      mol1%get_coords(), &
+      mol0, &
+      mol1, &
       travec, &
       rotmat, &
       error)

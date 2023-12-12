@@ -38,39 +38,17 @@ contains
 
 ! Assign atoms0 and atoms1
 subroutine assign_atoms( &
-   natom0, &
-   znums0, &
-   types0, &
-   weights0, &
-   coords0, &
-   adjmat0, &
-   natom1, &
-   znums1, &
-   types1, &
-   weights1, &
-   coords1, &
-   adjmat1, &
+   mol0, &
+   mol1, &
    maplist, &
    countlist, &
    nrec, &
    error)
 
-   integer, intent(in) :: natom0, natom1
-   integer, dimension(:), intent(in) :: znums0, znums1
-   integer, dimension(:), intent(in) :: types0, types1
-   logical, dimension(:, :), intent(in) :: adjmat0, adjmat1
-   real(wp), dimension(:), intent(in) :: weights0, weights1
-   real(wp), dimension(:, :), intent(in) :: coords0, coords1
+   type(Molecule), intent(inout) :: mol0, mol1
    integer, dimension(:, :), intent(inout) :: maplist
    integer, dimension(:), intent(inout) :: countlist
    integer, intent(out) :: nrec, error
-
-   integer :: workznums0(natom0), workznums1(natom1)
-   integer :: worktypes0(natom0), worktypes1(natom1)
-   logical :: workadjmat0(natom0, natom0), workadjmat1(natom1, natom1)
-   logical :: backadjmat0(natom0, natom0), backadjmat1(natom1, natom1)
-   real(wp) :: workweights0(natom0), workweights1(natom1)
-   real(wp) :: workcoords0(3, natom0), workcoords1(3, natom1)
 
    integer :: h, i, j, k
    integer :: nblk0, nblk1, neqv0, neqv1
@@ -84,9 +62,9 @@ subroutine assign_atoms( &
    integer, dimension(:), allocatable :: eqvlen0, eqvlen1
    real(wp) :: travec0(3), travec1(3)
 
-   integer, dimension(natom0) :: offset, blkidx, mapping
-   integer :: nbond0, bonds0(2, maxcoord*natom0)
-   integer :: nbond1, bonds1(2, maxcoord*natom1)
+   integer, dimension(mol0%natom) :: offset, blkidx, mapping
+   integer :: nbond0, bonds0(2, maxcoord*mol0%natom)
+   integer :: nbond1, bonds1(2, maxcoord*mol1%natom)
 
    ! Set error code to 0 by default
 
@@ -112,7 +90,7 @@ subroutine assign_atoms( &
 
    ! Abort if molecules have different number of atoms
 
-   if (natom0 /= natom1) then
+   if (mol0%natom /= mol1%natom) then
       write (error_unit, '(a)') 'Error: The molecules are not isomers'
       error = 1
       return
@@ -120,43 +98,48 @@ subroutine assign_atoms( &
 
    ! Allocate arrays
 
-   allocate(atomorder0(natom0), atomorder1(natom1))
-   allocate(backorder0(natom0), backorder1(natom1))
-   allocate(blkidx0(natom0), blkidx1(natom1))
-   allocate(blklen0(natom0), blklen1(natom1))
-   allocate(nadj0(natom0), nadj1(natom1))
-   allocate(adjlist0(maxcoord, natom0), adjlist1(maxcoord, natom1))
-   allocate(eqvidx0(natom0), eqvidx1(natom1))
-   allocate(eqvlen0(natom0), eqvlen1(natom1))
+   allocate(atomorder0(mol0%natom), atomorder1(mol1%natom))
+   allocate(backorder0(mol0%natom), backorder1(mol1%natom))
+   allocate(blkidx0(mol0%natom), blkidx1(mol1%natom))
+   allocate(blklen0(mol0%natom), blklen1(mol1%natom))
+   allocate(nadj0(mol0%natom), nadj1(mol1%natom))
+   allocate(adjlist0(maxcoord, mol0%natom), adjlist1(maxcoord, mol1%natom))
+   allocate(eqvidx0(mol0%natom), eqvidx1(mol1%natom))
+   allocate(eqvlen0(mol0%natom), eqvlen1(mol1%natom))
 
    ! Calculate adjacency lists
 
-   call adjmat2list(natom0, adjmat0, nadj0, adjlist0)
-   call adjmat2list(natom1, adjmat1, nadj1, adjlist1)
+   call adjmat2list(mol0%natom, mol0%adjmat, nadj0, adjlist0)
+   call adjmat2list(mol1%natom, mol1%adjmat, nadj1, adjlist1)
 
    ! Group atoms by type
 
-   call groupatoms(natom0, znums0, types0, weights0, nblk0, blklen0, blkidx0)
-   call groupatoms(natom1, znums1, types1, weights1, nblk1, blklen1, blkidx1)
+   call groupatoms(mol0%natom, mol0%get_znums(), mol0%get_ztypes(), mol0%get_weights(), nblk0, blklen0, blkidx0)
+   call groupatoms(mol1%natom, mol1%get_znums(), mol1%get_ztypes(), mol1%get_weights(), nblk1, blklen1, blkidx1)
 
    ! Group atoms by MNA
 
-   call groupequivatoms(natom0, nblk0, blkidx0, nadj0, adjlist0, neqv0, eqvlen0, eqvidx0)
-   call groupequivatoms(natom1, nblk1, blkidx1, nadj1, adjlist1, neqv1, eqvlen1, eqvidx1)
+   call groupequivatoms(mol0%natom, nblk0, blkidx0, nadj0, adjlist0, neqv0, eqvlen0, eqvidx0)
+   call groupequivatoms(mol1%natom, nblk1, blkidx1, nadj1, adjlist1, neqv1, eqvlen1, eqvidx1)
 
    ! Get atom order
 
-   atomorder0 = sortorder(eqvidx0, natom0)
-   atomorder1 = sortorder(eqvidx1, natom1)
+   atomorder0 = sortorder(eqvidx0, mol0%natom)
+   atomorder1 = sortorder(eqvidx1, mol1%natom)
 
    ! Get inverse atom order
 
    backorder0 = inverseperm(atomorder0)
    backorder1 = inverseperm(atomorder1)
 
+   ! Reorder data arrays
+
+   call mol0%permutate_atoms(atomorder0)
+   call mol1%permutate_atoms(atomorder1)
+
    ! Abort if molecules are not isomers
 
-   if (any(znums0(atomorder0) /= znums1(atomorder1))) then
+   if (any(mol0%get_znums() /= mol1%get_znums())) then
       write (error_unit, '(a)') 'Error: The molecules are not isomers'
       error = 1
       return
@@ -164,7 +147,7 @@ subroutine assign_atoms( &
 
    ! Abort if there are conflicting atomic types
 
-   if (any(types0(atomorder0) /= types1(atomorder1))) then
+   if (any(mol0%get_ztypes() /= mol1%get_ztypes())) then
       write (error_unit, '(a)') 'Error: There are conflicting atomic types'
       error = 1
       return
@@ -172,40 +155,27 @@ subroutine assign_atoms( &
 
    ! Abort if there are conflicting weights
 
-   if (any(abs(weights0(atomorder0) - weights1(atomorder1)) > 1.E-6)) then
+   if (any(abs(mol0%get_weights() - mol1%get_weights()) > 1.E-6)) then
       write (error_unit, '(a)') 'Error: There are conflicting weights'
       error = 1
       return
    end if
 
-   ! Reorder data arrays
-
-   workznums0 = znums0(atomorder0)
-   workznums1 = znums1(atomorder1)
-   worktypes0 = types0(atomorder0)
-   worktypes1 = types1(atomorder1)
-   workweights0 = weights0(atomorder0)
-   workweights1 = weights1(atomorder1)
-   workcoords0 = coords0(:, atomorder0)
-   workcoords1 = coords1(:, atomorder1)
-   workadjmat0 = adjmat0(atomorder0, atomorder0)
-   workadjmat1 = adjmat1(atomorder1, atomorder1)
-
    ! Mirror coordinates
 
    if (mirror_flag) then
-      workcoords1(1, :) = -workcoords1(1, :)
+      call mol1%mirror_coords()
    end if
 
    ! Calculate centroids
 
-   travec0 = -centroid(natom0, workweights0, workcoords0)
-   travec1 = -centroid(natom1, workweights1, workcoords1)
+   travec0 = -centroid(mol0%natom, mol0%get_weights(), mol0%get_coords())
+   travec1 = -centroid(mol1%natom, mol1%get_weights(), mol1%get_coords())
 
    ! Center coordinates at the centroids
 
-   call translate(natom0, workcoords0, travec0)
-   call translate(natom1, workcoords1, travec1)
+   call mol0%translate_coords(travec0)
+   call mol1%translate_coords(travec1)
 
    ! Initialize random number generator
 
@@ -214,103 +184,103 @@ subroutine assign_atoms( &
    ! Optimize the assignment to minimize AdjD/RMSD
 
    call optimize_assignment( &
-      natom0, &
+      mol0%natom, &
       nblk0, &
       blklen0, &
       neqv0, &
       eqvlen0, &
-      workcoords0, &
-      workadjmat0, &
+      mol0%get_coords(), &
+      mol0%adjmat, &
       neqv1, &
       eqvlen1, &
-      workcoords1, &
-      workadjmat1, &
-      workweights0, &
+      mol1%get_coords(), &
+      mol1%adjmat, &
+      mol1%get_weights(), &
       maplist, &
       countlist, &
       nrec)
 
-   if (react_flag) then
-
-      offset(1) = 0
-      do h = 1, nblk0 - 1
-         offset(h+1) = offset(h) + blklen0(h)
-      end do
-
-      do h = 1, nblk0
-         blkidx(offset(h)+1:offset(h)+blklen0(h)) = h
-      end do
-
-      mapping = maplist(:, 1)
-
-      ! Align coordinates
-
-      call rotate(natom1, workcoords1, leastrotquat(natom0, workweights0, workcoords0, workcoords1, mapping))
-
-      ! Remove reactive bonds
-
-      backadjmat0 = workadjmat0
-      backadjmat1 = workadjmat1
-
-      do i = 1, natom0
-         do j = i + 1, natom0
-            if (backadjmat0(i, j) .neqv. backadjmat1(mapping(i), mapping(j))) then
-               call removereacbond(i, j, natom0, workznums0, workadjmat0, workadjmat1, mapping)
-               h = blkidx(i)
-               do k = offset(h) + 1, offset(h) + blklen0(h)
-                  if (sum((workcoords0(:, i) - workcoords1(:, mapping(k)))**2) < 2.0 &
-                     .or. sum((workcoords0(:, k) - workcoords1(:, mapping(i)))**2) < 2.0 &
-                  ) then
-!                     print *, '<', j, mapping(j), k, mapping(k)
-                     call removereacbond(k, j, natom0, workznums0, workadjmat0, workadjmat1, mapping)
-                  end if
-               end do
-               h = blkidx(j)
-               do k = offset(h) + 1, offset(h) + blklen0(h)
-                  if (sum((workcoords0(:, j) - workcoords1(:, mapping(k)))**2) < 2.0 &
-                     .or. sum((workcoords0(:, k) - workcoords1(:, mapping(j)))**2) < 2.0 &
-                  ) then
-!                     print *, '>', i, mapping(i), k, mapping(k)
-                     call removereacbond(i, k, natom0, workznums0, workadjmat0, workadjmat1, mapping)
-                  end if
-               end do
-            end if
-         end do
-      end do
-
-      ! Optimize the assignment to minimize AdjD/RMSD
-
-      call optimize_assignment( &
-         natom0, &
-         nblk0, &
-         blklen0, &
-         neqv0, &
-         eqvlen0, &
-         workcoords0, &
-         workadjmat0, &
-         neqv1, &
-         eqvlen1, &
-         workcoords1, &
-         workadjmat1, &
-         workweights0, &
-         maplist, &
-         countlist, &
-         nrec)
-
-   end if
-
-   ! Print coordinates with internal order
-
-   mapping = maplist(:, 1)
-   call rotate(natom1, workcoords1, leastrotquat(natom0, workweights0, workcoords0, workcoords1, mapping))
-   open(unit=99, file='aligned_debug.mol2', action='write', status='replace')
-   call adjmat2bonds(natom0, workadjmat0, nbond0, bonds0)
-   call adjmat2bonds(natom1, workadjmat1, nbond1, bonds1)
-!   call adjmat2bonds(natom1, workadjmat1(mapping, mapping), nbond1, bonds1)
-   call writemol2(99, 'coords0', natom0, workznums0, workcoords0, nbond0, bonds0)
-   call writemol2(99, 'coords1', natom1, workznums1, workcoords1, nbond1, bonds1)
-!   call writemol2(99, 'coords1', natom1, workznums1(mapping), workcoords1(:, mapping), nbond1, bonds1)
-
+!   if (react_flag) then
+!
+!      offset(1) = 0
+!      do h = 1, nblk0 - 1
+!         offset(h+1) = offset(h) + blklen0(h)
+!      end do
+!
+!      do h = 1, nblk0
+!         blkidx(offset(h)+1:offset(h)+blklen0(h)) = h
+!      end do
+!
+!      mapping = maplist(:, 1)
+!
+!      ! Align coordinates
+!
+!      call rotate(natom1, workcoords1, leastrotquat(natom0, workweights0, workcoords0, workcoords1, mapping))
+!
+!      ! Remove reactive bonds
+!
+!      backadjmat0 = workadjmat0
+!      backadjmat1 = workadjmat1
+!
+!      do i = 1, natom0
+!         do j = i + 1, natom0
+!            if (backadjmat0(i, j) .neqv. backadjmat1(mapping(i), mapping(j))) then
+!               call removereacbond(i, j, natom0, workznums0, workadjmat0, workadjmat1, mapping)
+!               h = blkidx(i)
+!               do k = offset(h) + 1, offset(h) + blklen0(h)
+!                  if (sum((workcoords0(:, i) - workcoords1(:, mapping(k)))**2) < 2.0 &
+!                     .or. sum((workcoords0(:, k) - workcoords1(:, mapping(i)))**2) < 2.0 &
+!                  ) then
+!!                     print *, '<', j, mapping(j), k, mapping(k)
+!                     call removereacbond(k, j, natom0, workznums0, workadjmat0, workadjmat1, mapping)
+!                  end if
+!               end do
+!               h = blkidx(j)
+!               do k = offset(h) + 1, offset(h) + blklen0(h)
+!                  if (sum((workcoords0(:, j) - workcoords1(:, mapping(k)))**2) < 2.0 &
+!                     .or. sum((workcoords0(:, k) - workcoords1(:, mapping(j)))**2) < 2.0 &
+!                  ) then
+!!                     print *, '>', i, mapping(i), k, mapping(k)
+!                     call removereacbond(i, k, natom0, workznums0, workadjmat0, workadjmat1, mapping)
+!                  end if
+!               end do
+!            end if
+!         end do
+!      end do
+!
+!      ! Optimize the assignment to minimize AdjD/RMSD
+!
+!      call optimize_assignment( &
+!         natom0, &
+!         nblk0, &
+!         blklen0, &
+!         neqv0, &
+!         eqvlen0, &
+!         workcoords0, &
+!         workadjmat0, &
+!         neqv1, &
+!         eqvlen1, &
+!         workcoords1, &
+!         workadjmat1, &
+!         workweights0, &
+!         maplist, &
+!         countlist, &
+!         nrec)
+!
+!   end if
+!
+!   ! Print coordinates with internal order
+!
+!   mapping = maplist(:, 1)
+!   call rotate(natom1, workcoords1, leastrotquat(natom0, workweights0, workcoords0, workcoords1, mapping))
+!   open(unit=99, file='aligned_debug.mol2', action='write', status='replace')
+!   call adjmat2bonds(natom0, workadjmat0, nbond0, bonds0)
+!   call adjmat2bonds(natom1, workadjmat1, nbond1, bonds1)
+!!   call adjmat2bonds(natom1, workadjmat1(mapping, mapping), nbond1, bonds1)
+!   call writemol2(99, 'coords0', natom0, workznums0, workcoords0, nbond0, bonds0)
+!   call writemol2(99, 'coords1', natom1, workznums1, workcoords1, nbond1, bonds1)
+!!   call writemol2(99, 'coords1', natom1, workznums1(mapping), workcoords1(:, mapping), nbond1, bonds1)
+!
    ! Reorder back to original atom ordering
 
    do i = 1, nrec
@@ -321,25 +291,13 @@ end subroutine
 
 subroutine align_atoms( &
 ! Purpose: Align atoms0 and atoms1
-   natom0, &
-   znums0, &
-   types0, &
-   weights0, &
-   coords0, &
-   natom1, &
-   znums1, &
-   types1, &
-   weights1, &
-   coords1, &
+   mol0, &
+   mol1, &
    travec, &
    rotmat, &
    error)
 
-   integer, intent(in) :: natom0, natom1
-   integer, dimension(:), intent(in) :: znums0, types0
-   integer, dimension(:), intent(in) :: znums1, types1
-   real(wp), dimension(:, :), intent(in) :: coords0, coords1
-   real(wp), dimension(:), intent(in) :: weights0, weights1
+   type(Molecule), intent(inout) :: mol0, mol1
    real(wp), intent(out) :: travec(3), rotmat(3, 3)
    real(wp) :: travec0(3), travec1(3), rotquat(4)
    integer, intent(out) :: error
@@ -350,7 +308,7 @@ subroutine align_atoms( &
 
    ! Abort if molecules have different number of atoms
 
-   if (natom0 /= natom1) then
+   if (mol0%natom /= mol1%natom) then
       write (error_unit, '(a)') 'Error: The molecules are not isomers'
       error = 1
       return
@@ -358,7 +316,7 @@ subroutine align_atoms( &
 
    ! Abort if molecules are not isomers
 
-   if (any(sorted(znums0, natom0) /= sorted(znums1, natom1))) then
+   if (any(sorted(mol0%get_znums(), mol0%natom) /= sorted(mol1%get_znums(), mol1%natom))) then
       write (error_unit, '(a)') 'Error: The molecules are not isomers'
       error = 1
       return
@@ -366,7 +324,7 @@ subroutine align_atoms( &
 
    ! Abort if atoms are not ordered
 
-   if (any(znums0 /= znums1)) then
+   if (any(mol0%get_znums() /= mol1%get_znums())) then
       write (error_unit, '(a)') 'Error: The atoms are not in the same order'
       error = 1
       return
@@ -374,7 +332,7 @@ subroutine align_atoms( &
 
    ! Abort if there are conflicting atomic types
 
-   if (any(sorted(types0, natom0) /= sorted(types1, natom1))) then
+   if (any(sorted(mol0%get_ztypes(), mol0%natom) /= sorted(mol1%get_ztypes(), mol1%natom))) then
       write (error_unit, '(a)') 'Error: There are conflicting atomic types'
       error = 1
       return
@@ -382,7 +340,7 @@ subroutine align_atoms( &
 
    ! Abort if atomic types are not ordered
 
-   if (any(types0 /= types1)) then
+   if (any(mol0%get_ztypes() /= mol1%get_ztypes())) then
       write (error_unit, '(a)') 'Error: Atomic types are not in the same order'
       error = 1
       return
@@ -390,17 +348,17 @@ subroutine align_atoms( &
 
    ! Calculate centroids
 
-   travec0 = -centroid(natom0, weights0, coords0)
-   travec1 = -centroid(natom1, weights1, coords1)
+   travec0 = -centroid(mol0%natom, mol0%get_weights(), mol0%get_coords())
+   travec1 = -centroid(mol1%natom, mol1%get_weights(), mol1%get_coords())
 
    ! Calculate optimal rotation matrix
 
    rotquat = leastrotquat( &
-      natom0, &
-      weights0, &
-      translated(natom0, coords0, travec0), &
-      translated(natom1, coords1, travec1), &
-      identityperm(natom0) &
+      mol0%natom, &
+      mol0%get_weights(), &
+      translated(mol0%natom, mol0%get_coords(), travec0), &
+      translated(mol1%natom, mol1%get_coords(), travec1), &
+      identityperm(mol0%natom) &
    )
 
    rotmat = rotquat2rotmat(rotquat)

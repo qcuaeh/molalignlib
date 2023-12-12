@@ -43,12 +43,23 @@ contains
    procedure :: get_coords => get_coords
    procedure :: get_labels => get_labels
    procedure :: set_coords => set_coords
+   procedure :: mirror_coords => mirror_coords
    procedure :: rotate_coords => rotate_coords
    procedure :: translate_coords => translate_coords
    procedure :: permutate_atoms => permutate_atoms
 end type
 
 contains
+
+subroutine mirror_coords(self)
+   class(Molecule), intent(inout) :: self
+   real(wp) :: coords(3, self%natom)
+
+   coords = self%get_coords()
+   coords(1, :) = -coords(1, :)
+   call self%set_coords(coords)
+
+end subroutine
 
 subroutine rotate_coords(self, rotmat)
    class(Molecule), intent(inout) :: self
