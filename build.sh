@@ -199,7 +199,7 @@ prog)
 #   runtests jcim.2c01187/0.05 -rec 5 -sort -fast -tol 0.17
    runtests jcim.2c01187/0.1 -rec 5 -sort -fast -tol 0.35
 #   runtests jcim.2c01187/0.2 -rec 5 -sort -fast -tol 0.69
-   runtests MOBH35-shuffled/ -bond  -sort -fast -back
+   runtests MOBH35-shuffled/ -rec 5 -sort -fast -bond -back
    ;;
 lib)
    # Build dynamic library
