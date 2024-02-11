@@ -69,8 +69,8 @@ subroutine initialize_random()
    if (test_flag) then
 !      randnum01_sp => random_number_sp
 !      randnum01_dp => random_number_dp
-      randnum01_sp => real_uni01_sp
-      randnum01_dp => real_uni01_dp
+      randnum01_sp => sp_uni_01
+      randnum01_dp => dp_uni_01
       call rnglib_init()
    else
       randnum01_sp => random_number_sp
@@ -84,7 +84,7 @@ subroutine initialize_random()
          read(unit) seed
          close(unit)
       else
-         write (error_unit, '(a)') 'Error: can not read from /dev/urandom'
+         write (stderr, '(a)') 'Error: can not read from /dev/urandom'
          stop
       end if
       call random_seed(put=seed)

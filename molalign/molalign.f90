@@ -40,10 +40,12 @@ integer, allocatable, dimension(:) :: countlist
 integer, allocatable, dimension(:, :) :: maplist
 character(:), allocatable :: arg
 character(:), allocatable :: pathin1, pathin2, pathout
-character(:), allocatable :: fmtin0, fmtin1, fmtstdin, fmtout
+character(:), allocatable :: fmtin0, fmtin1, fmtout, optfmtin, optfmtout
 character(ll) :: posargs(2)
 real(wp) :: travec(3), rotmat(3, 3)
-logical :: remap_flag, stdin_flag, stdout_flag
+logical :: remap_flag
+logical :: stdin_flag, stdout_flag
+logical :: fmtin_flag, fmtout_flag
 type(Molecule) :: mol0, mol1, auxmol0, auxmol1
 integer :: adjd, minadjd
 real(wp) :: rmsd, minrmsd
@@ -60,10 +62,12 @@ test_flag = .false.
 react_flag = .false.
 stats_flag = .false.
 trial_flag = .false.
-stdin_flag = .false.
-stdout_flag = .false.
 mirror_flag = .false.
 remap_flag = .false.
+stdin_flag = .false.
+stdout_flag = .false.
+fmtin_flag = .false.
+fmtout_flag = .false.
 
 maxrec = 1
 maxcount = 10
@@ -117,12 +121,16 @@ do while (getarg(arg))
       call readoptarg(arg, maxrec)
    case ('-out')
       call readoptarg(arg, pathout)
+   case ('-fmtin')
+      fmtin_flag = .true.
+      call readoptarg(arg, optfmtin)
+   case ('-fmtout')
+      fmtout_flag = .true.
+      call readoptarg(arg, optfmtout)
    case ('-stdin')
       stdin_flag = .true.
-      call readoptarg(arg, fmtstdin)
    case ('-stdout')
       stdout_flag = .true.
-      call readoptarg(arg, fmtout)
    case default
       call readposarg(arg, posargs)
    end select
@@ -130,17 +138,17 @@ do while (getarg(arg))
 end do
 
 if (stdin_flag) then
-   fmtin0 = fmtstdin
-   fmtin1 = fmtstdin
-   read_unit0 = input_unit
-   read_unit1 = input_unit
+   read_unit0 = stdin
+   read_unit1 = stdin
+   fmtin0 = 'xyz'
+   fmtin1 = 'xyz'
 else
    select case (ipos)
    case (0)
-      write (error_unit, '(a)') 'Error: Missing arguments'
+      write (stderr, '(a)') 'Error: Missing arguments'
       stop
    case (1)
-      write (error_unit, '(a)') 'Error: Too few arguments'
+      write (stderr, '(a)') 'Error: Too few arguments'
       stop
    case (2)
       pathin1 = trim(posargs(1))
@@ -148,9 +156,14 @@ else
       call open2read(pathin1, read_unit0, fmtin0)
       call open2read(pathin2, read_unit1, fmtin1)
    case default
-      write (error_unit, '(a)') 'Error: Too many arguments'
+      write (stderr, '(a)') 'Error: Too many arguments'
       stop
    end select
+end if
+
+if (fmtin_flag) then
+   fmtin0 = optfmtin
+   fmtin1 = optfmtin
 end if
 
 ! Read coordinates
@@ -176,15 +189,14 @@ do i = 1, mol1%natom
 end do
 
 if (stdout_flag) then
-   write_unit = output_unit
+   write_unit = stdout
+   fmtout = 'xyz'
 else
-   fmtout = baseext(pathout)
-   if (len(fmtout) > 0) then
-      call open2write(pathout, write_unit)
-   else
-      write (error_unit, '(a)') 'Error: Output file must have an extension'
-      stop
-   end if
+   call open2write(pathout, write_unit, fmtout)
+end if
+
+if (fmtout_flag) then
+   fmtout = optfmtout
 end if
 
 ! Get adjacency matrices and lists
@@ -247,9 +259,9 @@ if (remap_flag) then
 
    if (.not. stats_flag) then
       if (bond_flag) then
-         write (output_unit, '(a,1x,a)') istr(minadjd), rstr(minrmsd, 4)
+         write (stdout, '(a,1x,a)') istr(minadjd), rstr(minrmsd, 4)
       else
-         write (output_unit, '(a,1x,a)') rstr(minrmsd, 4)
+         write (stdout, '(a,1x,a)') rstr(minrmsd, 4)
       end if
    end if
 
@@ -272,8 +284,8 @@ else
    rmsd = get_rmsd(mol0, mol1)
    adjd = get_adjd(mol0, mol1)
 
-!      write (output_unit, '(a)') istr(adjd)
-   write (output_unit, '(a)') rstr(rmsd, 4)
+!      write (stdout, '(a)') istr(adjd)
+   write (stdout, '(a)') rstr(rmsd, 4)
 
 !      mol0%title = 'Reference'
 !      call writefile(write_unit, fmtout, mol0)

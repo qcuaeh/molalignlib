@@ -3,42 +3,33 @@ shopt -s nullglob
 unalias -a
 
 to_array() {
-   IFS=\  read -r -a "$1_array" <<< "${!1}"
-}
-
-clean_build() {
-   $fresh_build || return 0
-   fresh_build=false
-   if test -d build; then
-      pushd build >/dev/null
-      for file in *.f90 *.mod *.o; do
-         rm "$file"
-      done
-      popd >/dev/null
-   fi
+   IFS=\  read -r -a "$1" <<< "${!1}"
 }
 
 compile() {
-   $build_flag || return 0
-   clean_build
-   to_array std_flags
-   to_array pic_flags
-   to_array optim_flags
-   to_array debug_flags
    srcdir=$rootdir/$1
+   $build_flag || return 0
+   if $fresh_build; then
+      fresh_build=false
+      if test -d build; then
+         for file in build/*{.f90,.mod,.o}; do
+            rm "$file"
+         done
+      fi
+   fi
    if test ! -d "$srcdir"; then
       echo Error: $srcdir does not exist
       exit 1
    fi
    pushd "$buildir" >/dev/null
-   flags=("${std_flags_array[@]}")
+   comp_flags=("${base_flags[@]}")
    if $pic_build; then
-      flags+=("${pic_flags_array[@]}")
+      comp_flags+=("${pic_flags[@]}")
    fi
    if $debug_build; then
-      flags+=("${debug_flags_array[@]}")
+      comp_flags+=("${debug_flags[@]}")
    else
-      flags+=("${optim_flags_array[@]}")
+      comp_flags+=("${opt_flags[@]}")
    fi
    while IFS= read -r srcfile; do
       prefix=${srcfile%.*}
@@ -51,7 +42,7 @@ compile() {
          if test "$srcdir" != "$PWD"; then
             cp -f "$srcdir/$srcfile" "$srcfile"
          fi
-         "$F90" "${flags[@]}" -c "$srcfile" -o "$objfile"
+         "$F90" "${comp_flags[@]}" -c "$srcfile" -o "$objfile"
       fi
       obj_files+=("$objfile")
    done < <(grep -v ^# "$srcdir/source_files")
@@ -72,7 +63,7 @@ make_prog() {
    fi
    echo Linking program...
    pushd "$buildir" > /dev/null
-   "$F90" -o "$1" "${obj_files[@]}" -llapack
+   "$F90" "${link_flags[@]}" "${obj_files[@]}" -o "$1"
    popd > /dev/null
 }
 
@@ -84,7 +75,7 @@ make_lib() {
    fi
    echo Linking dynamic library...
    pushd "$buildir" >/dev/null
-   "$F90" -shared -o "$1.so" "${obj_files[@]}" -llapack
+   "$F90" -shared "${link_flags[@]}" "${obj_files[@]}" -o "$1.so"
    popd >/dev/null
 }
 
@@ -101,7 +92,7 @@ make_pyext() {
    pushd "$buildir" >/dev/null
    echo Linking extension module...
    "$F2PY" -h "$1.pyf" -m "$1" --overwrite-signature "${f2py_files[@]}" --quiet
-   "$F2PY" -c "$1.pyf" --fcompiler=gnu95 --link-lapack "${obj_files[@]}" --quiet
+   "$F2PY" -c "$1.pyf" "${f2py_flags[@]}" "${obj_files[@]}" --quiet
    popd >/dev/null
 }
 
@@ -116,8 +107,8 @@ runtests() {
    for file in "$testdir/$testset"/*.out; do
       testname=$(basename "$file" .out)
       echo -n "Running test $testset/$testname... "
-#      "$executable" -stdin xyz -stdout xyz -test -stats "$@" < "$testdir/$testset/$testname.xyz" 2>&1 > "$file"
-      if diff -bB <("$executable" -stdin xyz -stdout xyz -test -stats "$@" < "$testdir/$testset/$testname.xyz" 2>&1) "$file"; then
+#      "$executable" -stdin -stdout -test -stats "$@" < "$testdir/$testset/$testname.xyz" 2>&1 > "$file"
+      if diff -bB <("$executable" -stdin -stdout -test -stats "$@" < "$testdir/$testset/$testname.xyz" 2>&1) "$file"; then
          echo ok
       else
          echo failed
@@ -146,16 +137,26 @@ elif test ! -d "$buildir"; then
 fi
 
 # Set environment
+
 while IFS= read -r line; do
    var=${line%%=*}
    value=${line#*=}
    declare -- "$var"="$value"
 done < <(grep -v -e^# -e^$ ./build.env)
 
+to_array base_flags
+to_array pic_flags
+to_array opt_flags
+to_array debug_flags
+to_array link_flags
+to_array f2py_flags
+
+# Read arguments and set options
+
 build_flag=true
+test_flag=true
 fresh_build=true
 debug_build=false
-test_flag=true
 
 while getopts ":dqt" opt; do
   case $opt in
@@ -199,7 +200,7 @@ prog)
 #   runtests jcim.2c01187/0.05 -rec 5 -sort -fast -tol 0.17
    runtests jcim.2c01187/0.1 -rec 5 -sort -fast -tol 0.35
 #   runtests jcim.2c01187/0.2 -rec 5 -sort -fast -tol 0.69
-   runtests MOBH35-shuffled/ -rec 5 -sort -fast -bond -back
+   runtests MOBH35-shuffled -rec 5 -sort -fast -bond -back
    ;;
 lib)
    # Build dynamic library

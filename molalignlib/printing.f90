@@ -42,13 +42,13 @@ subroutine print_stats_dist(nrec, matches, avgsteps, avgtotalrot, avgrealrot, re
    integer, dimension(:), intent(in) :: matches, recadjd
    real(wp), dimension(:), intent(in) :: avgsteps, avgtotalrot, avgrealrot, recrmsd
    integer :: irec
-   write (output_unit, '(1x,a,4x,a,4x,a,5x,a,7x,a)') 'Map', 'Count', 'Steps', 'Angle', 'RMSD'
-   write (output_unit, '(a)') line1
+   write (stdout, '(1x,a,4x,a,4x,a,5x,a,7x,a)') 'Map', 'Count', 'Steps', 'Angle', 'RMSD'
+   write (stdout, '(a)') line1
    do irec = 1, nrec
-      write (output_unit, '(i4,3x,i6,5x,f4.1,5x,f5.1,3x,f8.4)') &
+      write (stdout, '(i4,3x,i6,5x,f4.1,5x,f5.1,3x,f8.4)') &
          irec, matches(irec), avgsteps(irec), 90./asin(1.)*avgrealrot(irec), recrmsd(irec)
    end do
-   write (output_unit, '(a)') line1
+   write (stdout, '(a)') line1
 end subroutine
 
 subroutine print_stats_diff(nrec, matches, avgsteps, avgtotalrot, avgrealrot, recadjd, recrmsd)
@@ -56,24 +56,24 @@ subroutine print_stats_diff(nrec, matches, avgsteps, avgtotalrot, avgrealrot, re
    integer, dimension(:), intent(in) :: matches, recadjd
    real(wp), dimension(:), intent(in) :: avgsteps, avgtotalrot, avgrealrot, recrmsd
    integer :: irec
-   write (output_unit, '(1x,a,4x,a,4x,a,5x,a,3x,a,7x,a)') 'Map', 'Count', 'Steps', 'Angle', 'AdjD', 'RMSD'
-   write (output_unit, '(a)') line2
+   write (stdout, '(1x,a,4x,a,4x,a,5x,a,3x,a,7x,a)') 'Map', 'Count', 'Steps', 'Angle', 'AdjD', 'RMSD'
+   write (stdout, '(a)') line2
    do irec = 1, nrec
-      write (output_unit, '(i4,3x,i6,5x,f4.1,5x,f5.1,3x,i4,3x,f8.4)') &
+      write (stdout, '(i4,3x,i6,5x,f4.1,5x,f5.1,3x,i4,3x,f8.4)') &
          irec, matches(irec), avgsteps(irec), 90./asin(1.)*avgrealrot(irec), recadjd(irec), recrmsd(irec)
    end do
-   write (output_unit, '(a)') line2
+   write (stdout, '(a)') line2
 end subroutine
 
 subroutine print_final_stats(overflow, maxrec, nrec, ntrial, nstep)
    logical, intent(in) :: overflow
    integer, intent(in) :: maxrec, nrec, ntrial, nstep
-   write (output_unit, '(a,1x,i0)') 'Random trials =', ntrial
-   write (output_unit, '(a,1x,i0)') 'Minimization steps =', nstep
+   write (stdout, '(a,1x,i0)') 'Random trials =', ntrial
+   write (stdout, '(a,1x,i0)') 'Minimization steps =', nstep
    if (overflow) then
-      write (output_unit, '(a,1x,i0)') 'Visited local minima >', maxrec
+      write (stdout, '(a,1x,i0)') 'Visited local minima >', maxrec
    else
-      write (output_unit, '(a,1x,i0)') 'Visited local minima =', nrec
+      write (stdout, '(a,1x,i0)') 'Visited local minima =', nrec
    end if
 end subroutine
 

@@ -29,37 +29,44 @@ subroutine open2read(filepath, unit, fileext)
    character(*), intent(in) :: filepath
    integer, intent(out) :: unit
    character(:), allocatable, intent(out) :: fileext
-   character(:), allocatable :: filename
    integer :: stat
 
    if (len(filepath) == 0) then
-      write (error_unit, '(a)') 'Error: File path is empty'
+      write (stderr, '(a)') 'Error: File path is empty'
       stop
    end if
 
    fileext = baseext(filepath)
 
    if (len(fileext) == 0) then
-      write (error_unit, '(a,1x,a)') 'Missing file extension:', filepath
+      write (stderr, '(a,1x,a)') 'Missing file extension:', filepath
       stop
    end if
 
    open(newunit=unit, file=filepath, action='read', status='old', iostat=stat)
    if (stat /= 0) then
-      write (error_unit, '(a,1x,a,1x,a)') 'Error opening', filepath, 'for reading'
+      write (stderr, '(a,1x,a,1x,a)') 'Error opening', filepath, 'for reading'
       stop
    end if
 
 end subroutine
 
-subroutine open2write(filename, unit)
-   character(*), intent(in) :: filename
+subroutine open2write(filepath, unit, fileext)
+   character(*), intent(in) :: filepath
    integer, intent(out) :: unit
+   character(:), allocatable, intent(out) :: fileext
    integer :: stat
 
-   open(newunit=unit, file=filename, action='write', status='replace', iostat=stat)
+   fileext = baseext(filepath)
+
+   if (len(fileext) == 0) then
+      write (stderr, '(a,1x,a)') 'Missing file extension:', filepath
+      stop
+   end if
+
+   open(newunit=unit, file=filepath, action='write', status='replace', iostat=stat)
    if (stat /= 0) then
-      write (error_unit, '(a,1x,a,1x,a)') 'Error opening', filename, 'for writing'
+      write (stderr, '(a,1x,a,1x,a)') 'Error opening', filepath, 'for writing'
       stop
    end if
 
@@ -76,7 +83,7 @@ subroutine readfile(unit, fmtin, mol)
    case ('mol2')
       call readmol2(unit, mol)
    case default
-      write (error_unit, '(a,1x,a)') 'Invalid format:', fmtin
+      write (stderr, '(a,1x,a)') 'Invalid format:', fmtin
       stop
    end select
 
@@ -104,7 +111,7 @@ subroutine writefile(unit, fmtout, mol)
    case ('mol2')
       call writemol2(unit, mol%title, mol%natom, mol%get_znums(), mol%get_coords(), nbond, bonds)
    case default
-      write (error_unit, '(a,1x,a)') 'Invalid format:', fmtout
+      write (stderr, '(a,1x,a)') 'Invalid format:', fmtout
       stop
    end select
 

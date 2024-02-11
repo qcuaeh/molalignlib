@@ -66,7 +66,7 @@ subroutine groupatoms(natom, znums, ztypes, weights, nblk, blklen, blkidx)
                      remaining(j) = .false.
                   else
                      ! Abort if there are inconsistent weights
-                     write (error_unit, '(a)') 'Error: There are incosistent weights'
+                     write (stderr, '(a)') 'Error: There are incosistent weights'
                      stop
                   end if
                end if

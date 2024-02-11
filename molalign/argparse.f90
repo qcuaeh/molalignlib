@@ -49,14 +49,14 @@ subroutine readposarg(arg, posargs)
    character(ll), intent(out) :: posargs(:)
 
    if (arg(1:1) == '-') then
-      write (error_unit, '(a,1x,a)') 'Unknown option:', arg
+      write (stderr, '(a,1x,a)') 'Unknown option:', arg
       stop
    end if
 
    ipos = ipos + 1
 
    if (ipos > size(posargs)) then
-      write (error_unit, '(a)') 'Too many positional arguments'
+      write (stderr, '(a)') 'Too many positional arguments'
       stop
    end if
 
@@ -97,7 +97,7 @@ subroutine getoptarg(option, arg)
       end if
    end if
 
-   write (error_unit, '(a,1x,a,1x,a)') 'Option', option, 'requires an argument'
+   write (stderr, '(a,1x,a,1x,a)') 'Option', option, 'requires an argument'
    stop
 
 end subroutine
@@ -121,7 +121,7 @@ subroutine readintoptarg(option, optval)
    call getoptarg(option, arg)
    read (arg, *, iostat=stat) optval
    if (stat /= 0) then
-      write (error_unit, '(a,1x,a,1x,a)') 'Option', option, 'requires an integer argument'
+      write (stderr, '(a,1x,a,1x,a)') 'Option', option, 'requires an integer argument'
       stop
    end if
 
@@ -136,7 +136,7 @@ subroutine readrealoptarg(option, optval)
    call getoptarg(option, arg)
    read (arg, *, iostat=stat) optval
    if (stat /= 0) then
-      write (error_unit, '(a,1x,a,1x,a)') 'Option', option, 'requires a numeric argument'
+      write (stderr, '(a,1x,a,1x,a)') 'Option', option, 'requires a numeric argument'
       stop
    end if
 

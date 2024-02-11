@@ -58,7 +58,7 @@ subroutine adjmat2list(natom, adjmat, nadj, adjlist)
             nadj(i) = nadj(i) + 1
             nadj(j) = nadj(j) + 1
             if (nadj(i) > maxcoord .or. nadj(j) > maxcoord) then
-               write (error_unit, '("Maximum coordination number exceeded!")')
+               write (stderr, '("Maximum coordination number exceeded!")')
                stop
             end if
             adjlist(nadj(i), i) = j

@@ -52,7 +52,7 @@ subroutine readxyz(unit, mol)
    return
 
    99 continue
-   write (error_unit, '(a)') 'Unexpected end of file!'
+   write (stderr, '(a)') 'Unexpected end of file!'
    stop
 
 end subroutine
@@ -106,7 +106,7 @@ subroutine readmol2(unit, mol)
    return
 
    99 continue
-   write (error_unit, '(a)') 'Unexpected end of file!'
+   write (stderr, '(a)') 'Unexpected end of file!'
    stop
 
 end subroutine

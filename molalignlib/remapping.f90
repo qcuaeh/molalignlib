@@ -157,10 +157,10 @@ subroutine optimize_assignment( &
 !   offset = 0
 !   do h = 1, nblk0
 !      do i = offset+1, offset+blklen(h)
-!         write (output_unit, '(i0,":")', advance='no') i
+!         write (stdout, '(i0,":")', advance='no') i
 !         do j = offset+1, offset+blklen(h)
 !            if (biasmat(i, j) == 0) then
-!               write (output_unit, '(1x,i0)', advance='no') j
+!               write (stdout, '(1x,i0)', advance='no') j
 !            end if
 !         end do
 !         print *

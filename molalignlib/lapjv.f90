@@ -1,4 +1,5 @@
 module lapjv
+use iso_fortran_env, only: int64
 use kinds
 use stdio
 implicit none
@@ -188,7 +189,7 @@ subroutine minperm(n, p, q, pq, perm, dist)
       do i = 1, n
          j = first(i)
 30       if (j .gt. n*maxnei) then
-            write (error_unit, '(a)') 'Error: Assignment failed'
+            write (stderr, '(a)') 'Error: Assignment failed'
             stop
          end if
          if (kk(j) .ne. perm(i)) then
@@ -205,12 +206,12 @@ subroutine minperm(n, p, q, pq, perm, dist)
          if (perm(j) == i) exit
       end do
       if (j == n + 1) then
-         write (error_unit, '(a)') 'Error: Assignment failed'
+         write (stderr, '(a)') 'Error: Assignment failed'
          stop
       end if
    end do
 
-   dist = real(h, wp) / scale
+   dist = real(h, kind=wp) / scale
 
 end subroutine
    

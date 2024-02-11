@@ -46,7 +46,7 @@ real(wp) :: rmin
 integer, allocatable  :: iw(:,:)
 
 if (n < 1 .or. m < 1) then
-   write(error_unit, '(a, 2i8)') ' ** error in call to assndx; m, n = ', m, n
+   write(stderr, '(a, 2i8)') ' ** error in call to assndx; m, n = ', m, n
    return
 end if
 

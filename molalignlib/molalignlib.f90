@@ -91,7 +91,7 @@ subroutine assign_atoms( &
    ! Abort if molecules have different number of atoms
 
    if (mol0%natom /= mol1%natom) then
-      write (error_unit, '(a)') 'Error: The molecules are not isomers'
+      write (stderr, '(a)') 'Error: The molecules are not isomers'
       error = 1
       return
    end if
@@ -140,7 +140,7 @@ subroutine assign_atoms( &
    ! Abort if molecules are not isomers
 
    if (any(mol0%get_znums() /= mol1%get_znums())) then
-      write (error_unit, '(a)') 'Error: The molecules are not isomers'
+      write (stderr, '(a)') 'Error: The molecules are not isomers'
       error = 1
       return
    end if
@@ -148,7 +148,7 @@ subroutine assign_atoms( &
    ! Abort if there are conflicting atomic types
 
    if (any(mol0%get_ztypes() /= mol1%get_ztypes())) then
-      write (error_unit, '(a)') 'Error: There are conflicting atomic types'
+      write (stderr, '(a)') 'Error: There are conflicting atomic types'
       error = 1
       return
    end if
@@ -156,7 +156,7 @@ subroutine assign_atoms( &
    ! Abort if there are conflicting weights
 
    if (any(abs(mol0%get_weights() - mol1%get_weights()) > 1.E-6)) then
-      write (error_unit, '(a)') 'Error: There are conflicting weights'
+      write (stderr, '(a)') 'Error: There are conflicting weights'
       error = 1
       return
    end if
@@ -309,7 +309,7 @@ subroutine align_atoms( &
    ! Abort if molecules have different number of atoms
 
    if (mol0%natom /= mol1%natom) then
-      write (error_unit, '(a)') 'Error: The molecules are not isomers'
+      write (stderr, '(a)') 'Error: The molecules are not isomers'
       error = 1
       return
    end if
@@ -317,7 +317,7 @@ subroutine align_atoms( &
    ! Abort if molecules are not isomers
 
    if (any(sorted(mol0%get_znums(), mol0%natom) /= sorted(mol1%get_znums(), mol1%natom))) then
-      write (error_unit, '(a)') 'Error: The molecules are not isomers'
+      write (stderr, '(a)') 'Error: The molecules are not isomers'
       error = 1
       return
    end if
@@ -325,7 +325,7 @@ subroutine align_atoms( &
    ! Abort if atoms are not ordered
 
    if (any(mol0%get_znums() /= mol1%get_znums())) then
-      write (error_unit, '(a)') 'Error: The atoms are not in the same order'
+      write (stderr, '(a)') 'Error: The atoms are not in the same order'
       error = 1
       return
    end if
@@ -333,7 +333,7 @@ subroutine align_atoms( &
    ! Abort if there are conflicting atomic types
 
    if (any(sorted(mol0%get_ztypes(), mol0%natom) /= sorted(mol1%get_ztypes(), mol1%natom))) then
-      write (error_unit, '(a)') 'Error: There are conflicting atomic types'
+      write (stderr, '(a)') 'Error: There are conflicting atomic types'
       error = 1
       return
    end if
@@ -341,7 +341,7 @@ subroutine align_atoms( &
    ! Abort if atomic types are not ordered
 
    if (any(mol0%get_ztypes() /= mol1%get_ztypes())) then
-      write (error_unit, '(a)') 'Error: Atomic types are not in the same order'
+      write (stderr, '(a)') 'Error: Atomic types are not in the same order'
       error = 1
       return
    end if

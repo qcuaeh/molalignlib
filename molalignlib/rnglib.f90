@@ -4,8 +4,8 @@ implicit none
 
 private
 public rnglib_init
-public real_uni01_sp
-public real_uni01_dp
+public sp_uni_01
+public dp_uni_01
 
 contains
 
@@ -1475,7 +1475,7 @@ function multmod ( a, s, m )
    return
 end function
 
-subroutine real_uni01_sp ( num )
+subroutine sp_uni_01 ( num )
 
 !*****************************************************************************80
 !
@@ -1509,14 +1509,14 @@ subroutine real_uni01_sp ( num )
 !
 !  Parameters:
 !
-!    Output, real ( kind = 4 ) R4_UNI_01, a uniform random value in [0,1].
+!    Output, real ( sp ) NUM, a uniform random value in [0,1].
 !
    implicit none
 
    integer i
 !  integer i4_uni
 !  logical initialized_get
-   real ( kind = sp ) num
+   real ( sp ) num
 !
 !  Check whether the package must be initialized.
 !
@@ -1538,7 +1538,7 @@ subroutine real_uni01_sp ( num )
    return
 end subroutine
 
-subroutine real_uni01_dp ( num )
+subroutine dp_uni_01 ( num )
 
 !*****************************************************************************80
 !
@@ -1572,14 +1572,14 @@ subroutine real_uni01_dp ( num )
 !
 !  Parameters:
 !
-!    Output, real ( kind = rk ) R8_UNI_01, a uniform random value in [0,1].
+!    Output, real ( dp ) NUM, a uniform random value in [0,1].
 !
    implicit none
 
    integer i
 !  integer i4_uni
 !  logical initialized_get
-   real ( kind = dp ) num
+   real ( dp ) num
 !
 !  Check whether the package must be initialized.
 !
