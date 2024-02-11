@@ -1,2 +1,2 @@
-numpy
-ase-core
+numpy>=1.18.5
+ase-core>=3.23.0b1.post3

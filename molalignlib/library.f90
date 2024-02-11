@@ -25,7 +25,6 @@ use sorting
 use assorting
 use rotation
 use translation
-use adjacency
 use alignment
 use assignment
 
@@ -40,13 +39,11 @@ subroutine assign_atoms( &
    types0, &
    weights0, &
    incoords0, &
-   adjmat0, &
    natom1, &
    znums1, &
    types1, &
    weights1, &
    incoords1, &
-   adjmat1, &
    permlist, &
    countlist, &
    nrec, &
@@ -55,7 +52,6 @@ subroutine assign_atoms( &
    integer, intent(in) :: natom0, natom1
    integer, dimension(:), intent(in) :: znums0, znums1
    integer, dimension(:), intent(in) :: types0, types1
-   logical, dimension(:, :), intent(in) :: adjmat0, adjmat1
    real(wp), dimension(:, :), intent(in) :: incoords0, incoords1
    real(wp), dimension(:), intent(in) :: weights0, weights1
    integer, dimension(:, :), intent(inout) :: permlist
@@ -69,8 +65,6 @@ subroutine assign_atoms( &
    real(wp), dimension(:), allocatable :: blkwt0, blkwt1
    integer, dimension(:), allocatable :: atomorder0, atomorder1
    integer, dimension(:), allocatable :: backorder0, backorder1
-   integer, dimension(:), allocatable :: nadj0, nadj1
-   integer, dimension(:, :), allocatable :: adjlist0, adjlist1
    real(wp) :: center0(3), center1(3)
    real(wp), dimension(:, :), allocatable :: coords0, coords1
    real(wp), dimension(:, :), allocatable :: biasmat
@@ -94,15 +88,8 @@ subroutine assign_atoms( &
    allocate(blkid0(natom0), blkid1(natom1))
    allocate(blksz0(natom0), blksz1(natom1))
    allocate(blkwt0(natom0), blkwt1(natom1))
-   allocate(nadj0(natom0), nadj1(natom1))
-   allocate(adjlist0(maxcoord, natom0), adjlist1(maxcoord, natom1))
    allocate(coords0(3, natom0), coords1(3, natom1))
    allocate(biasmat(natom0, natom1))
-
-   ! Get adjacency lists
-
-   call adjmat2list(natom0, adjmat0, nadj0, adjlist0)
-   call adjmat2list(natom1, adjmat1, nadj1, adjlist1)
 
    ! Group atoms by label
 

@@ -28,7 +28,6 @@ program molalign
    use translation
    use rotation
    use alignment
-   use adjacency
    use discrete
    use library
 
@@ -48,11 +47,10 @@ program molalign
    character(:), allocatable :: title0, title1
    character(ll) :: posargs(2)
    character(wl), allocatable, dimension(:) :: labels0, labels1
-   real(wp) :: rmsd, travec(3), rotmat(3, 3)
+   real(wp) :: rmsd, minrmsd, travec(3), rotmat(3, 3)
    real(wp), allocatable, dimension(:) :: weights0, weights1
    real(wp), allocatable, dimension(:, :) :: coords0, coords1, aligned1
    logical :: sort_flag, mirror_flag, stdin_flag, stdout_flag
-   logical, dimension(:, :), allocatable :: adjmat0, adjmat1
 
    procedure(f_realint), pointer :: weight_function
 
@@ -68,7 +66,6 @@ program molalign
    mirror_flag = .false.
    live_flag = .false.
    bias_flag = .false.
-   bond_flag = .false.
 
    maxrec = 1
    maxcount = 10
@@ -97,13 +94,6 @@ program molalign
       case ('-fast')
          iter_flag = .true.
          bias_flag = .true.
-!         bias_func => setcrossbias
-!      case ('-topo')
-!         iter_flag = .true.
-!         bias_flag = .true.
-!         bias_func => setmnabias
-      case ('-bond')
-         bond_flag = .true.
       case ('-mass')
          weight_function => stdmass
       case ('-mirror')
@@ -115,16 +105,15 @@ program molalign
          call readoptarg(arg, maxtrials)
       case ('-tol')
          call readoptarg(arg, bias_tol)
-      case ('-scale')
-         call readoptarg(arg, bias_scale)
+!      case ('-scale')
+!         call readoptarg(arg, bias_scale)
       case ('-rec')
          call readoptarg(arg, maxrec)
       case ('-out')
          call readoptarg(arg, pathout)
       case ('-stdin')
          stdin_flag = .true.
-         call readoptarg(arg, fmtin0)
-         call readoptarg(arg, fmtin1)
+         call readoptarg(arg, fmtin)
       case ('-stdout')
          stdout_flag = .true.
          call readoptarg(arg, fmtout)
@@ -135,30 +124,33 @@ program molalign
    end do
 
    if (stdin_flag) then
+      fmtin0 = fmtin
+      fmtin1 = fmtin
       read_unit0 = input_unit
       read_unit1 = input_unit
    else
       select case (ipos)
       case (0)
-         write (error_unit, '(a)') 'Error: No file paths were specified'
+         write (error_unit, '(a)') 'Error: Missing arguments'
          stop
       case (1)
-         pathin1 = trim(posargs(1))
-         call open2read(pathin1, read_unit0, fmtin0)
-         read_unit1 = read_unit0
-         fmtin1 = fmtin0
+         write (error_unit, '(a)') 'Error: Too few arguments'
+         stop
       case (2)
          pathin1 = trim(posargs(1))
          pathin2 = trim(posargs(2))
          call open2read(pathin1, read_unit0, fmtin0)
          call open2read(pathin2, read_unit1, fmtin1)
+      case default
+         write (error_unit, '(a)') 'Error: Too many arguments'
+         stop
       end select
    end if
 
    ! Read coordinates
 
-   call readfile(read_unit0, fmtin0, title0, natom0, labels0, coords0, adjmat0)
-   call readfile(read_unit1, fmtin1, title1, natom1, labels1, coords1, adjmat1)
+   call readfile(read_unit0, fmtin0, title0, natom0, labels0, coords0)
+   call readfile(read_unit1, fmtin1, title1, natom1, labels1, coords1)
 
    if (mirror_flag) then
       coords1(1, :) = -coords1(1, :)
@@ -197,11 +189,6 @@ program molalign
       end if
    end if
 
-   ! Get adjacency matrices and lists
-
-   call getadjmat(natom0, coords0, znums0, adjmat0)
-   call getadjmat(natom1, coords1, znums1, adjmat1)
-
    ! Sort atoms to minimize MSD
 
    if (sort_flag) then
@@ -212,19 +199,21 @@ program molalign
          types0, &
          weights0, &
          coords0, &
-         adjmat0, &
          natom1, &
          znums1, &
          types1, &
          weights1, &
          coords1, &
-         adjmat1, &
          permlist, &
          countlist, &
          nrec, &
          error)
 
       if (error /= 0) stop
+
+      call writefile(write_unit, fmtout, 'Reference', natom0, znums0, coords0)
+
+      minrmsd = huge(rmsd)
 
       do i = 1, nrec
 
@@ -243,20 +232,16 @@ program molalign
             rotmat, &
             error)
 
-         if (error /= 0) stop
-
          aligned1 = translated(natom1, rotated(natom1, coords1, rotmat), travec)
          rmsd = sqrt(sum(weights0*sum((aligned1(:, permlist(:, i)) - coords0)**2, dim=1))/sum(weights0))
+         minrmsd = min(minrmsd, rmsd)
 
-         if (i == 1) then
-            write (output_unit, '(a)') 'Optimized RMSD = ' // realstr(rmsd, 4)
-            call writefile(write_unit, fmtout, 'Reference', natom0, znums0, coords0, adjmat0)
-         end if
-
-         call writefile(write_unit, fmtout, 'RMSD ' // realstr(rmsd, 4), natom1, znums1(permlist(:, i)), &
-            aligned1(:, permlist(:, i)), adjmat1(permlist(:, i), permlist(:, i)))
+         call writefile(write_unit, fmtout, 'RMSD '//realstr(rmsd, 4), natom1, &
+            znums1(permlist(:, i)), aligned1(:, permlist(:, i)))
 
       end do
+
+      if (.not. stats_flag) write (output_unit, '(a)') 'Optimized RMSD = '//realstr(minrmsd, 4)
 
    else
 
@@ -281,10 +266,9 @@ program molalign
 
       aligned1 = translated(natom1, rotated(natom1, coords1, rotmat), travec)
       rmsd = sqrt(sum(weights0*sum((aligned1 - coords0)**2, dim=1))/sum(weights0))
-
-      write (error_unit, '(a)') 'RMSD = ' // realstr(rmsd, 4)
-      call writefile(write_unit, fmtout, 'Reference', natom0, znums0, coords0, adjmat0)
-      call writefile(write_unit, fmtout, 'RMSD ' // realstr(rmsd, 4), natom1, znums1, aligned1, adjmat1)
+      write (output_unit, '(a)') 'RMSD = '//realstr(rmsd, 4)
+      call writefile(write_unit, fmtout, 'Reference', natom0, znums0, coords0)
+      call writefile(write_unit, fmtout, 'RMSD '//realstr(rmsd, 4), natom1, znums1, aligned1)
 
    end if
 

@@ -2,12 +2,13 @@
 shopt -s nullglob
 unalias -a
 
-toarray() {
+to_array() {
    IFS=\  read -r -a "$1" <<< "${!1}"
 }
 
 clean_build() {
-   $quick_build && return
+   $fresh_build || return 0
+   fresh_build=false
    if test -d build; then
       pushd build >/dev/null
       for file in *.f90 *.mod *.o; do
@@ -18,12 +19,13 @@ clean_build() {
 }
 
 compile() {
-   pic=false
-   toarray std_flags
-   toarray pic_flags
-   toarray optim_flags
-   toarray debug_flags
-   srcdir=$topdir/$1
+   $build_flag || return 0
+   clean_build
+   to_array std_flags
+   to_array pic_flags
+   to_array optim_flags
+   to_array debug_flags
+   srcdir=$rootdir/$1
    if test ! -d "$srcdir"; then
       echo Error: $srcdir does not exist
       exit 1
@@ -62,35 +64,33 @@ compile() {
 }
 
 make_prog() {
-   name=$1
    executable=$buildir/$1
-   if test -z "$name"; then
+   $build_flag || return 0
+   if test -z "$1"; then
       echo Error: name is empty
       exit 1
    fi
    echo Linking program...
    pushd "$buildir" > /dev/null
-   "$F90" -o "$name" "${obj_files[@]}" -llapack
+   "$F90" -o "$1" "${obj_files[@]}" -llapack
    popd > /dev/null
-   echo Done
 }
 
 make_lib() {
-   name=$1
-   if test -z "$name"; then
+   $build_flag || return 0
+   if test -z "$1"; then
       echo Error: name is empty
       exit 1
    fi
    echo Linking dynamic library...
    pushd "$buildir" >/dev/null
-   "$F90" -shared -o "$name.so" "${obj_files[@]}" -llapack
+   "$F90" -shared -o "$1.so" "${obj_files[@]}" -llapack
    popd >/dev/null
-   echo Done
 }
 
 make_pyext() {
-   name=$1
-   if test -z "$name"; then
+   $build_flag || return 0
+   if test -z "$1"; then
       echo Error: name is empty
       exit 1
    fi
@@ -100,32 +100,32 @@ make_pyext() {
    fi
    pushd "$buildir" >/dev/null
    echo Linking extension module...
-   "$F2PY" -h "$name.pyf" -m "$name" --overwrite-signature "${f2py_files[@]}" --quiet
-   "$F2PY" -c "$name.pyf" --fcompiler=gnu95 --link-lapack "${obj_files[@]}" --quiet
+   "$F2PY" -h "$1.pyf" -m "$1" --overwrite-signature "${f2py_files[@]}" --quiet
+   "$F2PY" -c "$1.pyf" --fcompiler=gnu95 --link-lapack "${obj_files[@]}" --quiet
    popd >/dev/null
-   echo Done
 }
 
 runtests() {
-   $quick_build && return
-   $debug_build && return
-   testdir=$topdir/$1
-   shift
+   $test_flag || return 0
    if test -z "$executable"; then
       echo Error: executable is not set
       exit 1
    fi
-   for file in "$testdir"/*.out; do
-      name=$(basename "$file")
-      echo -n Running test ${name%.out}.xyz...
-      if diff -bB <("$executable" "$testdir/${name%.out}.xyz" "$@" 2>&1) "$file" > /dev/null; then
-          echo \ passed
+   testset=$1
+   shift
+   for file in "$testdir/$testset"/*.out; do
+      testname=$(basename "$file" .out)
+      echo -n "Running test $testset/$testname... "
+#      "$executable" -stdin xyz -stdout xyz -test -stats "$@" < "$testdir/$testset/$testname.xyz" 2>&1 > "$file"
+      if diff -bB <("$executable" -stdin xyz -stdout xyz -test -stats "$@" < "$testdir/$testset/$testname.xyz" 2>&1) "$file"; then
+         echo ok
       else
-          echo \ failed
+         echo failed
       fi
    done
-   echo Done
 }
+
+rootdir=$(dirname "$(readlink -e "$0")")
 
 if test ! -e ./build.env; then
    echo Error: build.env does not exist
@@ -135,8 +135,8 @@ elif test ! -f ./build.env; then
    exit 1
 fi
 
-topdir=$(dirname "$(readlink -e "$0")")
-buildir=$topdir/build
+buildir=$rootdir/build
+testdir=$rootdir/tests
 
 if test ! -e "$buildir"; then
    mkdir "$buildir"
@@ -152,16 +152,26 @@ while IFS= read -r line; do
    declare -- "$var"="$value"
 done < <(grep -v -e^# -e^$ ./build.env)
 
+build_flag=true
+fresh_build=true
 debug_build=false
-quick_build=false
+test_flag=true
 
-while getopts ":dq" opt; do
+while getopts ":dqt" opt; do
   case $opt in
     d)
+      build_flag=true
       debug_build=true
+      test_flag=false
       ;;
     q)
-      quick_build=true
+      build_flag=true
+      fresh_build=false
+      test_flag=false
+      ;;
+    t)
+      build_flag=false
+      test_flag=true
       ;;
     \?)
       echo "Invalid option: -$OPTARG" >&2
@@ -181,26 +191,23 @@ fi
 case $target in
 prog)
    # Build program
-   clean_build
    pic_build=false
    compile molalignlib
    compile molalign
    make_prog molalign
    # Run tests
-#   runtests tests/jcim.2c01187/0.05 -test -stats -stdout xyz -rec 5 -sort -fast -tol 0.17
-   runtests tests/jcim.2c01187/0.1 -test -stats -stdout xyz -rec 5 -sort -fast -tol 0.35
-#   runtests tests/jcim.2c01187/0.2 -test -stats -stdout xyz -rec 5 -sort -fast -tol 0.69
+   runtests jcim.2c01187/0.05 -rec 5 -sort -fast -tol 0.17
+   runtests jcim.2c01187/0.1 -rec 5 -sort -fast -tol 0.35
+   runtests jcim.2c01187/0.2 -rec 5 -sort -fast -tol 0.69
    ;;
 lib)
    # Build dynamic library
-   clean_build
    pic_build=true
    compile molalignlib
    make_lib molalignlib
    ;;
 pyext)
    # Build python extension module
-   clean_build
    pic_build=true
    compile molalignlib
    make_pyext molalignlibext

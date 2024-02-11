@@ -20,24 +20,25 @@ use kinds
 use flags
 
 implicit none
+character(len=*), parameter :: hline = '-------------------------------------------'
 
 contains
 
 subroutine print_header()
-   write (output_unit, '(1x,a,4x,a,4x,a,5x,a,6x,a,7x,a)') 'Map', 'Count', 'Steps', 'Total', 'Real', 'RMSD'
-   write (output_unit, '(a)') '-----------------------------------------------------'
+   write (output_unit, '(1x,a,4x,a,4x,a,5x,a,7x,a)') 'Map', 'Count', 'Steps', 'Angle', 'RMSD'
+   write (output_unit, '(a)') hline
 end subroutine
 
 subroutine print_body(irec, matches, avgsteps, avgtotalrot, avgrealrot, dist2)
    integer, intent(in) :: irec, matches
    real(wp), intent(in) :: avgsteps, avgtotalrot, avgrealrot, dist2
-   write (output_unit, '(i4,3x,i6,5x,f4.1,5x,f5.1,5x,f5.1,3x,f8.4)') &
-      irec, matches, avgsteps, 90./asin(1.)*avgtotalrot, 90./asin(1.)*avgrealrot, sqrt(dist2)
+   write (output_unit, '(i4,3x,i6,5x,f4.1,5x,f5.1,3x,f8.4)') &
+      irec, matches, avgsteps, 90./asin(1.)*avgrealrot, sqrt(dist2)
 end subroutine
 
 subroutine print_footer()
    if (live_flag) write (output_unit, '(a)', advance='no') achar(27)//'[K'
-   write (output_unit, '(a)') '-----------------------------------------------------'
+   write (output_unit, '(a)') hline
 end subroutine
 
 subroutine print_stats(overflow, maxrec, nrec, ntrial, nstep)
