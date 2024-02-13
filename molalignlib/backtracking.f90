@@ -66,7 +66,7 @@ subroutine minadjdiff (natom, weights, nblk, blklen, coords0, nadj0, adjlist0, a
 
    ntrack = 0
    tracked(:) = .false.
-   unmapping = inverseperm(mapping)
+   unmapping = inverse_perm(mapping)
    moldiff = adjacencydiff (natom, adjmat0, adjmat1, mapping)
    moldist = squaredist (natom, weights, coords0, coords1, mapping)
 

@@ -168,12 +168,12 @@ contains
    end subroutine groupminsort
 
    ! inverts the order of a vector
-   function invsort (vec, n)
+   function invsort (vec, n) result(invec)
       integer, intent(in) :: vec(:), n
-      integer :: i, p, invsort(n)
+      integer :: i, p, invec(n)
       p = n
       do i = 1, n
-         invsort(p) = vec(i)
+         invec(p) = vec(i)
          p = p - 1
       end do
    end function invsort

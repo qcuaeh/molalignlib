@@ -64,7 +64,7 @@ subroutine readposarg(arg, posargs)
 
 end subroutine
 
-logical function getarg(arg)
+logical function getarg(arg) result(success)
    character(:), allocatable, intent(out) :: arg
    integer arglen
 
@@ -74,9 +74,9 @@ logical function getarg(arg)
       call get_command_argument(iarg, length=arglen)
       allocate(character(arglen) :: arg)
       call get_command_argument(iarg, arg)
-      getarg = .true.
+      success = .true.
    else
-      getarg = .false.
+      success = .false.
    end if
 
 end function

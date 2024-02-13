@@ -22,25 +22,27 @@ implicit none
 private
 public rotate
 public rotated
-public rotquat2rotmat
+public matrix_rotated
+public quater_rotated
+public quat2rotmat
 public quatmul
 public rotangle
 public genrotmat
 public genrotquat
 
 interface rotate
-   module procedure matrotate
-   module procedure quatrotate
+   module procedure matrix_rotate
+   module procedure quater_rotate
 end interface
 
 interface rotated
-   module procedure matrotated
-   module procedure quatrotated
+   module procedure matrix_rotated
+   module procedure quater_rotated
 end interface
 
 contains
 
-function rotquat2rotmat(rotquat) result(rotmat)
+function quat2rotmat(rotquat) result(rotmat)
 ! Purpose: Apply rotation quaternion to atomic coordinates
    real(wp), intent(in) :: rotquat(4)
    real(wp) :: rotmat(3, 3)
@@ -59,7 +61,7 @@ function rotquat2rotmat(rotquat) result(rotmat)
 
 end function
 
-subroutine matrotate(natom, coords, rotmat)
+subroutine matrix_rotate(natom, coords, rotmat)
 ! Purpose: Apply rotation matrix to atomic coordinates
    integer, intent(in) :: natom
    real(wp), intent (in) :: rotmat(3, 3)
@@ -69,18 +71,18 @@ subroutine matrotate(natom, coords, rotmat)
 
 end subroutine
 
-function matrotated(natom, coords, rotmat)
+function matrix_rotated(natom, coords, rotmat) result(rotcoords)
 ! Purpose: Apply rotation matrix to atomic coordinates
    integer, intent(in) :: natom
    real(wp), intent (in) :: rotmat(3, 3)
    real(wp), intent (in) :: coords(3, natom)
-   real(wp) :: matrotated(3, natom)
+   real(wp) :: rotcoords(3, natom)
 
-   matrotated = matmul(rotmat, coords)
+   rotcoords = matmul(rotmat, coords)
 
 end function
 
-subroutine quatrotate(natom, coords, rotquat)
+subroutine quater_rotate(natom, coords, rotquat)
 ! Purpose: Apply rotation quaternion to atomic coordinates
    integer, intent(in) :: natom
    real(wp), intent(in) :: rotquat(4)
@@ -88,26 +90,26 @@ subroutine quatrotate(natom, coords, rotquat)
 
 ! Rotate atomic coordinates
 
-!    call matrotate(natom, rotquat2rotmat(rotquat), coords)
-    coords = matmul(rotquat2rotmat(rotquat), coords)
+!    call matrix_rotate(natom, quat2rotmat(rotquat), coords)
+    coords = matmul(quat2rotmat(rotquat), coords)
 
 end subroutine
 
-function quatrotated(natom, coords, rotquat)
+function quater_rotated(natom, coords, rotquat) result(rotcoords)
 ! Purpose: Apply rotation quaternion to atomic coordinates
    integer, intent(in) :: natom
    real(wp), intent(in) :: rotquat(4)
    real(wp), intent(in) :: coords(3, natom)
-   real(wp) :: quatrotated(3, natom)
+   real(wp) :: rotcoords(3, natom)
 
-   quatrotated = matmul(rotquat2rotmat(rotquat), coords)
+   rotcoords = matmul(quat2rotmat(rotquat), coords)
 
 end function
 
-function quatmul(p, q)
+function quatmul(p, q) result(prod)
 
    real(wp), dimension(4), intent(in) :: p, q
-   real(wp) :: quatmul(4)
+   real(wp) :: prod(4)
    real(wp) :: left(4, 4)
 
    left(:, 1) = [ p(1), -p(2), -p(3), -p(4) ]
@@ -115,24 +117,25 @@ function quatmul(p, q)
    left(:, 3) = [ p(3),  p(4),  p(1), -p(2) ]
    left(:, 4) = [ p(4), -p(3),  p(2),  p(1) ]
 
-   quatmul = matmul(left, q)
+   prod = matmul(left, q)
 
 end function
 
-function rotangle(q)
+function rotangle(q) result(angle)
    real(wp), dimension(4), intent(in) :: q
-   real(wp) :: rotangle
+   real(wp) :: angle
 
-!    rotangle = 2*acos(q(1))
-!    rotangle = 2*asin(sqrt(sum(q(2:4)**2)))
-   rotangle = 2*abs(atan(sqrt(sum(q(2:4)**2))/q(1)))
-!    rotangle = 2*atan2(sqrt(sum(q(2:4)**2)), q(1))
+!    angle = 2*acos(q(1))
+!    angle = 2*asin(sqrt(sum(q(2:4)**2)))
+   angle = 2*abs(atan(sqrt(sum(q(2:4)**2))/q(1)))
+!    angle = 2*atan2(sqrt(sum(q(2:4)**2)), q(1))
 
 !    print *, sum(q**2), &
 !        90./asin(1.)*2*acos(q(1)), &
 !        90./asin(1.)*2*asin(sqrt(sum(q(2:4)**2))), &
 !        90./asin(1.)*2*atan(sqrt(sum(q(2:4)**2))/q(1)), &
 !        90./asin(1.)*2*atan2(sqrt(sum(q(2:4)**2)), q(1))
+
 end function
 
 function genrotquat(x) result(rotquat)
@@ -156,7 +159,7 @@ function genrotquat(x) result(rotquat)
    s2 = sin(a2)
    c2 = cos(a2)
 
-!   Quaternion (w, x, y, z), w must be first as required by rotquat2rotmat
+!   Quaternion (w, x, y, z), w must be first as required by quat2rotmat
    rotquat = [ c2*r2, s1*r1, c1*r1, s2*r2 ]
 
 !    print *, sum(rotquat**2)

@@ -19,14 +19,14 @@ import molalignlibext
 from ase import Atoms
 
 #print(molalignlibext.molalignlib.align_atoms.__doc__)
-#print(molalignlibext.molalignlib.assign_atoms.__doc__)
+#print(molalignlibext.molalignlib.remap_atoms.__doc__)
 
 class Assignment:
     def __init__(self, count, order):
         self.count = count
         self.order = order
 
-def assign_atoms(
+def remap_atoms(
     mol0,
     mol1,
     fast = False,
@@ -104,7 +104,7 @@ def assign_atoms(
     permlist = np.empty((natom0, maxrec), dtype=np.int32, order='F')
     countlist = np.empty(maxrec, dtype=np.int32)
     nrec, error = \
-        molalignlibext.molalignlib.assign_atoms(
+        molalignlibext.molalignlib.remap_atoms(
             natom0,
             znums0,
             types0,

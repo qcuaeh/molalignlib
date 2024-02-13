@@ -92,12 +92,12 @@ subroutine initialize_random()
 
 end subroutine initialize_random
 
-function randarray(n)
+function randarray(n) result(array)
    integer, intent(in) :: n
-   real(wp) :: randarray(n)
+   real(wp) :: array(n)
    integer :: i
    do i = 1, n
-      call randnum01(randarray(i))
+      call randnum01(array(i))
    end do
 end function
 

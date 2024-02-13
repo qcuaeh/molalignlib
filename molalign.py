@@ -18,13 +18,13 @@ from os import path
 from math import inf
 from argparse import ArgumentParser, SUPPRESS
 from ase.io import read, write
-from molalignlib import assign_atoms
+from molalignlib import remap_atoms
 
 def molalign():
 
     parser = ArgumentParser()
     parser.add_argument('file', nargs='*')
-    parser.add_argument('-sort', dest='remap', action='store_true')
+    parser.add_argument('-remap', action='store_true')
     parser.add_argument('-mirror', action='store_true')
     parser.add_argument('-stats', action='store_true')
     parser.add_argument('-fast', action='store_true')
@@ -58,7 +58,7 @@ def molalign():
         mol1.mirror_x()
 
     if args.remap:
-        assignments = assign_atoms(
+        assignments = remap_atoms(
             mol0,
             mol1,
             **vars(args)

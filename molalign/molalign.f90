@@ -59,7 +59,7 @@ bias_flag = .false.
 bond_flag = .false.
 back_flag = .false.
 test_flag = .false.
-react_flag = .false.
+reac_flag = .false.
 stats_flag = .false.
 trial_flag = .false.
 mirror_flag = .false.
@@ -93,7 +93,7 @@ do while (getarg(arg))
       stats_flag = .true.
    case ('-test')
       test_flag = .true.
-   case ('-sort')
+   case ('-remap')
       remap_flag = .true.
    case ('-back')
       back_flag = .true.
@@ -102,8 +102,9 @@ do while (getarg(arg))
       bias_flag = .true.
    case ('-bond')
       bond_flag = .true.
-!         react_flag = .true.
       print_stats => print_stats_diff
+   case ('-reac')
+      reac_flag = .true.
    case ('-mass')
       weight_func => stdmass
    case ('-mirror')
@@ -216,7 +217,7 @@ if (remap_flag) then
    auxmol0 = mol0
    auxmol1 = mol1
 
-   call assign_atoms( &
+   call remap_atoms( &
       auxmol0, &
       auxmol1, &
       maplist, &

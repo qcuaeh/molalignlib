@@ -5,7 +5,7 @@ logical :: bias_flag
 logical :: test_flag
 logical :: bond_flag
 logical :: back_flag
-logical :: react_flag
+logical :: reac_flag
 logical :: stats_flag
 logical :: trial_flag
 logical :: mirror_flag

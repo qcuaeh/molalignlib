@@ -20,26 +20,26 @@ implicit none
 
 contains
 
-function identityperm(n)
+function identity_perm(n) result(idenperm)
 ! Purpose: Get an identity permutation
    integer, intent(in) :: n
-   integer :: identityperm(n)
+   integer :: idenperm(n)
    integer :: i
 
    do i = 1, n
-      identityperm(i) = i
+      idenperm(i) = i
    end do
 
 end function
 
-function inverseperm(perm)
+function inverse_perm(perm) result(invperm)
 ! Purpose: Get the inverse permutation
    integer, intent(in) :: perm(:)
-   integer :: inverseperm(size(perm))
+   integer :: invperm(size(perm))
    integer :: i
 
    do i = 1, size(perm)
-      inverseperm(perm(i)) = i
+      invperm(perm(i)) = i
    end do
 
 end function

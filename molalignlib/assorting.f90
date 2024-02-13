@@ -79,21 +79,21 @@ subroutine groupatoms(natom, znums, ztypes, weights, nblk, blklen, blkidx)
 
    blkorder(:nblk) = sortorder(blktype, nblk)
    blklen(:nblk) = blklen(blkorder(:nblk))
-   blkorder(:nblk) = inverseperm(blkorder(:nblk))
+   blkorder(:nblk) = inverse_perm(blkorder(:nblk))
    blkidx = blkorder(blkidx)
 
    ! Order blocks by atomic number
 
    blkorder(:nblk) = sortorder(blkznum, nblk)
    blklen(:nblk) = blklen(blkorder(:nblk))
-   blkorder(:nblk) = inverseperm(blkorder(:nblk))
+   blkorder(:nblk) = inverse_perm(blkorder(:nblk))
    blkidx = blkorder(blkidx)
 
    ! Order blocks by block size
 
 !   blkorder(:nblk) = sortorder(blklen, nblk)
 !   blklen(:nblk) = blklen(blkorder(:nblk))
-!   blkorder(:nblk) = inverseperm(blkorder(:nblk))
+!   blkorder(:nblk) = inverse_perm(blkorder(:nblk))
 !   blkidx = blkorder(blkidx)
 
 end subroutine
@@ -139,7 +139,7 @@ subroutine groupbytype(nelem, elements, types, groupid, ngroup, groupsize)
     grouporder(:ngroup) = sortorder(grouptype, ngroup)
     grouptype(:ngroup) = grouptype(grouporder(:ngroup))
     groupsize(:ngroup) = groupsize(grouporder(:ngroup))
-    grouporder(:ngroup) = inverseperm(grouporder(:ngroup))
+    grouporder(:ngroup) = inverse_perm(grouporder(:ngroup))
     groupid(:nelem) = grouporder(groupid(:nelem))
 
 !    print *, groupid(:ngroup)
@@ -207,7 +207,7 @@ subroutine getmnatypes(natom, nin, intype, nadj, adjlist, nout, outype, outsize,
 !               print '(a, x, i0, x, i0)', trim(elsym(intype0(i))), i, j
             if (untyped(j)) then
                if (intype(j) == intype(i)) then
-                  if (sameadjacency(nin, intype, nadj(i), adjlist(:, i), intype, nadj(j), adjlist(:, j))) then
+                  if (same_adjacency(nin, intype, nadj(i), adjlist(:, i), intype, nadj(j), adjlist(:, j))) then
                      outype(j) = nout
                      outsize(nout) = outsize(nout) + 1
                      untyped(j) = .false.
@@ -252,7 +252,7 @@ subroutine groupequivatoms(natom, nblk, blkidx, nadj, adjlist, neqv, eqvlen, eqv
 
    grouporder(:neqv) = sortorder(basetype, neqv)
    eqvlen(:neqv) = eqvlen(grouporder(:neqv))
-   grouporder(:neqv) = inverseperm(grouporder(:neqv))
+   grouporder(:neqv) = inverse_perm(grouporder(:neqv))
    eqvidx = grouporder(eqvidx)
 
 !    do i = 1, natom
@@ -352,7 +352,7 @@ subroutine getmnacrosstypes(natom, nin, intype0, nadj0, adjlist0, intype1, nadj1
          do j = i + 1, natom
             if (untyped(j)) then
                if (intype0(j) == intype0(i)) then
-                  if (sameadjacency(nin, intype0, nadj0(i), adjlist0(:, i), intype0, nadj0(j), adjlist0(:, j))) then
+                  if (same_adjacency(nin, intype0, nadj0(i), adjlist0(:, i), intype0, nadj0(j), adjlist0(:, j))) then
                      outype0(j) = nout
                      untyped(j) = .false.
                   end if
@@ -368,7 +368,7 @@ subroutine getmnacrosstypes(natom, nin, intype0, nadj0, adjlist0, intype1, nadj1
       do j = 1, natom
          if (untyped(j)) then
             if (intype1(j) == intype0(archetype(i))) then
-               if (sameadjacency(nin, intype0, nadj0(archetype(i)), adjlist0(:, archetype(i)), intype1, nadj1(j), &
+               if (same_adjacency(nin, intype0, nadj0(archetype(i)), adjlist0(:, archetype(i)), intype1, nadj1(j), &
                             adjlist1(:, j))) then
                   outype1(j) = i
                   untyped(j) = .false.
@@ -385,7 +385,7 @@ subroutine getmnacrosstypes(natom, nin, intype0, nadj0, adjlist0, intype1, nadj1
          do j = i + 1, natom
             if (untyped(j)) then
                if (intype1(j) == intype1(i)) then
-                  if (sameadjacency(nin, intype1, nadj1(i), adjlist1(:, i), intype1, nadj1(j), adjlist1(:, j))) then
+                  if (same_adjacency(nin, intype1, nadj1(i), adjlist1(:, i), intype1, nadj1(j), adjlist1(:, j))) then
                      outype1(j) = nout
                      untyped(j) = .false.
                   end if
@@ -397,21 +397,21 @@ subroutine getmnacrosstypes(natom, nin, intype0, nadj0, adjlist0, intype1, nadj1
 
 end subroutine
 
-function sameadjacency(ntype, atomtype0, nadj0, adjlist0, atomtype1, nadj1, adjlist1)
+function same_adjacency(ntype, atomtype0, nadj0, adjlist0, atomtype1, nadj1, adjlist1) result(sameadj)
    integer, intent(in) :: ntype, nadj0, nadj1
    integer, dimension(:), intent(in) :: adjlist0, adjlist1
    integer, dimension(:) :: atomtype0, atomtype1
-   logical :: sameadjacency
+   logical :: sameadj
 
    integer :: i0, i1
    integer, dimension(ntype) :: n0, n1
 !   real :: atoms0(3, maxcoord), atoms1(3, maxcoord)
 !   integer :: typelist0(maxcoord, nin), typelist1(maxcoord, nin)
 
-   sameadjacency = .true.
+   sameadj = .true.
 
    if (nadj0 /= nadj1) then
-      sameadjacency = .false.
+      sameadj = .false.
       return
    end if
 
@@ -431,7 +431,7 @@ function sameadjacency(ntype, atomtype0, nadj0, adjlist0, atomtype1, nadj1, adjl
    end do
 
    if (any(n0 /= n1)) then
-      sameadjacency = .false.
+      sameadj = .false.
       return
    end if
 

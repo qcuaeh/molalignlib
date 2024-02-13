@@ -62,7 +62,7 @@ Program options
 
 #### Options supported by the native executable and the python script
 
-<code>-sort</code>&nbsp; Remap atoms to optimize the RMSD.  
+<code>-remap</code>&nbsp; Remap atoms to optimize the RMSD.  
 <code>-fast</code>&nbsp; Prune assignments that surpass the displacement tolerance.  
 <code>-bond</code>&nbsp; Prioritize assignments that minimize bonding differences.  
 <code>-tol <em>TOL</em></code>&nbsp; Set the displacement tolerance to *TOL* (defaults to 0.35 Å).  
@@ -97,7 +97,7 @@ formats supported by *ASE*.
 
 * Running the command without options will align the atoms without reordering.
 
-* Running the command with the `-sort` option will remap the atoms to minimize the
+* Running the command with the `-remap` option will remap the atoms to minimize the
 RMSD and the aligned coordinates will be written in the optimal mapping order.
 
 Advanced usage
@@ -127,7 +127,7 @@ Command line examples
 For small atom displacements the default tolerance is enough:
 
 ```
-./build/molalign examples/Co138_0.xyz examples/Co138_1.xyz -sort -fast
+./build/molalign examples/Co138_0.xyz examples/Co138_1.xyz -remap -fast
 ```
 
 ```
@@ -137,7 +137,7 @@ For small atom displacements the default tolerance is enough:
 but for atom displacements larger than the tolerance the assignment will fail:
 
 ```
-./build/molalign examples/Co138_0.xyz examples/Co138_3.xyz -sort -fast
+./build/molalign examples/Co138_0.xyz examples/Co138_3.xyz -remap -fast
 ```
 
 ```
@@ -147,7 +147,7 @@ Error: Assignment failed
 Increasing the tolerance will fix the problem but the calculation will slow down:
 
 ```
-./build/molalign examples/Co138_0.xyz examples/Co138_3.xyz -sort -fast -tol 0.7
+./build/molalign examples/Co138_0.xyz examples/Co138_3.xyz -remap -fast -tol 0.7
 ```
 
 ```
@@ -157,7 +157,7 @@ Increasing the tolerance will fix the problem but the calculation will slow down
 Printing multiple alignments and stats can be useful to identify rotational symmetric clusters:
 
 ```
-./build/molalign examples/Co138_0.xyz examples/Co138_1.xyz -sort -fast -rec 5 -stats
+./build/molalign examples/Co138_0.xyz examples/Co138_1.xyz -remap -fast -rec 5 -stats
 ```
 
 ```
@@ -185,11 +185,11 @@ Minimize the RMSD between two Cobalt clusters:
 
 ```
 from ase.io import read
-from molalignlib import assign_atoms
+from molalignlib import remap_atoms
 mol0 = read('Co138_0.xyz')
 mol1 = read('Co138_1.xyz')
 # Find optimal assignment
-assignment = assign_atoms(mol0, mol1, fast=True)
+assignment = remap_atoms(mol0, mol1, fast=True)
 # Remap mol1 with the optimal assignment
 mol1 = mol1[assignment.order]
 # Align mol1 to mol0 (returns RMSD)

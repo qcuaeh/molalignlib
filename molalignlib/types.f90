@@ -37,16 +37,18 @@ type, public :: Molecule
    type(Bond), allocatable :: bonds(:)
    logical, allocatable :: adjmat(:, :)
 contains
-   procedure :: get_znums => get_znums
-   procedure :: get_ztypes => get_ztypes
-   procedure :: get_weights => get_weights
-   procedure :: get_coords => get_coords
-   procedure :: get_labels => get_labels
-   procedure :: set_coords => set_coords
-   procedure :: mirror_coords => mirror_coords
-   procedure :: rotate_coords => rotate_coords
-   procedure :: translate_coords => translate_coords
-   procedure :: permutate_atoms => permutate_atoms
+   procedure :: get_znums
+   procedure :: get_ztypes
+   procedure :: get_weights
+   procedure :: get_coords
+   procedure :: get_labels
+   procedure :: set_coords
+   procedure :: mirror_coords
+   procedure, private :: matrix_rotate_coords
+   procedure, private :: quater_rotate_coords
+   generic, public :: rotate_coords => matrix_rotate_coords, quater_rotate_coords
+   procedure :: translate_coords
+   procedure :: permutate_atoms
 end type
 
 contains
@@ -61,11 +63,19 @@ subroutine mirror_coords(self)
 
 end subroutine
 
-subroutine rotate_coords(self, rotmat)
+subroutine matrix_rotate_coords(self, rotmat)
    class(Molecule), intent(inout) :: self
    real(wp), intent(in) :: rotmat(3, 3)
 
-   call self%set_coords(rotated(self%natom, self%get_coords(), rotmat))
+   call self%set_coords(matrix_rotated(self%natom, self%get_coords(), rotmat))
+
+end subroutine
+
+subroutine quater_rotate_coords(self, rotquat)
+   class(Molecule), intent(inout) :: self
+   real(wp), intent(in) :: rotquat(4)
+
+   call self%set_coords(quater_rotated(self%natom, self%get_coords(), rotquat))
 
 end subroutine
 

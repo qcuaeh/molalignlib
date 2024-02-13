@@ -16,6 +16,7 @@
 
 module remapping
 use kinds
+use types
 use flags
 use bounds
 use random
@@ -34,60 +35,75 @@ use assignment
 implicit none
 
 private
-public optimize_assignment
+public optimize_mapping
+public find_reactive_sites
 
 contains
 
-subroutine optimize_assignment( &
-   natom, &
+subroutine optimize_mapping( &
+   mol0, &
+   mol1, &
    nblk, &
    blklen, &
    neqv0, &
    eqvlen0, &
-   coords0, &
-   adjmat0, &
    neqv1, &
    eqvlen1, &
-   coords1, &
-   adjmat1, &
-   weights, &
    maplist, &
    countlist, &
    nrec)
 
-   integer, intent(in) :: natom, nblk, neqv0, neqv1
+   type(Molecule), intent(inout) :: mol0, mol1
+   integer, intent(in) :: nblk
    integer, dimension(:), intent(in) :: blklen
+   integer, intent(in) :: neqv0, neqv1
    integer, dimension(:), intent(in) :: eqvlen0, eqvlen1
-   real(wp), dimension(:, :), intent(in) :: coords0, coords1
-   logical, dimension(:, :), intent(in) :: adjmat0, adjmat1
-   real(wp), dimension(:), intent(in) :: weights
    integer, intent(out) :: maplist(:, :)
    integer, intent(out) :: countlist(:)
    integer, intent(out) :: nrec
 
-   logical visited, overflow
+   integer :: natom
+   real(wp), dimension(:), allocatable :: weights
+   real(wp), dimension(:, :), allocatable :: coords0, coords1
+   logical, dimension(:, :), allocatable :: adjmat0, adjmat1
+   logical :: visited, overflow
    integer :: nfrag0, nfrag1
    integer irec, mrec, ntrial, nstep, steps
-   integer, dimension(natom) :: mapping, newmapping
+   integer, dimension(mol0%natom) :: mapping, newmapping
    integer :: adjd, recadjd(maxrec)
-   integer, dimension(natom) :: nadj0, nadj1
-   integer, dimension(maxcoord, natom) :: adjlist0, adjlist1
-   integer, dimension(natom, maxlevel) :: nadjmna0, nadjmna1
-   integer, dimension(maxcoord, natom, maxlevel) :: adjmnalen0, adjmnalen1
-   integer, dimension(maxcoord, natom, maxlevel) :: adjmnalist0, adjmnalist1
-   integer, dimension(natom) :: nadjeqv0, nadjeqv1
-   integer, dimension(maxcoord, natom) :: adjeqvlen0, adjeqvlen1
-   integer, dimension(natom) :: fragroot0, fragroot1
-   integer :: equivmat(natom, natom)
+   integer, dimension(mol0%natom) :: nadj0
+   integer, dimension(mol1%natom) :: nadj1
+   integer, dimension(maxcoord, mol0%natom) :: adjlist0
+   integer, dimension(maxcoord, mol1%natom) :: adjlist1
+   integer, dimension(mol0%natom, maxlevel) :: nadjmna0
+   integer, dimension(mol1%natom, maxlevel) :: nadjmna1
+   integer, dimension(maxcoord, mol0%natom, maxlevel) :: adjmnalen0
+   integer, dimension(maxcoord, mol1%natom, maxlevel) :: adjmnalen1
+   integer, dimension(maxcoord, mol0%natom, maxlevel) :: adjmnalist0
+   integer, dimension(maxcoord, mol1%natom, maxlevel) :: adjmnalist1
+   integer, dimension(mol0%natom) :: nadjeqv0
+   integer, dimension(mol1%natom) :: nadjeqv1
+   integer, dimension(maxcoord, mol0%natom) :: adjeqvlen0
+   integer, dimension(maxcoord, mol1%natom) :: adjeqvlen1
+   integer, dimension(mol0%natom) :: fragroot0
+   integer, dimension(mol1%natom) :: fragroot1
+   integer :: equivmat(mol0%natom, mol1%natom)
    real(wp) :: rmsd, totalrot
    real(wp), dimension(4) :: rotquat, prodquat
    real(wp), dimension(maxrec) :: recrmsd, avgsteps, avgtotalrot, avgrealrot
-   real(wp) :: biasmat(natom, natom)
-   real(wp) :: workcoords1(3, natom)
+   real(wp) :: biasmat(mol0%natom, mol1%natom)
+   real(wp) :: workcoords1(3, mol1%natom)
 
 !   integer h, i, n, offset
 !   real(wp), dimension(3, natom) :: randcoords0, randcoords1
 !   integer :: votes(natom, natom)
+
+   natom = mol0%natom
+   weights = mol0%get_weights()
+   coords0 = mol0%get_coords()
+   adjmat0 = mol0%adjmat
+   coords1 = mol1%get_coords()
+   adjmat1 = mol1%adjmat
 
    ! Recalculate adjacency lists
 
@@ -307,6 +323,126 @@ subroutine optimize_assignment( &
    if (stats_flag) then
       call print_stats(nrec, countlist, avgsteps, avgtotalrot, avgrealrot, recadjd, recrmsd)
       call print_final_stats(overflow, maxrec, nrec, ntrial, nstep)
+   end if
+
+end subroutine
+
+subroutine find_reactive_sites(mol0, mol1, nblk, blklen, mapping)
+
+   type(Molecule), intent(inout) :: mol0, mol1
+   integer, intent(in) :: nblk
+   integer, dimension(:), intent(in) :: blklen
+   integer, dimension(:), intent(in) :: mapping
+
+   integer :: natom
+   integer :: h, i, j, k
+   integer, dimension(mol0%natom) :: offset, blkidx
+   real(wp), dimension(:, :), allocatable :: coords0, coords1
+   logical, dimension(:, :), allocatable :: backadjmat0, backadjmat1
+   real(wp) :: rotquat(4)
+
+   offset(1) = 0
+   do h = 1, nblk - 1
+      offset(h+1) = offset(h) + blklen(h)
+   end do
+
+   do h = 1, nblk
+      blkidx(offset(h)+1:offset(h)+blklen(h)) = h
+   end do
+
+   ! Align coordinates
+
+   rotquat = leastrotquat(mol0%natom, mol0%get_weights(), mol0%get_coords(), mol1%get_coords(), mapping)
+   call mol1%rotate_coords(rotquat)
+
+   ! Initialization
+
+   coords0 = mol0%get_coords()
+   coords1 = mol1%get_coords()
+   backadjmat0 = mol0%adjmat
+   backadjmat1 = mol1%adjmat
+
+   ! Remove reactive bonds
+
+   do i = 1, mol0%natom
+      do j = i + 1, mol0%natom
+         if (backadjmat0(i, j) .neqv. backadjmat1(mapping(i), mapping(j))) then
+            call remove_reactive_bond(i, j, mol0%natom, mol0%get_znums(), mol0%adjmat, mol1%adjmat, mapping)
+            h = blkidx(i)
+            do k = offset(h) + 1, offset(h) + blklen(h)
+               if (sum((coords0(:, i) - coords1(:, mapping(k)))**2) < 2.0 &
+                  .or. sum((coords0(:, k) - coords1(:, mapping(i)))**2) < 2.0 &
+               ) then
+!                  print *, '<', j, mapping(j), k, mapping(k)
+                  call remove_reactive_bond(k, j, mol0%natom, mol0%get_znums(), mol0%adjmat, mol1%adjmat, mapping)
+               end if
+            end do
+            h = blkidx(j)
+            do k = offset(h) + 1, offset(h) + blklen(h)
+               if (sum((coords0(:, j) - coords1(:, mapping(k)))**2) < 2.0 &
+                  .or. sum((coords0(:, k) - coords1(:, mapping(j)))**2) < 2.0 &
+               ) then
+!                  print *, '>', i, mapping(i), k, mapping(k)
+                  call remove_reactive_bond(i, k, mol0%natom, mol0%get_znums(), mol0%adjmat, mol1%adjmat, mapping)
+               end if
+            end do
+         end if
+      end do
+   end do
+
+end subroutine
+
+subroutine remove_reactive_bond(i, j, natom, znums, adjmat0, adjmat1, mapping)
+! Purpose: Remove reactive bonds
+   integer, intent(in) :: i, j, natom
+   integer, dimension(:), intent(in) :: znums
+   logical, dimension(:, :), intent(inout) :: adjmat0, adjmat1
+   integer, dimension(:), intent(in) :: mapping
+
+   integer :: k
+   integer, dimension(natom) :: nadj0, nadj1
+   integer, dimension(maxcoord, natom) :: adjlist0, adjlist1
+
+   ! Calculate adjacency lists
+
+   call adjmat2list(natom, adjmat0, nadj0, adjlist0)
+   call adjmat2list(natom, adjmat1, nadj1, adjlist1)
+
+   adjmat0(i, j) = .false.
+   adjmat0(j, i) = .false.
+   adjmat1(mapping(i), mapping(j)) = .false.
+   adjmat1(mapping(j), mapping(i)) = .false.
+   if (znums(i) == 1) then
+      do k = 1, nadj0(i)
+         if (znums(adjlist0(k, i)) == 7 .or. znums(adjlist0(k, i)) == 8) then
+            adjmat0(i, adjlist0(k, i)) = .false.
+            adjmat0(adjlist0(k, i), i) = .false.
+         end if
+      end do
+   end if
+   if (znums(i) == 1) then
+      do k = 1, nadj1(i)
+         if (znums(adjlist1(k, i)) == 7 .or. znums(adjlist1(k, i)) == 8) then
+            adjmat1(mapping(i), mapping(adjlist1(k, i))) = .false.
+            adjmat1(mapping(adjlist1(k, i)), mapping(i)) = .false.
+         end if
+      end do
+   end if
+   if (znums(j) == 1) then
+      do k = 1, nadj0(j)
+         if (znums(adjlist0(k, j)) == 7 .or. znums(adjlist0(k, j)) == 8) then
+            adjmat0(j, adjlist0(k, j)) = .false.
+            adjmat0(adjlist0(k, j), j) = .false.
+         end if
+      end do
+   end if
+   if (znums(j) == 1) then
+      do k = 1, nadj1(j)
+         if (znums(adjlist1(k, j)) == 7 .or. znums(adjlist1(k, j)) == 8) then
+            adjmat1(mapping(j), mapping(adjlist1(k, j))) = .false.
+            adjmat1(mapping(adjlist1(k, j)), mapping(j)) = .false.
+         end if
+      end do
    end if
 
 end subroutine

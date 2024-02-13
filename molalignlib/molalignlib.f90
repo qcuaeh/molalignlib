@@ -37,7 +37,7 @@ implicit none
 contains
 
 ! Assign atoms0 and atoms1
-subroutine assign_atoms( &
+subroutine remap_atoms( &
    mol0, &
    mol1, &
    maplist, &
@@ -50,7 +50,7 @@ subroutine assign_atoms( &
    integer, dimension(:), intent(inout) :: countlist
    integer, intent(out) :: nrec, error
 
-   integer :: h, i, j, k
+   integer :: i
    integer :: nblk0, nblk1, neqv0, neqv1
    integer, dimension(:), allocatable :: nadj0, nadj1
    integer, dimension(:, :), allocatable :: adjlist0, adjlist1
@@ -62,7 +62,7 @@ subroutine assign_atoms( &
    integer, dimension(:), allocatable :: eqvlen0, eqvlen1
    real(wp) :: travec0(3), travec1(3)
 
-   integer, dimension(mol0%natom) :: offset, blkidx, mapping
+   integer, dimension(mol0%natom) :: mapping
    integer :: nbond0, bonds0(2, maxcoord*mol0%natom)
    integer :: nbond1, bonds1(2, maxcoord*mol1%natom)
 
@@ -129,8 +129,8 @@ subroutine assign_atoms( &
 
    ! Get inverse atom order
 
-   backorder0 = inverseperm(atomorder0)
-   backorder1 = inverseperm(atomorder1)
+   backorder0 = inverse_perm(atomorder0)
+   backorder1 = inverse_perm(atomorder1)
 
    ! Reorder data arrays
 
@@ -169,8 +169,8 @@ subroutine assign_atoms( &
 
    ! Calculate centroids
 
-   travec0 = -centroid(mol0%natom, mol0%get_weights(), mol0%get_coords())
-   travec1 = -centroid(mol1%natom, mol1%get_weights(), mol1%get_coords())
+   travec0 = -center_coords(mol0%natom, mol0%get_weights(), mol0%get_coords())
+   travec1 = -center_coords(mol1%natom, mol1%get_weights(), mol1%get_coords())
 
    ! Center coordinates at the centroids
 
@@ -183,94 +183,40 @@ subroutine assign_atoms( &
 
    ! Optimize the assignment to minimize AdjD/RMSD
 
-   call optimize_assignment( &
-      mol0%natom, &
+   call optimize_mapping( &
+      mol0, &
+      mol1, &
       nblk0, &
       blklen0, &
       neqv0, &
       eqvlen0, &
-      mol0%get_coords(), &
-      mol0%adjmat, &
       neqv1, &
       eqvlen1, &
-      mol1%get_coords(), &
-      mol1%adjmat, &
-      mol1%get_weights(), &
       maplist, &
       countlist, &
       nrec)
 
-!   if (react_flag) then
-!
-!      offset(1) = 0
-!      do h = 1, nblk0 - 1
-!         offset(h+1) = offset(h) + blklen0(h)
-!      end do
-!
-!      do h = 1, nblk0
-!         blkidx(offset(h)+1:offset(h)+blklen0(h)) = h
-!      end do
-!
-!      mapping = maplist(:, 1)
-!
-!      ! Align coordinates
-!
-!      call rotate(natom1, workcoords1, leastrotquat(natom0, workweights0, workcoords0, workcoords1, mapping))
-!
-!      ! Remove reactive bonds
-!
-!      backadjmat0 = workadjmat0
-!      backadjmat1 = workadjmat1
-!
-!      do i = 1, natom0
-!         do j = i + 1, natom0
-!            if (backadjmat0(i, j) .neqv. backadjmat1(mapping(i), mapping(j))) then
-!               call removereacbond(i, j, natom0, workznums0, workadjmat0, workadjmat1, mapping)
-!               h = blkidx(i)
-!               do k = offset(h) + 1, offset(h) + blklen0(h)
-!                  if (sum((workcoords0(:, i) - workcoords1(:, mapping(k)))**2) < 2.0 &
-!                     .or. sum((workcoords0(:, k) - workcoords1(:, mapping(i)))**2) < 2.0 &
-!                  ) then
-!!                     print *, '<', j, mapping(j), k, mapping(k)
-!                     call removereacbond(k, j, natom0, workznums0, workadjmat0, workadjmat1, mapping)
-!                  end if
-!               end do
-!               h = blkidx(j)
-!               do k = offset(h) + 1, offset(h) + blklen0(h)
-!                  if (sum((workcoords0(:, j) - workcoords1(:, mapping(k)))**2) < 2.0 &
-!                     .or. sum((workcoords0(:, k) - workcoords1(:, mapping(j)))**2) < 2.0 &
-!                  ) then
-!!                     print *, '>', i, mapping(i), k, mapping(k)
-!                     call removereacbond(i, k, natom0, workznums0, workadjmat0, workadjmat1, mapping)
-!                  end if
-!               end do
-!            end if
-!         end do
-!      end do
-!
-!      ! Optimize the assignment to minimize AdjD/RMSD
-!
-!      call optimize_assignment( &
-!         natom0, &
-!         nblk0, &
-!         blklen0, &
-!         neqv0, &
-!         eqvlen0, &
-!         workcoords0, &
-!         workadjmat0, &
-!         neqv1, &
-!         eqvlen1, &
-!         workcoords1, &
-!         workadjmat1, &
-!         workweights0, &
-!         maplist, &
-!         countlist, &
-!         nrec)
-!
-!   end if
-!
+   if (reac_flag) then
+
+      call find_reactive_sites(mol0, mol1, nblk0, blklen0, maplist(:, 1))
+
+      call optimize_mapping( &
+         mol0, &
+         mol1, &
+         nblk0, &
+         blklen0, &
+         neqv0, &
+         eqvlen0, &
+         neqv1, &
+         eqvlen1, &
+         maplist, &
+         countlist, &
+         nrec)
+
+   end if
+
 !   ! Print coordinates with internal order
-!
+
 !   mapping = maplist(:, 1)
 !   call rotate(natom1, workcoords1, leastrotquat(natom0, workweights0, workcoords0, workcoords1, mapping))
 !   open(unit=99, file='aligned_debug.mol2', action='write', status='replace')
@@ -280,7 +226,7 @@ subroutine assign_atoms( &
 !   call writemol2(99, 'coords0', natom0, workznums0, workcoords0, nbond0, bonds0)
 !   call writemol2(99, 'coords1', natom1, workznums1, workcoords1, nbond1, bonds1)
 !!   call writemol2(99, 'coords1', natom1, workznums1(mapping), workcoords1(:, mapping), nbond1, bonds1)
-!
+
    ! Reorder back to original atom ordering
 
    do i = 1, nrec
@@ -348,8 +294,8 @@ subroutine align_atoms( &
 
    ! Calculate centroids
 
-   travec0 = -centroid(mol0%natom, mol0%get_weights(), mol0%get_coords())
-   travec1 = -centroid(mol1%natom, mol1%get_weights(), mol1%get_coords())
+   travec0 = -center_coords(mol0%natom, mol0%get_weights(), mol0%get_coords())
+   travec1 = -center_coords(mol1%natom, mol1%get_weights(), mol1%get_coords())
 
    ! Calculate optimal rotation matrix
 
@@ -358,10 +304,10 @@ subroutine align_atoms( &
       mol0%get_weights(), &
       translated(mol0%natom, mol0%get_coords(), travec0), &
       translated(mol1%natom, mol1%get_coords(), travec1), &
-      identityperm(mol0%natom) &
+      identity_perm(mol0%natom) &
    )
 
-   rotmat = rotquat2rotmat(rotquat)
+   rotmat = quat2rotmat(rotquat)
 
    ! Calculate optimal translation vector
 
@@ -369,66 +315,11 @@ subroutine align_atoms( &
 
 end subroutine
 
-subroutine removereacbond(i, j, natom, znums, adjmat0, adjmat1, mapping)
-! Purpose: Remove reactive bonds
-   integer, intent(in) :: i, j, natom
-   integer, dimension(:), intent(in) :: znums
-   logical, dimension(:, :), intent(inout) :: adjmat0, adjmat1
-   integer, dimension(:), intent(in) :: mapping
-
-   integer :: k
-   integer, dimension(natom) :: nadj0, nadj1
-   integer, dimension(maxcoord, natom) :: adjlist0, adjlist1
-
-   ! Calculate adjacency lists
-
-   call adjmat2list(natom, adjmat0, nadj0, adjlist0)
-   call adjmat2list(natom, adjmat1, nadj1, adjlist1)
-
-   adjmat0(i, j) = .false.
-   adjmat0(j, i) = .false.
-   adjmat1(mapping(i), mapping(j)) = .false.
-   adjmat1(mapping(j), mapping(i)) = .false.
-   if (znums(i) == 1) then
-      do k = 1, nadj0(i)
-         if (znums(adjlist0(k, i)) == 7 .or. znums(adjlist0(k, i)) == 8) then
-            adjmat0(i, adjlist0(k, i)) = .false.
-            adjmat0(adjlist0(k, i), i) = .false.
-         end if
-      end do
-   end if
-   if (znums(i) == 1) then
-      do k = 1, nadj1(i)
-         if (znums(adjlist1(k, i)) == 7 .or. znums(adjlist1(k, i)) == 8) then
-            adjmat1(mapping(i), mapping(adjlist1(k, i))) = .false.
-            adjmat1(mapping(adjlist1(k, i)), mapping(i)) = .false.
-         end if
-      end do
-   end if
-   if (znums(j) == 1) then
-      do k = 1, nadj0(j)
-         if (znums(adjlist0(k, j)) == 7 .or. znums(adjlist0(k, j)) == 8) then
-            adjmat0(j, adjlist0(k, j)) = .false.
-            adjmat0(adjlist0(k, j), j) = .false.
-         end if
-      end do
-   end if
-   if (znums(j) == 1) then
-      do k = 1, nadj1(j)
-         if (znums(adjlist1(k, j)) == 7 .or. znums(adjlist1(k, j)) == 8) then
-            adjmat1(mapping(j), mapping(adjlist1(k, j))) = .false.
-            adjmat1(mapping(adjlist1(k, j)), mapping(j)) = .false.
-         end if
-      end do
-   end if
-
-end subroutine
-
 function get_rmsd(mol0, mol1) result(rmsd)
    class(Molecule), intent(in) :: mol0, mol1
    real(wp) :: rmsd
 
-   rmsd = sqrt(squaredist(mol0%natom, mol0%get_weights(), mol0%get_coords(), mol1%get_coords(), identityperm(mol0%natom)) &
+   rmsd = sqrt(squaredist(mol0%natom, mol0%get_weights(), mol0%get_coords(), mol1%get_coords(), identity_perm(mol0%natom)) &
         / sum(mol0%get_weights()))
 
 end function
@@ -437,7 +328,7 @@ function get_adjd(mol0, mol1) result(adjd)
    class(Molecule), intent(in) :: mol0, mol1
    integer :: adjd
 
-   adjd = adjacencydiff(mol0%natom, mol0%adjmat, mol1%adjmat, identityperm(mol0%natom))
+   adjd = adjacencydiff(mol0%natom, mol0%adjmat, mol1%adjmat, identity_perm(mol0%natom))
 
 end function
 

@@ -197,10 +197,10 @@ prog)
    compile molalign
    make_prog molalign
    # Run tests
-#   runtests jcim.2c01187/0.05 -rec 5 -sort -fast -tol 0.17
-   runtests jcim.2c01187/0.1 -rec 5 -sort -fast -tol 0.35
-#   runtests jcim.2c01187/0.2 -rec 5 -sort -fast -tol 0.69
-   runtests MOBH35-shuffled -rec 5 -sort -fast -bond -back
+#   runtests jcim.2c01187/0.05 -rec 5 -remap -fast -tol 0.17
+   runtests jcim.2c01187/0.1 -rec 5 -remap -fast -tol 0.35
+#   runtests jcim.2c01187/0.2 -rec 5 -remap -fast -tol 0.69
+   runtests MOBH35-shuffled -rec 5 -remap -fast -bond -back
    ;;
 lib)
    # Build dynamic library

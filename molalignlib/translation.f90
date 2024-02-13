@@ -20,40 +20,40 @@ use kinds
 implicit none
 
 private
-public centroid
 public translate
 public translated
+public center_coords
 
 contains
 
-function centroid(natom, weights, coords)
-! Purpose: Get coordinates of centroid
+function center_coords(natom, weights, coords) result(cntrcoords)
+! Purpose: Get the centroid coordinates
    integer, intent(in) :: natom
    real(wp), intent(in) :: weights(natom), coords(3, natom)
-   real(wp) :: centroid(3)
+   real(wp) :: cntrcoords(3)
    integer :: i
 
 ! Calculate the coordinates of the center of mass
 
-   centroid(:) = 0
+   cntrcoords(:) = 0
 
    do i = 1, natom
-      centroid(:) = centroid(:) + weights(i)*coords(:, i)
+      cntrcoords(:) = cntrcoords(:) + weights(i)*coords(:, i)
    end do
 
-   centroid(:) = centroid(:)/sum(weights)
+   cntrcoords(:) = cntrcoords(:)/sum(weights)
 
 end function
 
-function translated(natom, coords, vector)
+function translated(natom, coords, vector) result(transcoords)
 ! Purpose: Translate atomic coordinates to its vector of geometry
    integer, intent(in) :: natom
    real(wp), intent(in) :: coords(3, natom), vector(3)
-   real(wp) :: translated(3, natom)
+   real(wp) :: transcoords(3, natom)
    integer :: i
 
    do i = 1, natom
-      translated(:, i) = coords(:, i) + vector(:)
+      transcoords(:, i) = coords(:, i) + vector(:)
    end do
 
 end function
