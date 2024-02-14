@@ -316,7 +316,7 @@ subroutine align_atoms( &
 end subroutine
 
 function get_rmsd(mol0, mol1) result(rmsd)
-   class(Molecule), intent(in) :: mol0, mol1
+   type(Molecule), intent(in) :: mol0, mol1
    real(wp) :: rmsd
 
    rmsd = sqrt(squaredist(mol0%natom, mol0%get_weights(), mol0%get_coords(), mol1%get_coords(), identity_perm(mol0%natom)) &
@@ -325,7 +325,7 @@ function get_rmsd(mol0, mol1) result(rmsd)
 end function
 
 function get_adjd(mol0, mol1) result(adjd)
-   class(Molecule), intent(in) :: mol0, mol1
+   type(Molecule), intent(in) :: mol0, mol1
    integer :: adjd
 
    adjd = adjacencydiff(mol0%natom, mol0%adjmat, mol1%adjmat, identity_perm(mol0%natom))

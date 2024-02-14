@@ -31,19 +31,19 @@ end type
 
 type, public :: Block
    integer :: blklen
-   integer :: nequiv
    integer, allocatable :: blkidx(:)
-   type(Equiv), allocatable :: equivs(:)
 end type
 
 type, public :: Molecule
    integer :: natom
    integer :: nbond
    integer :: nblock
+   integer :: nequiv
    character(:), allocatable :: title
    type(Atom), allocatable :: atoms(:)
    type(Bond), allocatable :: bonds(:)
    type(Block), allocatable :: blocks(:)
+   type(Equiv), allocatable :: equivs(:)
    logical, allocatable :: adjmat(:, :)
 contains
    procedure :: get_znums
@@ -63,6 +63,7 @@ end type
 contains
 
 subroutine mirror_coords(self)
+
    class(Molecule), intent(inout) :: self
    real(wp) :: coords(3, self%natom)
 
@@ -70,105 +71,133 @@ subroutine mirror_coords(self)
    coords(1, :) = -coords(1, :)
    call self%set_coords(coords)
 
-end subroutine
+end subroutine mirror_coords
 
 subroutine matrix_rotate_coords(self, rotmat)
+
    class(Molecule), intent(inout) :: self
    real(wp), intent(in) :: rotmat(3, 3)
 
    call self%set_coords(matrix_rotated(self%natom, self%get_coords(), rotmat))
 
-end subroutine
+end subroutine matrix_rotate_coords
 
 subroutine quater_rotate_coords(self, rotquat)
+
    class(Molecule), intent(inout) :: self
    real(wp), intent(in) :: rotquat(4)
 
    call self%set_coords(quater_rotated(self%natom, self%get_coords(), rotquat))
 
-end subroutine
+end subroutine quater_rotate_coords
 
 subroutine translate_coords(self, travec)
+
    class(Molecule), intent(inout) :: self
    real(wp), intent(in) :: travec(3)
 
    call self%set_coords(translated(self%natom, self%get_coords(), travec))
 
-end subroutine
+end subroutine translate_coords
 
 subroutine permutate_atoms(self, order)
+
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: order(:)
 
    self%atoms = self%atoms(order(1:self%natom))
    self%adjmat = self%adjmat(order(1:self%natom), order(1:self%natom))
 
-end subroutine
+end subroutine permutate_atoms
 
 function get_znums(self) result(znums)
+
    class(Molecule), intent(in) :: self
-   integer, dimension(self%natom) :: znums
+   integer :: znums(self%natom)
    integer i
 
    do i = 1, self%natom
       znums(i) = self%atoms(i)%znum
    end do
 
-end function
+end function get_znums
 
 function get_ztypes(self) result(ztypes)
+
    class(Molecule), intent(in) :: self
-   integer, dimension(self%natom) :: ztypes
+   integer :: ztypes(self%natom)
    integer i
 
    do i = 1, self%natom
       ztypes(i) = self%atoms(i)%ztype
    end do
 
-end function
+end function get_ztypes
 
 function get_weights(self) result(weights)
+
    class(Molecule), intent(in) :: self
-   real(wp), dimension(self%natom) :: weights
+   real(wp) :: weights(self%natom)
    integer i
 
    do i = 1, self%natom
       weights(i) = self%atoms(i)%weight
    end do
 
-end function
+end function get_weights
 
 function get_coords(self) result(coords)
+
    class(Molecule), intent(in) :: self
-   real(wp), dimension(3, self%natom) :: coords
+   real(wp) :: coords(3, self%natom)
    integer i
 
    do i = 1, self%natom
       coords(:, i) = self%atoms(i)%coords
    end do
 
-end function
+end function get_coords
 
 subroutine set_coords(self, coords)
+
    class(Molecule), intent(inout) :: self
-   real(wp), dimension(3, self%natom), intent(in) :: coords
+   real(wp), intent(in) :: coords(3, self%natom)
    integer i
 
    do i = 1, self%natom
       self%atoms(i)%coords = coords(:, i)
    end do
 
-end subroutine
+end subroutine set_coords
 
 function get_labels(self) result(labels)
+
    class(Molecule), intent(in) :: self
-   character(wl), dimension(self%natom) :: labels
+   character(wl) :: labels(self%natom)
    integer i
 
    do i = 1, self%natom
       labels(i) = self%atoms(i)%label
    end do
 
-end function
+end function get_labels
+
+function get_adjmat(self) result(adjmat)
+
+   class(Molecule), intent(in) :: self
+   type(Atom) :: iatom
+   logical :: adjmat(self%natom, self%natom)
+   integer i, k
+
+   adjmat(:, :) = .false.
+
+   do i = 1, self%natom
+      iatom = self%atoms(i)
+      do k = 1, iatom%nadj
+         adjmat(i, iatom%adjidx(k)) = .true.
+      end do
+   end do
+
+end function get_adjmat
 
 end module
