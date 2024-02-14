@@ -180,12 +180,12 @@ allocate(countlist(maxrec))
 ! Get atomic numbers, types and weights
 
 do i = 1, mol0%natom
-   call readlabel(mol0%atoms(i)%label, mol0%atoms(i)%znum, mol0%atoms(i)%type)
+   call readlabel(mol0%atoms(i)%label, mol0%atoms(i)%znum, mol0%atoms(i)%ztype)
    mol0%atoms(i)%weight = weight_func(mol0%atoms(i)%znum)
 end do
 
 do i = 1, mol1%natom
-   call readlabel(mol1%atoms(i)%label, mol1%atoms(i)%znum, mol1%atoms(i)%type)
+   call readlabel(mol1%atoms(i)%label, mol1%atoms(i)%znum, mol1%atoms(i)%ztype)
    mol1%atoms(i)%weight = weight_func(mol1%atoms(i)%znum)
 end do
 

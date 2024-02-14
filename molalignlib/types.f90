@@ -11,9 +11,11 @@ private
 type :: Atom
    character(:), allocatable :: label
    integer :: znum
-   integer :: type
+   integer :: ztype
    real(wp) :: weight
    real(wp) :: coords(3)
+   integer :: nadj
+   integer, allocatable :: adjidx(:)
 end type
 
 type :: Bond
@@ -22,19 +24,26 @@ type :: Bond
    character(2) :: order
 end type
 
+type, public :: Equiv
+   integer :: eqvlen
+   integer, allocatable :: eqvidx(:)
+end type
+
 type, public :: Block
-   integer :: nblk
-   integer, allocatable :: nblkidx
-   integer, allocatable :: nblklen
-   integer, allocatable :: nblkoff
+   integer :: blklen
+   integer :: nequiv
+   integer, allocatable :: blkidx(:)
+   type(Equiv), allocatable :: equivs(:)
 end type
 
 type, public :: Molecule
    integer :: natom
    integer :: nbond
+   integer :: nblock
    character(:), allocatable :: title
    type(Atom), allocatable :: atoms(:)
    type(Bond), allocatable :: bonds(:)
+   type(Block), allocatable :: blocks(:)
    logical, allocatable :: adjmat(:, :)
 contains
    procedure :: get_znums
@@ -113,7 +122,7 @@ function get_ztypes(self) result(ztypes)
    integer i
 
    do i = 1, self%natom
-      ztypes(i) = self%atoms(i)%type
+      ztypes(i) = self%atoms(i)%ztype
    end do
 
 end function
