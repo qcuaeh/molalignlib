@@ -103,7 +103,7 @@ subroutine writefile(unit, fmtout, mol)
    integer :: nbond
    integer :: bonds(2, mol%natom*maxcoord)
 
-   call adjmat2bonds(mol%natom, mol%adjmat, nbond, bonds)
+   call adjmat2bonds(mol%natom, mol%get_adjmat(), nbond, bonds)
 
    select case (fmtout)
    case ('xyz')

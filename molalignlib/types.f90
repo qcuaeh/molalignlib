@@ -8,6 +8,16 @@ use alignment
 implicit none
 private
 
+type :: Block
+   integer :: blklen
+   integer, allocatable :: blkidx(:)
+end type
+
+type, public :: Equiv
+   integer :: eqvlen
+   integer, allocatable :: eqvidx(:)
+end type
+
 type :: Atom
    character(:), allocatable :: label
    integer :: znum
@@ -18,40 +28,22 @@ type :: Atom
    integer, allocatable :: adjidx(:)
 end type
 
-type :: Bond
-   integer :: atom1
-   integer :: atom2
-   character(2) :: order
-end type
-
-type, public :: Equiv
-   integer :: eqvlen
-   integer, allocatable :: eqvidx(:)
-end type
-
-type, public :: Block
-   integer :: blklen
-   integer, allocatable :: blkidx(:)
-end type
-
 type, public :: Molecule
    integer :: natom
-   integer :: nbond
    integer :: nblock
    integer :: nequiv
    character(:), allocatable :: title
    type(Atom), allocatable :: atoms(:)
-   type(Bond), allocatable :: bonds(:)
    type(Block), allocatable :: blocks(:)
    type(Equiv), allocatable :: equivs(:)
-   logical, allocatable :: adjmat(:, :)
 contains
    procedure :: get_znums
    procedure :: get_ztypes
    procedure :: get_weights
    procedure :: get_coords
-   procedure :: get_labels
    procedure :: set_coords
+   procedure :: get_labels
+   procedure :: get_adjmat
    procedure :: mirror_coords
    procedure, private :: matrix_rotate_coords
    procedure, private :: quater_rotate_coords
@@ -104,9 +96,15 @@ subroutine permutate_atoms(self, order)
 
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: order(:)
+   integer i, k, invorder(self%natom)
 
-   self%atoms = self%atoms(order(1:self%natom))
-   self%adjmat = self%adjmat(order(1:self%natom), order(1:self%natom))
+   invorder = inverse_perm(order)
+   self%atoms = self%atoms(order(:))
+   do i = 1, self%natom
+      do k = 1, self%atoms(i)%nadj
+         self%atoms(i)%adjidx(k) = invorder(self%atoms(i)%adjidx(k))
+      end do
+   end do
 
 end subroutine permutate_atoms
 

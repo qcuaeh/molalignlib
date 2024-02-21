@@ -200,14 +200,11 @@ if (fmtout_flag) then
    fmtout = optfmtout
 end if
 
-! Get adjacency matrices and lists
+! Calculate adjacency lists
 
 if (bond_flag) then
-   call getadjmat(mol0%natom, mol0%get_coords(), mol0%get_znums(), mol0%adjmat)
-   call getadjmat(mol1%natom, mol1%get_coords(), mol1%get_znums(), mol1%adjmat)
-else
-   mol0%adjmat = .false.
-   mol1%adjmat = .false.
+   call get_adjlist(mol0)
+   call get_adjlist(mol1)
 end if
 
 if (.not. nrec_flag) then
