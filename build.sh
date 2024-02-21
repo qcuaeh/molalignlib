@@ -8,9 +8,8 @@ to_array() {
 
 compile() {
    srcdir=$rootdir/$1
-   $build_flag || return 0
-   if $fresh_build; then
-      fresh_build=false
+   if $full_build; then
+      full_build=false
       if test -d build; then
          for file in build/*{.f90,.mod,.o}; do
             rm "$file"
@@ -55,8 +54,6 @@ compile() {
 }
 
 make_prog() {
-   executable=$buildir/$1
-   $build_flag || return 0
    if test -z "$1"; then
       echo Error: name is empty
       exit 1
@@ -68,7 +65,6 @@ make_prog() {
 }
 
 make_lib() {
-   $build_flag || return 0
    if test -z "$1"; then
       echo Error: name is empty
       exit 1
@@ -80,7 +76,6 @@ make_lib() {
 }
 
 make_pyext() {
-   $build_flag || return 0
    if test -z "$1"; then
       echo Error: name is empty
       exit 1
@@ -96,22 +91,23 @@ make_pyext() {
    popd >/dev/null
 }
 
-runtests() {
-   $test_flag || return 0
-   if test -z "$executable"; then
-      echo Error: executable is not set
-      exit 1
-   fi
-   testset=$1
-   shift
-   for file in "$testdir/$testset"/*.out; do
-      testname=$(basename "$file" .out)
-      echo -n "Running test $testset/$testname... "
-#      "$executable" -stdin -stdout -test -stats "$@" < "$testdir/$testset/$testname.xyz" 2>&1 > "$file"
-      if diff -bB <("$executable" -stdin -stdout -test -stats "$@" < "$testdir/$testset/$testname.xyz" 2>&1) "$file"; then
-         echo ok
+run_tests() {
+   suffix=$1
+   subdir=$2
+   shift 2
+   executable=$buildir/molalign
+   for file in "$testdir/$subdir"/*.xyz; do
+      name=$(basename "$file" .xyz)_$suffix
+      echo -n "Running test $subdir/$name... "
+      if $write_test; then
+         "$executable" -stdin -stdout -test -stats "$@" < "$file" 2>&1 > "$testdir/$subdir/$name.out"
+         echo done
       else
-         echo failed
+         if diff -bB <("$executable" -stdin -stdout -test -stats "$@" < "$file" 2>&1) "$testdir/$subdir/$name.out"; then
+            echo ok
+         else
+            echo failed
+         fi
       fi
    done
 }
@@ -154,25 +150,30 @@ to_array f2py_flags
 # Read arguments and set options
 
 build_flag=true
+full_build=true
 test_flag=true
-fresh_build=true
+write_test=false
 debug_build=false
 
-while getopts ":dqt" opt; do
+while getopts ":bdqtw" opt; do
   case $opt in
-    d)
-      build_flag=true
-      debug_build=true
+    b)
       test_flag=false
+      ;;
+    d)
+      test_flag=false
+      debug_build=true
       ;;
     q)
-      build_flag=true
-      fresh_build=false
       test_flag=false
+      full_build=false
       ;;
     t)
-      build_flag=false
       test_flag=true
+      build_flag=false
+      ;;
+    w)
+      write_test=true
       ;;
     \?)
       echo "Invalid option: -$OPTARG" >&2
@@ -189,31 +190,36 @@ else
    target=prog
 fi
 
-case $target in
-prog)
-   # Build program
-   pic_build=false
-   compile molalignlib
-   compile molalign
-   make_prog molalign
+if $build_flag; then
+   case $target in
+   prog)
+      # Build program
+      pic_build=false
+      compile molalignlib
+      compile molalign
+      make_prog molalign
+      ;;
+   lib)
+      # Build dynamic library
+      pic_build=true
+      compile molalignlib
+      make_lib molalignlib
+      ;;
+   pyext)
+      # Build python extension module
+      pic_build=true
+      compile molalignlib
+      make_pyext molalignlibext
+      ;;
+   *)
+      echo Unknown target $target
+   esac
+fi
+
+if $test_flag; then
    # Run tests
-#   runtests jcim.2c01187/0.05 -rec 5 -remap -fast -tol 0.17
-   runtests jcim.2c01187/0.1 -rec 5 -remap -fast -tol 0.35
-#   runtests jcim.2c01187/0.2 -rec 5 -remap -fast -tol 0.69
-   runtests MOBH35-shuffled -rec 5 -remap -fast -bond -back
-   ;;
-lib)
-   # Build dynamic library
-   pic_build=true
-   compile molalignlib
-   make_lib molalignlib
-   ;;
-pyext)
-   # Build python extension module
-   pic_build=true
-   compile molalignlib
-   make_pyext molalignlibext
-   ;;
-*)
-   echo Unknown target $target
-esac
+   run_tests fast17 jcim.2c01187/0.05 -rec 5 -remap -fast -tol 0.17
+   run_tests fastbond MOBH35-shuffled -rec 5 -remap -fast -bond
+   run_tests fastbondback MOBH35-shuffled -rec 5 -remap -fast -bond -back
+   run_tests fastbondbackreac MOBH35-shuffled -rec 5 -remap -fast -bond -back -reac
+fi
