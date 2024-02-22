@@ -100,10 +100,10 @@ run_tests() {
       name=$(basename "$file" .xyz)_$suffix
       echo -n "Running test $subdir/$name... "
       if $write_test; then
-         "$executable" -stdin -stdout -test -stats "$@" < "$file" 2>&1 > "$testdir/$subdir/$name.out"
+         "$executable" -pipe -test -stats -N 5 "$@" < "$file" 2>&1 > "$testdir/$subdir/$name.out"
          echo done
       else
-         if diff -bB <("$executable" -stdin -stdout -test -stats "$@" < "$file" 2>&1) "$testdir/$subdir/$name.out"; then
+         if diff -bB <("$executable" -pipe -test -stats -N 5 "$@" < "$file" 2>&1) "$testdir/$subdir/$name.out"; then
             echo ok
          else
             echo failed
@@ -158,19 +158,18 @@ debug_build=false
 while getopts ":bdqtw" opt; do
   case $opt in
     b)
+      build_flag=true
       test_flag=false
       ;;
     d)
-      test_flag=false
       debug_build=true
       ;;
     q)
-      test_flag=false
       full_build=false
       ;;
     t)
-      test_flag=true
       build_flag=false
+      test_flag=true
       ;;
     w)
       write_test=true
@@ -218,8 +217,8 @@ fi
 
 if $test_flag; then
    # Run tests
-   run_tests fast17 jcim.2c01187/0.05 -rec 5 -remap -fast -tol 0.17
-   run_tests fastbond MOBH35-shuffled -rec 5 -remap -fast -bond
-   run_tests fastbondback MOBH35-shuffled -rec 5 -remap -fast -bond -back
-   run_tests fastbondbackreac MOBH35-shuffled -rec 5 -remap -fast -bond -back -reac
+   run_tests fast17 jcim.2c01187/0.05 -remap -fast -tol 0.17
+   run_tests fastbond MOBH35-shuffled -remap -fast -bond
+   run_tests fastbondback MOBH35-shuffled -remap -fast -bond -back
+   run_tests fastbondbackreac MOBH35-shuffled -remap -fast -bond -back -reac
 fi

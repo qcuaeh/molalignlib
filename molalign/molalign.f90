@@ -42,10 +42,9 @@ character(:), allocatable :: arg
 character(:), allocatable :: pathin1, pathin2, pathout
 character(:), allocatable :: fmtin0, fmtin1, fmtout, optfmtin, optfmtout
 character(ll) :: posargs(2)
-real(wp) :: travec(3), rotmat(3, 3)
-logical :: remap_flag
-logical :: stdin_flag, stdout_flag
 logical :: fmtin_flag, fmtout_flag
+logical :: remap_flag, pipe_flag, nrec_flag
+real(wp) :: travec(3), rotmat(3, 3)
 type(Molecule) :: mol0, mol1, auxmol0, auxmol1
 integer :: adjd, minadjd
 real(wp) :: rmsd, minrmsd
@@ -64,10 +63,10 @@ stats_flag = .false.
 trial_flag = .false.
 mirror_flag = .false.
 remap_flag = .false.
-stdin_flag = .false.
-stdout_flag = .false.
+pipe_flag = .false.
 fmtin_flag = .false.
 fmtout_flag = .false.
+nrec_flag = .false.
 
 maxrec = 1
 maxcount = 10
@@ -118,7 +117,8 @@ do while (getarg(arg))
       call readoptarg(arg, bias_tol)
 !      case ('-scale')
 !         call readoptarg(arg, bias_scale)
-   case ('-rec')
+   case ('-N')
+      nrec_flag = .true.
       call readoptarg(arg, maxrec)
    case ('-out')
       call readoptarg(arg, pathout)
@@ -128,17 +128,17 @@ do while (getarg(arg))
    case ('-fmtout')
       fmtout_flag = .true.
       call readoptarg(arg, optfmtout)
-   case ('-stdin')
-      stdin_flag = .true.
-   case ('-stdout')
-      stdout_flag = .true.
+   case ('-pipe')
+      pipe_flag = .true.
+   case ('-to')
+      nrec_flag = .true.
    case default
       call readposarg(arg, posargs)
    end select
 
 end do
 
-if (stdin_flag) then
+if (pipe_flag) then
    read_unit0 = stdin
    read_unit1 = stdin
    fmtin0 = 'xyz'
@@ -189,7 +189,7 @@ do i = 1, mol1%natom
    mol1%atoms(i)%weight = weight_func(mol1%atoms(i)%znum)
 end do
 
-if (stdout_flag) then
+if (pipe_flag) then
    write_unit = stdout
    fmtout = 'xyz'
 else
@@ -210,12 +210,16 @@ else
    mol1%adjmat = .false.
 end if
 
-! Sort atoms to minimize MSD
+if (.not. nrec_flag) then
+   call writefile(write_unit, fmtout, mol0)
+end if
 
 if (remap_flag) then
 
    auxmol0 = mol0
    auxmol1 = mol1
+
+   ! Remap atoms to minimize the MSD
 
    call remap_atoms( &
       auxmol0, &
@@ -226,9 +230,6 @@ if (remap_flag) then
       error)
 
    if (error /= 0) stop
-
-!      mol0%title = 'Reference'
-!      call writefile(write_unit, fmtout, mol0)
 
    auxmol1 = mol1
    minrmsd = huge(rmsd)
@@ -249,10 +250,12 @@ if (remap_flag) then
       call mol1%rotate_coords(rotmat)
       call mol1%translate_coords(travec)
 
-      rmsd = get_rmsd(mol0, mol1)
       adjd = get_adjd(mol0, mol1)
-      minrmsd = min(minrmsd, rmsd)
       minadjd = min(minadjd, adjd)
+
+      rmsd = get_rmsd(mol0, mol1)
+      minrmsd = min(minrmsd, rmsd)
+
       mol1%title = 'Map='//istr(i)//' RMSD='//rstr(rmsd, 4)
       call writefile(write_unit, fmtout, mol1)
 
@@ -260,9 +263,9 @@ if (remap_flag) then
 
    if (.not. stats_flag) then
       if (bond_flag) then
-         write (stdout, '(a,1x,a)') istr(minadjd), rstr(minrmsd, 4)
+         write (stderr, '(a,",",a)') istr(minadjd), rstr(minrmsd, 4)
       else
-         write (stdout, '(a,1x,a)') rstr(minrmsd, 4)
+         write (stderr, '(a)') rstr(minrmsd, 4)
       end if
    end if
 
@@ -282,14 +285,14 @@ else
    call mol1%rotate_coords(rotmat)
    call mol1%translate_coords(travec)
 
-   rmsd = get_rmsd(mol0, mol1)
    adjd = get_adjd(mol0, mol1)
+   rmsd = get_rmsd(mol0, mol1)
 
-!      write (stdout, '(a)') istr(adjd)
-   write (stdout, '(a)') rstr(rmsd, 4)
-
-!      mol0%title = 'Reference'
-!      call writefile(write_unit, fmtout, mol0)
+   if (bond_flag) then
+      write (stderr, '(a,",",a)') istr(adjd), rstr(rmsd, 4)
+   else
+      write (stderr, '(a)') rstr(rmsd, 4)
+   end if
 
    mol1%title = 'RMSD='//rstr(rmsd, 4)
    call writefile(write_unit, fmtout, mol1)
