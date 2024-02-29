@@ -26,6 +26,8 @@ type :: Atom
    real(wp) :: coords(3)
    integer :: nadj
    integer, allocatable :: adjidx(:)
+contains
+   procedure :: print => print_atom
 end type
 
 type, public :: Molecule
@@ -50,6 +52,7 @@ contains
    generic, public :: rotate_coords => matrix_rotate_coords, quater_rotate_coords
    procedure :: translate_coords
    procedure :: permutate_atoms
+   procedure :: print => print_molecule
 end type
 
 contains
@@ -197,5 +200,64 @@ function get_adjmat(self) result(adjmat)
    end do
 
 end function get_adjmat
+
+subroutine print_atom(self, ind, outLvl)
+   class(Atom), intent(in) :: self
+   integer, intent(in) :: ind, outLvl
+   character(255) :: frmt
+   character(2) :: num
+
+! *** code to manage unitlbl pending ***
+   
+   select case (outLvl)
+
+   case (1)
+      if (self%nadj == 0) then
+         frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a)'
+         write (*, frmt) ind, ": ", self%label(:2), self%znum, self%ztype, &
+                     self%weight, " {", self%coords(:), " }"
+      else
+         write (num, '(i0)') self%nadj
+         frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a,'//num//'i3,a)'
+         write (*, frmt) ind, ": ", self%label(:2), self%znum, self%ztype, &
+               self%weight, " {", self%coords(:), " } [", &
+               self%adjidx(:self%nadj), " ]"
+      end if
+
+!  case (2)
+!
+   case default
+      if (self%nadj == 0) then
+         frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a)'
+         write (*, frmt) ind, ": ", self%label(:2), self%znum, self%ztype, &
+                     self%weight, " {", self%coords(:), " }"
+      else
+         write (num, '(i0)') self%nadj
+         frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a,'//num//'i3,a)'
+         write (*, frmt) ind, ": ", self%label(:2), self%znum, self%ztype, &
+               self%weight, " {", self%coords(:), " } [", &
+               self%adjidx(:self%nadj), " ]"
+      end if
+   end select
+
+end subroutine print_atom
+
+subroutine print_molecule(self, molname)
+   class(Molecule), intent(in) :: self
+   character(*), intent(in) :: molname
+   integer :: i
+
+! *** code to manage unitlbl pending ***
+   
+   write (*, '(a,1x,a,3x,a,i0,a)') "Contents of molecule structure:", molname, &
+                                   "(", self%natom, " atoms)"
+   write (*, '(a,a4,a5,a6,a7,2a17)') "ind:", "lbl", "znum", "ztype", "weight", &
+                     "{ coords }", "[ adjlist ]"
+
+   do i = 1, self%natom
+      call self%atoms(i)%print(i, 1)
+   end do
+
+end subroutine print_molecule
 
 end module
