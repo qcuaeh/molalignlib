@@ -53,6 +53,9 @@ contains
    procedure :: translate_coords
    procedure :: permutate_atoms
    procedure :: print => print_molecule
+   procedure :: bonded
+   procedure :: break_bond
+   procedure :: add_bond
 end type
 
 contains
@@ -214,12 +217,12 @@ subroutine print_atom(self, ind, outLvl)
    case (1)
       if (self%nadj == 0) then
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a)'
-         write (*, frmt) ind, ": ", self%label(:2), self%znum, self%ztype, &
+         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%ztype, &
                      self%weight, " {", self%coords(:), " }"
       else
          write (num, '(i0)') self%nadj
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a,'//num//'i3,a)'
-         write (*, frmt) ind, ": ", self%label(:2), self%znum, self%ztype, &
+         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%ztype, &
                self%weight, " {", self%coords(:), " } [", &
                self%adjidx(:self%nadj), " ]"
       end if
@@ -229,12 +232,12 @@ subroutine print_atom(self, ind, outLvl)
    case default
       if (self%nadj == 0) then
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a)'
-         write (*, frmt) ind, ": ", self%label(:2), self%znum, self%ztype, &
+         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%ztype, &
                      self%weight, " {", self%coords(:), " }"
       else
          write (num, '(i0)') self%nadj
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a,'//num//'i3,a)'
-         write (*, frmt) ind, ": ", self%label(:2), self%znum, self%ztype, &
+         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%ztype, &
                self%weight, " {", self%coords(:), " } [", &
                self%adjidx(:self%nadj), " ]"
       end if
@@ -249,10 +252,10 @@ subroutine print_molecule(self, molname)
 
 ! *** code to manage unitlbl pending ***
    
-   write (*, '(a,1x,a,3x,a,i0,a)') "Contents of molecule structure:", molname, &
-                                   "(", self%natom, " atoms)"
-   write (*, '(a,a4,a5,a6,a7,2a17)') "ind:", "lbl", "znum", "ztype", "weight", &
-                     "{ coords }", "[ adjlist ]"
+   write (stderr, '(a,1x,a,3x,a,i0,a)') "Contents of molecule structure:", &
+                                        molname, "(", self%natom, " atoms)"
+   write (stderr, '(a,a4,a5,a6,a7,2a17)') "ind:", "lbl", "znum", "ztype", &
+                                          "weight", "{ coords }", "[ adjlist ]"
 
    do i = 1, self%natom
       call self%atoms(i)%print(i, 1)
@@ -260,4 +263,112 @@ subroutine print_molecule(self, molname)
 
 end subroutine print_molecule
 
+function bonded(self, ind1, ind2) result(isbond)
+   class(Molecule), intent(in) :: self
+   integer, intent(in) :: ind1, ind2
+   integer :: i
+   logical :: isbond, found1, found2
+
+! initialization
+   found1 = .false.
+   found2 = .false.
+
+! check cross reference of ind1 and ind2 in both adjlists
+   do i = 1, self%atoms(ind1)%nadj
+      if (ind2 == self%atoms(ind1)%adjidx(i)) then
+         found1 = .true.
+         exit
+      end if
+   end do
+   do i = 1, self%atoms(ind2)%nadj
+      if (ind1 == self%atoms(ind2)%adjidx(i)) then
+         found2 = .true.
+         exit
+      end if
+   end do
+
+! report or stop program
+   if (found1 .and. found2) then
+      isbond = .true.
+   else if (found1 .or. found2) then
+      write (stderr, '(a,i0,2x,i0)') 'Inconsistent bond for atoms: ', ind1, ind2
+      stop
+   else
+      isbond = .false.
+   end if
+
+end function bonded
+
+subroutine break_bond(self, ind1, ind2)
+   class(Molecule), intent(inout) :: self
+   integer, intent(in) :: ind1, ind2
+   integer i, pos1, pos2
+
+! initialization
+   pos1 = 0   ! position of ind2 in adjlist of atom 1
+   pos2 = 0   ! position of ind1 in adjlist of atom 2
+
+! find position of ind2 and ind1 in adjlists of atoms ind1 and ind2, resp.
+   do i = 1, self%atoms(ind1)%nadj
+      if (ind2 == self%atoms(ind1)%adjidx(i)) then
+         pos1 = i
+         exit
+      end if
+   end do
+   do i = 1, self%atoms(ind2)%nadj
+      if (ind1 == self%atoms(ind2)%adjidx(i)) then
+         pos2 = i
+         exit
+      end if
+   end do
+
+! delete ind2 and ind1 from the ajdlists where they appear
+   if ((pos1 /= 0) .and. (pos2 /= 0)) then
+      self%atoms(ind1)%nadj = self%atoms(ind1)%nadj - 1
+      do i = pos1, self%atoms(ind1)%nadj
+         self%atoms(ind1)%adjidx(i) = self%atoms(ind1)%adjidx(i+1)
+      end do
+      self%atoms(ind2)%nadj = self%atoms(ind2)%nadj - 1
+      do i = pos2, self%atoms(ind2)%nadj
+         self%atoms(ind2)%adjidx(i) = self%atoms(ind2)%adjidx(i+1)
+      end do
+   else
+      write (stderr, '(a,i0,2x,i0)') 'Error: atoms not bonded: ', ind1, ind2
+   end if
+
+end subroutine break_bond
+
+subroutine add_bond(self, ind1, ind2)
+   class(Molecule), intent(inout) :: self
+   integer, intent(in) :: ind1, ind2
+   integer :: pos1, pos2
+
+! initialization
+   pos1 = self%atoms(ind1)%nadj
+   pos2 = self%atoms(ind2)%nadj
+
+   if (.not. self%bonded(ind1, ind2)) then
+! indices in adjlists are supposed to be sorted; inserting new indices
+      self%atoms(ind1)%nadj = self%atoms(ind1)%nadj + 1
+! find position to insert ind2 and shift indices greater than ind2
+      do while ((pos1 >= 1) .and. (ind2 < self%atoms(ind1)%adjidx(pos1)))
+         self%atoms(ind1)%adjidx(pos1+1) = self%atoms(ind1)%adjidx(pos1)
+         pos1 = pos1 - 1
+      end do
+      self%atoms(ind1)%adjidx(pos1+1) = ind2
+      
+      self%atoms(ind2)%nadj = self%atoms(ind2)%nadj + 1
+! find position to insert ind1 and shift indices greater than ind1
+      do while ((pos2 >= 1) .and. (ind1 < self%atoms(ind2)%adjidx(pos2)))
+         self%atoms(ind2)%adjidx(pos2+1) = self%atoms(ind2)%adjidx(pos2)
+         pos2 = pos2 - 1
+      end do
+      self%atoms(ind2)%adjidx(pos2+1) = ind1
+   else
+      write (stderr, '(a,i0,2x,i0)') "Error: atoms already bonded: ", ind1, ind2
+   end if
+
+end subroutine add_bond
+
 end module
+
