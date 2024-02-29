@@ -206,13 +206,18 @@ end function get_adjmat
 
 subroutine print_atom(self, ind, outLvl)
    class(Atom), intent(in) :: self
-   integer, intent(in) :: ind, outLvl
+   integer, intent(in) :: ind
+   integer, intent(in), optional :: outLvl
    character(255) :: frmt
    character(2) :: num
+   integer :: outLevel
 
 ! *** code to manage unitlbl pending ***
+
+   outLevel = 1
+   if (present(outLvl)) outLevel = outLvl
    
-   select case (outLvl)
+   select case (outLevel)
 
    case (1)
       if (self%nadj == 0) then
@@ -245,20 +250,20 @@ subroutine print_atom(self, ind, outLvl)
 
 end subroutine print_atom
 
-subroutine print_molecule(self, molname)
+subroutine print_molecule(self)
    class(Molecule), intent(in) :: self
-   character(*), intent(in) :: molname
    integer :: i
 
 ! *** code to manage unitlbl pending ***
    
-   write (stderr, '(a,1x,a,3x,a,i0,a)') "Contents of molecule structure:", &
-                                        molname, "(", self%natom, " atoms)"
+   write (stderr, '(a,i0,a)') "Contents of molecule structure:   (", &
+                                         self%natom, " atoms)"
+   write (stderr, '(2a)') 'Title: ', self%title
    write (stderr, '(a,a4,a5,a6,a7,2a17)') "ind:", "lbl", "znum", "ztype", &
                                           "weight", "{ coords }", "[ adjlist ]"
 
    do i = 1, self%natom
-      call self%atoms(i)%print(i, 1)
+      call self%atoms(i)%print(i)
    end do
 
 end subroutine print_molecule
