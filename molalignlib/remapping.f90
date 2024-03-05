@@ -53,7 +53,7 @@ subroutine optimize_mapping( &
    countlist, &
    nrec)
 
-   type(Molecule), intent(inout) :: mol0, mol1
+   type(Molecule), intent(in) :: mol0, mol1
    integer, intent(in) :: nblk
    integer, dimension(:), intent(in) :: blklen
    integer, intent(in) :: neqv0, neqv1
@@ -340,7 +340,6 @@ subroutine find_reactive_sites(mol0, mol1, nblk, blklen, mapping)
    integer, dimension(:), allocatable :: znums0, znums1
    real(wp), dimension(:, :), allocatable :: coords0, coords1
    logical, dimension(:, :), allocatable :: adjmat0, adjmat1
-   logical, dimension(:, :), allocatable :: backadjmat0, backadjmat1
    real(wp) :: rotquat(4)
 
    offset(1) = 0
@@ -359,28 +358,24 @@ subroutine find_reactive_sites(mol0, mol1, nblk, blklen, mapping)
 
    ! Initialization
 
-   znums0 = mol0%get_znums()
-   znums1 = mol1%get_znums()
    coords0 = mol0%get_coords()
    coords1 = mol1%get_coords()
    adjmat0 = mol0%get_adjmat()
    adjmat1 = mol1%get_adjmat()
-   backadjmat0 = mol0%get_adjmat()
-   backadjmat1 = mol1%get_adjmat()
 
    ! Remove reactive bonds
 
    do i = 1, mol0%natom
       do j = i + 1, mol0%natom
-         if (backadjmat0(i, j) .neqv. backadjmat1(mapping(i), mapping(j))) then
-            call remove_reactive_bond(i, j, mol0%natom, znums0, adjmat0, adjmat1, mapping)
+         if (adjmat0(i, j) .neqv. adjmat1(mapping(i), mapping(j))) then
+            call remove_reactive_bond(i, j, mol0, mol1, mapping)
             h = blkidx(i)
             do k = offset(h) + 1, offset(h) + blklen(h)
                if (sum((coords0(:, i) - coords1(:, mapping(k)))**2) < 2.0 &
                   .or. sum((coords0(:, k) - coords1(:, mapping(i)))**2) < 2.0 &
                ) then
 !                  print *, '<', j, mapping(j), k, mapping(k)
-                  call remove_reactive_bond(k, j, mol0%natom, znums0, adjmat0, adjmat1, mapping)
+                  call remove_reactive_bond(k, j, mol0, mol1, mapping)
                end if
             end do
             h = blkidx(j)
@@ -389,7 +384,7 @@ subroutine find_reactive_sites(mol0, mol1, nblk, blklen, mapping)
                   .or. sum((coords0(:, k) - coords1(:, mapping(j)))**2) < 2.0 &
                ) then
 !                  print *, '>', i, mapping(i), k, mapping(k)
-                  call remove_reactive_bond(i, k, mol0%natom, znums0, adjmat0, adjmat1, mapping)
+                  call remove_reactive_bond(i, k, mol0, mol1, mapping)
                end if
             end do
          end if
@@ -398,55 +393,45 @@ subroutine find_reactive_sites(mol0, mol1, nblk, blklen, mapping)
 
 end subroutine
 
-subroutine remove_reactive_bond(i, j, natom, znums, adjmat0, adjmat1, mapping)
+subroutine remove_reactive_bond(i, j, mol0, mol1, mapping)
 ! Purpose: Remove reactive bonds
-   integer, intent(in) :: i, j, natom
-   integer, dimension(:), intent(in) :: znums
-   logical, dimension(:, :), intent(inout) :: adjmat0, adjmat1
+   integer, intent(in) :: i, j
    integer, dimension(:), intent(in) :: mapping
+   type(Molecule), intent(inout) :: mol0, mol1
 
    integer :: k
-   integer, dimension(natom) :: nadj0, nadj1
-   integer, dimension(maxcoord, natom) :: adjlist0, adjlist1
 
-   ! Calculate adjacency lists
+   call mol0%remove_bond(i, j)
+   call mol1%remove_bond(mapping(i), mapping(j))
 
-   call adjmat2list(natom, adjmat0, nadj0, adjlist0)
-   call adjmat2list(natom, adjmat1, nadj1, adjlist1)
-
-   adjmat0(i, j) = .false.
-   adjmat0(j, i) = .false.
-   adjmat1(mapping(i), mapping(j)) = .false.
-   adjmat1(mapping(j), mapping(i)) = .false.
-   if (znums(i) == 1) then
-      do k = 1, nadj0(i)
-         if (znums(adjlist0(k, i)) == 7 .or. znums(adjlist0(k, i)) == 8) then
-            adjmat0(i, adjlist0(k, i)) = .false.
-            adjmat0(adjlist0(k, i), i) = .false.
+   if (mol0%atoms(i)%znum == 1) then
+      do k = 1, mol0%atoms(i)%nadj
+         if (any([7, 8] == mol0%atoms(mol0%atoms(i)%adjlist(k))%znum)) then
+            call mol0%remove_bond(i, mol0%atoms(i)%adjlist(k))
          end if
       end do
    end if
-   if (znums(i) == 1) then
-      do k = 1, nadj1(i)
-         if (znums(adjlist1(k, i)) == 7 .or. znums(adjlist1(k, i)) == 8) then
-            adjmat1(mapping(i), mapping(adjlist1(k, i))) = .false.
-            adjmat1(mapping(adjlist1(k, i)), mapping(i)) = .false.
+
+   if (mol1%atoms(i)%znum == 1) then
+      do k = 1, mol1%atoms(i)%nadj
+         if (any([7, 8] == mol1%atoms(mol1%atoms(i)%adjlist(k))%znum)) then
+            call mol0%remove_bond(i, mol1%atoms(i)%adjlist(k))
          end if
       end do
    end if
-   if (znums(j) == 1) then
-      do k = 1, nadj0(j)
-         if (znums(adjlist0(k, j)) == 7 .or. znums(adjlist0(k, j)) == 8) then
-            adjmat0(j, adjlist0(k, j)) = .false.
-            adjmat0(adjlist0(k, j), j) = .false.
+
+   if (mol0%atoms(j)%znum == 1) then
+      do k = 1, mol0%atoms(j)%nadj
+         if (any([7, 8] == mol0%atoms(mol0%atoms(j)%adjlist(k))%znum)) then
+            call mol0%remove_bond(j, mol0%atoms(j)%adjlist(k))
          end if
       end do
    end if
-   if (znums(j) == 1) then
-      do k = 1, nadj1(j)
-         if (znums(adjlist1(k, j)) == 7 .or. znums(adjlist1(k, j)) == 8) then
-            adjmat1(mapping(j), mapping(adjlist1(k, j))) = .false.
-            adjmat1(mapping(adjlist1(k, j)), mapping(j)) = .false.
+
+   if (mol1%atoms(j)%znum == 1) then
+      do k = 1, mol1%atoms(j)%nadj
+         if (any([7, 8] == mol1%atoms(mol1%atoms(j)%adjlist(k))%znum)) then
+            call mol1%remove_bond(j, mol1%atoms(j)%adjlist(k))
          end if
       end do
    end if

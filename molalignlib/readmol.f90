@@ -58,7 +58,7 @@ subroutine readmol2(unit, mol)
    character(ll) :: buffer
    integer :: i, id
    integer :: atom1, atom2, bondorder, nbond
-   integer, allocatable :: nadj(:), adjidx(:, :)
+   integer, allocatable :: nadj(:), adjlist(:, :)
 
    do
       read (unit, '(a)', end=99) buffer
@@ -71,9 +71,9 @@ subroutine readmol2(unit, mol)
 
    allocate(mol%atoms(mol%natom))
    allocate(nadj(mol%natom))
-   allocate(adjidx(mol%natom,mol%natom))
+   allocate(adjlist(mol%natom,mol%natom))
    nadj(:) = 0
-   adjidx(:, :) = 0
+   adjlist(:, :) = 0
 
    do
       read (unit, '(a)', end=99) buffer
@@ -94,15 +94,15 @@ subroutine readmol2(unit, mol)
       read (unit, *, end=99) id, atom1, atom2, bondorder
       nadj(atom1) = nadj(atom1) + 1
       nadj(atom2) = nadj(atom2) + 1
-      adjidx(nadj(atom1),atom1) = atom2
-      adjidx(nadj(atom2),atom2) = atom1
+      adjlist(nadj(atom1),atom1) = atom2
+      adjlist(nadj(atom2),atom2) = atom1
    end do
 
    do i = 1, mol%natom
       mol%atoms(i)%nadj = nadj(i)
-      allocate(mol%atoms(i)%adjidx(maxcoord))
-!      allocate(mol%atoms(i)%adjidx(nadj(i)))
-      mol%atoms(i)%adjidx(1:nadj(i)) = adjidx(1:nadj(i),i)
+      allocate(mol%atoms(i)%adjlist(maxcoord))
+!      allocate(mol%atoms(i)%adjlist(nadj(i)))
+      mol%atoms(i)%adjlist(1:nadj(i)) = adjlist(1:nadj(i),i)
    end do
 
    return
@@ -120,14 +120,14 @@ subroutine get_adjlist (mol)
    real(wp), dimension(:), allocatable :: adjrad
    real(wp), dimension(:, :), allocatable :: coords
    integer, dimension(:), allocatable :: znums
-   integer, allocatable :: nadj(:), adjidx(:, :)
+   integer, allocatable :: nadj(:), adjlist(:, :)
 
    ! initialization
 
    allocate(adjrad(mol%natom))
    allocate(coords(3,mol%natom))
    allocate(znums(mol%natom))
-   allocate(nadj(mol%natom),adjidx(maxcoord,mol%natom))
+   allocate(nadj(mol%natom),adjlist(maxcoord,mol%natom))
 
    znums = mol%get_znums()
    coords = mol%get_coords()
@@ -152,8 +152,8 @@ subroutine get_adjlist (mol)
                write (stderr, '("Maximum coordination number exceeded!")')
                stop
             end if
-            adjidx(nadj(i), i) = j
-            adjidx(nadj(j), j) = i
+            adjlist(nadj(i), i) = j
+            adjlist(nadj(j), j) = i
          end if
       end do
    end do
@@ -162,9 +162,9 @@ subroutine get_adjlist (mol)
 
    do i = 1, mol%natom
       mol%atoms(i)%nadj = nadj(i)
-!      allocate(mol%atoms(i)%adjidx(maxcoord))   ! fixed array size
-      allocate(mol%atoms(i)%adjidx(nadj(i)))   ! exact array size
-      mol%atoms(i)%adjidx(1:nadj(i)) = adjidx(1:nadj(i),i)
+!      allocate(mol%atoms(i)%adjlist(maxcoord))   ! fixed array size
+      allocate(mol%atoms(i)%adjlist(nadj(i)))   ! exact array size
+      mol%atoms(i)%adjlist(1:nadj(i)) = adjlist(1:nadj(i),i)
    end do
 
 end subroutine get_adjlist

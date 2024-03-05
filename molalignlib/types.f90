@@ -25,7 +25,7 @@ type :: Atom
    real(wp) :: weight
    real(wp) :: coords(3)
    integer :: nadj
-   integer, allocatable :: adjidx(:)
+   integer, allocatable :: adjlist(:)
 contains
    procedure :: print => print_atom
 end type
@@ -54,7 +54,7 @@ contains
    procedure :: permutate_atoms
    procedure :: print => print_molecule
    procedure :: bonded
-   procedure :: break_bond
+   procedure :: remove_bond
    procedure :: add_bond
 end type
 
@@ -108,7 +108,7 @@ subroutine permutate_atoms(self, order)
    self%atoms = self%atoms(order(:))
    do i = 1, self%natom
       do k = 1, self%atoms(i)%nadj
-         self%atoms(i)%adjidx(k) = invorder(self%atoms(i)%adjidx(k))
+         self%atoms(i)%adjlist(k) = invorder(self%atoms(i)%adjlist(k))
       end do
    end do
 
@@ -198,7 +198,7 @@ function get_adjmat(self) result(adjmat)
    do i = 1, self%natom
       iatom = self%atoms(i)
       do k = 1, iatom%nadj
-         adjmat(i, iatom%adjidx(k)) = .true.
+         adjmat(i, iatom%adjlist(k)) = .true.
       end do
    end do
 
@@ -229,7 +229,7 @@ subroutine print_atom(self, ind, outLvl)
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a,'//num//'i3,a)'
          write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%ztype, &
                self%weight, " {", self%coords(:), " } [", &
-               self%adjidx(:self%nadj), " ]"
+               self%adjlist(:self%nadj), " ]"
       end if
 
 !  case (2)
@@ -244,7 +244,7 @@ subroutine print_atom(self, ind, outLvl)
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a,'//num//'i3,a)'
          write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%ztype, &
                self%weight, " {", self%coords(:), " } [", &
-               self%adjidx(:self%nadj), " ]"
+               self%adjlist(:self%nadj), " ]"
       end if
    end select
 
@@ -280,13 +280,13 @@ function bonded(self, ind1, ind2) result(isbond)
 
 ! check cross reference of ind1 and ind2 in both adjlists
    do i = 1, self%atoms(ind1)%nadj
-      if (ind2 == self%atoms(ind1)%adjidx(i)) then
+      if (ind2 == self%atoms(ind1)%adjlist(i)) then
          found1 = .true.
          exit
       end if
    end do
    do i = 1, self%atoms(ind2)%nadj
-      if (ind1 == self%atoms(ind2)%adjidx(i)) then
+      if (ind1 == self%atoms(ind2)%adjlist(i)) then
          found2 = .true.
          exit
       end if
@@ -304,7 +304,7 @@ function bonded(self, ind1, ind2) result(isbond)
 
 end function bonded
 
-subroutine break_bond(self, ind1, ind2)
+subroutine remove_bond(self, ind1, ind2)
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: ind1, ind2
    integer i, pos1, pos2
@@ -315,13 +315,13 @@ subroutine break_bond(self, ind1, ind2)
 
 ! find position of ind2 and ind1 in adjlists of atoms ind1 and ind2, resp.
    do i = 1, self%atoms(ind1)%nadj
-      if (ind2 == self%atoms(ind1)%adjidx(i)) then
+      if (ind2 == self%atoms(ind1)%adjlist(i)) then
          pos1 = i
          exit
       end if
    end do
    do i = 1, self%atoms(ind2)%nadj
-      if (ind1 == self%atoms(ind2)%adjidx(i)) then
+      if (ind1 == self%atoms(ind2)%adjlist(i)) then
          pos2 = i
          exit
       end if
@@ -331,17 +331,17 @@ subroutine break_bond(self, ind1, ind2)
    if ((pos1 /= 0) .and. (pos2 /= 0)) then
       self%atoms(ind1)%nadj = self%atoms(ind1)%nadj - 1
       do i = pos1, self%atoms(ind1)%nadj
-         self%atoms(ind1)%adjidx(i) = self%atoms(ind1)%adjidx(i+1)
+         self%atoms(ind1)%adjlist(i) = self%atoms(ind1)%adjlist(i+1)
       end do
       self%atoms(ind2)%nadj = self%atoms(ind2)%nadj - 1
       do i = pos2, self%atoms(ind2)%nadj
-         self%atoms(ind2)%adjidx(i) = self%atoms(ind2)%adjidx(i+1)
+         self%atoms(ind2)%adjlist(i) = self%atoms(ind2)%adjlist(i+1)
       end do
    else
       write (stderr, '(a,i0,2x,i0)') 'Error: atoms not bonded: ', ind1, ind2
    end if
 
-end subroutine break_bond
+end subroutine remove_bond
 
 subroutine add_bond(self, ind1, ind2)
    class(Molecule), intent(inout) :: self
@@ -356,19 +356,19 @@ subroutine add_bond(self, ind1, ind2)
 ! indices in adjlists are supposed to be sorted; inserting new indices
       self%atoms(ind1)%nadj = self%atoms(ind1)%nadj + 1
 ! find position to insert ind2 and shift indices greater than ind2
-      do while ((pos1 >= 1) .and. (ind2 < self%atoms(ind1)%adjidx(pos1)))
-         self%atoms(ind1)%adjidx(pos1+1) = self%atoms(ind1)%adjidx(pos1)
+      do while ((pos1 >= 1) .and. (ind2 < self%atoms(ind1)%adjlist(pos1)))
+         self%atoms(ind1)%adjlist(pos1+1) = self%atoms(ind1)%adjlist(pos1)
          pos1 = pos1 - 1
       end do
-      self%atoms(ind1)%adjidx(pos1+1) = ind2
+      self%atoms(ind1)%adjlist(pos1+1) = ind2
       
       self%atoms(ind2)%nadj = self%atoms(ind2)%nadj + 1
 ! find position to insert ind1 and shift indices greater than ind1
-      do while ((pos2 >= 1) .and. (ind1 < self%atoms(ind2)%adjidx(pos2)))
-         self%atoms(ind2)%adjidx(pos2+1) = self%atoms(ind2)%adjidx(pos2)
+      do while ((pos2 >= 1) .and. (ind1 < self%atoms(ind2)%adjlist(pos2)))
+         self%atoms(ind2)%adjlist(pos2+1) = self%atoms(ind2)%adjlist(pos2)
          pos2 = pos2 - 1
       end do
-      self%atoms(ind2)%adjidx(pos2+1) = ind1
+      self%atoms(ind2)%adjlist(pos2+1) = ind1
    else
       write (stderr, '(a,i0,2x,i0)') "Error: atoms already bonded: ", ind1, ind2
    end if
@@ -376,4 +376,3 @@ subroutine add_bond(self, ind1, ind2)
 end subroutine add_bond
 
 end module
-
