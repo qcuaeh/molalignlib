@@ -401,8 +401,13 @@ subroutine remove_reactive_bond(i, j, mol0, mol1, mapping)
 
    integer :: k
 
-   call mol0%remove_bond(i, j)
-   call mol1%remove_bond(mapping(i), mapping(j))
+   if (mol0%bonded(i, j)) then
+      call mol0%remove_bond(i, j)
+   end if
+
+   if (mol1%bonded(mapping(i), mapping(j))) then
+      call mol1%remove_bond(mapping(i), mapping(j))
+   end if
 
    if (mol0%atoms(i)%znum == 1) then
       do k = 1, mol0%atoms(i)%nadj
@@ -415,7 +420,9 @@ subroutine remove_reactive_bond(i, j, mol0, mol1, mapping)
    if (mol1%atoms(i)%znum == 1) then
       do k = 1, mol1%atoms(i)%nadj
          if (any([7, 8] == mol1%atoms(mol1%atoms(i)%adjlist(k))%znum)) then
-            call mol0%remove_bond(i, mol1%atoms(i)%adjlist(k))
+            if (mol1%bonded(mapping(i), mapping(mol1%atoms(i)%adjlist(k)))) then
+               call mol1%remove_bond(mapping(i), mapping(mol1%atoms(i)%adjlist(k)))
+            end if
          end if
       end do
    end if
@@ -431,7 +438,9 @@ subroutine remove_reactive_bond(i, j, mol0, mol1, mapping)
    if (mol1%atoms(j)%znum == 1) then
       do k = 1, mol1%atoms(j)%nadj
          if (any([7, 8] == mol1%atoms(mol1%atoms(j)%adjlist(k))%znum)) then
-            call mol1%remove_bond(j, mol1%atoms(j)%adjlist(k))
+            if (mol1%bonded(mapping(j), mapping(mol1%atoms(j)%adjlist(k)))) then
+               call mol1%remove_bond(mapping(j), mapping(mol1%atoms(j)%adjlist(k)))
+            end if
          end if
       end do
    end if
