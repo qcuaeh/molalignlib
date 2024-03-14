@@ -109,8 +109,8 @@ subroutine remap_atoms( &
 
    ! Calculate adjacency lists
 
-   call adjmat2list(mol0%natom, mol0%adjmat, nadj0, adjlist0)
-   call adjmat2list(mol1%natom, mol1%adjmat, nadj1, adjlist1)
+   call adjmat2list(mol0%natom, mol0%get_adjmat(), nadj0, adjlist0)
+   call adjmat2list(mol1%natom, mol1%get_adjmat(), nadj1, adjlist1)
 
    ! Group atoms by type
 
@@ -328,7 +328,7 @@ function get_adjd(mol0, mol1) result(adjd)
    type(Molecule), intent(in) :: mol0, mol1
    integer :: adjd
 
-   adjd = adjacencydiff(mol0%natom, mol0%adjmat, mol1%adjmat, identity_perm(mol0%natom))
+   adjd = adjacencydiff(mol0%natom, mol0%get_adjmat(), mol1%get_adjmat(), identity_perm(mol0%natom))
 
 end function
 

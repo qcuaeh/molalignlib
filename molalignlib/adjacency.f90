@@ -10,39 +10,6 @@ implicit none
 
 contains
 
-subroutine getadjmat(natom, coords, znums, adjmat)
-   integer, intent(in) :: natom
-   integer, dimension(:), intent(in) :: znums
-   real(wp), dimension(:, :), intent(in) :: coords
-   logical, dimension(:, :), intent(out) :: adjmat
-
-   integer :: i, j
-   real(wp) :: atomdist
-   real(wp) :: adjrad(natom)
-
-   ! Initialization
-
-   adjmat(:, :) = .false.
-
-   ! Set adjacency radii
-
-   adjrad(:) = covrad(znums) + 0.25*(vdwrad(znums) - covrad(znums))
-
-   ! Change adjacency matrix i,j to true if atoms i and j are closer
-   ! than the sum of their adjacency radius
-
-   do i = 1, natom
-      do j = i + 1, natom
-         atomdist = sqrt(sum((coords(:, i) - coords(:, j))**2))
-         if (atomdist < adjrad(i) + adjrad(j)) then
-            adjmat(i, j) = .true.
-            adjmat(j, i) = .true.
-         end if
-      end do
-   end do
-
-end subroutine
-
 subroutine adjmat2list(natom, adjmat, nadj, adjlist)
    integer, intent(in) :: natom
    logical, dimension(:, :), intent(in) :: adjmat

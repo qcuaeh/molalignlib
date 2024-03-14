@@ -33,7 +33,6 @@ subroutine readxyz(unit, mol)
    integer :: i
 
    read (unit, *, end=99) mol%natom
-   mol%nbond = 0
 
    allocate(mol%atoms(mol%natom))
 
@@ -44,10 +43,6 @@ subroutine readxyz(unit, mol)
       read (unit, *, end=99) buffer, mol%atoms(i)%coords(:)
       mol%atoms(i)%label = buffer
    end do
-
-   allocate(mol%adjmat(mol%natom, mol%natom))
-
-   mol%adjmat(:, :) = .false.
 
    return
 
@@ -62,6 +57,8 @@ subroutine readmol2(unit, mol)
    type(Molecule), intent(out) :: mol
    character(ll) :: buffer
    integer :: i, id
+   integer :: atom1, atom2, bondorder, nbond
+   integer, allocatable :: nadj(:), adjlist(:, :)
 
    do
       read (unit, '(a)', end=99) buffer
@@ -70,10 +67,13 @@ subroutine readmol2(unit, mol)
 
    read (unit, '(a)', end=99) buffer
    mol%title = trim(buffer)
-   read (unit, *, end=99) mol%natom, mol%nbond
+   read (unit, *, end=99) mol%natom, nbond
 
    allocate(mol%atoms(mol%natom))
-   allocate(mol%bonds(mol%nbond))
+   allocate(nadj(mol%natom))
+   allocate(adjlist(mol%natom,mol%natom))
+   nadj(:) = 0
+   adjlist(:, :) = 0
 
    do
       read (unit, '(a)', end=99) buffer
@@ -90,17 +90,19 @@ subroutine readmol2(unit, mol)
       if (buffer == '@<TRIPOS>BOND') exit
    end do
 
-   do i = 1, mol%nbond
-      read (unit, *, end=99) id, mol%bonds(i)%atom1, mol%bonds(i)%atom2, mol%bonds(i)%order
+   do i = 1, nbond
+      read (unit, *, end=99) id, atom1, atom2, bondorder
+      nadj(atom1) = nadj(atom1) + 1
+      nadj(atom2) = nadj(atom2) + 1
+      adjlist(nadj(atom1),atom1) = atom2
+      adjlist(nadj(atom2),atom2) = atom1
    end do
 
-   allocate(mol%adjmat(mol%natom, mol%natom))
-
-   mol%adjmat(:, :) = .false.
-
-   do i = 1, mol%nbond
-      mol%adjmat(mol%bonds(i)%atom1, mol%bonds(i)%atom2) = .true.
-      mol%adjmat(mol%bonds(i)%atom2, mol%bonds(i)%atom1) = .true.
+   do i = 1, mol%natom
+      mol%atoms(i)%nadj = nadj(i)
+      allocate(mol%atoms(i)%adjlist(maxcoord))
+!      allocate(mol%atoms(i)%adjlist(nadj(i)))
+      mol%atoms(i)%adjlist(1:nadj(i)) = adjlist(1:nadj(i),i)
    end do
 
    return
@@ -110,5 +112,61 @@ subroutine readmol2(unit, mol)
    stop
 
 end subroutine
+
+subroutine get_adjlist (mol)
+   type(Molecule), intent(inout) :: mol
+   integer :: i, j
+   real(wp) :: atomdist
+   real(wp), dimension(:), allocatable :: adjrad
+   real(wp), dimension(:, :), allocatable :: coords
+   integer, dimension(:), allocatable :: znums
+   integer, allocatable :: nadj(:), adjlist(:, :)
+
+   ! initialization
+
+   allocate(adjrad(mol%natom))
+   allocate(coords(3,mol%natom))
+   allocate(znums(mol%natom))
+   allocate(nadj(mol%natom),adjlist(maxcoord,mol%natom))
+
+   znums = mol%get_znums()
+   coords = mol%get_coords()
+
+   mol%atoms(:)%nadj = 0
+   nadj(:) = 0
+
+   ! Set adjacency radii
+
+   adjrad(:) = covrad(znums) + 0.25*(vdwrad(znums) - covrad(znums))
+
+   ! Register adjacency matrix i,j if atoms i and j are closer
+   ! than the sum of their adjacency radius
+
+   do i = 1, mol%natom
+      do j = i + 1, mol%natom
+         atomdist = sqrt(sum((coords(:, i) - coords(:, j))**2))
+         if (atomdist < adjrad(i) + adjrad(j)) then
+            nadj(i) = nadj(i) + 1
+            nadj(j) = nadj(j) + 1
+            if (nadj(i) > maxcoord .or. nadj(j) > maxcoord) then
+               write (stderr, '("Maximum coordination number exceeded!")')
+               stop
+            end if
+            adjlist(nadj(i), i) = j
+            adjlist(nadj(j), j) = i
+         end if
+      end do
+   end do
+
+   ! update adjecency lists in mol structure from adjecency matrix
+
+   do i = 1, mol%natom
+      mol%atoms(i)%nadj = nadj(i)
+!      allocate(mol%atoms(i)%adjlist(maxcoord))   ! fixed array size
+      allocate(mol%atoms(i)%adjlist(nadj(i)))   ! exact array size
+      mol%atoms(i)%adjlist(1:nadj(i)) = adjlist(1:nadj(i),i)
+   end do
+
+end subroutine get_adjlist
 
 end module
