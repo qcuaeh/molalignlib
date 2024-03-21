@@ -20,6 +20,7 @@ use types
 use readmol
 use writemol
 use adjacency
+use assorting
 
 implicit none
 
@@ -86,6 +87,12 @@ subroutine readfile(unit, fmtin, mol)
       write (stderr, '(a,1x,a)') 'Invalid format:', fmtin
       stop
    end select
+
+   ! Find atom blocks
+   call find_atomblocks(mol)
+
+   ! Find MNA-equivalent atoms
+   call find_equivatoms(mol)
 
 end subroutine
 

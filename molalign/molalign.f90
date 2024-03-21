@@ -19,6 +19,7 @@ use kinds
 use types
 use flags
 use bounds
+use pointers
 use printing
 use rotation
 use translation
@@ -48,8 +49,6 @@ real(wp) :: travec(3), rotmat(3, 3)
 type(Molecule) :: mol0, mol1, auxmol0, auxmol1
 integer :: adjd, minadjd
 real(wp) :: rmsd, minrmsd
-
-procedure(f_realint), pointer :: weight_func
 
 ! Set default options
 
@@ -176,18 +175,6 @@ call readfile(read_unit1, fmtin1, mol1)
 
 allocate(maplist(mol0%natom, maxrec))
 allocate(countlist(maxrec))
-
-! Get atomic numbers, types and weights
-
-do i = 1, mol0%natom
-   call readlabel(mol0%atoms(i)%label, mol0%atoms(i)%znum, mol0%atoms(i)%ztype)
-   mol0%atoms(i)%weight = weight_func(mol0%atoms(i)%znum)
-end do
-
-do i = 1, mol1%natom
-   call readlabel(mol1%atoms(i)%label, mol1%atoms(i)%znum, mol1%atoms(i)%ztype)
-   mol1%atoms(i)%weight = weight_func(mol1%atoms(i)%znum)
-end do
 
 if (pipe_flag) then
    write_unit = stdout

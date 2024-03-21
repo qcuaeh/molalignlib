@@ -17,53 +17,62 @@
 module assorting
 use stdio
 use kinds
+use types
 use flags
 use bounds
+use pointers
 use discrete
 use sorting
 use chemdata
+use chemutils
 
 implicit none
 
 contains
 
-subroutine groupatoms(natom, znums, ztypes, weights, nblk, blklen, blkidx)
+subroutine find_atomblocks(mol)
 ! Purpose: Group atoms by atomic numbers and types
-   integer, intent(in) :: natom
-   integer, dimension(:), intent(in) :: znums
-   integer, dimension(:), intent(in) :: ztypes
-   real(wp), dimension(:), intent(in) :: weights
-   integer, intent(out) :: nblk
-   integer, dimension(:), intent(out) :: blklen
-   integer, dimension(:), intent(out) :: blkidx
+   type(Molecule), intent(inout) :: mol
 
-   integer :: i, j
-   logical :: remaining(natom)
-   integer :: blkznum(natom)
-   integer :: blktype(natom)
-   integer :: blkorder(natom)
+   integer :: i, j, nblock
+   integer :: znumi, ztypei, znumj, ztypej
+   integer :: blkid(mol%natom)
+   logical :: remaining(mol%natom)
+   integer, dimension(mol%natom) :: blklen, blkznum, blkynum
+   integer, dimension(mol%natom) :: order, idorder
 
    ! Initialization
 
-   nblk = 0
+   nblock = 0
    remaining = .true.
 
    ! Create block list
 
-   do i = 1, natom
+   do i = 1, mol%natom
+
       if (remaining(i)) then
-         nblk = nblk + 1
-         blklen(nblk) = 1
-         blkznum(nblk) = znums(i)
-         blktype(nblk) = ztypes(i)
-         blkidx(i) = nblk
-         do j = i + 1, natom
-            if (remaining(i)) then
-               if (znums(j) == znums(i) .and. ztypes(j) == ztypes(i)) then
-                  if (weights(j) == weights(i)) then
-                     blkidx(j) = nblk
-                     blklen(nblk) = blklen(nblk) + 1
+
+         call readlabel(mol%atoms(i)%label, znumi, ztypei)
+
+         nblock = nblock + 1
+         blkid(i) = nblock
+         blklen(nblock) = 1
+         blkznum(nblock) = znumi
+         blkynum(nblock) = ztypei
+         mol%atoms(i)%znum = znumi
+         mol%atoms(i)%weight = weight_func(znumi)
+         remaining(i) = .false.
+
+         do j = 1, mol%natom
+            if (remaining(j)) then
+               call readlabel(mol%atoms(j)%label, znumj, ztypej)
+               if (znumi == znumj .and. ztypei == ztypej) then
+                  if (weight_func(znumi) == weight_func(znumj)) then
+                     blkid(j) = nblock
+                     mol%atoms(j)%znum = znumj
+                     mol%atoms(j)%weight = weight_func(znumj)
                      remaining(j) = .false.
+                     blklen(nblock) = blklen(nblock) + 1
                   else
                      ! Abort if there are inconsistent weights
                      write (stderr, '(a)') 'Error: There are incosistent weights'
@@ -72,29 +81,80 @@ subroutine groupatoms(natom, znums, ztypes, weights, nblk, blklen, blkidx)
                end if
             end if
          end do
+
       end if
+
    end do
 
-   ! Order blocks by atomic type
+   ! Order blocks by type number
 
-   blkorder(:nblk) = sortorder(blktype, nblk)
-   blklen(:nblk) = blklen(blkorder(:nblk))
-   blkorder(:nblk) = inverse_perm(blkorder(:nblk))
-   blkidx = blkorder(blkidx)
+   order(:nblock) = sortorder(blkynum, nblock)
+   idorder = inverse_perm(order)
+   blklen(:nblock) = blklen(order(:nblock))
+   blkid = idorder(blkid)
 
    ! Order blocks by atomic number
 
-   blkorder(:nblk) = sortorder(blkznum, nblk)
-   blklen(:nblk) = blklen(blkorder(:nblk))
-   blkorder(:nblk) = inverse_perm(blkorder(:nblk))
-   blkidx = blkorder(blkidx)
+   order(:nblock) = sortorder(blkznum, nblock)
+   idorder = inverse_perm(order)
+   blklen(:nblock) = blklen(order(:nblock))
+   blkid = idorder(blkid)
 
-   ! Order blocks by block size
+   allocate (mol%blklen(nblock))
 
-!   blkorder(:nblk) = sortorder(blklen, nblk)
-!   blklen(:nblk) = blklen(blkorder(:nblk))
-!   blkorder(:nblk) = inverse_perm(blkorder(:nblk))
-!   blkidx = blkorder(blkidx)
+   mol%nblock = nblock
+   mol%blklen = blklen(:nblock)
+!   mol%atoms(:)%blkid = blkid(:)
+   do i = 1, mol%natom
+      mol%atoms(i)%blkid = blkid(i)
+   end do
+
+end subroutine
+
+subroutine find_equivatoms(mol)
+! Group atoms by MNA type at infinite level
+   type(Molecule), intent(inout) :: mol
+
+   integer i, nin, nequiv
+   integer, dimension(mol%natom) :: eqvid, eqvlen
+   integer, dimension(mol%natom) :: intype, uptype, basetype
+   integer, dimension(mol%natom) :: order, idorder
+
+   ! Determine MNA types iteratively
+
+   nin = mol%nblock
+   intype = mol%get_blkids()
+   basetype = [(i, i=1, mol%natom)]
+
+   do
+
+      call getmnatypes(mol, nin, intype, nequiv, eqvid, eqvlen, uptype)
+      basetype(:nequiv) = basetype(uptype(:nequiv))
+
+      if (all(eqvid == intype)) exit
+
+      nin = nequiv
+      intype = eqvid
+
+   end do
+
+   order(:nequiv) = sortorder(basetype, nequiv)
+   idorder = inverse_perm(order)
+   eqvlen(:nequiv) = eqvlen(order(:nequiv))
+   eqvid = idorder(eqvid)
+
+!    do i = 1, mol%natom
+!        print *, i, elsym(znum(i)), eqvid(i)
+!    end do
+
+   allocate (mol%eqvlen(nequiv))
+
+   mol%nequiv = nequiv
+   mol%eqvlen = eqvlen(:nequiv)
+!   mol%atoms(:)%eqvid = eqvid(:)
+   do i = 1, mol%natom
+      mol%atoms(i)%eqvid = eqvid(i)
+   end do
 
 end subroutine
 
@@ -106,7 +166,7 @@ subroutine groupbytype(nelem, elements, types, groupid, ngroup, groupsize)
     integer, dimension(:), intent(out) :: groupid, groupsize
 
     integer i, j
-    integer, dimension(maxcoord) :: grouptype, grouporder
+    integer, dimension(maxcoord) :: grouptype, order
     logical, dimension(maxcoord) :: remaining
 
 ! Initialization
@@ -136,39 +196,39 @@ subroutine groupbytype(nelem, elements, types, groupid, ngroup, groupsize)
 
 ! Order groups by category type 
 
-    grouporder(:ngroup) = sortorder(grouptype, ngroup)
-    grouptype(:ngroup) = grouptype(grouporder(:ngroup))
-    groupsize(:ngroup) = groupsize(grouporder(:ngroup))
-    grouporder(:ngroup) = inverse_perm(grouporder(:ngroup))
-    groupid(:nelem) = grouporder(groupid(:nelem))
+    order(:ngroup) = sortorder(grouptype, ngroup)
+    grouptype(:ngroup) = grouptype(order(:ngroup))
+    groupsize(:ngroup) = groupsize(order(:ngroup))
+    order(:ngroup) = inverse_perm(order(:ngroup))
+    groupid(:nelem) = order(groupid(:nelem))
 
 !    print *, groupid(:ngroup)
-!    print *, typess(grouporder)
+!    print *, typess(order)
 
 end subroutine
 
-subroutine groupneighbors(natom, neqv, eqvlen, nadj, adjlist, nadjeqv, adjeqvlen)
+subroutine groupneighbors(natom, nequiv, eqvlen, nadj, adjlist, nadjeqv, adjeqvlen)
 ! Purpose: Categorize atoms by eqtypes
-   integer, intent(in) :: natom, neqv
+   integer, intent(in) :: natom, nequiv
    integer, dimension(:), intent(in) :: nadj, eqvlen
    integer, dimension(:, :), intent(inout) :: adjlist
    integer, dimension(:), intent(out) :: nadjeqv
    integer, dimension(:, :), intent(out) :: adjeqvlen
 
    integer i, h, offset
-   integer :: eqvidx(natom)
+   integer :: eqvid(natom)
    integer, dimension(maxcoord) :: adjeqvid, atomorder
 
    ! assing equivalence group
 
    offset = 0
-   do h = 1, neqv
-      eqvidx(offset+1:offset+eqvlen(h)) = h
+   do h = 1, nequiv
+      eqvid(offset+1:offset+eqvlen(h)) = h
       offset = offset + eqvlen(h)
    end do
 
    do i = 1, natom
-      call groupbytype(nadj(i), adjlist(:, i), eqvidx, adjeqvid, nadjeqv(i), adjeqvlen(:, i))
+      call groupbytype(nadj(i), adjlist(:, i), eqvid, adjeqvid, nadjeqv(i), adjeqvlen(:, i))
       atomorder(:nadj(i)) = sortorder(adjeqvid, nadj(i))
       adjlist(:nadj(i), i) = adjlist(atomorder(:nadj(i)), i)
    end do
@@ -184,30 +244,31 @@ subroutine groupneighbors(natom, neqv, eqvlen, nadj, adjlist, nadjeqv, adjeqvlen
 
 end subroutine
 
-subroutine getmnatypes(natom, nin, intype, nadj, adjlist, nout, outype, outsize, uptype)
-   integer, intent(in) :: natom, nin
-   integer, dimension(:), intent(in) :: intype, nadj
-   integer, dimension(:, :), intent(in) :: adjlist
+subroutine getmnatypes(mol, nin, intype, nout, outype, outsize, uptype)
+   type(Molecule), intent(inout) :: mol
+   integer, intent(in) :: nin
+   integer, dimension(:), intent(in) :: intype
    integer, intent(out) :: nout
    integer, dimension(:), intent(out) :: outype, outsize, uptype
 
    integer :: i, j
-   logical :: untyped(natom)
+   logical :: untyped(mol%natom)
 
    nout = 0
    untyped(:) = .true.
 
-   do i = 1, natom
+   do i = 1, mol%natom
       if (untyped(i)) then
          nout = nout + 1
          outype(i) = nout
          outsize(nout) = 1
          uptype(nout) = intype(i)
-         do j = i + 1, natom
+         do j = i + 1, mol%natom
 !               print '(a, x, i0, x, i0)', trim(elsym(intype0(i))), i, j
             if (untyped(j)) then
                if (intype(j) == intype(i)) then
-                  if (same_adjacency(nin, intype, nadj(i), adjlist(:, i), intype, nadj(j), adjlist(:, j))) then
+                  if (same_adjacency(nin, intype, mol%atoms(i)%nadj, mol%atoms(i)%adjlist, intype, &
+                        mol%atoms(j)%nadj, mol%atoms(j)%adjlist)) then
                      outype(j) = nout
                      outsize(nout) = outsize(nout) + 1
                      untyped(j) = .false.
@@ -217,47 +278,6 @@ subroutine getmnatypes(natom, nin, intype, nadj, adjlist, nout, outype, outsize,
          end do
       end if
    end do
-
-end subroutine
-
-subroutine groupequivatoms(natom, nblk, blkidx, nadj, adjlist, neqv, eqvlen, eqvidx)
-! Group atoms by MNA type at infinite level
-   integer, intent(in) :: natom, nblk
-   integer, dimension(:), intent(in) :: nadj
-   integer, dimension(:), intent(in) :: blkidx
-   integer, dimension(:, :), intent(in) :: adjlist
-   integer, dimension(:), intent(out) :: eqvidx
-   integer, dimension(:), intent(out) :: eqvlen
-
-   integer i, nin, neqv
-   integer, dimension(natom) :: intype, grouporder, uptype, basetype
-
-   ! Determine MNA types iteratively
-
-   nin = nblk
-   intype = blkidx
-   basetype = [(i, i=1, natom)]
-
-   do
-
-      call getmnatypes(natom, nin, intype, nadj, adjlist, neqv, eqvidx, eqvlen, uptype)
-      basetype(:neqv) = basetype(uptype(:neqv))
-
-      if (all(eqvidx == intype)) exit
-
-      nin = neqv
-      intype = eqvidx
-
-   end do
-
-   grouporder(:neqv) = sortorder(basetype, neqv)
-   eqvlen(:neqv) = eqvlen(grouporder(:neqv))
-   grouporder(:neqv) = inverse_perm(grouporder(:neqv))
-   eqvidx = grouporder(eqvidx)
-
-!    do i = 1, natom
-!        print *, i, elsym(znum(i)), eqvidx(i)
-!    end do
 
 end subroutine
 

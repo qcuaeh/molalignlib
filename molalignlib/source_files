@@ -2,6 +2,7 @@ stdio.f90
 kinds.f90
 flags.f90
 bounds.f90
+pointers.f90
 strutils.f90
 discrete.f90
 sorting.f90
