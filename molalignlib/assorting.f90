@@ -89,14 +89,14 @@ subroutine find_atomblocks(mol)
    ! Order blocks by type number
 
    order(:nblock) = sortorder(blkynum, nblock)
-   idorder = inverse_perm(order)
+   idorder(:nblock) = inverse_perm(order(:nblock))
    blklen(:nblock) = blklen(order(:nblock))
    blkid = idorder(blkid)
 
    ! Order blocks by atomic number
 
    order(:nblock) = sortorder(blkznum, nblock)
-   idorder = inverse_perm(order)
+   idorder(:nblock) = inverse_perm(order(:nblock))
    blklen(:nblock) = blklen(order(:nblock))
    blkid = idorder(blkid)
 
@@ -139,7 +139,7 @@ subroutine find_equivatoms(mol)
    end do
 
    order(:nequiv) = sortorder(basetype, nequiv)
-   idorder = inverse_perm(order)
+   idorder(:nequiv) = inverse_perm(order(:nequiv))
    eqvlen(:nequiv) = eqvlen(order(:nequiv))
    eqvid = idorder(eqvid)
 
@@ -166,8 +166,9 @@ subroutine groupbytype(nelem, elements, types, groupid, ngroup, groupsize)
     integer, dimension(:), intent(out) :: groupid, groupsize
 
     integer i, j
-    integer, dimension(maxcoord) :: grouptype, order
+    integer, dimension(maxcoord) :: grouptype
     logical, dimension(maxcoord) :: remaining
+    integer, dimension(maxcoord) :: order, idorder
 
 ! Initialization
 
@@ -197,10 +198,10 @@ subroutine groupbytype(nelem, elements, types, groupid, ngroup, groupsize)
 ! Order groups by category type 
 
     order(:ngroup) = sortorder(grouptype, ngroup)
+    idorder(:ngroup) = inverse_perm(order(:ngroup))
     grouptype(:ngroup) = grouptype(order(:ngroup))
     groupsize(:ngroup) = groupsize(order(:ngroup))
-    order(:ngroup) = inverse_perm(order(:ngroup))
-    groupid(:nelem) = order(groupid(:nelem))
+    groupid(:nelem) = idorder(groupid(:nelem))
 
 !    print *, groupid(:ngroup)
 !    print *, typess(order)

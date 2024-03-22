@@ -187,13 +187,6 @@ if (fmtout_flag) then
    fmtout = optfmtout
 end if
 
-! Calculate adjacency lists
-
-if (bond_flag) then
-   call get_adjlist(mol0)
-   call get_adjlist(mol1)
-end if
-
 if (.not. nrec_flag) then
    call writefile(write_unit, fmtout, mol0)
 end if

@@ -88,10 +88,8 @@ subroutine readfile(unit, fmtin, mol)
       stop
    end select
 
-   ! Find atom blocks
    call find_atomblocks(mol)
-
-   ! Find MNA-equivalent atoms
+   call find_neighbors(mol)
    call find_equivatoms(mol)
 
 end subroutine
