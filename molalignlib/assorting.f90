@@ -88,15 +88,15 @@ subroutine find_atomblocks(mol)
 
    ! Order blocks by type number
 
-   order(:nblock) = sortorder(blkynum, nblock)
-   idorder(:nblock) = inverse_perm(order(:nblock))
+   order(:nblock) = sorted_order(blkynum, nblock)
+   idorder(:nblock) = inverse_permut(order(:nblock))
    blklen(:nblock) = blklen(order(:nblock))
    blkid = idorder(blkid)
 
    ! Order blocks by atomic number
 
-   order(:nblock) = sortorder(blkznum, nblock)
-   idorder(:nblock) = inverse_perm(order(:nblock))
+   order(:nblock) = sorted_order(blkznum, nblock)
+   idorder(:nblock) = inverse_permut(order(:nblock))
    blklen(:nblock) = blklen(order(:nblock))
    blkid = idorder(blkid)
 
@@ -135,8 +135,8 @@ subroutine find_equivatoms(mol)
 
    end do
 
-   order(:nequiv) = sortorder(basetype, nequiv)
-   idorder(:nequiv) = inverse_perm(order(:nequiv))
+   order(:nequiv) = sorted_order(basetype, nequiv)
+   idorder(:nequiv) = inverse_permut(order(:nequiv))
    eqvlen(:nequiv) = eqvlen(order(:nequiv))
    eqvid = idorder(eqvid)
 
@@ -191,8 +191,8 @@ subroutine groupbytype(nelem, elements, types, groupid, ngroup, groupsize)
 
 ! Order groups by category type 
 
-    order(:ngroup) = sortorder(grouptype, ngroup)
-    idorder(:ngroup) = inverse_perm(order(:ngroup))
+    order(:ngroup) = sorted_order(grouptype, ngroup)
+    idorder(:ngroup) = inverse_permut(order(:ngroup))
     grouptype(:ngroup) = grouptype(order(:ngroup))
     groupsize(:ngroup) = groupsize(order(:ngroup))
     groupid(:nelem) = idorder(groupid(:nelem))
@@ -224,7 +224,7 @@ subroutine groupneighbors(natom, nequiv, eqvlen, nadj, adjlist, nadjeqv, adjeqvl
 
    do i = 1, natom
       call groupbytype(nadj(i), adjlist(:, i), eqvid, adjeqvid, nadjeqv(i), adjeqvlen(:, i))
-      atomorder(:nadj(i)) = sortorder(adjeqvid, nadj(i))
+      atomorder(:nadj(i)) = sorted_order(adjeqvid, nadj(i))
       adjlist(:nadj(i), i) = adjlist(atomorder(:nadj(i)), i)
    end do
 
@@ -318,13 +318,13 @@ subroutine calcequivmat(natom, nblk, blklen, nadj0, adjlist0, nadjmna0, adjmnale
 
       do i = 1, natom
          call groupbytype(nadj0(i), adjlist0(:, i), intype0, indices, nadjmna0(i, level), adjmnalen0(:, i, level))
-         atomorder(:nadj0(i)) = sortorder(indices, nadj0(i))
+         atomorder(:nadj0(i)) = sorted_order(indices, nadj0(i))
          adjmnalist0(:nadj0(i), i, level) = adjlist0(atomorder(:nadj0(i)), i)
       end do
 
       do i = 1, natom
          call groupbytype(nadj1(i), adjlist1(:, i), intype1, indices, nadjmna1(i, level), adjmnalen1(:, i, level))
-         atomorder(:nadj1(i)) = sortorder(indices, nadj1(i))
+         atomorder(:nadj1(i)) = sorted_order(indices, nadj1(i))
          adjmnalist1(:nadj1(i), i, level) = adjlist1(atomorder(:nadj1(i)), i)
       end do
 

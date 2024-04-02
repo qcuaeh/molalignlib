@@ -156,7 +156,7 @@ contains
       integer, intent(inout) :: firstn
       integer i, n, firstitem
 
-      order = sortorder (vec, firstn)
+      order = sorted_order (vec, firstn)
       n = firstn
       firstitem = vec(order(1))
       do i = 2, n

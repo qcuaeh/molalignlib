@@ -93,7 +93,7 @@ subroutine permutate_atoms(self, order)
    integer, intent(in) :: order(:)
    integer i, k, invorder(self%natom)
 
-   invorder = inverse_perm(order)
+   invorder = inverse_permut(order)
    self%atoms = self%atoms(order(:))
    do i = 1, self%natom
       do k = 1, self%atoms(i)%nadj

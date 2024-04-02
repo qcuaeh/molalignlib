@@ -111,13 +111,13 @@ subroutine remap_atoms( &
 
    ! Get atom order
 
-   atomorder0 = sortorder(mol0%get_eqvids(), mol0%natom)
-   atomorder1 = sortorder(mol1%get_eqvids(), mol1%natom)
+   atomorder0 = sorted_order(mol0%get_eqvids(), mol0%natom)
+   atomorder1 = sorted_order(mol1%get_eqvids(), mol1%natom)
 
    ! Get inverse atom order
 
-   backorder0 = inverse_perm(atomorder0)
-   backorder1 = inverse_perm(atomorder1)
+   backorder0 = inverse_permut(atomorder0)
+   backorder1 = inverse_permut(atomorder1)
 
    ! Reorder data arrays
 

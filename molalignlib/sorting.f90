@@ -22,7 +22,7 @@ implicit none
 private
 public sort
 public sorted
-public sortorder
+public sorted_order
 
 interface sort
    module procedure intquicksort
@@ -34,10 +34,10 @@ interface sorted
    module procedure realsorted
 end interface
 
-interface sortorder
-   module procedure intorder
-   module procedure realorder
-   module procedure charorder
+interface sorted_order
+   module procedure intsortedorder
+   module procedure realsortedorder
+   module procedure charsortedorder
 end interface
 
 contains
@@ -58,7 +58,7 @@ function realsorted(x, n) result(y)
    call realquicksort(y, 1, n)
 end function
 
-function intorder(x, n) result(o)
+function intsortedorder(x, n) result(o)
    integer, intent(in) :: n
    integer, intent(in) :: x(:)
    integer :: i, o(n), t((n+1)/2)
@@ -66,7 +66,7 @@ function intorder(x, n) result(o)
    call intmergesort(x, o, n, t)
 end function
 
-function realorder(x, n) result(o)
+function realsortedorder(x, n) result(o)
    integer, intent(in) :: n
    real(wp), intent(in) :: x(:)
    integer :: i, o(n), t((n+1)/2)
@@ -74,7 +74,7 @@ function realorder(x, n) result(o)
    call realmergesort(x, o, n, t)
 end function
 
-function charorder(x, n) result(o)
+function charsortedorder(x, n) result(o)
    integer, intent(in) :: n
    character(*), intent(in) :: x(:)
    integer :: i, o(n), t((n+1)/2)
