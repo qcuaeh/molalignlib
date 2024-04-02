@@ -104,10 +104,7 @@ subroutine find_atomblocks(mol)
 
    mol%nblock = nblock
    mol%blklen = blklen(:nblock)
-!   mol%atoms(:)%blkid = blkid(:)
-   do i = 1, mol%natom
-      mol%atoms(i)%blkid = blkid(i)
-   end do
+   mol%atoms(:)%blkid = blkid(:)
 
 end subroutine
 
@@ -151,10 +148,7 @@ subroutine find_equivatoms(mol)
 
    mol%nequiv = nequiv
    mol%eqvlen = eqvlen(:nequiv)
-!   mol%atoms(:)%eqvid = eqvid(:)
-   do i = 1, mol%natom
-      mol%atoms(i)%eqvid = eqvid(i)
-   end do
+   mol%atoms(:)%eqvid = eqvid(:)
 
 end subroutine
 

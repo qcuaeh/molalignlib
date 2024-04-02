@@ -108,10 +108,7 @@ function get_znums(self) result(znums)
    integer :: znums(self%natom)
    integer i
 
-!   znums(:) = self%atoms(:)%znum
-   do i = 1, self%natom
-      znums(i) = self%atoms(i)%znum
-   end do
+   znums(:) = self%atoms(:)%znum
 
 end function get_znums
 
@@ -120,10 +117,7 @@ function get_blkids(self) result(blkids)
    integer :: blkids(self%natom)
    integer i
 
-!   blkids(:) = self%atoms(:)%blkid
-   do i = 1, self%natom
-      blkids(i) = self%atoms(i)%blkid
-   end do
+   blkids(:) = self%atoms(:)%blkid
 
 end function get_blkids
 
@@ -132,10 +126,7 @@ function get_eqvids(self) result(eqvids)
    integer :: eqvids(self%natom)
    integer i
 
-!   eqvids(:) = self%atoms(:)%blkid
-   do i = 1, self%natom
-      eqvids(i) = self%atoms(i)%blkid
-   end do
+   eqvids(:) = self%atoms(:)%eqvid
 
 end function get_eqvids
 
@@ -144,10 +135,7 @@ function get_weights(self) result(weights)
    real(wp) :: weights(self%natom)
    integer i
 
-!   weights(:) = self%atoms(:)%weight
-   do i = 1, self%natom
-      weights(i) = self%atoms(i)%weight
-   end do
+   weights(:) = self%atoms(:)%weight
 
 end function get_weights
 
