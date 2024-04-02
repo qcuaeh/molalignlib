@@ -32,7 +32,7 @@ function identity_perm(n) result(idenperm)
 
 end function
 
-function inverse_perm(perm) result(invperm)
+function inverse_permut(perm) result(invperm)
 ! Purpose: Get the inverse permutation
    integer, intent(in) :: perm(:)
    integer :: invperm(size(perm))

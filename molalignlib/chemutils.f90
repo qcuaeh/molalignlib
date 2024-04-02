@@ -16,24 +16,17 @@
 
 module chemutils
 use kinds
+use pointers
 use chemdata
 use strutils
 
 implicit none
 
 private
-public f_realint
 public unity
 public stdmass
 public valency
 public readlabel
-
-abstract interface
-   real(wp) function f_realint(z)
-      use kinds
-      integer, intent(in) :: z
-   end function
-end interface
 
 contains
 
@@ -52,22 +45,22 @@ real(wp) function valency(z) result(res)
    res = real(valencies(z), wp)
 end function
 
-subroutine readlabel(label, znum, type)
+subroutine readlabel(label, znum, ztype)
    character(*), intent(in) :: label
-   integer, intent(out) :: znum, type
+   integer, intent(out) :: znum, ztype
    integer :: m, n
 
    n = len_trim(label)
    m = verify(uppercase(trim(label)), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ')
 
    if (m == 0) then
-      type = 0
+      ztype = 0
       znum = atomic_number(label)
    else if (verify(label(m:n), '1234567890') == 0) then
-      read (label(m:n), *) type
+      read (label(m:n), *) ztype
       znum = atomic_number(label(1:m-1))
    else
-      type = -1
+      ztype = -1
       znum = atomic_number(label(1:m-1))
    end if
 

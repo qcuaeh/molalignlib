@@ -8,20 +8,11 @@ use alignment
 implicit none
 private
 
-type :: Block
-   integer :: blklen
-   integer, allocatable :: blkidx(:)
-end type
-
-type, public :: Equiv
-   integer :: eqvlen
-   integer, allocatable :: eqvidx(:)
-end type
-
 type :: Atom
    character(:), allocatable :: label
    integer :: znum
-   integer :: ztype
+   integer :: blkid
+   integer :: eqvid
    real(wp) :: weight
    real(wp) :: coords(3)
    integer :: nadj
@@ -36,12 +27,15 @@ type, public :: Molecule
    integer :: nequiv
    character(:), allocatable :: title
    type(Atom), allocatable :: atoms(:)
-   type(Block), allocatable :: blocks(:)
-   type(Equiv), allocatable :: equivs(:)
+   integer, allocatable :: blklen(:)
+   integer, allocatable :: eqvlen(:)
 contains
    procedure :: get_znums
-   procedure :: get_ztypes
    procedure :: get_weights
+   procedure :: get_blkids
+   procedure :: get_eqvids
+   procedure :: get_blklen
+   procedure :: get_eqvlen
    procedure :: get_coords
    procedure :: set_coords
    procedure :: get_labels
@@ -61,7 +55,6 @@ end type
 contains
 
 subroutine mirror_coords(self)
-
    class(Molecule), intent(inout) :: self
    real(wp) :: coords(3, self%natom)
 
@@ -72,7 +65,6 @@ subroutine mirror_coords(self)
 end subroutine mirror_coords
 
 subroutine matrix_rotate_coords(self, rotmat)
-
    class(Molecule), intent(inout) :: self
    real(wp), intent(in) :: rotmat(3, 3)
 
@@ -81,7 +73,6 @@ subroutine matrix_rotate_coords(self, rotmat)
 end subroutine matrix_rotate_coords
 
 subroutine quater_rotate_coords(self, rotquat)
-
    class(Molecule), intent(inout) :: self
    real(wp), intent(in) :: rotquat(4)
 
@@ -90,7 +81,6 @@ subroutine quater_rotate_coords(self, rotquat)
 end subroutine quater_rotate_coords
 
 subroutine translate_coords(self, travec)
-
    class(Molecule), intent(inout) :: self
    real(wp), intent(in) :: travec(3)
 
@@ -99,12 +89,11 @@ subroutine translate_coords(self, travec)
 end subroutine translate_coords
 
 subroutine permutate_atoms(self, order)
-
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: order(:)
    integer i, k, invorder(self%natom)
 
-   invorder = inverse_perm(order)
+   invorder = inverse_permut(order)
    self%atoms = self%atoms(order(:))
    do i = 1, self%natom
       do k = 1, self%atoms(i)%nadj
@@ -115,55 +104,54 @@ subroutine permutate_atoms(self, order)
 end subroutine permutate_atoms
 
 function get_znums(self) result(znums)
-
    class(Molecule), intent(in) :: self
    integer :: znums(self%natom)
    integer i
 
-   do i = 1, self%natom
-      znums(i) = self%atoms(i)%znum
-   end do
+   znums(:) = self%atoms(:)%znum
 
 end function get_znums
 
-function get_ztypes(self) result(ztypes)
-
+function get_blkids(self) result(blkids)
    class(Molecule), intent(in) :: self
-   integer :: ztypes(self%natom)
+   integer :: blkids(self%natom)
    integer i
 
-   do i = 1, self%natom
-      ztypes(i) = self%atoms(i)%ztype
-   end do
+   blkids(:) = self%atoms(:)%blkid
 
-end function get_ztypes
+end function get_blkids
+
+function get_eqvids(self) result(eqvids)
+   class(Molecule), intent(in) :: self
+   integer :: eqvids(self%natom)
+   integer i
+
+   eqvids(:) = self%atoms(:)%eqvid
+
+end function get_eqvids
 
 function get_weights(self) result(weights)
-
    class(Molecule), intent(in) :: self
    real(wp) :: weights(self%natom)
    integer i
 
-   do i = 1, self%natom
-      weights(i) = self%atoms(i)%weight
-   end do
+   weights(:) = self%atoms(:)%weight
 
 end function get_weights
 
 function get_coords(self) result(coords)
-
    class(Molecule), intent(in) :: self
    real(wp) :: coords(3, self%natom)
    integer i
 
+!   coords(:, :) = self%atoms(:)%coords(:)
    do i = 1, self%natom
-      coords(:, i) = self%atoms(i)%coords
+      coords(:, i) = self%atoms(i)%coords(:)
    end do
 
 end function get_coords
 
 subroutine set_coords(self, coords)
-
    class(Molecule), intent(inout) :: self
    real(wp), intent(in) :: coords(3, self%natom)
    integer i
@@ -175,7 +163,6 @@ subroutine set_coords(self, coords)
 end subroutine set_coords
 
 function get_labels(self) result(labels)
-
    class(Molecule), intent(in) :: self
    character(wl) :: labels(self%natom)
    integer i
@@ -187,7 +174,6 @@ function get_labels(self) result(labels)
 end function get_labels
 
 function get_adjmat(self) result(adjmat)
-
    class(Molecule), intent(in) :: self
    type(Atom) :: iatom
    logical :: adjmat(self%natom, self%natom)
@@ -222,12 +208,12 @@ subroutine print_atom(self, ind, outLvl)
    case (1)
       if (self%nadj == 0) then
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a)'
-         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%ztype, &
+         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%blkid, &
                      self%weight, " {", self%coords(:), " }"
       else
          write (num, '(i0)') self%nadj
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a,'//num//'i3,a)'
-         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%ztype, &
+         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%blkid, &
                self%weight, " {", self%coords(:), " } [", &
                self%adjlist(:self%nadj), " ]"
       end if
@@ -237,12 +223,12 @@ subroutine print_atom(self, ind, outLvl)
    case default
       if (self%nadj == 0) then
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a)'
-         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%ztype, &
+         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%blkid, &
                      self%weight, " {", self%coords(:), " }"
       else
          write (num, '(i0)') self%nadj
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a,'//num//'i3,a)'
-         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%ztype, &
+         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%blkid, &
                self%weight, " {", self%coords(:), " } [", &
                self%adjlist(:self%nadj), " ]"
       end if
@@ -259,7 +245,7 @@ subroutine print_molecule(self)
    write (stderr, '(a,i0,a)') "Contents of molecule structure:   (", &
                                          self%natom, " atoms)"
    write (stderr, '(2a)') 'Title: ', self%title
-   write (stderr, '(a,a4,a5,a6,a7,2a17)') "ind:", "lbl", "znum", "ztype", &
+   write (stderr, '(a,a4,a5,a6,a7,2a17)') "ind:", "lbl", "znum", "blkid", &
                                           "weight", "{ coords }", "[ adjlist ]"
 
    do i = 1, self%natom
@@ -374,5 +360,35 @@ subroutine add_bond(self, ind1, ind2)
    end if
 
 end subroutine add_bond
+
+integer function get_blklen(self, blockid) result(blklen)
+   class(Molecule), intent(inout) :: self
+   integer, intent(in) :: blockid
+   integer :: i
+
+   blklen = 0
+
+   do i = 1, self%natom
+      if (self%atoms(i)%blkid == blockid) then
+         blklen = blklen + 1
+      end if
+   end do
+
+end function get_blklen
+
+integer function get_eqvlen(self, equivid) result(eqvlen)
+   class(Molecule), intent(inout) :: self
+   integer, intent(in) :: equivid
+   integer :: i
+
+   eqvlen = 0
+
+   do i = 1, self%natom
+      if (self%atoms(i)%eqvid == equivid) then
+         eqvlen = eqvlen + 1
+      end if
+   end do
+
+end function get_eqvlen
 
 end module

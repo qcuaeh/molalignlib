@@ -51,20 +51,17 @@ subroutine remap_atoms( &
    integer, intent(out) :: nrec, error
 
    integer :: i
-   integer :: nblk0, nblk1, neqv0, neqv1
-   integer, dimension(:), allocatable :: nadj0, nadj1
-   integer, dimension(:, :), allocatable :: adjlist0, adjlist1
-   integer, dimension(:), allocatable :: blkidx0, blkidx1
-   integer, dimension(:), allocatable :: blklen0, blklen1
    integer, dimension(:), allocatable :: atomorder0, atomorder1
    integer, dimension(:), allocatable :: backorder0, backorder1
-   integer, dimension(:), allocatable :: eqvidx0, eqvidx1
-   integer, dimension(:), allocatable :: eqvlen0, eqvlen1
    real(wp) :: travec0(3), travec1(3)
 
    integer, dimension(mol0%natom) :: mapping
    integer :: nbond0, bonds0(2, maxcoord*mol0%natom)
    integer :: nbond1, bonds1(2, maxcoord*mol1%natom)
+
+   integer nblk0, neqv0, neqv1
+   integer, dimension(:), allocatable :: blklen0
+   integer, dimension(:), allocatable :: eqvlen0, eqvlen1
 
    ! Set error code to 0 by default
 
@@ -100,37 +97,27 @@ subroutine remap_atoms( &
 
    allocate(atomorder0(mol0%natom), atomorder1(mol1%natom))
    allocate(backorder0(mol0%natom), backorder1(mol1%natom))
-   allocate(blkidx0(mol0%natom), blkidx1(mol1%natom))
-   allocate(blklen0(mol0%natom), blklen1(mol1%natom))
-   allocate(nadj0(mol0%natom), nadj1(mol1%natom))
-   allocate(adjlist0(maxcoord, mol0%natom), adjlist1(maxcoord, mol1%natom))
-   allocate(eqvidx0(mol0%natom), eqvidx1(mol1%natom))
+   allocate(blklen0(mol0%natom))
    allocate(eqvlen0(mol0%natom), eqvlen1(mol1%natom))
 
-   ! Calculate adjacency lists
+   ! Temporary data copy
 
-   call adjmat2list(mol0%natom, mol0%get_adjmat(), nadj0, adjlist0)
-   call adjmat2list(mol1%natom, mol1%get_adjmat(), nadj1, adjlist1)
-
-   ! Group atoms by type
-
-   call groupatoms(mol0%natom, mol0%get_znums(), mol0%get_ztypes(), mol0%get_weights(), nblk0, blklen0, blkidx0)
-   call groupatoms(mol1%natom, mol1%get_znums(), mol1%get_ztypes(), mol1%get_weights(), nblk1, blklen1, blkidx1)
-
-   ! Group atoms by MNA
-
-   call groupequivatoms(mol0%natom, nblk0, blkidx0, nadj0, adjlist0, neqv0, eqvlen0, eqvidx0)
-   call groupequivatoms(mol1%natom, nblk1, blkidx1, nadj1, adjlist1, neqv1, eqvlen1, eqvidx1)
+   nblk0 = mol0%nblock
+   blklen0 = mol0%blklen
+   neqv0 = mol0%nequiv
+   eqvlen0 = mol0%eqvlen
+   neqv1 = mol1%nequiv
+   eqvlen1 = mol1%eqvlen
 
    ! Get atom order
 
-   atomorder0 = sortorder(eqvidx0, mol0%natom)
-   atomorder1 = sortorder(eqvidx1, mol1%natom)
+   atomorder0 = sorted_order(mol0%get_eqvids(), mol0%natom)
+   atomorder1 = sorted_order(mol1%get_eqvids(), mol1%natom)
 
    ! Get inverse atom order
 
-   backorder0 = inverse_perm(atomorder0)
-   backorder1 = inverse_perm(atomorder1)
+   backorder0 = inverse_permut(atomorder0)
+   backorder1 = inverse_permut(atomorder1)
 
    ! Reorder data arrays
 
@@ -147,7 +134,7 @@ subroutine remap_atoms( &
 
    ! Abort if there are conflicting atomic types
 
-   if (any(mol0%get_ztypes() /= mol1%get_ztypes())) then
+   if (any(mol0%get_blkids() /= mol1%get_blkids())) then
       write (stderr, '(a)') 'Error: There are conflicting atomic types'
       error = 1
       return
@@ -278,7 +265,7 @@ subroutine align_atoms( &
 
    ! Abort if there are conflicting atomic types
 
-   if (any(sorted(mol0%get_ztypes(), mol0%natom) /= sorted(mol1%get_ztypes(), mol1%natom))) then
+   if (any(sorted(mol0%get_blkids(), mol0%natom) /= sorted(mol1%get_blkids(), mol1%natom))) then
       write (stderr, '(a)') 'Error: There are conflicting atomic types'
       error = 1
       return
@@ -286,7 +273,7 @@ subroutine align_atoms( &
 
    ! Abort if atomic types are not ordered
 
-   if (any(mol0%get_ztypes() /= mol1%get_ztypes())) then
+   if (any(mol0%get_blkids() /= mol1%get_blkids())) then
       write (stderr, '(a)') 'Error: Atomic types are not in the same order'
       error = 1
       return
