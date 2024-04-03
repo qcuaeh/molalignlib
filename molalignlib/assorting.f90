@@ -30,7 +30,7 @@ implicit none
 
 contains
 
-subroutine find_atomblocks(mol)
+subroutine assort_atoms(mol)
 ! Purpose: Group atoms by atomic numbers and types
    type(Molecule), intent(inout) :: mol
 
@@ -108,7 +108,7 @@ subroutine find_atomblocks(mol)
 
 end subroutine
 
-subroutine find_equivatoms(mol)
+subroutine find_equiv_atoms(mol)
 ! Group atoms by MNA type at infinite level
    type(Molecule), intent(inout) :: mol
 

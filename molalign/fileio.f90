@@ -88,9 +88,9 @@ subroutine readfile(unit, fmtin, mol)
       stop
    end select
 
-   call find_atomblocks(mol)
-   call find_neighbors(mol)
-   call find_equivatoms(mol)
+   call assort_atoms(mol)
+   call set_atom_bonds(mol)
+   call find_equiv_atoms(mol)
 
 end subroutine
 
