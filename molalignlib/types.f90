@@ -52,6 +52,10 @@ contains
    procedure :: add_bond
 end type
 
+type :: Block
+   integer, allocatable :: atmid(:)
+end type
+
 contains
 
 subroutine mirror_coords(self)
@@ -111,6 +115,24 @@ function get_znums(self) result(znums)
    znums(:) = self%atoms(:)%znum
 
 end function get_znums
+
+function get_blocks(self) result(blocks)
+   class(Molecule), intent(in) :: self
+   type(Block) :: blocks(self%nblock)
+   integer :: k(self%nblock)
+
+   k(:) = 0
+
+   do h = 1, self%nblock
+      allocate(blocks(h)%atmid(self%blklen(h)))
+   end do
+
+   do i = 1, self%natom
+      k(self%atom(i)%blkid) = k(self%atom(i)%blkid) + 1
+      blocks(self%atom(i)%blkid)%atmid(k(self%atom(i)%blkid)) = j
+   end do
+
+end function get_block
 
 function get_blkids(self) result(blkids)
    class(Molecule), intent(in) :: self

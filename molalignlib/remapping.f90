@@ -327,29 +327,20 @@ subroutine optimize_mapping( &
 
 end subroutine
 
-subroutine find_reactive_sites(mol0, mol1, nblk, blklen, mapping)
+subroutine find_reactive_sites(mol0, mol1, mapping)
 
    type(Molecule), intent(inout) :: mol0, mol1
-   integer, intent(in) :: nblk
-   integer, dimension(:), intent(in) :: blklen
    integer, dimension(:), intent(in) :: mapping
 
    integer :: natom
    integer :: h, i, j, k
-   integer, dimension(mol0%natom) :: offset, blkidx
    integer, dimension(:), allocatable :: znums0, znums1
    real(wp), dimension(:, :), allocatable :: coords0, coords1
    logical, dimension(:, :), allocatable :: adjmat0, adjmat1
    real(wp) :: rotquat(4)
-
-   offset(1) = 0
-   do h = 1, nblk - 1
-      offset(h+1) = offset(h) + blklen(h)
-   end do
-
-   do h = 1, nblk
-      blkidx(offset(h)+1:offset(h)+blklen(h)) = h
-   end do
+   integer :: k(mol0%nblock)
+   integer :: block0(mol0%natom, mol0%nblock)
+   integer :: block1(mol1%natom, mol1%nblock)
 
    ! Align coordinates
 
@@ -362,26 +353,28 @@ subroutine find_reactive_sites(mol0, mol1, nblk, blklen, mapping)
    coords1 = mol1%get_coords()
    adjmat0 = mol0%get_adjmat()
    adjmat1 = mol1%get_adjmat()
+   blocks0 = mol0%get_blocks()
+   blocks1 = mol1%get_blocks()
 
    ! Remove reactive bonds
 
    do i = 1, mol0%natom
+      m = mol0%atoms(i)%blkid
       do j = i + 1, mol0%natom
+         n = mol0%atoms(j)%blkid
          if (adjmat0(i, j) .neqv. adjmat1(mapping(i), mapping(j))) then
             call remove_reactive_bond(i, j, mol0, mol1, mapping)
-            h = blkidx(i)
-            do k = offset(h) + 1, offset(h) + blklen(h)
-               if (sum((coords0(:, i) - coords1(:, mapping(k)))**2) < 2.0 &
-                  .or. sum((coords0(:, k) - coords1(:, mapping(i)))**2) < 2.0 &
+            do k = 1, mol0%blklen(m)
+               if (sum((coords0(:, i) - coords1(:, mapping(blocks1(m)%atmid(k))))**2) < 2.0 &
+                  .or. sum((coords0(:, blocks0(m)%atmid(k)) - coords1(:, mapping(i)))**2) < 2.0 &
                ) then
 !                  print *, '<', j, mapping(j), k, mapping(k)
                   call remove_reactive_bond(k, j, mol0, mol1, mapping)
                end if
             end do
-            h = blkidx(j)
-            do k = offset(h) + 1, offset(h) + blklen(h)
-               if (sum((coords0(:, j) - coords1(:, mapping(k)))**2) < 2.0 &
-                  .or. sum((coords0(:, k) - coords1(:, mapping(j)))**2) < 2.0 &
+            do k = 1, mol0%blklen(n)
+               if (sum((coords0(:, j) - coords1(:, mapping(blocks1(n)%atmid(k))))**2) < 2.0 &
+                  .or. sum((coords0(:, blocks0(n)%atmid(k)) - coords1(:, mapping(j)))**2) < 2.0 &
                ) then
 !                  print *, '>', i, mapping(i), k, mapping(k)
                   call remove_reactive_bond(i, k, mol0, mol1, mapping)
