@@ -157,11 +157,11 @@ subroutine remap_atoms( &
    ! Calculate centroids
 
 !CZGC: nuevo llamado (por actualizar en molalignlib/types.f90, LAZH):
-   travec0 = -mol0%get_center()
-   travec1 = -mol1%get_center()
+!   travec0 = -mol0%get_center()
+!   travec1 = -mol1%get_center()
 !CZGC: llamado anterior
-!   travec0 = -center_coords(mol0%natom, mol0%get_weights(), mol0%get_coords())
-!   travec1 = -center_coords(mol1%natom, mol1%get_weights(), mol1%get_coords())
+   travec0 = -center_coords(mol0%natom, mol0%get_weights(), mol0%get_coords())
+   travec1 = -center_coords(mol1%natom, mol1%get_weights(), mol1%get_coords())
 
    ! Center coordinates at the centroids
 
@@ -177,18 +177,18 @@ subroutine remap_atoms( &
 !CZGC: nuevo llamado (por actualizar en molalignlib/remapping.f90, CZGC)
     call optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 !CZGC: llamado anterior:
-!   call optimize_mapping( &
-!      mol0, &
-!      mol1, &
-!      nblk0, &
-!      blklen0, &
-!      neqv0, &
-!      eqvlen0, &
-!      neqv1, &
-!      eqvlen1, &
-!      maplist, &
-!      countlist, &
-!      nrec)
+   call optimize_mapping( &
+      mol0, &
+      mol1, &
+      nblk0, &
+      blklen0, &
+      neqv0, &
+      eqvlen0, &
+      neqv1, &
+      eqvlen1, &
+      maplist, &
+      countlist, &
+      nrec)
 
    if (reac_flag) then
 
@@ -200,18 +200,18 @@ subroutine remap_atoms( &
 !CZGC: nuevo llamado (por actualizar en molalignlib/remapping.f90, CZGC)
       call optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 !CZGC: llamado anterior:
-!      call optimize_mapping( &
-!         mol0, &
-!         mol1, &
-!         nblk0, &
-!         blklen0, &
-!         neqv0, &
-!         eqvlen0, &
-!         neqv1, &
-!         eqvlen1, &
-!         maplist, &
-!         countlist, &
-!         nrec)
+      call optimize_mapping( &
+         mol0, &
+         mol1, &
+         nblk0, &
+         blklen0, &
+         neqv0, &
+         eqvlen0, &
+         neqv1, &
+         eqvlen1, &
+         maplist, &
+         countlist, &
+         nrec)
 
    end if
 
@@ -295,11 +295,11 @@ subroutine align_atoms( &
    ! Calculate centroids
 
 !CZGC: nuevo llamado (por actualizar en molalignlib/types.f90, LAZH):
-    travec0 = -mol0%get_center()
-    travec1 = -mol1%get_center()
+!    travec0 = -mol0%get_center()
+!    travec1 = -mol1%get_center()
 !CZGC: llamado anterior
-!   travec0 = -center_coords(mol0%natom, mol0%get_weights(), mol0%get_coords())
-!   travec1 = -center_coords(mol1%natom, mol1%get_weights(), mol1%get_coords())
+   travec0 = -center_coords(mol0%natom, mol0%get_weights(), mol0%get_coords())
+   travec1 = -center_coords(mol1%natom, mol1%get_weights(), mol1%get_coords())
 
    ! Calculate optimal rotation matrix
 
