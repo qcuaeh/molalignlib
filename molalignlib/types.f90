@@ -31,6 +31,7 @@ type, public :: Molecule
    integer, allocatable :: eqvlen(:)
 contains
    procedure :: get_znums
+   procedure :: get_center
    procedure :: get_weights
    procedure :: get_blkids
    procedure :: get_eqvids
@@ -116,6 +117,24 @@ function get_znums(self) result(znums)
    znums(:) = self%atoms(:)%znum
 
 end function get_znums
+
+function get_center(self) result(cntrcoords)
+! Purpose: Get the centroid coordinates
+   class(Molecule), intent(in) :: self
+   real(wp) :: cntrcoords(3)
+   integer :: i
+
+! Calculate the coordinates of the center of mass
+
+   cntrcoords(:) = 0
+
+   do i = 1, self%natom
+      cntrcoords(:) = cntrcoords(:) + self%atoms(i)%weight*self%atoms(i)%coords(:)
+   end do
+
+   cntrcoords(:) = cntrcoords(:)/sum(self%get_weights())
+
+end function get_center
 
 function get_blocks(self) result(blocks)
    class(Molecule), intent(in) :: self
@@ -413,5 +432,7 @@ integer function get_eqvlen(self, equivid) result(eqvlen)
    end do
 
 end function get_eqvlen
+
+
 
 end module
