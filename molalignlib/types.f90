@@ -40,6 +40,7 @@ contains
    procedure :: set_coords
    procedure :: get_labels
    procedure :: get_adjmat
+   procedure :: get_blocks
    procedure :: mirror_coords
    procedure, private :: matrix_rotate_coords
    procedure, private :: quater_rotate_coords
@@ -52,7 +53,7 @@ contains
    procedure :: add_bond
 end type
 
-type :: Block
+type, public :: Block
    integer, allocatable :: atmid(:)
 end type
 
@@ -119,7 +120,7 @@ end function get_znums
 function get_blocks(self) result(blocks)
    class(Molecule), intent(in) :: self
    type(Block) :: blocks(self%nblock)
-   integer :: k(self%nblock)
+   integer :: h, i, k(self%nblock)
 
    k(:) = 0
 
@@ -128,11 +129,11 @@ function get_blocks(self) result(blocks)
    end do
 
    do i = 1, self%natom
-      k(self%atom(i)%blkid) = k(self%atom(i)%blkid) + 1
-      blocks(self%atom(i)%blkid)%atmid(k(self%atom(i)%blkid)) = j
+      k(self%atoms(i)%blkid) = k(self%atoms(i)%blkid) + 1
+      blocks(self%atoms(i)%blkid)%atmid(k(self%atoms(i)%blkid)) = i
    end do
 
-end function get_block
+end function get_blocks
 
 function get_blkids(self) result(blkids)
    class(Molecule), intent(in) :: self

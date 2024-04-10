@@ -333,14 +333,12 @@ subroutine find_reactive_sites(mol0, mol1, mapping)
    integer, dimension(:), intent(in) :: mapping
 
    integer :: natom
-   integer :: h, i, j, k
+   integer :: h, i, j, k, m, n
    integer, dimension(:), allocatable :: znums0, znums1
    real(wp), dimension(:, :), allocatable :: coords0, coords1
    logical, dimension(:, :), allocatable :: adjmat0, adjmat1
+   type(Block), dimension(:), allocatable :: blocks0, blocks1
    real(wp) :: rotquat(4)
-   integer :: k(mol0%nblock)
-   integer :: block0(mol0%natom, mol0%nblock)
-   integer :: block1(mol1%natom, mol1%nblock)
 
    ! Align coordinates
 
