@@ -23,12 +23,12 @@ compile() {
    pushd "$buildir" >/dev/null
    comp_flags=("${base_flags[@]}")
    if $pic_build; then
-      comp_flags+=("${pic_flags[@]}")
+      comp_flags+=("${exec_flags[@]}")
    fi
    if $debug_build; then
       comp_flags+=("${debug_flags[@]}")
    else
-      comp_flags+=("${opt_flags[@]}")
+      comp_flags+=("${optim_flags[@]}")
    fi
    while IFS= read -r srcfile; do
       prefix=${srcfile%.*}
@@ -141,8 +141,8 @@ while IFS= read -r line; do
 done < <(grep -v -e^# -e^$ ./build.env)
 
 to_array base_flags
-to_array pic_flags
-to_array opt_flags
+to_array exec_flags
+to_array optim_flags
 to_array debug_flags
 to_array link_flags
 to_array f2py_flags
