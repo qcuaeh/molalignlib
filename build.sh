@@ -103,7 +103,7 @@ run_tests() {
          "$executable" -pipe -test -stats -N 5 "$@" < "$file" 2>&1 > "$testdir/$subdir/$name.out"
          echo done
       else
-         if diff -bB <("$executable" -pipe -test -stats -N 5 "$@" < "$file" 2>&1) "$testdir/$subdir/$name.out"; then
+         if diff -bB "$testdir/$subdir/$name.out" <("$executable" -pipe -test -stats -N 5 "$@" < "$file" 2>&1); then
             echo ok
          else
             echo failed

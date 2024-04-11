@@ -366,16 +366,14 @@ subroutine find_reactive_sites(mol0, mol1, mapping)
                if (sum((coords0(:, i) - coords1(:, mapping(blocks1(m)%atmid(k))))**2) < 2.0 &
                   .or. sum((coords0(:, blocks0(m)%atmid(k)) - coords1(:, mapping(i)))**2) < 2.0 &
                ) then
-!                  print *, '<', j, mapping(j), k, mapping(k)
-                  call remove_reactive_bond(k, j, mol0, mol1, mapping)
+                  call remove_reactive_bond(blocks0(m)%atmid(k), j, mol0, mol1, mapping)
                end if
             end do
             do k = 1, mol0%blklen(n)
                if (sum((coords0(:, j) - coords1(:, mapping(blocks1(n)%atmid(k))))**2) < 2.0 &
                   .or. sum((coords0(:, blocks0(n)%atmid(k)) - coords1(:, mapping(j)))**2) < 2.0 &
                ) then
-!                  print *, '>', i, mapping(i), k, mapping(k)
-                  call remove_reactive_bond(i, k, mol0, mol1, mapping)
+                  call remove_reactive_bond(i, blocks1(n)%atmid(k), mol0, mol1, mapping)
                end if
             end do
          end if
