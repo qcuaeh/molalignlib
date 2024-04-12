@@ -40,24 +40,29 @@ public find_reactive_sites
 
 contains
 
-subroutine optimize_mapping( &
-   mol0, &
-   mol1, &
-   nblk, &
-   blklen, &
-   neqv0, &
-   eqvlen0, &
-   neqv1, &
-   eqvlen1, &
-   maplist, &
-   countlist, &
-   nrec)
+subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
+!subroutine optimize_mapping( &
+!   mol0, &
+!   mol1, &
+!   nblk, &
+!   blklen, &
+!   neqv0, &
+!   eqvlen0, &
+!   neqv1, &
+!   eqvlen1, &
+!   maplist, &
+!   countlist, &
+!   nrec)
 
    type(Molecule), intent(in) :: mol0, mol1
-   integer, intent(in) :: nblk
-   integer, dimension(:), intent(in) :: blklen
-   integer, intent(in) :: neqv0, neqv1
-   integer, dimension(:), intent(in) :: eqvlen0, eqvlen1
+   integer :: nblk
+   integer, dimension(:), allocatable :: blklen
+   integer :: neqv0, neqv1
+   integer, dimension(:), allocatable :: eqvlen0, eqvlen1
+!   integer, intent(in) :: nblk
+!   integer, dimension(:), intent(in) :: blklen
+!   integer, intent(in) :: neqv0, neqv1
+!   integer, dimension(:), intent(in) :: eqvlen0, eqvlen1
    integer, intent(out) :: maplist(:, :)
    integer, intent(out) :: countlist(:)
    integer, intent(out) :: nrec
@@ -94,6 +99,7 @@ subroutine optimize_mapping( &
    real(wp) :: biasmat(mol0%natom, mol1%natom)
    real(wp) :: workcoords1(3, mol1%natom)
 
+   integer i
 !   integer h, i, n, offset
 !   real(wp), dimension(3, natom) :: randcoords0, randcoords1
 !   integer :: votes(natom, natom)
@@ -105,8 +111,31 @@ subroutine optimize_mapping( &
    adjmat0 = mol0%get_adjmat()
    adjmat1 = mol1%get_adjmat()
 
+!CZGC: temporal variables
+   allocate(blklen(mol0%natom))
+   allocate(eqvlen0(mol0%nequiv))
+   allocate(eqvlen1(mol1%nequiv))
+
+   nblk = mol0%nblock
+   do i = 1, nblk
+      blklen(i) = mol0%get_blklen(i)
+   end do
+   neqv0 = mol0%nequiv
+   do i = 1, neqv0
+      eqvlen0(i) = mol0%get_eqvlen(i)
+   end do
+   neqv1 = mol1%nequiv
+   do i = 1, neqv0
+      eqvlen1(i) = mol1%get_eqvlen(i)
+   end do
+
    ! Recalculate adjacency lists
 
+!CZGC: new call
+!    call adjmat2list(mol0, nadj0, adjlist0)
+!    call adjmat2list(mol1, nadj1, adjlist1)
+!CZGC: opcionalmente, vector nadj y matriz adjlist no se calculan aquí
+!CZGC: old call
    call adjmat2list(natom, adjmat0, nadj0, adjlist0)
    call adjmat2list(natom, adjmat1, nadj1, adjlist1)
 
@@ -117,6 +146,13 @@ subroutine optimize_mapping( &
 
    ! Group neighbors by MNA
 
+!CZGC: new call
+!   call groupneighbors(mol0, nadj0, adjlist0, nadjeqv0, adjeqvlen0)
+!   call groupneighbors(mol1, nadj1, adjlist1, nadjeqv1, adjeqvlen1)
+!CZGC: opcionalmente:
+!   call groupneighbors(mol0, nadjeqv0, adjeqvlen0)
+!   call groupneighbors(mol1, nadjeqv1, adjeqvlen1)
+!CZGC: old call
    call groupneighbors(natom, neqv0, eqvlen0, nadj0, adjlist0, nadjeqv0, adjeqvlen0)
    call groupneighbors(natom, neqv1, eqvlen1, nadj1, adjlist1, nadjeqv1, adjeqvlen1)
 
@@ -144,11 +180,21 @@ subroutine optimize_mapping( &
 
    ! Detect fagments and starting atoms
 
+!CZGC: new call
+!   call findmolfrags(mol0, nadj0, adjlist0, nfrag0, fragroot0)
+!   call findmolfrags(mol1, nadj1, adjlist1, nfrag1, fragroot1)
+!CZGC: optionally
+!   call findmolfrags(mol0, nfrag0, fragroot0)
+!   call findmolfrags(mol1, nfrag1, fragroot1)
+!CZGC: old call
    call findmolfrags(natom, nadj0, adjlist0, nblk, blklen, neqv0, eqvlen0, nfrag0, fragroot0)
    call findmolfrags(natom, nadj1, adjlist1, nblk, blklen, neqv1, eqvlen1, nfrag1, fragroot1)
 
    ! Calculate MNA equivalence matrix
 
+!CZGC: new call
+!   call calcequivmat(mol0, mol1, nadjmna0, adjmnalen0, adjmnalist0, nadjmna1, adjmnalen1, adjmnalist1, equivmat)
+!CZGC: old call
    call calcequivmat(natom, nblk, blklen, nadj0, adjlist0, nadjmna0, adjmnalen0, adjmnalist0, &
       nadj1, adjlist1, nadjmna1, adjmnalen1, adjmnalist1, equivmat)
 
@@ -166,6 +212,10 @@ subroutine optimize_mapping( &
 
    ! Calculate bias matrix
 
+
+!CZGC: new call
+!   call setcrossbias(mol0, mol1, equivmat, biasmat)
+!CZGC: old call
    call setcrossbias(natom, nblk, blklen, coords0, coords1, equivmat, biasmat)
 
    ! Print biases

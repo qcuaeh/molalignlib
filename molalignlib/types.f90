@@ -404,7 +404,7 @@ subroutine add_bond(self, ind1, ind2)
 end subroutine add_bond
 
 integer function get_blklen(self, blockid) result(blklen)
-   class(Molecule), intent(inout) :: self
+   class(Molecule), intent(in) :: self
    integer, intent(in) :: blockid
    integer :: i
 
@@ -419,7 +419,7 @@ integer function get_blklen(self, blockid) result(blklen)
 end function get_blklen
 
 integer function get_eqvlen(self, equivid) result(eqvlen)
-   class(Molecule), intent(inout) :: self
+   class(Molecule), intent(in) :: self
    integer, intent(in) :: equivid
    integer :: i
 

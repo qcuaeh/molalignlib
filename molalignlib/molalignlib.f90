@@ -175,20 +175,20 @@ subroutine remap_atoms( &
    ! Optimize the assignment to minimize AdjD/RMSD
 
 !CZGC: nuevo llamado (por actualizar en molalignlib/remapping.f90, CZGC)
-!    call optimize_mapping(mol0, mol1, maplist, countlist, nrec)
+    call optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 !CZGC: llamado anterior:
-   call optimize_mapping( &
-      mol0, &
-      mol1, &
-      nblk0, &
-      blklen0, &
-      neqv0, &
-      eqvlen0, &
-      neqv1, &
-      eqvlen1, &
-      maplist, &
-      countlist, &
-      nrec)
+!   call optimize_mapping( &
+!      mol0, &
+!      mol1, &
+!      nblk0, &
+!      blklen0, &
+!      neqv0, &
+!      eqvlen0, &
+!      neqv1, &
+!      eqvlen1, &
+!      maplist, &
+!      countlist, &
+!      nrec)
 
    if (reac_flag) then
 
@@ -198,20 +198,20 @@ subroutine remap_atoms( &
 !      call find_reactive_sites(mol0, mol1, nblk0, blklen0, maplist(:, 1))
 
 !CZGC: nuevo llamado (por actualizar en molalignlib/remapping.f90, CZGC)
-!      call optimize_mapping(mol0, mol1, maplist, countlist, nrec)
+      call optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 !CZGC: llamado anterior:
-      call optimize_mapping( &
-         mol0, &
-         mol1, &
-         nblk0, &
-         blklen0, &
-         neqv0, &
-         eqvlen0, &
-         neqv1, &
-         eqvlen1, &
-         maplist, &
-         countlist, &
-         nrec)
+!      call optimize_mapping( &
+!         mol0, &
+!         mol1, &
+!         nblk0, &
+!         blklen0, &
+!         neqv0, &
+!         eqvlen0, &
+!         neqv1, &
+!         eqvlen1, &
+!         maplist, &
+!         countlist, &
+!         nrec)
 
    end if
 
