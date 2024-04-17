@@ -128,12 +128,13 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
    ! Recalculate adjacency lists
 
 !CZGC: new call
-!    call adjmat2list(mol0, nadj0, adjlist0)
-!    call adjmat2list(mol1, nadj1, adjlist1)
-!CZGC: opcionalmente, vector nadj y matriz adjlist no se calculan aquí
+   nadj0 = mol0%get_nadj()
+   adjlist0 = mol0%get_adjlist()
+   nadj1 = mol1%get_nadj()
+   adjlist1 = mol1%get_adjlist()
 !CZGC: old call
-   call adjmat2list(natom, adjmat0, nadj0, adjlist0)
-   call adjmat2list(natom, adjmat1, nadj1, adjlist1)
+!   call adjmat2list(natom, adjmat0, nadj0, adjlist0)
+!   call adjmat2list(natom, adjmat1, nadj1, adjlist1)
 
    ! Group neighbors by type
 

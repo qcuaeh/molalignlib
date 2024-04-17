@@ -5,6 +5,7 @@ use rotation
 use translation
 use adjacency
 use alignment
+use bounds
 implicit none
 private
 
@@ -41,6 +42,8 @@ contains
    procedure :: set_coords
    procedure :: get_labels
    procedure :: get_adjmat
+   procedure :: get_nadj
+   procedure :: get_adjlist
    procedure :: get_blocks
    procedure :: mirror_coords
    procedure, private :: matrix_rotate_coords
@@ -231,6 +234,29 @@ function get_adjmat(self) result(adjmat)
    end do
 
 end function get_adjmat
+
+function get_nadj(self) result(nadj)
+   class(Molecule), intent(in) :: self
+   integer :: nadj(self%natom)
+   integer i
+
+   do i = 1, self%natom
+      nadj(i) = self%atoms(i)%nadj
+   end do
+
+end function get_nadj
+
+function get_adjlist(self) result(adjlist)
+   class(Molecule), intent(in) :: self
+   integer :: adjlist(maxcoord, self%natom)
+   integer i
+
+   do i = 1, self%natom
+      adjlist(:self%atoms(i)%nadj, i) = self%atoms(i)%adjlist(:self%atoms(i)%nadj)
+   end do
+
+end function get_adjlist
+
 
 subroutine print_atom(self, ind, outLvl)
    class(Atom), intent(in) :: self
