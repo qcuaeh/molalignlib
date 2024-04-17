@@ -56,9 +56,10 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 
    type(Molecule), intent(in) :: mol0, mol1
    integer :: nblk
-   integer, dimension(:), allocatable :: blklen
+   integer, dimension(mol0%natom) :: blklen
    integer :: neqv0, neqv1
-   integer, dimension(:), allocatable :: eqvlen0, eqvlen1
+   integer, dimension(mol0%natom) :: eqvlen0
+   integer, dimension(mol1%natom) :: eqvlen1
 !   integer, intent(in) :: nblk
 !   integer, dimension(:), intent(in) :: blklen
 !   integer, intent(in) :: neqv0, neqv1
@@ -111,11 +112,6 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
    adjmat0 = mol0%get_adjmat()
    adjmat1 = mol1%get_adjmat()
 
-!CZGC: temporal variables
-   allocate(blklen(mol0%natom))
-   allocate(eqvlen0(mol0%nequiv))
-   allocate(eqvlen1(mol1%nequiv))
-
    nblk = mol0%nblock
    do i = 1, nblk
       blklen(i) = mol0%get_blklen(i)
@@ -125,7 +121,7 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
       eqvlen0(i) = mol0%get_eqvlen(i)
    end do
    neqv1 = mol1%nequiv
-   do i = 1, neqv0
+   do i = 1, neqv1
       eqvlen1(i) = mol1%get_eqvlen(i)
    end do
 
