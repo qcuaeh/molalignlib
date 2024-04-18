@@ -181,11 +181,18 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 !   call findmolfrags(mol0, nadj0, adjlist0, nfrag0, fragroot0)
 !   call findmolfrags(mol1, nadj1, adjlist1, nfrag1, fragroot1)
 !CZGC: optionally
-!   call findmolfrags(mol0, nfrag0, fragroot0)
-!   call findmolfrags(mol1, nfrag1, fragroot1)
+   call findmolfrags(mol0, nfrag0, fragroot0)
+   call findmolfrags(mol1, nfrag1, fragroot1)
+!CZGC: optionally 2
+!   call findmolfrags(mol0)
+!   call findmolfrags(mol1)
+!   nfrag0 = mol0%get_nfrag()
+!   fragroot0 = mol0%get_fragroot()
+!   nfrag1 = mol1%get_nfrag()
+!   fragroot1 = mol1%get_fragroot()
 !CZGC: old call
-   call findmolfrags(natom, nadj0, adjlist0, nblk, blklen, neqv0, eqvlen0, nfrag0, fragroot0)
-   call findmolfrags(natom, nadj1, adjlist1, nblk, blklen, neqv1, eqvlen1, nfrag1, fragroot1)
+!   call findmolfrags(natom, nadj0, adjlist0, nblk, blklen, neqv0, eqvlen0, nfrag0, fragroot0)
+!   call findmolfrags(natom, nadj1, adjlist1, nblk, blklen, neqv1, eqvlen1, nfrag1, fragroot1)
 
    ! Calculate MNA equivalence matrix
 

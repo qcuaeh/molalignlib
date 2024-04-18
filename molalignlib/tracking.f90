@@ -3,6 +3,8 @@
 module tracking
 
 use stdio
+use types
+use bounds
 use sorting
 implicit none
 private
@@ -10,24 +12,44 @@ public findmolfrags
 
 contains
 
-subroutine findmolfrags (natom, nadj, adjlist, nblk, blklen, &
-                  neqv, eqvlen, nfrag, fragroot)
+!CZGC: new definition
+subroutine findmolfrags (mol, nfrag, fragroot)
+!CZGC: old definition
+!subroutine findmolfrags (natom, nadj, adjlist, nblk, blklen, &
+!                  neqv, eqvlen, nfrag, fragroot)
 
-   integer, intent(in) :: natom, nblk, neqv
-   integer, dimension(:), intent(in) :: nadj, blklen, eqvlen
-   integer, dimension(:, :), intent(in) :: adjlist
-   integer, intent(out) :: nfrag, fragroot(natom)
+   type(Molecule), intent(in) :: mol
+   integer :: natom, nblk, neqv
+   integer, dimension(mol%natom) :: nadj, blklen, eqvlen
+   integer, dimension(maxcoord, mol%natom) :: adjlist
+!   integer, intent(in) :: natom, nblk, neqv
+!   integer, dimension(:), intent(in) :: nadj, blklen, eqvlen
+!   integer, dimension(:, :), intent(in) :: adjlist
+   integer, intent(out) :: nfrag, fragroot(mol%natom)
 
-   integer :: h, n, f, firstn, prevn, offset
-   integer, dimension(natom) :: order
-   integer, dimension(natom) :: blkidx
-   integer, dimension(natom) :: eqvidx
-   integer, dimension(natom) :: fragid
-   integer, dimension(natom) :: fragsize
-   integer, dimension(natom,natom) :: fragind, fragblock, fragequiv, fragcoord
-   logical :: track(natom), printInfo = .false.
+   integer :: i, h, n, f, firstn, prevn, offset
+   integer, dimension(mol%natom) :: order
+   integer, dimension(mol%natom) :: blkidx
+   integer, dimension(mol%natom) :: eqvidx
+   integer, dimension(mol%natom) :: fragid
+   integer, dimension(mol%natom) :: fragsize
+   integer, dimension(mol%natom,mol%natom) :: fragind, fragblock, fragequiv, fragcoord
+   logical :: track(mol%natom), printInfo = .false.
    character(80) :: fmtstr
    character(3) :: numat
+
+!CZGC: temporal variable
+   natom = mol%natom
+   nblk = mol%nblock
+   do i = 1, nblk
+      blklen(i) = mol%get_blklen(i)
+   end do
+   neqv = mol%nequiv
+   do i = 1, neqv
+      eqvlen(i) = mol%get_eqvlen(i)
+   end do
+   nadj = mol%get_nadj()
+   adjlist = mol%get_adjlist()
 
    ! set atoms block indices
 
