@@ -121,7 +121,7 @@ subroutine readmol2(unit, mol)
 
 end subroutine
 
-subroutine set_atom_bonds (mol)
+subroutine set_bonds (mol)
    type(Molecule), intent(inout) :: mol
    integer :: i, j
    real(wp) :: atomdist
@@ -175,6 +175,6 @@ subroutine set_atom_bonds (mol)
       mol%atoms(i)%adjlist(1:nadj(i)) = adjlist(1:nadj(i),i)
    end do
 
-end subroutine set_atom_bonds
+end subroutine set_bonds
 
 end module

@@ -18,17 +18,19 @@ type :: Atom
    real(wp) :: coords(3)
    integer :: nadj
    integer, allocatable :: adjlist(:)
+   integer :: nadjeqv
+   integer, allocatable :: adjeqvlen(:)
 contains
    procedure :: print => print_atom
 end type
 
 type, public :: Molecule
-   integer :: natom
-   integer :: nblock
-   integer :: nequiv
    character(:), allocatable :: title
+   integer :: natom
    type(Atom), allocatable :: atoms(:)
+   integer :: nblock
    integer, allocatable :: blklen(:)
+   integer :: nequiv
    integer, allocatable :: eqvlen(:)
 contains
    procedure :: get_znums

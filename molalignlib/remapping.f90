@@ -105,6 +105,8 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 !   real(wp), dimension(3, natom) :: randcoords0, randcoords1
 !   integer :: votes(natom, natom)
 
+!  Temporary variable copies
+
    natom = mol0%natom
    weights = mol0%get_weights()
    coords0 = mol0%get_coords()
@@ -125,57 +127,21 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
       eqvlen1(i) = mol1%get_eqvlen(i)
    end do
 
-   ! Recalculate adjacency lists
-
-!CZGC: new call
    nadj0 = mol0%get_nadj()
    adjlist0 = mol0%get_adjlist()
    nadj1 = mol1%get_nadj()
    adjlist1 = mol1%get_adjlist()
-!CZGC: old call
-!   call adjmat2list(natom, adjmat0, nadj0, adjlist0)
-!   call adjmat2list(natom, adjmat1, nadj1, adjlist1)
 
-   ! Group neighbors by type
+   nadjeqv0(:) = mol0%atoms(:)%nadjeqv
+   do i = 1, mol0%natom
+      adjeqvlen0(:, i) = mol0%atoms(i)%adjeqvlen(:)
+   end do
+   nadjeqv1(:) = mol1%atoms(:)%nadjeqv
+   do i = 1, mol1%natom
+      adjeqvlen1(:, i) = mol1%atoms(i)%adjeqvlen(:)
+   end do
 
-!   call groupneighbors(natom, nblk, blklen, nadj0, adjlist0, nadjmna0, adjmnalen0)
-!   call groupneighbors(natom, nblk, blklen, nadj1, adjlist1, nadjmna1, adjmnalen1)
-
-   ! Group neighbors by MNA
-
-!CZGC: new call
-!   call groupneighbors(mol0, nadj0, adjlist0, nadjeqv0, adjeqvlen0)
-!   call groupneighbors(mol1, nadj1, adjlist1, nadjeqv1, adjeqvlen1)
-!CZGC: opcionalmente:
-!   call groupneighbors(mol0, nadjeqv0, adjeqvlen0)
-!   call groupneighbors(mol1, nadjeqv1, adjeqvlen1)
-!CZGC: old call
-   call groupneighbors(natom, neqv0, eqvlen0, nadj0, adjlist0, nadjeqv0, adjeqvlen0)
-   call groupneighbors(natom, neqv1, eqvlen1, nadj1, adjlist1, nadjeqv1, adjeqvlen1)
-
-   ! Print adjacency lists
-
-!   do i = 1, natom
-!      offset = 0
-!      do h = 1, nadjmna0(i)
-!         do k = offset + 1, offset + adjmnalen0(h, i)
-!            print *, i, h, adjlist0(k, i)
-!         end do
-!         offset = offset + adjmnalen0(h, i)
-!      end do
-!   end do
-!
-!   do i = 1, natom
-!      offset = 0
-!      do h = 1, nadjmna1(i)
-!         do k = offset + 1, offset + adjmnalen1(h, i)
-!            print *, i, h, adjlist1(k, i)
-!         end do
-!         offset = offset + adjmnalen1(h, i)
-!      end do
-!   end do
-
-   ! Detect fagments and starting atoms
+   ! Detect fragments and root atoms
 
 !CZGC: new call
 !   call findmolfrags(mol0, nadj0, adjlist0, nfrag0, fragroot0)

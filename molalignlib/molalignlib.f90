@@ -59,9 +59,6 @@ subroutine remap_atoms( &
    integer :: nbond0, bonds0(2, maxcoord*mol0%natom)
    integer :: nbond1, bonds1(2, maxcoord*mol1%natom)
 
-   integer nblk0, neqv0, neqv1
-   integer, dimension(:), allocatable :: blklen0
-   integer, dimension(:), allocatable :: eqvlen0, eqvlen1
 
    ! Set error code to 0 by default
 
@@ -97,17 +94,6 @@ subroutine remap_atoms( &
 
    allocate(atomorder0(mol0%natom), atomorder1(mol1%natom))
    allocate(backorder0(mol0%natom), backorder1(mol1%natom))
-   allocate(blklen0(mol0%natom))
-   allocate(eqvlen0(mol0%natom), eqvlen1(mol1%natom))
-
-   ! Temporary data copy
-
-   nblk0 = mol0%nblock
-   blklen0 = mol0%blklen
-   neqv0 = mol0%nequiv
-   eqvlen0 = mol0%eqvlen
-   neqv1 = mol1%nequiv
-   eqvlen1 = mol1%eqvlen
 
    ! Get atom order
 
@@ -156,12 +142,8 @@ subroutine remap_atoms( &
 
    ! Calculate centroids
 
-!CZGC: nuevo llamado (por actualizar en molalignlib/types.f90, LAZH):
    travec0 = -mol0%get_center()
    travec1 = -mol1%get_center()
-!CZGC: llamado anterior
-!   travec0 = -center_coords(mol0%natom, mol0%get_weights(), mol0%get_coords())
-!   travec1 = -center_coords(mol1%natom, mol1%get_weights(), mol1%get_coords())
 
    ! Center coordinates at the centroids
 
@@ -172,47 +154,15 @@ subroutine remap_atoms( &
 
    call initialize_random()
 
-   ! Optimize the assignment to minimize AdjD/RMSD
+   ! Optimize assignment to minimize the AdjD and RMSD
 
-!CZGC: nuevo llamado (por actualizar en molalignlib/remapping.f90, CZGC)
     call optimize_mapping(mol0, mol1, maplist, countlist, nrec)
-!CZGC: llamado anterior:
-!   call optimize_mapping( &
-!      mol0, &
-!      mol1, &
-!      nblk0, &
-!      blklen0, &
-!      neqv0, &
-!      eqvlen0, &
-!      neqv1, &
-!      eqvlen1, &
-!      maplist, &
-!      countlist, &
-!      nrec)
+
+   ! Debond reactive sites and reoptimize assignment
 
    if (reac_flag) then
-
-!CZGC: nuevo llamado (por actualizar en molalignlib/remapping.f90, JMVP)
       call find_reactive_sites(mol0, mol1, maplist(:, 1))
-!CZGC: llamado anterior:
-!      call find_reactive_sites(mol0, mol1, nblk0, blklen0, maplist(:, 1))
-
-!CZGC: nuevo llamado (por actualizar en molalignlib/remapping.f90, CZGC)
       call optimize_mapping(mol0, mol1, maplist, countlist, nrec)
-!CZGC: llamado anterior:
-!      call optimize_mapping( &
-!         mol0, &
-!         mol1, &
-!         nblk0, &
-!         blklen0, &
-!         neqv0, &
-!         eqvlen0, &
-!         neqv1, &
-!         eqvlen1, &
-!         maplist, &
-!         countlist, &
-!         nrec)
-
    end if
 
 !   ! Print coordinates with internal order

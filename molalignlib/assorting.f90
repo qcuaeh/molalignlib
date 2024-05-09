@@ -108,7 +108,7 @@ subroutine assort_atoms(mol)
 
 end subroutine
 
-subroutine find_equiv_atoms(mol)
+subroutine set_equiv_atoms(mol)
 ! Group atoms by MNA type at infinite level
    type(Molecule), intent(inout) :: mol
 
@@ -152,7 +152,7 @@ subroutine find_equiv_atoms(mol)
 
 end subroutine
 
-subroutine groupbytype(nelem, elements, types, groupid, ngroup, groupsize)
+subroutine groupbytype(nelem, elements, types, ngroup, groupsize, groupid)
 ! Purpose: Categorize atoms by types
     integer, intent(in) :: nelem
     integer, intent(out) :: ngroup
@@ -202,40 +202,20 @@ subroutine groupbytype(nelem, elements, types, groupid, ngroup, groupsize)
 
 end subroutine
 
-subroutine groupneighbors(natom, nequiv, eqvlen, nadj, adjlist, nadjeqv, adjeqvlen)
+subroutine assort_neighbors(mol)
 ! Purpose: Categorize atoms by eqtypes
-   integer, intent(in) :: natom, nequiv
-   integer, dimension(:), intent(in) :: nadj, eqvlen
-   integer, dimension(:, :), intent(inout) :: adjlist
-   integer, dimension(:), intent(out) :: nadjeqv
-   integer, dimension(:, :), intent(out) :: adjeqvlen
+   type(Molecule), intent(inout) :: mol
 
-   integer i, h, offset
-   integer :: eqvid(natom)
+   integer :: i, h
    integer, dimension(maxcoord) :: adjeqvid, atomorder
 
-   ! assing equivalence group
-
-   offset = 0
-   do h = 1, nequiv
-      eqvid(offset+1:offset+eqvlen(h)) = h
-      offset = offset + eqvlen(h)
+   do i = 1, mol%natom
+      allocate(mol%atoms(i)%adjeqvlen(maxcoord))
+      call groupbytype(mol%atoms(i)%nadj, mol%atoms(i)%adjlist, mol%atoms(:)%eqvid, &
+            mol%atoms(i)%nadjeqv, mol%atoms(i)%adjeqvlen, adjeqvid)
+      atomorder(:mol%atoms(i)%nadj) = sorted_order(adjeqvid, mol%atoms(i)%nadj)
+      mol%atoms(i)%adjlist(:mol%atoms(i)%nadj) = mol%atoms(i)%adjlist(atomorder(:mol%atoms(i)%nadj))
    end do
-
-   do i = 1, natom
-      call groupbytype(nadj(i), adjlist(:, i), eqvid, adjeqvid, nadjeqv(i), adjeqvlen(:, i))
-      atomorder(:nadj(i)) = sorted_order(adjeqvid, nadj(i))
-      adjlist(:nadj(i), i) = adjlist(atomorder(:nadj(i)), i)
-   end do
-
-!    do i = 1, natom
-!        print '(a, 1x, i0, 1x, a)', '--------------', i, '--------------'
-!        offset = 0
-!        do j = 1, nadjeqv(i)
-!            print *, adjlist(offset+1:offset+adjeqvlen(j, i), i)
-!            offset = offset + adjeqvlen(j, i)
-!         end do
-!    end do
 
 end subroutine
 
@@ -317,13 +297,13 @@ subroutine calcequivmat(natom, nblk, blklen, nadj0, adjlist0, nadjmna0, adjmnale
       end do
 
       do i = 1, natom
-         call groupbytype(nadj0(i), adjlist0(:, i), intype0, indices, nadjmna0(i, level), adjmnalen0(:, i, level))
+         call groupbytype(nadj0(i), adjlist0(:, i), intype0, nadjmna0(i, level), adjmnalen0(:, i, level), indices)
          atomorder(:nadj0(i)) = sorted_order(indices, nadj0(i))
          adjmnalist0(:nadj0(i), i, level) = adjlist0(atomorder(:nadj0(i)), i)
       end do
 
       do i = 1, natom
-         call groupbytype(nadj1(i), adjlist1(:, i), intype1, indices, nadjmna1(i, level), adjmnalen1(:, i, level))
+         call groupbytype(nadj1(i), adjlist1(:, i), intype1, nadjmna1(i, level), adjmnalen1(:, i, level), indices)
          atomorder(:nadj1(i)) = sorted_order(indices, nadj1(i))
          adjmnalist1(:nadj1(i), i, level) = adjlist1(atomorder(:nadj1(i)), i)
       end do
