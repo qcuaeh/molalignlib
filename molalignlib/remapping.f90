@@ -134,11 +134,11 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 
    nadjeqv0(:) = mol0%atoms(:)%nadjeqv
    do i = 1, mol0%natom
-      adjeqvlen0(:, i) = mol0%atoms(i)%adjeqvlen(:)
+      adjeqvlen0(:, i) = mol0%atoms(i)%adjeqvlens(:)
    end do
    nadjeqv1(:) = mol1%atoms(:)%nadjeqv
    do i = 1, mol1%natom
-      adjeqvlen1(:, i) = mol1%atoms(i)%adjeqvlen(:)
+      adjeqvlen1(:, i) = mol1%atoms(i)%adjeqvlens(:)
    end do
 
    ! Detect fragments and root atoms
@@ -163,10 +163,10 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
    ! Calculate MNA equivalence matrix
 
 !CZGC: new call
-!   call calcequivmat(mol0, mol1, nadjmna0, adjmnalen0, adjmnalist0, nadjmna1, adjmnalen1, adjmnalist1, equivmat)
+   call calcequivmat(mol0, mol1, nadjmna0, adjmnalen0, adjmnalist0, nadjmna1, adjmnalen1, adjmnalist1, equivmat)
 !CZGC: old call
-   call calcequivmat(natom, nblk, blklen, nadj0, adjlist0, nadjmna0, adjmnalen0, adjmnalist0, &
-      nadj1, adjlist1, nadjmna1, adjmnalen1, adjmnalist1, equivmat)
+!   call calcequivmat(natom, nblk, blklen, nadj0, adjlist0, nadjmna0, adjmnalen0, adjmnalist0, &
+!      nadj1, adjlist1, nadjmna1, adjmnalen1, adjmnalist1, equivmat)
 
    ! Print equivalence matrix
 
@@ -382,14 +382,14 @@ subroutine find_reactive_sites(mol0, mol1, mapping)
          n = mol0%atoms(j)%blkid
          if (adjmat0(i, j) .neqv. adjmat1(mapping(i), mapping(j))) then
             call remove_reactive_bond(i, j, mol0, mol1, mapping)
-            do k = 1, mol0%blklen(m)
+            do k = 1, mol0%blklens(m)
                if (sum((coords0(:, i) - coords1(:, mapping(blocks1(m)%atmid(k))))**2) < 2.0 &
                   .or. sum((coords0(:, blocks0(m)%atmid(k)) - coords1(:, mapping(i)))**2) < 2.0 &
                ) then
                   call remove_reactive_bond(blocks0(m)%atmid(k), j, mol0, mol1, mapping)
                end if
             end do
-            do k = 1, mol0%blklen(n)
+            do k = 1, mol0%blklens(n)
                if (sum((coords0(:, j) - coords1(:, mapping(blocks1(n)%atmid(k))))**2) < 2.0 &
                   .or. sum((coords0(:, blocks0(n)%atmid(k)) - coords1(:, mapping(j)))**2) < 2.0 &
                ) then

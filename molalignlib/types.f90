@@ -19,7 +19,7 @@ type :: Atom
    integer :: nadj
    integer, allocatable :: adjlist(:)
    integer :: nadjeqv
-   integer, allocatable :: adjeqvlen(:)
+   integer, allocatable :: adjeqvlens(:)
 contains
    procedure :: print => print_atom
 end type
@@ -29,16 +29,19 @@ type, public :: Molecule
    integer :: natom
    type(Atom), allocatable :: atoms(:)
    integer :: nblock
-   integer, allocatable :: blklen(:)
+   integer, allocatable :: blklens(:)
    integer :: nequiv
-   integer, allocatable :: eqvlen(:)
+   integer, allocatable :: eqvlens(:)
 contains
+   procedure :: get_natom
+   procedure :: get_nblock
    procedure :: get_znums
    procedure :: get_center
    procedure :: get_weights
    procedure :: get_blkids
    procedure :: get_eqvids
    procedure :: get_blklen
+   procedure :: get_blklens
    procedure :: get_eqvlen
    procedure :: get_coords
    procedure :: set_coords
@@ -64,6 +67,20 @@ type, public :: Block
 end type
 
 contains
+
+integer function get_natom(self) result(natom)
+   class(Molecule), intent(in) :: self
+
+   natom = self%natom
+
+end function get_natom
+
+integer function get_nblock(self) result(nblock)
+   class(Molecule), intent(in) :: self
+
+   nblock = self%nblock
+
+end function get_nblock
 
 subroutine mirror_coords(self)
    class(Molecule), intent(inout) :: self
@@ -149,7 +166,7 @@ function get_blocks(self) result(blocks)
    k(:) = 0
 
    do h = 1, self%nblock
-      allocate(blocks(h)%atmid(self%blklen(h)))
+      allocate(blocks(h)%atmid(self%blklens(h)))
    end do
 
    do i = 1, self%natom
@@ -445,6 +462,14 @@ integer function get_blklen(self, blockid) result(blklen)
    end do
 
 end function get_blklen
+
+function get_blklens(self) result(blklens)
+   class(Molecule), intent(in) :: self
+   integer, allocatable :: blklens(:)
+
+   blklens = self%blklens
+
+end function get_blklens
 
 integer function get_eqvlen(self, equivid) result(eqvlen)
    class(Molecule), intent(in) :: self

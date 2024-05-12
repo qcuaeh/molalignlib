@@ -38,7 +38,7 @@ subroutine assort_atoms(mol)
    integer :: znumi, ztypei, znumj, ztypej
    integer :: blkid(mol%natom)
    logical :: remaining(mol%natom)
-   integer, dimension(mol%natom) :: blklen, blkznum, blkynum
+   integer, dimension(mol%natom) :: blklens, blkznum, blkynum
    integer, dimension(mol%natom) :: order, idorder
 
    ! Initialization
@@ -56,7 +56,7 @@ subroutine assort_atoms(mol)
 
          nblock = nblock + 1
          blkid(i) = nblock
-         blklen(nblock) = 1
+         blklens(nblock) = 1
          blkznum(nblock) = znumi
          blkynum(nblock) = ztypei
          mol%atoms(i)%znum = znumi
@@ -72,7 +72,7 @@ subroutine assort_atoms(mol)
                      mol%atoms(j)%znum = znumj
                      mol%atoms(j)%weight = weight_func(znumj)
                      remaining(j) = .false.
-                     blklen(nblock) = blklen(nblock) + 1
+                     blklens(nblock) = blklens(nblock) + 1
                   else
                      ! Abort if there are inconsistent weights
                      write (stderr, '(a)') 'Error: There are incosistent weights'
@@ -90,20 +90,20 @@ subroutine assort_atoms(mol)
 
    order(:nblock) = sorted_order(blkynum, nblock)
    idorder(:nblock) = inverse_permut(order(:nblock))
-   blklen(:nblock) = blklen(order(:nblock))
+   blklens(:nblock) = blklens(order(:nblock))
    blkid = idorder(blkid)
 
    ! Order blocks by atomic number
 
    order(:nblock) = sorted_order(blkznum, nblock)
    idorder(:nblock) = inverse_permut(order(:nblock))
-   blklen(:nblock) = blklen(order(:nblock))
+   blklens(:nblock) = blklens(order(:nblock))
    blkid = idorder(blkid)
 
-   allocate (mol%blklen(nblock))
+   allocate (mol%blklens(nblock))
 
    mol%nblock = nblock
-   mol%blklen = blklen(:nblock)
+   mol%blklens = blklens(:nblock)
    mol%atoms(:)%blkid = blkid(:)
 
 end subroutine
@@ -113,7 +113,7 @@ subroutine set_equiv_atoms(mol)
    type(Molecule), intent(inout) :: mol
 
    integer i, nin, nequiv
-   integer, dimension(mol%natom) :: eqvid, eqvlen
+   integer, dimension(mol%natom) :: eqvid, eqvlens
    integer, dimension(mol%natom) :: intype, uptype, basetype
    integer, dimension(mol%natom) :: order, idorder
 
@@ -125,7 +125,7 @@ subroutine set_equiv_atoms(mol)
 
    do
 
-      call getmnatypes(mol, nin, intype, nequiv, eqvid, eqvlen, uptype)
+      call getmnatypes(mol, nin, intype, nequiv, eqvid, eqvlens, uptype)
       basetype(:nequiv) = basetype(uptype(:nequiv))
 
       if (all(eqvid == intype)) exit
@@ -137,17 +137,17 @@ subroutine set_equiv_atoms(mol)
 
    order(:nequiv) = sorted_order(basetype, nequiv)
    idorder(:nequiv) = inverse_permut(order(:nequiv))
-   eqvlen(:nequiv) = eqvlen(order(:nequiv))
+   eqvlens(:nequiv) = eqvlens(order(:nequiv))
    eqvid = idorder(eqvid)
 
 !    do i = 1, mol%natom
 !        print *, i, elsym(znum(i)), eqvid(i)
 !    end do
 
-   allocate (mol%eqvlen(nequiv))
+   allocate (mol%eqvlens(nequiv))
 
    mol%nequiv = nequiv
-   mol%eqvlen = eqvlen(:nequiv)
+   mol%eqvlens = eqvlens(:nequiv)
    mol%atoms(:)%eqvid = eqvid(:)
 
 end subroutine
@@ -210,9 +210,9 @@ subroutine assort_neighbors(mol)
    integer, dimension(maxcoord) :: adjeqvid, atomorder
 
    do i = 1, mol%natom
-      allocate(mol%atoms(i)%adjeqvlen(maxcoord))
+      allocate(mol%atoms(i)%adjeqvlens(maxcoord))
       call groupbytype(mol%atoms(i)%nadj, mol%atoms(i)%adjlist, mol%atoms(:)%eqvid, &
-            mol%atoms(i)%nadjeqv, mol%atoms(i)%adjeqvlen, adjeqvid)
+            mol%atoms(i)%nadjeqv, mol%atoms(i)%adjeqvlens, adjeqvid)
       atomorder(:mol%atoms(i)%nadj) = sorted_order(adjeqvid, mol%atoms(i)%nadj)
       mol%atoms(i)%adjlist(:mol%atoms(i)%nadj) = mol%atoms(i)%adjlist(atomorder(:mol%atoms(i)%nadj))
    end do
@@ -256,44 +256,50 @@ subroutine getmnatypes(mol, nin, intype, nout, outype, outsize, uptype)
 
 end subroutine
 
-subroutine calcequivmat(natom, nblk, blklen, nadj0, adjlist0, nadjmna0, adjmnalen0, adjmnalist0, &
-   nadj1, adjlist1, nadjmna1, adjmnalen1, adjmnalist1, equivmat)
+subroutine calcequivmat(mol0, mol1, nadjmna0, adjmnalen0, adjmnalist0, &
+   nadjmna1, adjmnalen1, adjmnalist1, equivmat)
 ! Purpose: Calculate the maximum common MNA level for all atom cross assignments
-   integer, intent(in) :: natom, nblk
-   integer, dimension(:), intent(in) :: blklen
-   integer, dimension(:), intent(in) :: nadj0, nadj1
-   integer, dimension(:, :), intent(inout) :: adjlist0, adjlist1
+   type(Molecule), intent(in) :: mol0, mol1
+
    integer, dimension(:, :), intent(out) :: nadjmna0, nadjmna1
    integer, dimension(:, :, :), intent(out) :: adjmnalen0, adjmnalen1
    integer, dimension(:, :, :), intent(out) :: adjmnalist0, adjmnalist1
    integer, dimension(:, :), intent(out) :: equivmat
 
+   integer :: natom, nblock
+   integer, allocatable :: blklens(:)
+   integer, dimension(:), allocatable :: nadj0, nadj1
+   integer, dimension(:, :), allocatable :: adjlist0, adjlist1
+
    integer :: h, i, j, offset, level, nin, nout
-   integer, dimension(natom) :: intype0, intype1, outype0, outype1
+   integer, dimension(mol0%natom) :: intype0, intype1, outype0, outype1
    integer, dimension(maxcoord) :: indices, atomorder
 
-   level = 1
-   nin = nblk
+   natom = mol0%get_natom()
+   nblock = mol0%get_nblock()
+   blklens = mol0%get_blklens()
+   nadj0 = mol0%get_nadj()
+   nadj1 = mol1%get_nadj()
+   adjlist0 = mol0%get_adjlist()
+   adjlist1 = mol1%get_adjlist()
 
-   offset = 0
-   do h = 1, nblk
-      intype0(offset+1:offset+blklen(h)) = h
-      intype1(offset+1:offset+blklen(h)) = h
-      offset = offset + blklen(h)
-   end do
+   nin = nblock
+   intype0 = mol0%get_blkids()
+   intype1 = mol1%get_blkids()
+   level = 1
 
    do
 
       offset = 0
-      do h = 1, nblk
-         do i = offset + 1, offset + blklen(h)
-            do j = offset + 1, offset + blklen(h)
+      do h = 1, nblock
+         do i = offset + 1, offset + blklens(h)
+            do j = offset + 1, offset + blklens(h)
                if (intype0(i) == intype1(j)) then
                   equivmat(j, i) = level
                end if
             end do
          end do
-         offset = offset + blklen(h)
+         offset = offset + blklens(h)
       end do
 
       do i = 1, natom
@@ -308,7 +314,7 @@ subroutine calcequivmat(natom, nblk, blklen, nadj0, adjlist0, nadjmna0, adjmnale
          adjmnalist1(:nadj1(i), i, level) = adjlist1(atomorder(:nadj1(i)), i)
       end do
 
-      call getmnacrosstypes(natom, nin, intype0, nadj0, adjlist0, intype1, nadj1, adjlist1, &
+      call getmnacrosstypes(mol0%natom, nin, intype0, nadj0, adjlist0, intype1, nadj1, adjlist1, &
          nout, outype0, outype1)
 
       if (all(outype0 == intype0) .and. all((outype1 == intype1))) exit
