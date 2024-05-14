@@ -50,6 +50,7 @@ contains
    procedure :: get_labels
    procedure :: get_adjmat
    procedure :: get_nadj
+   procedure :: set_adjlist
    procedure :: get_adjlist
    procedure :: get_fragroot
    procedure :: get_blocks
@@ -267,6 +268,19 @@ function get_nadj(self) result(nadj)
    end do
 
 end function get_nadj
+
+subroutine set_adjlist(self, nadj, adjlist)
+   class(Molecule), intent(inout) :: self
+   integer, intent(in) :: nadj(self%natom)
+   integer, intent(in) :: adjlist(maxcoord, self%natom)
+   integer i
+
+   do i = 1, self%natom
+      self%atoms(i)%nadj = nadj(i)
+      self%atoms(i)%adjlist = adjlist(:self%atoms(i)%nadj, i)
+   end do
+
+end subroutine set_adjlist
 
 function get_adjlist(self) result(adjlist)
    class(Molecule), intent(in) :: self
