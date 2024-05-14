@@ -54,7 +54,7 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 !   countlist, &
 !   nrec)
 
-   type(Molecule), intent(in) :: mol0, mol1
+   type(Molecule), intent(inout) :: mol0, mol1
    integer :: nblk
    integer, dimension(mol0%natom) :: blklen
    integer :: neqv0, neqv1
@@ -115,14 +115,23 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
    adjmat1 = mol1%get_adjmat()
 
    nblk = mol0%nblock
+!CZGC: new call
+!   blklen = mol0%get_blklen()
+!CZGC: old call
    do i = 1, nblk
       blklen(i) = mol0%get_blklen(i)
    end do
    neqv0 = mol0%nequiv
+!CZGC: new call
+!   eqvlen0 = mol0%get_eqvlen()
+!CZGC: old call
    do i = 1, neqv0
       eqvlen0(i) = mol0%get_eqvlen(i)
    end do
    neqv1 = mol1%nequiv
+!CZGC: new call
+!   eqvlen1 = mol1%get_eqvlen()
+!CZGC: old call
    do i = 1, neqv1
       eqvlen1(i) = mol1%get_eqvlen(i)
    end do
@@ -147,15 +156,16 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 !   call findmolfrags(mol0, nadj0, adjlist0, nfrag0, fragroot0)
 !   call findmolfrags(mol1, nadj1, adjlist1, nfrag1, fragroot1)
 !CZGC: optionally
-   call findmolfrags(mol0, nfrag0, fragroot0)
-   call findmolfrags(mol1, nfrag1, fragroot1)
-!CZGC: optionally 2
-!   call findmolfrags(mol0)
-!   call findmolfrags(mol1)
-!   nfrag0 = mol0%get_nfrag()
-!   fragroot0 = mol0%get_fragroot()
-!   nfrag1 = mol1%get_nfrag()
-!   fragroot1 = mol1%get_fragroot()
+!   call findmolfrags(mol0, nfrag0, fragroot0)
+!   call findmolfrags(mol1, nfrag1, fragroot1)
+!CZGC: optionally 2 (nota: sólo pasan todos los tests si se llama findmolfrags
+!                          aquí y no al inicio en fileio.f90)
+   call findmolfrags(mol0)
+   call findmolfrags(mol1)
+   nfrag0 = mol0%nfrag
+   fragroot0 = mol0%get_fragroot()
+   nfrag1 = mol1%nfrag
+   fragroot1 = mol1%get_fragroot()
 !CZGC: old call
 !   call findmolfrags(natom, nadj0, adjlist0, nblk, blklen, neqv0, eqvlen0, nfrag0, fragroot0)
 !   call findmolfrags(natom, nadj1, adjlist1, nblk, blklen, neqv1, eqvlen1, nfrag1, fragroot1)

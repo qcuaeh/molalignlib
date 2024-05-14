@@ -13,19 +13,21 @@ public findmolfrags
 contains
 
 !CZGC: new definition
-subroutine findmolfrags (mol, nfrag, fragroot)
+subroutine findmolfrags (mol)
+!subroutine findmolfrags (mol, nfrag, fragroot)
 !CZGC: old definition
 !subroutine findmolfrags (natom, nadj, adjlist, nblk, blklen, &
 !                  neqv, eqvlen, nfrag, fragroot)
 
-   type(Molecule), intent(in) :: mol
+   type(Molecule), intent(inout) :: mol
    integer :: natom, nblk, neqv
    integer, dimension(mol%natom) :: nadj, blklen, eqvlen
    integer, dimension(maxcoord, mol%natom) :: adjlist
 !   integer, intent(in) :: natom, nblk, neqv
 !   integer, dimension(:), intent(in) :: nadj, blklen, eqvlen
 !   integer, dimension(:, :), intent(in) :: adjlist
-   integer, intent(out) :: nfrag, fragroot(mol%natom)
+!   integer, intent(out) :: nfrag, fragroot(mol%natom)
+   integer :: nfrag, fragroot(mol%natom)
 
    integer :: i, h, n, f, firstn, prevn, offset
    integer, dimension(mol%natom) :: order
@@ -74,7 +76,6 @@ subroutine findmolfrags (mol, nfrag, fragroot)
 
    order = [ (n, n = 1, natom) ]
    track(:) = .false.
-   nfrag = 0
    fragid(:) = 0
    fragsize(:) = 0
    fragind(:,:) = 0
@@ -146,6 +147,13 @@ subroutine findmolfrags (mol, nfrag, fragroot)
          print '(i2,1x,a,1x,i10)', f, "fragment start ind:", fragroot(f)
       end do
    end if
+
+   ! register nfrag and fragroot in the mol strucutre
+   if ( mol%nfrag == 0 ) then
+      allocate(mol%fragroot(mol%natom))
+   end if
+   mol%nfrag = nfrag
+   mol%fragroot = fragroot
 
 contains
 

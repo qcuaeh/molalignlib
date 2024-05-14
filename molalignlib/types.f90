@@ -32,6 +32,8 @@ type, public :: Molecule
    integer, allocatable :: blklens(:)
    integer :: nequiv
    integer, allocatable :: eqvlens(:)
+   integer :: nfrag
+   integer, allocatable :: fragroot(:)
 contains
    procedure :: get_natom
    procedure :: get_nblock
@@ -49,6 +51,7 @@ contains
    procedure :: get_adjmat
    procedure :: get_nadj
    procedure :: get_adjlist
+   procedure :: get_fragroot
    procedure :: get_blocks
    procedure :: mirror_coords
    procedure, private :: matrix_rotate_coords
@@ -276,6 +279,13 @@ function get_adjlist(self) result(adjlist)
 
 end function get_adjlist
 
+function get_fragroot(self) result(fragroot)
+   class(Molecule), intent(in) :: self
+   integer :: fragroot(self%natom)
+
+   fragroot = self%fragroot
+
+end function get_fragroot
 
 subroutine print_atom(self, ind, outLvl)
    class(Atom), intent(in) :: self

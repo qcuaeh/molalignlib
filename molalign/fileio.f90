@@ -21,6 +21,7 @@ use readmol
 use writemol
 use adjacency
 use assorting
+use tracking
 
 implicit none
 
@@ -92,6 +93,7 @@ subroutine readfile(unit, fmtin, mol)
    call set_bonds(mol)
    call set_equiv_atoms(mol)
    call assort_neighbors(mol)
+!   call findmolfrags(mol)
 
 end subroutine
 
