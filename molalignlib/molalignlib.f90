@@ -162,6 +162,8 @@ subroutine remap_atoms( &
 
    if (reac_flag) then
       call find_reactive_sites(mol0, mol1, maplist(:, 1))
+      call assort_neighbors(mol0)
+      call assort_neighbors(mol1)
       call optimize_mapping(mol0, mol1, maplist, countlist, nrec)
    end if
 

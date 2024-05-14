@@ -210,7 +210,9 @@ subroutine assort_neighbors(mol)
    integer, dimension(maxcoord) :: adjeqvid, atomorder
 
    do i = 1, mol%natom
-      allocate(mol%atoms(i)%adjeqvlens(maxcoord))
+      if (.not. allocated(mol%atoms(i)%adjeqvlens)) then
+         allocate(mol%atoms(i)%adjeqvlens(maxcoord))
+      end if
       call groupbytype(mol%atoms(i)%nadj, mol%atoms(i)%adjlist, mol%atoms(:)%eqvid, &
             mol%atoms(i)%nadjeqv, mol%atoms(i)%adjeqvlens, adjeqvid)
       atomorder(:mol%atoms(i)%nadj) = sorted_order(adjeqvid, mol%atoms(i)%nadj)
