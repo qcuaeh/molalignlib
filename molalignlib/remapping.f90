@@ -115,26 +115,11 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
    adjmat1 = mol1%get_adjmat()
 
    nblk = mol0%nblock
-!CZGC: new call
-!   blklen = mol0%get_blklen()
-!CZGC: old call
-   do i = 1, nblk
-      blklen(i) = mol0%get_blklen(i)
-   end do
+   blklen = mol0%get_blklens()
    neqv0 = mol0%nequiv
-!CZGC: new call
-!   eqvlen0 = mol0%get_eqvlen()
-!CZGC: old call
-   do i = 1, neqv0
-      eqvlen0(i) = mol0%get_eqvlen(i)
-   end do
+   eqvlen0 = mol0%get_eqvlens()
    neqv1 = mol1%nequiv
-!CZGC: new call
-!   eqvlen1 = mol1%get_eqvlen()
-!CZGC: old call
-   do i = 1, neqv1
-      eqvlen1(i) = mol1%get_eqvlen(i)
-   end do
+   eqvlen1 = mol1%get_eqvlens()
 
    nadj0 = mol0%get_nadj()
    adjlist0 = mol0%get_adjlist()

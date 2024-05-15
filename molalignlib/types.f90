@@ -45,8 +45,9 @@ contains
    procedure :: get_blklen
    procedure :: get_blklens
    procedure :: get_eqvlen
-   procedure :: get_coords
+   procedure :: get_eqvlens
    procedure :: set_coords
+   procedure :: get_coords
    procedure :: get_labels
    procedure :: get_adjmat
    procedure :: get_nadj
@@ -472,18 +473,12 @@ subroutine add_bond(self, ind1, ind2)
 
 end subroutine add_bond
 
-integer function get_blklen(self, blockid) result(blklen)
+integer function get_blklen(self, blkid) result(blklen)
    class(Molecule), intent(in) :: self
-   integer, intent(in) :: blockid
+   integer, intent(in) :: blkid
    integer :: i
 
-   blklen = 0
-
-   do i = 1, self%natom
-      if (self%atoms(i)%blkid == blockid) then
-         blklen = blklen + 1
-      end if
-   end do
+   blklen = self%blklens(blkid)
 
 end function get_blklen
 
@@ -495,21 +490,21 @@ function get_blklens(self) result(blklens)
 
 end function get_blklens
 
-integer function get_eqvlen(self, equivid) result(eqvlen)
+integer function get_eqvlen(self, eqvid) result(eqvlen)
    class(Molecule), intent(in) :: self
-   integer, intent(in) :: equivid
+   integer, intent(in) :: eqvid
    integer :: i
 
-   eqvlen = 0
-
-   do i = 1, self%natom
-      if (self%atoms(i)%eqvid == equivid) then
-         eqvlen = eqvlen + 1
-      end if
-   end do
+   eqvlen = self%eqvlens(eqvid)
 
 end function get_eqvlen
 
+function get_eqvlens(self) result(eqvlens)
+   class(Molecule), intent(in) :: self
+   integer, allocatable :: eqvlens(:)
 
+   eqvlens = self%eqvlens
+
+end function get_eqvlens
 
 end module
