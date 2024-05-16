@@ -75,12 +75,9 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
    logical :: visited, overflow
    integer :: nfrag0, nfrag1
    integer irec, mrec, ntrial, nstep, steps
-   integer, dimension(mol0%natom) :: mapping, newmapping
    integer :: adjd, recadjd(maxrec)
-   integer, dimension(mol0%natom) :: nadj0
-   integer, dimension(mol1%natom) :: nadj1
-   integer, dimension(maxcoord, mol0%natom) :: adjlist0
-   integer, dimension(maxcoord, mol1%natom) :: adjlist1
+   integer :: nadj0(mol0%natom), adjlist0(maxcoord, mol0%natom)
+   integer :: nadj1(mol1%natom), adjlist1(maxcoord, mol1%natom)
    integer, dimension(mol0%natom, maxlevel) :: nadjmna0
    integer, dimension(mol1%natom, maxlevel) :: nadjmna1
    integer, dimension(maxcoord, mol0%natom, maxlevel) :: adjmnalen0
@@ -94,6 +91,7 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
    integer, dimension(mol0%natom) :: fragroot0
    integer, dimension(mol1%natom) :: fragroot1
    integer :: equivmat(mol0%natom, mol1%natom)
+   integer, dimension(mol0%natom) :: mapping, newmapping
    real(wp) :: rmsd, totalrot
    real(wp), dimension(4) :: rotquat, prodquat
    real(wp), dimension(maxrec) :: recrmsd, avgsteps, avgtotalrot, avgrealrot
@@ -116,15 +114,16 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 
    nblk = mol0%nblock
    blklen = mol0%get_blklens()
-   neqv0 = mol0%nequiv
-   eqvlen0 = mol0%get_eqvlens()
-   neqv1 = mol1%nequiv
-   eqvlen1 = mol1%get_eqvlens()
 
    nadj0 = mol0%get_nadj()
-   adjlist0 = mol0%get_adjlist()
    nadj1 = mol1%get_nadj()
+   adjlist0 = mol0%get_adjlist()
    adjlist1 = mol1%get_adjlist()
+
+   neqv0 = mol0%nequiv
+   neqv1 = mol1%nequiv
+   eqvlen0 = mol0%get_eqvlens()
+   eqvlen1 = mol1%get_eqvlens()
 
    nadjeqv0(:) = mol0%atoms(:)%nadjeqv
    do i = 1, mol0%natom
@@ -404,6 +403,13 @@ subroutine remove_reactive_bond(i, j, mol0, mol1, mapping)
    type(Molecule), intent(inout) :: mol0, mol1
 
    integer :: k
+   integer :: nadj0(mol0%natom), adjlist0(maxcoord, mol0%natom)
+   integer :: nadj1(mol1%natom), adjlist1(maxcoord, mol1%natom)
+
+   nadj0 = mol0%get_nadj()
+   nadj1 = mol1%get_nadj()
+   adjlist0 = mol0%get_adjlist()
+   adjlist1 = mol1%get_adjlist()
 
    if (mol0%bonded(i, j)) then
       call mol0%remove_bond(i, j)
@@ -414,36 +420,36 @@ subroutine remove_reactive_bond(i, j, mol0, mol1, mapping)
    end if
 
    if (mol0%atoms(i)%znum == 1) then
-      do k = 1, mol0%atoms(i)%nadj
-         if (any([7, 8] == mol0%atoms(mol0%atoms(i)%adjlist(k))%znum)) then
-            call mol0%remove_bond(i, mol0%atoms(i)%adjlist(k))
+      do k = 1, nadj0(i)
+         if (any([7, 8] == mol0%atoms(adjlist0(k, i))%znum)) then
+            call mol0%remove_bond(i, adjlist0(k, i))
          end if
       end do
    end if
 
    if (mol1%atoms(i)%znum == 1) then
-      do k = 1, mol1%atoms(i)%nadj
-         if (any([7, 8] == mol1%atoms(mol1%atoms(i)%adjlist(k))%znum)) then
-            if (mol1%bonded(mapping(i), mapping(mol1%atoms(i)%adjlist(k)))) then
-               call mol1%remove_bond(mapping(i), mapping(mol1%atoms(i)%adjlist(k)))
+      do k = 1, nadj1(i)
+         if (any([7, 8] == mol1%atoms(adjlist1(k, i))%znum)) then
+            if (mol1%bonded(mapping(i), mapping(adjlist1(k, i)))) then
+               call mol1%remove_bond(mapping(i), mapping(adjlist1(k, i)))
             end if
          end if
       end do
    end if
 
    if (mol0%atoms(j)%znum == 1) then
-      do k = 1, mol0%atoms(j)%nadj
-         if (any([7, 8] == mol0%atoms(mol0%atoms(j)%adjlist(k))%znum)) then
-            call mol0%remove_bond(j, mol0%atoms(j)%adjlist(k))
+      do k = 1, nadj0(j)
+         if (any([7, 8] == mol0%atoms(adjlist0(k, j))%znum)) then
+            call mol0%remove_bond(j, adjlist0(k, j))
          end if
       end do
    end if
 
    if (mol1%atoms(j)%znum == 1) then
-      do k = 1, mol1%atoms(j)%nadj
-         if (any([7, 8] == mol1%atoms(mol1%atoms(j)%adjlist(k))%znum)) then
-            if (mol1%bonded(mapping(j), mapping(mol1%atoms(j)%adjlist(k)))) then
-               call mol1%remove_bond(mapping(j), mapping(mol1%atoms(j)%adjlist(k)))
+      do k = 1, nadj1(j)
+         if (any([7, 8] == mol1%atoms(adjlist1(k, j))%znum)) then
+            if (mol1%bonded(mapping(j), mapping(adjlist1(k, j)))) then
+               call mol1%remove_bond(mapping(j), mapping(adjlist1(k, j)))
             end if
          end if
       end do

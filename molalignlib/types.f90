@@ -264,9 +264,7 @@ function get_nadj(self) result(nadj)
    integer :: nadj(self%natom)
    integer i
 
-   do i = 1, self%natom
-      nadj(i) = self%atoms(i)%nadj
-   end do
+   nadj = self%atoms(:)%nadj
 
 end function get_nadj
 
@@ -278,7 +276,7 @@ subroutine set_adjlist(self, nadj, adjlist)
 
    do i = 1, self%natom
       self%atoms(i)%nadj = nadj(i)
-      self%atoms(i)%adjlist = adjlist(:self%atoms(i)%nadj, i)
+      self%atoms(i)%adjlist = adjlist(:nadj(i), i)
    end do
 
 end subroutine set_adjlist
@@ -289,7 +287,7 @@ function get_adjlist(self) result(adjlist)
    integer i
 
    do i = 1, self%natom
-      adjlist(:self%atoms(i)%nadj, i) = self%atoms(i)%adjlist(:self%atoms(i)%nadj)
+      adjlist(:self%atoms(i)%nadj, i) = self%atoms(i)%adjlist
    end do
 
 end function get_adjlist

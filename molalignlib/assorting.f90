@@ -207,17 +207,24 @@ subroutine assort_neighbors(mol)
    type(Molecule), intent(inout) :: mol
 
    integer :: i, h
-   integer, dimension(maxcoord) :: adjeqvid, atomorder
+   integer :: nadj(mol%natom), adjlist(maxcoord, mol%natom)
+   integer :: adjeqvid(maxcoord), atomorder(maxcoord), eqvids(mol%natom)
+
+   nadj = mol%get_nadj()
+   adjlist = mol%get_adjlist()
+   eqvids = mol%get_eqvids()
 
    do i = 1, mol%natom
       if (.not. allocated(mol%atoms(i)%adjeqvlens)) then
          allocate(mol%atoms(i)%adjeqvlens(maxcoord))
       end if
-      call groupbytype(mol%atoms(i)%nadj, mol%atoms(i)%adjlist, mol%atoms(:)%eqvid, &
+      call groupbytype(nadj(i), adjlist(:, i), eqvids, &
             mol%atoms(i)%nadjeqv, mol%atoms(i)%adjeqvlens, adjeqvid)
-      atomorder(:mol%atoms(i)%nadj) = sorted_order(adjeqvid, mol%atoms(i)%nadj)
-      mol%atoms(i)%adjlist(:mol%atoms(i)%nadj) = mol%atoms(i)%adjlist(atomorder(:mol%atoms(i)%nadj))
+      atomorder(:nadj(i)) = sorted_order(adjeqvid, nadj(i))
+      adjlist(:nadj(i), i) = adjlist(atomorder(:nadj(i)), i)
    end do
+
+   call mol%set_adjlist(nadj, adjlist)
 
 end subroutine
 
@@ -229,7 +236,11 @@ subroutine getmnatypes(mol, nin, intype, nout, outype, outsize, uptype)
    integer, dimension(:), intent(out) :: outype, outsize, uptype
 
    integer :: i, j
+   integer :: nadj(mol%natom), adjlist(maxcoord, mol%natom)
    logical :: untyped(mol%natom)
+
+   nadj = mol%get_nadj()
+   adjlist = mol%get_adjlist()
 
    nout = 0
    untyped(:) = .true.
@@ -244,8 +255,8 @@ subroutine getmnatypes(mol, nin, intype, nout, outype, outsize, uptype)
 !               print '(a, x, i0, x, i0)', trim(elsym(intype0(i))), i, j
             if (untyped(j)) then
                if (intype(j) == intype(i)) then
-                  if (same_adjacency(nin, intype, mol%atoms(i)%nadj, mol%atoms(i)%adjlist, intype, &
-                        mol%atoms(j)%nadj, mol%atoms(j)%adjlist)) then
+                  if (same_adjacency(nin, intype, nadj(i), adjlist(:, i), intype, &
+                        nadj(j), adjlist(:, j))) then
                      outype(j) = nout
                      outsize(nout) = outsize(nout) + 1
                      untyped(j) = .false.

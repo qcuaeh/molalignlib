@@ -74,9 +74,6 @@ subroutine readmol2(unit, mol)
    allocate(nadj(mol%natom))
    allocate(adjlist(mol%natom, mol%natom))
 
-   nadj(:) = 0
-   adjlist(:, :) = 0
-
    do
       read (unit, '(a)', end=99) buffer
       if (buffer == '@<TRIPOS>ATOM') exit
@@ -92,9 +89,13 @@ subroutine readmol2(unit, mol)
       if (buffer == '@<TRIPOS>BOND') exit
    end do
 
-   ! Return if bonds are not required
+   ! Bond initialization
+   nadj(:) = 0
+   adjlist(:, :) = 0
+
+   ! Return if bonds are not requested
    if (.not. bond_flag) then
-      mol%atoms(:)%nadj = 0
+      call mol%set_adjlist(nadj, adjlist)
       return
    end if
 
@@ -106,12 +107,7 @@ subroutine readmol2(unit, mol)
       adjlist(nadj(atom2), atom2) = atom1
    end do
 
-   do i = 1, mol%natom
-      mol%atoms(i)%nadj = nadj(i)
-      allocate(mol%atoms(i)%adjlist(maxcoord))
-!      allocate(mol%atoms(i)%adjlist(nadj(i)))
-      mol%atoms(i)%adjlist(1:nadj(i)) = adjlist(1:nadj(i), i)
-   end do
+   call mol%set_adjlist(nadj, adjlist)
 
    return
 
@@ -123,31 +119,28 @@ end subroutine
 
 subroutine set_bonds(mol)
    type(Molecule), intent(inout) :: mol
-   integer :: i, j
-   real(wp) :: atomdist
-   real(wp), dimension(:), allocatable :: adjrad
-   real(wp), dimension(:, :), allocatable :: coords
-   integer, dimension(:), allocatable :: znums
-   integer, allocatable :: nadj(:), adjlist(:, :)
 
-   ! Quick return if bonds are not required
+   integer :: i, j
+   integer, allocatable :: znums(:)
+   integer :: nadj(mol%natom), adjlist(maxcoord, mol%natom)
+   real(wp) :: atomdist
+   real(wp), allocatable :: adjrad(:)
+   real(wp), allocatable :: coords(:, :)
+
+   ! Bond initialization
+   nadj(:) = 0
+
+   ! Return if bonds are not requested
    if (.not. bond_flag) then
-      mol%atoms(:)%nadj = 0
+      call mol%set_adjlist(nadj, adjlist)
       return
    end if
 
-   allocate(adjrad(mol%natom))
-   allocate(coords(3, mol%natom))
-   allocate(znums(mol%natom))
-   allocate(nadj(mol%natom), adjlist(maxcoord, mol%natom))
    znums = mol%get_znums()
    coords = mol%get_coords()
 
-   ! initialization
-   nadj(:) = 0
-
    ! Set adjacency radii
-   adjrad(:) = covrad(znums) + 0.25*(vdwrad(znums) - covrad(znums))
+   adjrad = covrad(znums) + 0.25*(vdwrad(znums) - covrad(znums))
 
    ! Register adjacency matrix i,j if atoms i and j are closer
    ! than the sum of their adjacency radius
