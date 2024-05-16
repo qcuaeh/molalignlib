@@ -59,7 +59,7 @@ subroutine readmol2(unit, mol)
    character(ll) :: buffer
    integer :: i, id
    integer :: atom1, atom2, bondorder, nbond
-   integer, allocatable :: nadj(:), adjlist(:, :)
+   integer, allocatable :: nadjs(:), adjlists(:, :)
 
    do
       read (unit, '(a)', end=99) buffer
@@ -71,8 +71,8 @@ subroutine readmol2(unit, mol)
    read (unit, *, end=99) mol%natom, nbond
 
    allocate(mol%atoms(mol%natom))
-   allocate(nadj(mol%natom))
-   allocate(adjlist(mol%natom, mol%natom))
+   allocate(nadjs(mol%natom))
+   allocate(adjlists(mol%natom, mol%natom))
 
    do
       read (unit, '(a)', end=99) buffer
@@ -90,24 +90,24 @@ subroutine readmol2(unit, mol)
    end do
 
    ! Bond initialization
-   nadj(:) = 0
-   adjlist(:, :) = 0
+   nadjs(:) = 0
+   adjlists(:, :) = 0
 
    ! Return if bonds are not requested
    if (.not. bond_flag) then
-      call mol%set_adjlist(nadj, adjlist)
+      call mol%set_adjlists(nadjs, adjlists)
       return
    end if
 
    do i = 1, nbond
       read (unit, *, end=99) id, atom1, atom2, bondorder
-      nadj(atom1) = nadj(atom1) + 1
-      nadj(atom2) = nadj(atom2) + 1
-      adjlist(nadj(atom1), atom1) = atom2
-      adjlist(nadj(atom2), atom2) = atom1
+      nadjs(atom1) = nadjs(atom1) + 1
+      nadjs(atom2) = nadjs(atom2) + 1
+      adjlists(nadjs(atom1), atom1) = atom2
+      adjlists(nadjs(atom2), atom2) = atom1
    end do
 
-   call mol%set_adjlist(nadj, adjlist)
+   call mol%set_adjlists(nadjs, adjlists)
 
    return
 
@@ -122,17 +122,17 @@ subroutine set_bonds(mol)
 
    integer :: i, j
    integer, allocatable :: znums(:)
-   integer :: nadj(mol%natom), adjlist(maxcoord, mol%natom)
+   integer :: nadjs(mol%natom), adjlists(maxcoord, mol%natom)
    real(wp) :: atomdist
-   real(wp), allocatable :: adjrad(:)
+   real(wp), allocatable :: adjrads(:)
    real(wp), allocatable :: coords(:, :)
 
    ! Bond initialization
-   nadj(:) = 0
+   nadjs(:) = 0
 
    ! Return if bonds are not requested
    if (.not. bond_flag) then
-      call mol%set_adjlist(nadj, adjlist)
+      call mol%set_adjlists(nadjs, adjlists)
       return
    end if
 
@@ -140,27 +140,27 @@ subroutine set_bonds(mol)
    coords = mol%get_coords()
 
    ! Set adjacency radii
-   adjrad = covrad(znums) + 0.25*(vdwrad(znums) - covrad(znums))
+   adjrads = covrad(znums) + 0.25*(vdwrad(znums) - covrad(znums))
 
    ! Register adjacency matrix i,j if atoms i and j are closer
    ! than the sum of their adjacency radius
    do i = 1, mol%natom
       do j = i + 1, mol%natom
          atomdist = sqrt(sum((coords(:, i) - coords(:, j))**2))
-         if (atomdist < adjrad(i) + adjrad(j)) then
-            nadj(i) = nadj(i) + 1
-            nadj(j) = nadj(j) + 1
-            if (nadj(i) > maxcoord .or. nadj(j) > maxcoord) then
+         if (atomdist < adjrads(i) + adjrads(j)) then
+            nadjs(i) = nadjs(i) + 1
+            nadjs(j) = nadjs(j) + 1
+            if (nadjs(i) > maxcoord .or. nadjs(j) > maxcoord) then
                write (stderr, '("Maximum coordination number exceeded!")')
                stop
             end if
-            adjlist(nadj(i), i) = j
-            adjlist(nadj(j), j) = i
+            adjlists(nadjs(i), i) = j
+            adjlists(nadjs(j), j) = i
          end if
       end do
    end do
 
-   call mol%set_adjlist(nadj, adjlist)
+   call mol%set_adjlists(nadjs, adjlists)
 
 end subroutine set_bonds
 

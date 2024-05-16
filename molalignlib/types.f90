@@ -33,7 +33,7 @@ type, public :: Molecule
    integer :: nequiv
    integer, allocatable :: eqvlens(:)
    integer :: nfrag
-   integer, allocatable :: fragroot(:)
+   integer, allocatable :: fragroots(:)
 contains
    procedure :: get_natom
    procedure :: get_nblock
@@ -50,9 +50,9 @@ contains
    procedure :: get_coords
    procedure :: get_labels
    procedure :: get_adjmat
-   procedure :: get_nadj
-   procedure :: set_adjlist
-   procedure :: get_adjlist
+   procedure :: get_nadjs
+   procedure :: set_adjlists
+   procedure :: get_adjlists
    procedure :: get_fragroot
    procedure :: get_blocks
    procedure :: mirror_coords
@@ -259,44 +259,44 @@ function get_adjmat(self) result(adjmat)
 
 end function get_adjmat
 
-function get_nadj(self) result(nadj)
+function get_nadjs(self) result(nadjs)
    class(Molecule), intent(in) :: self
-   integer :: nadj(self%natom)
+   integer :: nadjs(self%natom)
    integer i
 
-   nadj = self%atoms(:)%nadj
+   nadjs = self%atoms(:)%nadj
 
-end function get_nadj
+end function get_nadjs
 
-subroutine set_adjlist(self, nadj, adjlist)
+subroutine set_adjlists(self, nadjs, adjlists)
    class(Molecule), intent(inout) :: self
-   integer, intent(in) :: nadj(self%natom)
-   integer, intent(in) :: adjlist(maxcoord, self%natom)
+   integer, intent(in) :: nadjs(self%natom)
+   integer, intent(in) :: adjlists(maxcoord, self%natom)
    integer i
 
    do i = 1, self%natom
-      self%atoms(i)%nadj = nadj(i)
-      self%atoms(i)%adjlist = adjlist(:nadj(i), i)
+      self%atoms(i)%nadj = nadjs(i)
+      self%atoms(i)%adjlist = adjlists(:nadjs(i), i)
    end do
 
-end subroutine set_adjlist
+end subroutine set_adjlists
 
-function get_adjlist(self) result(adjlist)
+function get_adjlists(self) result(adjlists)
    class(Molecule), intent(in) :: self
-   integer :: adjlist(maxcoord, self%natom)
+   integer :: adjlists(maxcoord, self%natom)
    integer i
 
    do i = 1, self%natom
-      adjlist(:self%atoms(i)%nadj, i) = self%atoms(i)%adjlist
+      adjlists(:self%atoms(i)%nadj, i) = self%atoms(i)%adjlist
    end do
 
-end function get_adjlist
+end function get_adjlists
 
-function get_fragroot(self) result(fragroot)
+function get_fragroot(self) result(fragroots)
    class(Molecule), intent(in) :: self
-   integer :: fragroot(self%natom)
+   integer :: fragroots(self%natom)
 
-   fragroot = self%fragroot
+   fragroots = self%fragroots
 
 end function get_fragroot
 
@@ -356,7 +356,7 @@ subroutine print_molecule(self)
                                          self%natom, " atoms)"
    write (stderr, '(2a)') 'Title: ', self%title
    write (stderr, '(a,a4,a5,a6,a7,2a17)') "ind:", "lbl", "znum", "blkid", &
-                                          "weight", "{ coords }", "[ adjlist ]"
+                                          "weight", "{ coords }", "[ adjlists ]"
 
    do i = 1, self%natom
       call self%atoms(i)%print(i)

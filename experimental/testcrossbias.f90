@@ -1,11 +1,11 @@
-subroutine vdwcrossbias(natom, nblk, blklen, blkz, nadj0, adjlist0, &
-   nadj1, adjlist1, coords0, coords1, biasmat)
+subroutine vdwcrossbias(natom, nblk, blklen, blkz, nadjs0, adjlists0, &
+   nadjs1, adjlists1, coords0, coords1, biasmat)
 ! Purpose: Generate the adjacency matrix
 
     integer, intent(in) :: natom, nblk
-    integer, dimension(:), intent(in) :: nadj0, nadj1
+    integer, dimension(:), intent(in) :: nadjs0, nadjs1
     integer, dimension(:), intent(in) :: blklen, blkz
-    integer, dimension(:, :), intent(in) :: adjlist0, adjlist1
+    integer, dimension(:, :), intent(in) :: adjlists0, adjlists1
     real(wp), dimension(:, :), intent(in) :: coords0, coords1
     real(wp), dimension(:, :), intent(out) :: biasmat
 
@@ -69,14 +69,14 @@ subroutine vdwcrossbias(natom, nblk, blklen, blkz, nadj0, adjlist0, &
     n1(:, :) = 0
 
     do i = 1, natom
-       do k = 1, nadj0(i)
-          n0(blkidx(adjlist0(k, i)), i) = n0(blkidx(adjlist0(k, i)), i) + 1
+       do k = 1, nadjs0(i)
+          n0(blkidx(adjlists0(k, i)), i) = n0(blkidx(adjlists0(k, i)), i) + 1
        end do
     end do
 
     do i = 1, natom
-       do k = 1, nadj1(i)
-          n1(blkidx(adjlist1(k, i)), i) = n1(blkidx(adjlist1(k, i)), i) + 1
+       do k = 1, nadjs1(i)
+          n1(blkidx(adjlists1(k, i)), i) = n1(blkidx(adjlists1(k, i)), i) + 1
        end do
     end do
 
@@ -112,14 +112,14 @@ subroutine vdwcrossbias(natom, nblk, blklen, blkz, nadj0, adjlist0, &
 
 end subroutine
 
-subroutine mixedcrossbias(natom, nblk, blklen, nadj0, adjlist0, &
-   nadj1, adjlist1, coords0, coords1, biasmat)
+subroutine mixedcrossbias(natom, nblk, blklen, nadjs0, adjlists0, &
+   nadjs1, adjlists1, coords0, coords1, biasmat)
 ! Purpose: Generate the adjacency matrix
 
     integer, intent(in) :: natom, nblk
-    integer, dimension(:), intent(in) :: nadj0, nadj1
+    integer, dimension(:), intent(in) :: nadjs0, nadjs1
     integer, dimension(:), intent(in) :: blklen
-    integer, dimension(:, :), intent(in) :: adjlist0, adjlist1
+    integer, dimension(:, :), intent(in) :: adjlists0, adjlists1
     real(wp), dimension(:, :), intent(in) :: coords0, coords1
     real(wp), dimension(:, :), intent(out) :: biasmat
 
@@ -178,14 +178,14 @@ subroutine mixedcrossbias(natom, nblk, blklen, nadj0, adjlist0, &
     n1(:, :) = 0
 
     do i = 1, natom
-       do k = 1, nadj0(i)
-          n0(blkidx(adjlist0(k, i)), i) = n0(blkidx(adjlist0(k, i)), i) + 1
+       do k = 1, nadjs0(i)
+          n0(blkidx(adjlists0(k, i)), i) = n0(blkidx(adjlists0(k, i)), i) + 1
        end do
     end do
 
     do i = 1, natom
-       do k = 1, nadj1(i)
-          n1(blkidx(adjlist1(k, i)), i) = n1(blkidx(adjlist1(k, i)), i) + 1
+       do k = 1, nadjs1(i)
+          n1(blkidx(adjlists1(k, i)), i) = n1(blkidx(adjlists1(k, i)), i) + 1
        end do
     end do
 

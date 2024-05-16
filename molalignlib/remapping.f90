@@ -76,8 +76,8 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
    integer :: nfrag0, nfrag1
    integer irec, mrec, ntrial, nstep, steps
    integer :: adjd, recadjd(maxrec)
-   integer :: nadj0(mol0%natom), adjlist0(maxcoord, mol0%natom)
-   integer :: nadj1(mol1%natom), adjlist1(maxcoord, mol1%natom)
+   integer :: nadjs0(mol0%natom), adjlists0(maxcoord, mol0%natom)
+   integer :: nadjs1(mol1%natom), adjlists1(maxcoord, mol1%natom)
    integer, dimension(mol0%natom, maxlevel) :: nadjmna0
    integer, dimension(mol1%natom, maxlevel) :: nadjmna1
    integer, dimension(maxcoord, mol0%natom, maxlevel) :: adjmnalen0
@@ -115,10 +115,10 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
    nblk = mol0%nblock
    blklen = mol0%get_blklens()
 
-   nadj0 = mol0%get_nadj()
-   nadj1 = mol1%get_nadj()
-   adjlist0 = mol0%get_adjlist()
-   adjlist1 = mol1%get_adjlist()
+   nadjs0 = mol0%get_nadjs()
+   nadjs1 = mol1%get_nadjs()
+   adjlists0 = mol0%get_adjlists()
+   adjlists1 = mol1%get_adjlists()
 
    neqv0 = mol0%nequiv
    neqv1 = mol1%nequiv
@@ -137,8 +137,8 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
    ! Detect fragments and root atoms
 
 !CZGC: new call
-!   call findmolfrags(mol0, nadj0, adjlist0, nfrag0, fragroot0)
-!   call findmolfrags(mol1, nadj1, adjlist1, nfrag1, fragroot1)
+!   call findmolfrags(mol0, nadjs0, adjlists0, nfrag0, fragroot0)
+!   call findmolfrags(mol1, nadjs1, adjlists1, nfrag1, fragroot1)
 !CZGC: optionally
 !   call findmolfrags(mol0, nfrag0, fragroot0)
 !   call findmolfrags(mol1, nfrag1, fragroot1)
@@ -151,16 +151,16 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
    nfrag1 = mol1%nfrag
    fragroot1 = mol1%get_fragroot()
 !CZGC: old call
-!   call findmolfrags(natom, nadj0, adjlist0, nblk, blklen, neqv0, eqvlen0, nfrag0, fragroot0)
-!   call findmolfrags(natom, nadj1, adjlist1, nblk, blklen, neqv1, eqvlen1, nfrag1, fragroot1)
+!   call findmolfrags(natom, nadjs0, adjlists0, nblk, blklen, neqv0, eqvlen0, nfrag0, fragroot0)
+!   call findmolfrags(natom, nadjs1, adjlists1, nblk, blklen, neqv1, eqvlen1, nfrag1, fragroot1)
 
    ! Calculate MNA equivalence matrix
 
 !CZGC: new call
    call calcequivmat(mol0, mol1, nadjmna0, adjmnalen0, adjmnalist0, nadjmna1, adjmnalen1, adjmnalist1, equivmat)
 !CZGC: old call
-!   call calcequivmat(natom, nblk, blklen, nadj0, adjlist0, nadjmna0, adjmnalen0, adjmnalist0, &
-!      nadj1, adjlist1, nadjmna1, adjmnalen1, adjmnalist1, equivmat)
+!   call calcequivmat(natom, nblk, blklen, nadjs0, adjlists0, nadjmna0, adjmnalen0, adjmnalist0, &
+!      nadjs1, adjlists1, nadjmna1, adjmnalen1, adjmnalist1, equivmat)
 
    ! Print equivalence matrix
 
@@ -272,10 +272,10 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 
       if (back_flag) then
 
-         call minadjdiff(natom, weights, nblk, blklen, coords0, nadj0, adjlist0, adjmat0, neqv0, &
-            eqvlen0, workcoords1, nadj1, adjlist1, adjmat1, neqv1, eqvlen1, mapping, nfrag0, fragroot0)
+         call minadjdiff(natom, weights, nblk, blklen, coords0, nadjs0, adjlists0, adjmat0, neqv0, &
+            eqvlen0, workcoords1, nadjs1, adjlists1, adjmat1, neqv1, eqvlen1, mapping, nfrag0, fragroot0)
 
-         call eqvatomperm(natom, weights, coords0, adjmat0, adjlist0, neqv0, eqvlen0, &
+         call eqvatomperm(natom, weights, coords0, adjmat0, adjlists0, neqv0, eqvlen0, &
             nadjeqv0, adjeqvlen0, workcoords1, adjmat1, mapping, nfrag0, fragroot0)
 
       end if
@@ -403,13 +403,13 @@ subroutine remove_reactive_bond(i, j, mol0, mol1, mapping)
    type(Molecule), intent(inout) :: mol0, mol1
 
    integer :: k
-   integer :: nadj0(mol0%natom), adjlist0(maxcoord, mol0%natom)
-   integer :: nadj1(mol1%natom), adjlist1(maxcoord, mol1%natom)
+   integer :: nadjs0(mol0%natom), adjlists0(maxcoord, mol0%natom)
+   integer :: nadjs1(mol1%natom), adjlists1(maxcoord, mol1%natom)
 
-   nadj0 = mol0%get_nadj()
-   nadj1 = mol1%get_nadj()
-   adjlist0 = mol0%get_adjlist()
-   adjlist1 = mol1%get_adjlist()
+   nadjs0 = mol0%get_nadjs()
+   nadjs1 = mol1%get_nadjs()
+   adjlists0 = mol0%get_adjlists()
+   adjlists1 = mol1%get_adjlists()
 
    if (mol0%bonded(i, j)) then
       call mol0%remove_bond(i, j)
@@ -420,36 +420,36 @@ subroutine remove_reactive_bond(i, j, mol0, mol1, mapping)
    end if
 
    if (mol0%atoms(i)%znum == 1) then
-      do k = 1, nadj0(i)
-         if (any([7, 8] == mol0%atoms(adjlist0(k, i))%znum)) then
-            call mol0%remove_bond(i, adjlist0(k, i))
+      do k = 1, nadjs0(i)
+         if (any([7, 8] == mol0%atoms(adjlists0(k, i))%znum)) then
+            call mol0%remove_bond(i, adjlists0(k, i))
          end if
       end do
    end if
 
    if (mol1%atoms(i)%znum == 1) then
-      do k = 1, nadj1(i)
-         if (any([7, 8] == mol1%atoms(adjlist1(k, i))%znum)) then
-            if (mol1%bonded(mapping(i), mapping(adjlist1(k, i)))) then
-               call mol1%remove_bond(mapping(i), mapping(adjlist1(k, i)))
+      do k = 1, nadjs1(i)
+         if (any([7, 8] == mol1%atoms(adjlists1(k, i))%znum)) then
+            if (mol1%bonded(mapping(i), mapping(adjlists1(k, i)))) then
+               call mol1%remove_bond(mapping(i), mapping(adjlists1(k, i)))
             end if
          end if
       end do
    end if
 
    if (mol0%atoms(j)%znum == 1) then
-      do k = 1, nadj0(j)
-         if (any([7, 8] == mol0%atoms(adjlist0(k, j))%znum)) then
-            call mol0%remove_bond(j, adjlist0(k, j))
+      do k = 1, nadjs0(j)
+         if (any([7, 8] == mol0%atoms(adjlists0(k, j))%znum)) then
+            call mol0%remove_bond(j, adjlists0(k, j))
          end if
       end do
    end if
 
    if (mol1%atoms(j)%znum == 1) then
-      do k = 1, nadj1(j)
-         if (any([7, 8] == mol1%atoms(adjlist1(k, j))%znum)) then
-            if (mol1%bonded(mapping(j), mapping(adjlist1(k, j)))) then
-               call mol1%remove_bond(mapping(j), mapping(adjlist1(k, j)))
+      do k = 1, nadjs1(j)
+         if (any([7, 8] == mol1%atoms(adjlists1(k, j))%znum)) then
+            if (mol1%bonded(mapping(j), mapping(adjlists1(k, j)))) then
+               call mol1%remove_bond(mapping(j), mapping(adjlists1(k, j)))
             end if
          end if
       end do

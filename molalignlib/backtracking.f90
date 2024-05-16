@@ -15,13 +15,13 @@ public eqvatomperm
 
 contains
 
-subroutine minadjdiff (natom, weights, nblk, blklen, coords0, nadj0, adjlist0, adjmat0, neqv0, &
-   eqvlen0, coords1, nadj1, adjlist1, adjmat1, neqv1, eqvlen1, mapping, nfrag0, fragroot0)
+subroutine minadjdiff (natom, weights, nblk, blklen, coords0, nadjs0, adjlists0, adjmat0, neqv0, &
+   eqvlen0, coords1, nadjs1, adjlists1, adjmat1, neqv1, eqvlen1, mapping, nfrag0, fragroot0)
 ! Purpose: Find best correspondence between points of graphs
 
    integer, intent(in) :: natom, nblk, neqv0, neqv1
-   integer, dimension(:), intent(in) :: blklen, nadj0, nadj1
-   integer, dimension(:, :), intent(in) :: adjlist0, adjlist1
+   integer, dimension(:), intent(in) :: blklen, nadjs0, nadjs1
+   integer, dimension(:, :), intent(in) :: adjlists0, adjlists1
    integer, dimension(:), intent(in) :: eqvlen0, eqvlen1
    real(wp), dimension(:), intent(in) :: weights
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
@@ -102,21 +102,21 @@ subroutine minadjdiff (natom, weights, nblk, blklen, coords0, nadj0, adjlist0, a
       integer, intent(out) :: nmismatch1, mismatches1(natom)
       integer :: i, adj0(natom), adj1(natom)
 
-      adj0(:nadj0(node)) = adjlist0(:nadj0(node), node)
-      adj1(:nadj1(mapping(node))) = adjlist1(:nadj1(mapping(node)), mapping(node))
+      adj0(:nadjs0(node)) = adjlists0(:nadjs0(node), node)
+      adj1(:nadjs1(mapping(node))) = adjlists1(:nadjs1(mapping(node)), mapping(node))
       nmatch = 0
       nmismatch0 = 0
       nmismatch1 = 0
 
-      do i = 1, nadj0(node)
-         if (findInd(mapping(adj0(i)), nadj1(mapping(node)), adj1) /= 0) then
+      do i = 1, nadjs0(node)
+         if (findInd(mapping(adj0(i)), nadjs1(mapping(node)), adj1) /= 0) then
             call addInd(adj0(i), nmatch, matches)
          else
             call addInd(adj0(i), nmismatch0, mismatches0)
          end if
       end do
 
-      do i = 1, nadj1(mapping(node))
+      do i = 1, nadjs1(mapping(node))
          if (findInd(adj1(i), nmatch, mapping(matches(:nmatch))) == 0) then
             call addInd(adj1(i), nmismatch1, mismatches1)
          end if
@@ -205,7 +205,7 @@ subroutine minadjdiff (natom, weights, nblk, blklen, coords0, nadj0, adjlist0, a
                         + sum((coords1(:, mapping(mismatches0(i))) - coords0(:, unmapping(mismatches1(j))))**2))
 
                      ! Update adjd with swap
-                     moldiff_branch = moldiff + adjacencydelta(nadj0, adjlist0, adjmat1, &
+                     moldiff_branch = moldiff + adjacencydelta(nadjs0, adjlists0, adjmat1, &
                                    mapping, mismatches0(i), unmapping(mismatches1(j)))
 
                      ! backtrack swapped index
@@ -250,19 +250,19 @@ subroutine minadjdiff (natom, weights, nblk, blklen, coords0, nadj0, adjlist0, a
 
 end subroutine
 
-subroutine eqvatomperm (natom, weights, coords, adjmat, adjlist, neqv, eqvlen, &
-   nadjeqv, adjeqvlen, refcoords, refadjmat, mapping, nfrag, fragroot)
+subroutine eqvatomperm (natom, weights, coords, adjmat, adjlists, neqv, eqvlen, &
+   nadjeqv, adjeqvlen, refcoords, refadjmat, mapping, nfrag, fragroots)
 ! Purpose: Find best correspondence between points of graphs
 
    integer, intent(in) :: natom, neqv
    integer, dimension(:), intent(in) :: eqvlen, nadjeqv
-   integer, dimension(:, :), intent(in) :: adjlist, adjeqvlen
+   integer, dimension(:, :), intent(in) :: adjlists, adjeqvlen
    integer, dimension(:), intent(inout) :: mapping
    real(wp), dimension(:), intent(in) :: weights
    real(wp), dimension(:, :), intent(in) :: coords, refcoords
    logical, dimension(:, :), intent(in) :: adjmat, refadjmat
    integer, intent(in) :: nfrag
-   integer, dimension(:), intent(in) :: fragroot
+   integer, dimension(:), intent(in) :: fragroots
 
    integer :: unmap(natom), track(natom)
    integer, dimension(natom) :: eqvos, eqvidx
@@ -296,7 +296,7 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlist, neqv, eqvlen, &
 !   do i = 1, natom
 !      offset = 0
 !      do h = 1, nadjeqv(i)
-!         print *, i, ':', adjlist(offset+1:offset+adjeqvlen(h, i), i)
+!         print *, i, ':', adjlists(offset+1:offset+adjeqvlen(h, i), i)
 !         offset = offset + adjeqvlen(h, i)
 !      end do
 !   end do
@@ -321,7 +321,7 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlist, neqv, eqvlen, &
 !    end do
 
    do i = 1, nfrag
-      call recursive_permut (fragroot(i), mapping, tracked, held, ntrack, track)
+      call recursive_permut (fragroots(i), mapping, tracked, held, ntrack, track)
 !        print *, ntrack
    end do
 
@@ -348,10 +348,10 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlist, neqv, eqvlen, &
          ! find not tracked neighbors in group
          meqvnei = 0
          do i = 1, adjeqvlen(h, nodea)
-            if (.not. held(adjlist(offset+i, nodea))) then 
+            if (.not. held(adjlists(offset+i, nodea))) then 
                meqvnei = meqvnei + 1
-               equiva(meqvnei) = adjlist(offset+meqvnei, nodea)
-               equivb(meqvnei) = adjlist(offset+meqvnei, nodeb)
+               equiva(meqvnei) = adjlists(offset+meqvnei, nodea)
+               equivb(meqvnei) = adjlists(offset+meqvnei, nodeb)
             end if
          end do
          locked_c(:) = held(:)
@@ -404,10 +404,10 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlist, neqv, eqvlen, &
          ! find not tracked neighbors in group
          meqvnei = 0
          do i = 1, adjeqvlen(h, node)
-            if (.not. tracked(adjlist(offset+i, node)) &
-               .and. .not. held(adjlist(offset+i, node))) then
+            if (.not. tracked(adjlists(offset+i, node)) &
+               .and. .not. held(adjlists(offset+i, node))) then
                meqvnei = meqvnei + 1
-               equiv(meqvnei) = adjlist(offset+meqvnei, node)
+               equiv(meqvnei) = adjlists(offset+meqvnei, node)
             end if
          end do
          ! check permutations

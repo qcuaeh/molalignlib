@@ -1,5 +1,5 @@
 ! purpose: determines the most convenient atom to start runs over the structure
-!          of each fragment in a molecule. (returns nfrag, fragroot)
+!          of each fragment in a molecule. (returns nfrag, fragroots)
 module tracking
 
 use stdio
@@ -14,20 +14,20 @@ contains
 
 !CZGC: new definition
 subroutine findmolfrags (mol)
-!subroutine findmolfrags (mol, nfrag, fragroot)
+!subroutine findmolfrags (mol, nfrag, fragroots)
 !CZGC: old definition
-!subroutine findmolfrags (natom, nadj, adjlist, nblk, blklen, &
-!                  neqv, eqvlen, nfrag, fragroot)
+!subroutine findmolfrags (natom, nadjs, adjlists, nblk, blklen, &
+!                  neqv, eqvlen, nfrag, fragroots)
 
    type(Molecule), intent(inout) :: mol
    integer :: natom, nblk, neqv
-   integer, dimension(mol%natom) :: nadj, blklen, eqvlen
-   integer, dimension(maxcoord, mol%natom) :: adjlist
+   integer, dimension(mol%natom) :: nadjs, blklen, eqvlen
+   integer, dimension(maxcoord, mol%natom) :: adjlists
 !   integer, intent(in) :: natom, nblk, neqv
-!   integer, dimension(:), intent(in) :: nadj, blklen, eqvlen
-!   integer, dimension(:, :), intent(in) :: adjlist
-!   integer, intent(out) :: nfrag, fragroot(mol%natom)
-   integer :: nfrag, fragroot(mol%natom)
+!   integer, dimension(:), intent(in) :: nadjs, blklen, eqvlen
+!   integer, dimension(:, :), intent(in) :: adjlists
+!   integer, intent(out) :: nfrag, fragroots(mol%natom)
+   integer :: nfrag, fragroots(mol%natom)
 
    integer :: i, h, n, f, firstn, prevn, offset
    integer, dimension(mol%natom) :: order
@@ -50,8 +50,8 @@ subroutine findmolfrags (mol)
    do i = 1, neqv
       eqvlen(i) = mol%get_eqvlen(i)
    end do
-   nadj = mol%get_nadj()
-   adjlist = mol%get_adjlist()
+   nadjs = mol%get_nadjs()
+   adjlists = mol%get_adjlists()
 
    ! set atoms block indices
 
@@ -72,7 +72,7 @@ subroutine findmolfrags (mol)
    ! initialization
 
    nfrag = 0
-   fragroot(:) = 1
+   fragroots(:) = 1
 
    order = [ (n, n = 1, natom) ]
    track(:) = .false.
@@ -107,11 +107,11 @@ subroutine findmolfrags (mol)
          print fmtstr, f, "frag inds ini:  ", fragind(:fragsize(f),f)
          print fmtstr, f, "frag block size:", fragblock(:fragsize(f),f)
          print fmtstr, f, "frag equiv size:", fragequiv(:fragsize(f),f)
-         print fmtstr, f, "frag nadj:    ", fragcoord(:fragsize(f),f)
+         print fmtstr, f, "frag nadjs:    ", fragcoord(:fragsize(f),f)
       end do
    end if
 
-   ! sorts sequentially by blklen, eqvlen, and nadj for each fragment
+   ! sorts sequentially by blklen, eqvlen, and nadjs for each fragment
    order = [ (n, n = 1, natom) ]
    do f = 1, nfrag
       firstn = fragsize(f)
@@ -132,7 +132,7 @@ subroutine findmolfrags (mol)
       fragblock(:firstn,f) = fragblock(order(:firstn),f)
       fragequiv(:firstn,f) = fragequiv(order(:firstn),f)
       fragcoord(:prevn,f) = fragcoord(order(:prevn),f)
-      fragroot(f) = fragind(1,f)
+      fragroots(f) = fragind(1,f)
    end do
 
    ! print final vectors
@@ -143,17 +143,17 @@ subroutine findmolfrags (mol)
          print fmtstr, f, "frag inds fin:  ", fragind(:fragsize(f),f)
          print fmtstr, f, "frag block size:", fragblock(:fragsize(f),f)
          print fmtstr, f, "frag equiv size:", fragequiv(:fragsize(f),f)
-         print fmtstr, f, "frag nadj:    ", fragcoord(:fragsize(f),f)
-         print '(i2,1x,a,1x,i10)', f, "fragment start ind:", fragroot(f)
+         print fmtstr, f, "frag nadjs:    ", fragcoord(:fragsize(f),f)
+         print '(i2,1x,a,1x,i10)', f, "fragment start ind:", fragroots(f)
       end do
    end if
 
-   ! register nfrag and fragroot in the mol strucutre
+   ! register nfrag and fragroots in the mol strucutre
    if ( mol%nfrag == 0 ) then
-      allocate(mol%fragroot(mol%natom))
+      allocate(mol%fragroots(mol%natom))
    end if
    mol%nfrag = nfrag
-   mol%fragroot = fragroot
+   mol%fragroots = fragroots
 
 contains
 
@@ -171,10 +171,10 @@ contains
       fragind(fragsize(nfrag),nfrag) = n
       fragblock(fragsize(nfrag),nfrag) = blklen(blkidx(n))
       fragequiv(fragsize(nfrag),nfrag) = eqvlen(eqvidx(n))
-      fragcoord(fragsize(nfrag),nfrag) = nadj(n)
+      fragcoord(fragsize(nfrag),nfrag) = nadjs(n)
       
-      do i = 1, nadj(n)
-         call recrun (adjList(i, n), track)
+      do i = 1, nadjs(n)
+         call recrun (adjlists(i, n), track)
       end do
    end subroutine recrun
 
