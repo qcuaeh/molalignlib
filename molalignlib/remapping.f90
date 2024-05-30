@@ -403,6 +403,7 @@ subroutine remove_reactive_bond(i, j, mol0, mol1, mapping)
    type(Molecule), intent(inout) :: mol0, mol1
 
    integer :: k
+   integer, allocatable, dimension(:) :: znums0, znums1
    integer :: nadjs0(mol0%natom), adjlists0(maxcoord, mol0%natom)
    integer :: nadjs1(mol1%natom), adjlists1(maxcoord, mol1%natom)
 
@@ -410,6 +411,8 @@ subroutine remove_reactive_bond(i, j, mol0, mol1, mapping)
    nadjs1 = mol1%get_nadjs()
    adjlists0 = mol0%get_adjlists()
    adjlists1 = mol1%get_adjlists()
+   znums0 = mol0%get_znums()
+   znums1 = mol1%get_znums()
 
    if (mol0%bonded(i, j)) then
       call mol0%remove_bond(i, j)
@@ -419,17 +422,17 @@ subroutine remove_reactive_bond(i, j, mol0, mol1, mapping)
       call mol1%remove_bond(mapping(i), mapping(j))
    end if
 
-   if (mol0%atoms(i)%znum == 1) then
+   if (znums0(i) == 1) then
       do k = 1, nadjs0(i)
-         if (any([7, 8] == mol0%atoms(adjlists0(k, i))%znum)) then
+         if (any([7, 8] == znums0(adjlists0(k, i)))) then
             call mol0%remove_bond(i, adjlists0(k, i))
          end if
       end do
    end if
 
-   if (mol1%atoms(i)%znum == 1) then
+   if (znums1(i) == 1) then
       do k = 1, nadjs1(i)
-         if (any([7, 8] == mol1%atoms(adjlists1(k, i))%znum)) then
+         if (any([7, 8] == znums1(adjlists1(k, i)))) then
             if (mol1%bonded(mapping(i), mapping(adjlists1(k, i)))) then
                call mol1%remove_bond(mapping(i), mapping(adjlists1(k, i)))
             end if
@@ -437,17 +440,17 @@ subroutine remove_reactive_bond(i, j, mol0, mol1, mapping)
       end do
    end if
 
-   if (mol0%atoms(j)%znum == 1) then
+   if (znums0(j) == 1) then
       do k = 1, nadjs0(j)
-         if (any([7, 8] == mol0%atoms(adjlists0(k, j))%znum)) then
+         if (any([7, 8] == znums0(adjlists0(k, j)))) then
             call mol0%remove_bond(j, adjlists0(k, j))
          end if
       end do
    end if
 
-   if (mol1%atoms(j)%znum == 1) then
+   if (znums1(j) == 1) then
       do k = 1, nadjs1(j)
-         if (any([7, 8] == mol1%atoms(adjlists1(k, j))%znum)) then
+         if (any([7, 8] == znums1(adjlists1(k, j)))) then
             if (mol1%bonded(mapping(j), mapping(adjlists1(k, j)))) then
                call mol1%remove_bond(mapping(j), mapping(adjlists1(k, j)))
             end if

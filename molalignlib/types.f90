@@ -10,12 +10,12 @@ implicit none
 private
 
 type :: Atom
-   character(:), allocatable :: label
-   integer :: znum
+   character(:), allocatable, private :: label
+   integer, private :: znum
    integer :: blkid
    integer :: eqvid
-   real(wp) :: weight
-   real(wp) :: coords(3)
+   real(wp), private :: weight
+   real(wp), private :: coords(3)
    integer :: nadj
    integer, allocatable :: adjlist(:)
    integer :: nadjeqv
@@ -38,21 +38,24 @@ contains
    procedure :: get_natom
    procedure :: get_nblock
    procedure :: get_znums
+   procedure :: set_znums
    procedure :: get_center
    procedure :: get_weights
+   procedure :: set_weights
    procedure :: get_blkids
    procedure :: get_eqvids
    procedure :: get_blklen
    procedure :: get_blklens
    procedure :: get_eqvlen
    procedure :: get_eqvlens
-   procedure :: set_coords
    procedure :: get_coords
+   procedure :: set_coords
    procedure :: get_labels
+   procedure :: set_labels
    procedure :: get_adjmat
    procedure :: get_nadjs
-   procedure :: set_adjlists
    procedure :: get_adjlists
+   procedure :: set_adjlists
    procedure :: get_fragroot
    procedure :: get_blocks
    procedure :: mirror_coords
@@ -145,6 +148,14 @@ function get_znums(self) result(znums)
 
 end function get_znums
 
+subroutine set_znums(self, znums)
+   class(Molecule), intent(inout) :: self
+   integer, intent(in) :: znums(self%natom)
+
+   self%atoms(:)%znum = znums(:)
+
+end subroutine set_znums
+
 function get_center(self) result(cntrcoords)
 ! Purpose: Get the centroid coordinates
    class(Molecule), intent(in) :: self
@@ -205,6 +216,14 @@ function get_weights(self) result(weights)
 
 end function get_weights
 
+subroutine set_weights(self, weights)
+   class(Molecule), intent(inout) :: self
+   real(wp), intent(in) :: weights(self%natom)
+
+   self%atoms(:)%weight = weights(:)
+
+end subroutine set_weights
+
 function get_coords(self) result(coords)
    class(Molecule), intent(in) :: self
    real(wp) :: coords(3, self%natom)
@@ -238,6 +257,17 @@ function get_labels(self) result(labels)
    end do
 
 end function get_labels
+
+subroutine set_labels(self, labels)
+   class(Molecule), intent(inout) :: self
+   character(wl), intent(in) :: labels(self%natom)
+   integer :: i
+
+   do i = 1, self%natom
+      self%atoms(i)%label = labels(i)
+   end do
+
+end subroutine set_labels
 
 function get_adjmat(self) result(adjmat)
    class(Molecule), intent(in) :: self

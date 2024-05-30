@@ -34,17 +34,25 @@ subroutine assort_atoms(mol)
 ! Purpose: Group atoms by atomic numbers and types
    type(Molecule), intent(inout) :: mol
 
-   integer :: i, j, nblock
-   integer :: znumi, ztypei, znumj, ztypej
+   integer :: i, j
+   integer :: nblock, ztype
    integer :: blkid(mol%natom)
    logical :: remaining(mol%natom)
    integer, dimension(mol%natom) :: blklens, blkznum, blkynum
    integer, dimension(mol%natom) :: order, idorder
 
+   integer, allocatable :: znums(:)
+   real(wp), allocatable :: weights(:)
+   character(wl), allocatable :: labels(:)
+
    ! Initialization
 
    nblock = 0
    remaining = .true.
+   labels = mol%get_labels()
+!   weights = mol%get_weights()
+   allocate(znums(mol%natom))
+   allocate(weights(mol%natom))
 
    ! Create block list
 
@@ -52,32 +60,30 @@ subroutine assort_atoms(mol)
 
       if (remaining(i)) then
 
-         call readlabel(mol%atoms(i)%label, znumi, ztypei)
+         call readlabel(labels(i), znums(i), ztype)
+         weights = weight_func(znums(i))
 
          nblock = nblock + 1
          blkid(i) = nblock
          blklens(nblock) = 1
-         blkznum(nblock) = znumi
-         blkynum(nblock) = ztypei
-         mol%atoms(i)%znum = znumi
-         mol%atoms(i)%weight = weight_func(znumi)
+         blkznum(nblock) = znums(i)
+         blkynum(nblock) = ztype
          remaining(i) = .false.
 
          do j = 1, mol%natom
             if (remaining(j)) then
-               call readlabel(mol%atoms(j)%label, znumj, ztypej)
-               if (znumi == znumj .and. ztypei == ztypej) then
-                  if (weight_func(znumi) == weight_func(znumj)) then
+               if (labels(i) == labels(j)) then
+!                  if (weights(i) == weights(j)) then
                      blkid(j) = nblock
-                     mol%atoms(j)%znum = znumj
-                     mol%atoms(j)%weight = weight_func(znumj)
+                     znums(j) = znums(i)
+                     weights(j) = weights(i)
                      remaining(j) = .false.
                      blklens(nblock) = blklens(nblock) + 1
-                  else
-                     ! Abort if there are inconsistent weights
-                     write (stderr, '(a)') 'Error: There are incosistent weights'
-                     stop
-                  end if
+!                  else
+!                     ! Abort if there are inconsistent weights
+!                     write (stderr, '(a)') 'Error: There are incosistent weights'
+!                     stop
+!                  end if
                end if
             end if
          end do
@@ -105,6 +111,9 @@ subroutine assort_atoms(mol)
    mol%nblock = nblock
    mol%blklens = blklens(:nblock)
    mol%atoms(:)%blkid = blkid(:)
+
+   call mol%set_znums(znums)
+   call mol%set_weights(weights)
 
 end subroutine
 

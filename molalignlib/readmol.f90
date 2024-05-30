@@ -30,20 +30,26 @@ subroutine readxyz(unit, mol)
    integer, intent(in) :: unit
    type(Molecule), intent(out) :: mol
    character(ll) :: buffer
+   character(wl), allocatable :: labels(:)
+   real(wp), allocatable :: coords(:, :)
 
    integer :: i
 
    read (unit, *, end=99) mol%natom
 
+   allocate(labels(mol%natom))
+   allocate(coords(3, mol%natom))
    allocate(mol%atoms(mol%natom))
 
    read (unit, '(a)', end=99) buffer
    mol%title = trim(buffer)
 
    do i = 1, mol%natom
-      read (unit, *, end=99) buffer, mol%atoms(i)%coords(:)
-      mol%atoms(i)%label = buffer
+      read (unit, *, end=99) labels(i), coords(:, i)
    end do
+
+   call mol%set_labels(labels)
+   call mol%set_coords(coords)
 
    return
 
@@ -59,7 +65,9 @@ subroutine readmol2(unit, mol)
    character(ll) :: buffer
    integer :: i, id
    integer :: atom1, atom2, bondorder, nbond
+   character(wl), allocatable :: labels(:)
    integer, allocatable :: nadjs(:), adjlists(:, :)
+   real(wp), allocatable :: coords(:, :)
 
    do
       read (unit, '(a)', end=99) buffer
@@ -70,9 +78,11 @@ subroutine readmol2(unit, mol)
    mol%title = trim(buffer)
    read (unit, *, end=99) mol%natom, nbond
 
-   allocate(mol%atoms(mol%natom))
+   allocate(labels(mol%natom))
+   allocate(coords(3, mol%natom))
    allocate(nadjs(mol%natom))
    allocate(adjlists(mol%natom, mol%natom))
+   allocate(mol%atoms(mol%natom))
 
    do
       read (unit, '(a)', end=99) buffer
@@ -80,8 +90,7 @@ subroutine readmol2(unit, mol)
    end do
 
    do i = 1, mol%natom
-      read (unit, *, end=99) id, buffer, mol%atoms(i)%coords(:)
-      mol%atoms(i)%label = buffer
+      read (unit, *, end=99) id, labels(i), coords(:, i)
    end do
 
    do
@@ -107,6 +116,8 @@ subroutine readmol2(unit, mol)
       adjlists(nadjs(atom2), atom2) = atom1
    end do
 
+   call mol%set_labels(labels)
+   call mol%set_coords(coords)
    call mol%set_adjlists(nadjs, adjlists)
 
    return
