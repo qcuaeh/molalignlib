@@ -124,7 +124,8 @@ end subroutine translate_coords
 subroutine permutate_atoms(self, order)
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: order(:)
-   integer i, k, invorder(self%natom)
+   integer :: i, k
+   integer :: invorder(self%natom)
 
    invorder = inverse_permut(order)
    self%atoms = self%atoms(order(:))
@@ -139,7 +140,6 @@ end subroutine permutate_atoms
 function get_znums(self) result(znums)
    class(Molecule), intent(in) :: self
    integer :: znums(self%natom)
-   integer i
 
    znums(:) = self%atoms(:)%znum
 
@@ -184,7 +184,6 @@ end function get_blocks
 function get_blkids(self) result(blkids)
    class(Molecule), intent(in) :: self
    integer :: blkids(self%natom)
-   integer i
 
    blkids(:) = self%atoms(:)%blkid
 
@@ -193,7 +192,6 @@ end function get_blkids
 function get_eqvids(self) result(eqvids)
    class(Molecule), intent(in) :: self
    integer :: eqvids(self%natom)
-   integer i
 
    eqvids(:) = self%atoms(:)%eqvid
 
@@ -202,7 +200,6 @@ end function get_eqvids
 function get_weights(self) result(weights)
    class(Molecule), intent(in) :: self
    real(wp) :: weights(self%natom)
-   integer i
 
    weights(:) = self%atoms(:)%weight
 
@@ -211,7 +208,7 @@ end function get_weights
 function get_coords(self) result(coords)
    class(Molecule), intent(in) :: self
    real(wp) :: coords(3, self%natom)
-   integer i
+   integer :: i
 
 !   coords(:, :) = self%atoms(:)%coords(:)
    do i = 1, self%natom
@@ -223,7 +220,7 @@ end function get_coords
 subroutine set_coords(self, coords)
    class(Molecule), intent(inout) :: self
    real(wp), intent(in) :: coords(3, self%natom)
-   integer i
+   integer :: i
 
    do i = 1, self%natom
       self%atoms(i)%coords = coords(:, i)
@@ -234,7 +231,7 @@ end subroutine set_coords
 function get_labels(self) result(labels)
    class(Molecule), intent(in) :: self
    character(wl) :: labels(self%natom)
-   integer i
+   integer :: i
 
    do i = 1, self%natom
       labels(i) = self%atoms(i)%label
@@ -246,7 +243,7 @@ function get_adjmat(self) result(adjmat)
    class(Molecule), intent(in) :: self
    type(Atom) :: iatom
    logical :: adjmat(self%natom, self%natom)
-   integer i, k
+   integer :: i, k
 
    adjmat(:, :) = .false.
 
@@ -262,7 +259,6 @@ end function get_adjmat
 function get_nadjs(self) result(nadjs)
    class(Molecule), intent(in) :: self
    integer :: nadjs(self%natom)
-   integer i
 
    nadjs = self%atoms(:)%nadj
 
@@ -272,7 +268,7 @@ subroutine set_adjlists(self, nadjs, adjlists)
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: nadjs(self%natom)
    integer, intent(in) :: adjlists(maxcoord, self%natom)
-   integer i
+   integer :: i
 
    do i = 1, self%natom
       self%atoms(i)%nadj = nadjs(i)
@@ -284,7 +280,7 @@ end subroutine set_adjlists
 function get_adjlists(self) result(adjlists)
    class(Molecule), intent(in) :: self
    integer :: adjlists(maxcoord, self%natom)
-   integer i
+   integer :: i
 
    do i = 1, self%natom
       adjlists(:self%atoms(i)%nadj, i) = self%atoms(i)%adjlist
@@ -403,7 +399,7 @@ end function bonded
 subroutine remove_bond(self, ind1, ind2)
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: ind1, ind2
-   integer i, pos1, pos2
+   integer :: i, pos1, pos2
 
 ! initialization
    pos1 = 0   ! position of ind2 in adjlist of atom 1
