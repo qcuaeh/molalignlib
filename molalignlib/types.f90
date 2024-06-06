@@ -17,7 +17,7 @@ type :: Atom
    real(wp), private :: weight
    real(wp), private :: coords(3)
    integer, private :: nadj
-   integer, allocatable :: adjlist(:)
+   integer, allocatable, private :: adjlist(:)
    integer :: nadjeqv
    integer, allocatable :: adjeqvlens(:)
 contains
