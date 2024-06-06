@@ -122,7 +122,7 @@ subroutine set_equiv_atoms(mol)
    type(Molecule), intent(inout) :: mol
 
    integer i, nin, nequiv
-   integer, dimension(mol%natom) :: eqvid, eqvlens
+   integer, dimension(mol%natom) :: eqvids, eqvlens
    integer, dimension(mol%natom) :: intype, uptype, basetype
    integer, dimension(mol%natom) :: order, idorder
 
@@ -134,30 +134,31 @@ subroutine set_equiv_atoms(mol)
 
    do
 
-      call getmnatypes(mol, nin, intype, nequiv, eqvid, eqvlens, uptype)
+      call getmnatypes(mol, nin, intype, nequiv, eqvids, eqvlens, uptype)
       basetype(:nequiv) = basetype(uptype(:nequiv))
 
-      if (all(eqvid == intype)) exit
+      if (all(eqvids == intype)) exit
 
       nin = nequiv
-      intype = eqvid
+      intype = eqvids
 
    end do
 
    order(:nequiv) = sorted_order(basetype, nequiv)
    idorder(:nequiv) = inverse_permut(order(:nequiv))
    eqvlens(:nequiv) = eqvlens(order(:nequiv))
-   eqvid = idorder(eqvid)
+   eqvids = idorder(eqvids)
 
 !    do i = 1, mol%natom
-!        print *, i, elsym(znum(i)), eqvid(i)
+!        print *, i, elsym(znum(i)), eqvids(i)
 !    end do
 
    allocate (mol%eqvlens(nequiv))
 
    mol%nequiv = nequiv
    mol%eqvlens = eqvlens(:nequiv)
-   mol%atoms(:)%eqvid = eqvid(:)
+   
+   call mol%set_eqvids(eqvids)
 
 end subroutine
 

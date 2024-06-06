@@ -13,7 +13,7 @@ type :: Atom
    character(:), allocatable, private :: label
    integer, private :: znum
    integer, private :: blkid
-   integer :: eqvid
+   integer, private :: eqvid
    real(wp), private :: weight
    real(wp), private :: coords(3)
    integer, private :: nadj
@@ -45,6 +45,7 @@ contains
    procedure :: get_blkids
    procedure :: set_blkids
    procedure :: get_eqvids
+   procedure :: set_eqvids
    procedure :: get_blklen
    procedure :: get_blklens
    procedure :: get_eqvlen
@@ -156,6 +157,14 @@ subroutine set_znums(self, znums)
    self%atoms(:)%znum = znums(:)
 
 end subroutine set_znums
+
+subroutine set_eqvids(self, eqvids)
+   class(Molecule), intent(inout) :: self
+   integer, intent(in) :: eqvids(self%natom)
+
+   self%atoms(:)%eqvid = eqvids(:)
+
+end subroutine set_eqvids
 
 subroutine set_blkids(self, blkids)
    class(Molecule), intent(inout) :: self
