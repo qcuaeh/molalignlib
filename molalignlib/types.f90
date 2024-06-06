@@ -12,11 +12,11 @@ private
 type :: Atom
    character(:), allocatable, private :: label
    integer, private :: znum
-   integer :: blkid
+   integer, private :: blkid
    integer :: eqvid
    real(wp), private :: weight
    real(wp), private :: coords(3)
-   integer :: nadj
+   integer, private :: nadj
    integer, allocatable :: adjlist(:)
    integer :: nadjeqv
    integer, allocatable :: adjeqvlens(:)
@@ -43,6 +43,7 @@ contains
    procedure :: get_weights
    procedure :: set_weights
    procedure :: get_blkids
+   procedure :: set_blkids
    procedure :: get_eqvids
    procedure :: get_blklen
    procedure :: get_blklens
@@ -155,6 +156,14 @@ subroutine set_znums(self, znums)
    self%atoms(:)%znum = znums(:)
 
 end subroutine set_znums
+
+subroutine set_blkids(self, blkids)
+   class(Molecule), intent(inout) :: self
+   integer, intent(in) :: blkids(self%natom)
+
+   self%atoms(:)%blkid = blkids(:)
+
+end subroutine set_blkids
 
 function get_center(self) result(cntrcoords)
 ! Purpose: Get the centroid coordinates

@@ -36,7 +36,7 @@ subroutine assort_atoms(mol)
 
    integer :: i, j
    integer :: nblock, ztype
-   integer :: blkid(mol%natom)
+   integer :: blkids(mol%natom)
    logical :: remaining(mol%natom)
    integer, dimension(mol%natom) :: blklens, blkznum, blkynum
    integer, dimension(mol%natom) :: order, idorder
@@ -64,7 +64,7 @@ subroutine assort_atoms(mol)
          weights = weight_func(znums(i))
 
          nblock = nblock + 1
-         blkid(i) = nblock
+         blkids(i) = nblock
          blklens(nblock) = 1
          blkznum(nblock) = znums(i)
          blkynum(nblock) = ztype
@@ -74,7 +74,7 @@ subroutine assort_atoms(mol)
             if (remaining(j)) then
                if (labels(i) == labels(j)) then
 !                  if (weights(i) == weights(j)) then
-                     blkid(j) = nblock
+                     blkids(j) = nblock
                      znums(j) = znums(i)
                      weights(j) = weights(i)
                      remaining(j) = .false.
@@ -97,21 +97,21 @@ subroutine assort_atoms(mol)
    order(:nblock) = sorted_order(blkynum, nblock)
    idorder(:nblock) = inverse_permut(order(:nblock))
    blklens(:nblock) = blklens(order(:nblock))
-   blkid = idorder(blkid)
+   blkids = idorder(blkids)
 
    ! Order blocks by atomic number
 
    order(:nblock) = sorted_order(blkznum, nblock)
    idorder(:nblock) = inverse_permut(order(:nblock))
    blklens(:nblock) = blklens(order(:nblock))
-   blkid = idorder(blkid)
+   blkids = idorder(blkids)
 
    allocate (mol%blklens(nblock))
 
    mol%nblock = nblock
    mol%blklens = blklens(:nblock)
-   mol%atoms(:)%blkid = blkid(:)
 
+   call mol%set_blkids(blkids) 
    call mol%set_znums(znums)
    call mol%set_weights(weights)
 

@@ -349,6 +349,7 @@ subroutine find_reactive_sites(mol0, mol1, mapping)
    integer :: natom
    integer :: h, i, j, k, m, n
    integer, dimension(:), allocatable :: znums0, znums1
+   integer, dimension(:), allocatable :: blkids0, blkids1
    real(wp), dimension(:, :), allocatable :: coords0, coords1
    logical, dimension(:, :), allocatable :: adjmat0, adjmat1
    type(Block), dimension(:), allocatable :: blocks0, blocks1
@@ -367,13 +368,15 @@ subroutine find_reactive_sites(mol0, mol1, mapping)
    adjmat1 = mol1%get_adjmat()
    blocks0 = mol0%get_blocks()
    blocks1 = mol1%get_blocks()
+   blkids0 = mol0%get_blkids()
+   blkids1 = mol1%get_blkids()
 
    ! Remove reactive bonds
 
    do i = 1, mol0%natom
-      m = mol0%atoms(i)%blkid
+      m = blkids0(i)
       do j = i + 1, mol0%natom
-         n = mol0%atoms(j)%blkid
+         n = blkids0(j)
          if (adjmat0(i, j) .neqv. adjmat1(mapping(i), mapping(j))) then
             call remove_reactive_bond(i, j, mol0, mol1, mapping)
             do k = 1, mol0%blklens(m)
