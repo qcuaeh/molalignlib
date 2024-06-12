@@ -30,11 +30,11 @@ public mapatoms_bonded
 public proc_mapatoms
 
 abstract interface
-   subroutine proc_mapatoms(natom, nblk, blklen, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
+   subroutine proc_mapatoms(natom, ntype, typeaggs, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
       nadjmna1, adjmnalen1, adjmnalist1, coords1, weights, equivmat, biasmat, mapping)
       use kinds
-      integer, intent(in) :: natom, nblk
-      integer, dimension(:), intent(in) :: blklen
+      integer, intent(in) :: natom, ntype
+      integer, dimension(:), intent(in) :: typeaggs
       integer, dimension(:, :), intent(in) :: nadjmna0, nadjmna1
       integer, dimension(:, :, :), intent(in) :: adjmnalen0, adjmnalen1
       integer, dimension(:, :, :), intent(in) :: adjmnalist0, adjmnalist1
@@ -50,11 +50,11 @@ procedure(proc_mapatoms), pointer :: mapatoms
 
 contains
 
-subroutine mapatoms_free(natom, nblk, blklen, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
+subroutine mapatoms_free(natom, ntype, typeaggs, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
    nadjmna1, adjmnalen1, adjmnalist1, coords1, weights, equivmat, biasmat, mapping)
 ! Find best correspondence between points sets with fixed orientation
-   integer, intent(in) :: natom, nblk
-   integer, dimension(:), intent(in) :: blklen
+   integer, intent(in) :: natom, ntype
+   integer, dimension(:), intent(in) :: typeaggs
    integer, dimension(:, :), intent(in) :: nadjmna0, nadjmna1
    integer, dimension(:, :, :), intent(in) :: adjmnalen0, adjmnalen1
    integer, dimension(:, :, :), intent(in) :: adjmnalist0, adjmnalist1
@@ -71,20 +71,20 @@ subroutine mapatoms_free(natom, nblk, blklen, nadjmna0, adjmnalen0, adjmnalist0,
 
    offset = 0
 
-   do h = 1, nblk
-      call minperm(blklen(h), coords0(:, offset+1:offset+blklen(h)), coords1(:, offset+1:offset+blklen(h)), &
-         biasmat(offset+1:offset+blklen(h), offset+1:offset+blklen(h)), mapping(offset+1:), dummy)
-      mapping(offset+1:offset+blklen(h)) = mapping(offset+1:offset+blklen(h)) + offset
-      offset = offset + blklen(h)
+   do h = 1, ntype
+      call minperm(typeaggs(h), coords0(:, offset+1:offset+typeaggs(h)), coords1(:, offset+1:offset+typeaggs(h)), &
+         biasmat(offset+1:offset+typeaggs(h), offset+1:offset+typeaggs(h)), mapping(offset+1:), dummy)
+      mapping(offset+1:offset+typeaggs(h)) = mapping(offset+1:offset+typeaggs(h)) + offset
+      offset = offset + typeaggs(h)
    end do
 
 end subroutine
 
-subroutine mapatoms_bonded(natom, nblk, blklen, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
+subroutine mapatoms_bonded(natom, ntype, typeaggs, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
    nadjmna1, adjmnalen1, adjmnalist1, coords1, weights, equivmat, biasmat, mapping)
 ! Find best correspondence between points sets with fixed orientation
-   integer, intent(in) :: natom, nblk
-   integer, dimension(:), intent(in) :: blklen
+   integer, intent(in) :: natom, ntype
+   integer, dimension(:), intent(in) :: typeaggs
    integer, dimension(:, :), intent(in) :: nadjmna0, nadjmna1
    integer, dimension(:, :, :), intent(in) :: adjmnalen0, adjmnalen1
    integer, dimension(:, :, :), intent(in) :: adjmnalist0, adjmnalist1
@@ -102,9 +102,9 @@ subroutine mapatoms_bonded(natom, nblk, blklen, nadjmna0, adjmnalen0, adjmnalist
    allocate(costs(natom, natom))
 
    offset = 0
-   do h = 1, nblk
-      do i = offset + 1, offset + blklen(h)
-         do j = offset + 1, offset + blklen(h)
+   do h = 1, ntype
+      do i = offset + 1, offset + typeaggs(h)
+         do j = offset + 1, offset + typeaggs(h)
 !            costs(i, j) = sum((coords0(:, i) - coords1(:, j))**2)
             costs(i, j) = biasmat(j, i) + sum((coords0(:, i) - coords1(:, j))**2)
 !            costs(i, j) = biasmat(j, i) &
@@ -112,9 +112,9 @@ subroutine mapatoms_bonded(natom, nblk, blklen, nadjmna0, adjmnalen0, adjmnalist
 !                             coords0, nadjmna1, adjmnalen1, adjmnalist1, coords1, weights)
          end do
       end do
-      call assndx(1, costs(offset+1:, offset+1:), blklen(h), blklen(h), mapping(offset+1:), dummy)
-      mapping(offset+1:offset+blklen(h)) = mapping(offset+1:offset+blklen(h)) + offset
-      offset = offset + blklen(h)
+      call assndx(1, costs(offset+1:, offset+1:), typeaggs(h), typeaggs(h), mapping(offset+1:), dummy)
+      mapping(offset+1:offset+typeaggs(h)) = mapping(offset+1:offset+typeaggs(h)) + offset
+      offset = offset + typeaggs(h)
    end do
 
 end subroutine

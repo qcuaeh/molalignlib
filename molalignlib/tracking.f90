@@ -16,16 +16,16 @@ contains
 subroutine findmolfrags (mol)
 !subroutine findmolfrags (mol, nfrag, fragroots)
 !CZGC: old definition
-!subroutine findmolfrags (natom, nadjs, adjlists, nblk, blklen, &
-!                  neqv, eqvlen, nfrag, fragroots)
+!subroutine findmolfrags (natom, coonums, neighbors, ntype, typeaggs, &
+!                  nequiv, equivaggs, nfrag, fragroots)
 
    type(Molecule), intent(inout) :: mol
-   integer :: natom, nblk, neqv
-   integer, dimension(mol%natom) :: nadjs, blklen, eqvlen
-   integer, dimension(maxcoord, mol%natom) :: adjlists
-!   integer, intent(in) :: natom, nblk, neqv
-!   integer, dimension(:), intent(in) :: nadjs, blklen, eqvlen
-!   integer, dimension(:, :), intent(in) :: adjlists
+   integer :: natom, ntype, nequiv
+   integer, dimension(mol%natom) :: coonums, typeaggs, equivaggs
+   integer, dimension(maxcoord, mol%natom) :: neighbors
+!   integer, intent(in) :: natom, ntype, nequiv
+!   integer, dimension(:), intent(in) :: coonums, typeaggs, equivaggs
+!   integer, dimension(:, :), intent(in) :: neighbors
 !   integer, intent(out) :: nfrag, fragroots(mol%natom)
    integer :: nfrag, fragroots(mol%natom)
 
@@ -42,31 +42,27 @@ subroutine findmolfrags (mol)
 
 !CZGC: temporal variable
    natom = mol%natom
-   nblk = mol%nblock
-   do i = 1, nblk
-      blklen(i) = mol%get_blklen(i)
-   end do
-   neqv = mol%nequiv
-   do i = 1, neqv
-      eqvlen(i) = mol%get_eqvlen(i)
-   end do
-   nadjs = mol%get_nadjs()
-   adjlists = mol%get_adjlists()
+   ntype = mol%get_ntype()
+   typeaggs = mol%get_typeaggs()
+   nequiv = mol%get_nequiv()
+   equivaggs = mol%get_equivaggs()
+   coonums = mol%get_coonums()
+   neighbors = mol%get_neighbors()
 
    ! set atoms block indices
 
    offset = 0
-   do h = 1, nblk
-      blkidx(offset+1:offset+blklen(h)) = h
-      offset = offset + blklen(h)
+   do h = 1, ntype
+      blkidx(offset+1:offset+typeaggs(h)) = h
+      offset = offset + typeaggs(h)
    end do
 
    ! set atoms equivalence indices
 
    offset = 0
-   do h = 1, neqv
-      eqvidx(offset+1:offset+eqvlen(h)) = h
-      offset = offset + eqvlen(h)
+   do h = 1, nequiv
+      eqvidx(offset+1:offset+equivaggs(h)) = h
+      offset = offset + equivaggs(h)
    end do
 
    ! initialization
@@ -107,11 +103,11 @@ subroutine findmolfrags (mol)
          print fmtstr, f, "frag inds ini:  ", fragind(:fragsize(f),f)
          print fmtstr, f, "frag block size:", fragblock(:fragsize(f),f)
          print fmtstr, f, "frag equiv size:", fragequiv(:fragsize(f),f)
-         print fmtstr, f, "frag nadjs:    ", fragcoord(:fragsize(f),f)
+         print fmtstr, f, "frag coonums:    ", fragcoord(:fragsize(f),f)
       end do
    end if
 
-   ! sorts sequentially by blklen, eqvlen, and nadjs for each fragment
+   ! sorts sequentially by typeaggs, equivaggs, and coonums for each fragment
    order = [ (n, n = 1, natom) ]
    do f = 1, nfrag
       firstn = fragsize(f)
@@ -143,7 +139,7 @@ subroutine findmolfrags (mol)
          print fmtstr, f, "frag inds fin:  ", fragind(:fragsize(f),f)
          print fmtstr, f, "frag block size:", fragblock(:fragsize(f),f)
          print fmtstr, f, "frag equiv size:", fragequiv(:fragsize(f),f)
-         print fmtstr, f, "frag nadjs:    ", fragcoord(:fragsize(f),f)
+         print fmtstr, f, "frag coonums:    ", fragcoord(:fragsize(f),f)
          print '(i2,1x,a,1x,i10)', f, "fragment start ind:", fragroots(f)
       end do
    end if
@@ -169,12 +165,12 @@ contains
       fragsize(nfrag) = fragsize(nfrag) + 1
       fragid(n) = nfrag
       fragind(fragsize(nfrag),nfrag) = n
-      fragblock(fragsize(nfrag),nfrag) = blklen(blkidx(n))
-      fragequiv(fragsize(nfrag),nfrag) = eqvlen(eqvidx(n))
-      fragcoord(fragsize(nfrag),nfrag) = nadjs(n)
+      fragblock(fragsize(nfrag),nfrag) = typeaggs(blkidx(n))
+      fragequiv(fragsize(nfrag),nfrag) = equivaggs(eqvidx(n))
+      fragcoord(fragsize(nfrag),nfrag) = coonums(n)
       
-      do i = 1, nadjs(n)
-         call recrun (adjlists(i, n), track)
+      do i = 1, coonums(n)
+         call recrun (neighbors(i, n), track)
       end do
    end subroutine recrun
 

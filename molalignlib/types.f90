@@ -9,17 +9,24 @@ use bounds
 implicit none
 private
 
+type :: MNA
+   integer, allocatable :: lengths(:)
+end type
+
 type :: Atom
    character(:), allocatable, private :: label
    integer, private :: znum
-   integer, private :: blkid
-   integer, private :: eqvid
+   integer, private :: typeidx
+   integer, private :: equividx
+   integer, allocatable, private :: mnaid(:)
    real(wp), private :: weight
    real(wp), private :: coords(3)
-   integer, private :: nadj
-   integer, allocatable, private :: adjlist(:)
-   integer :: nadjeqv
-   integer, allocatable :: adjeqvlens(:)
+   integer, private :: coonum
+   integer, allocatable, private :: neighbors(:)
+   integer :: nneieqv
+   integer, allocatable :: neieqvlens(:)
+   integer :: nneimna
+   integer, allocatable :: neimnalens(:)
 contains
    procedure :: print => print_atom
 end type
@@ -28,36 +35,37 @@ type, public :: Molecule
    character(:), allocatable :: title
    integer :: natom
    type(Atom), allocatable :: atoms(:)
-   integer :: nblock
-   integer, allocatable :: blklens(:)
-   integer :: nequiv
-   integer, allocatable :: eqvlens(:)
+   integer, allocatable :: typeaggs(:)
+   integer, allocatable :: equivaggs(:)
    integer :: nfrag
    integer, allocatable :: fragroots(:)
+   integer :: nmna
+   type(MNA), allocatable :: mnas(:)
 contains
    procedure :: get_natom
-   procedure :: get_nblock
+   procedure :: get_ntype
+   procedure :: get_nequiv
    procedure :: get_znums
    procedure :: set_znums
    procedure :: get_center
    procedure :: get_weights
    procedure :: set_weights
-   procedure :: get_blkids
-   procedure :: set_blkids
-   procedure :: get_eqvids
-   procedure :: set_eqvids
-   procedure :: get_blklen
-   procedure :: get_blklens
-   procedure :: get_eqvlen
-   procedure :: get_eqvlens
+   procedure :: get_typeidcs
+   procedure :: set_typeidcs
+   procedure :: get_equividcs
+   procedure :: set_equividcs
+   procedure :: get_typeaggs
+   procedure :: set_typeaggs
+   procedure :: get_equivaggs
+   procedure :: set_equivaggs
    procedure :: get_coords
    procedure :: set_coords
    procedure :: get_labels
    procedure :: set_labels
    procedure :: get_adjmat
-   procedure :: get_nadjs
-   procedure :: get_adjlists
-   procedure :: set_adjlists
+   procedure :: get_coonums
+   procedure :: get_neighbors
+   procedure :: set_neighbors
    procedure :: get_fragroot
    procedure :: get_blocks
    procedure :: mirror_coords
@@ -73,7 +81,7 @@ contains
 end type
 
 type, public :: Block
-   integer, allocatable :: atmid(:)
+   integer, allocatable :: atomidx(:)
 end type
 
 contains
@@ -85,12 +93,19 @@ integer function get_natom(self) result(natom)
 
 end function get_natom
 
-integer function get_nblock(self) result(nblock)
+integer function get_ntype(self) result(ntype)
    class(Molecule), intent(in) :: self
 
-   nblock = self%nblock
+   ntype = size(self%typeaggs)
 
-end function get_nblock
+end function get_ntype
+
+integer function get_nequiv(self) result(nequiv)
+   class(Molecule), intent(in) :: self
+
+   nequiv = size(self%equivaggs)
+
+end function get_nequiv
 
 subroutine mirror_coords(self)
    class(Molecule), intent(inout) :: self
@@ -135,8 +150,8 @@ subroutine permutate_atoms(self, order)
    invorder = inverse_permut(order)
    self%atoms = self%atoms(order(:))
    do i = 1, self%natom
-      do k = 1, self%atoms(i)%nadj
-         self%atoms(i)%adjlist(k) = invorder(self%atoms(i)%adjlist(k))
+      do k = 1, self%atoms(i)%coonum
+         self%atoms(i)%neighbors(k) = invorder(self%atoms(i)%neighbors(k))
       end do
    end do
 
@@ -158,21 +173,21 @@ subroutine set_znums(self, znums)
 
 end subroutine set_znums
 
-subroutine set_eqvids(self, eqvids)
+subroutine set_equividcs(self, equividcs)
    class(Molecule), intent(inout) :: self
-   integer, intent(in) :: eqvids(self%natom)
+   integer, intent(in) :: equividcs(self%natom)
 
-   self%atoms(:)%eqvid = eqvids(:)
+   self%atoms(:)%equividx = equividcs(:)
 
-end subroutine set_eqvids
+end subroutine set_equividcs
 
-subroutine set_blkids(self, blkids)
+subroutine set_typeidcs(self, typeidcs)
    class(Molecule), intent(inout) :: self
-   integer, intent(in) :: blkids(self%natom)
+   integer, intent(in) :: typeidcs(self%natom)
 
-   self%atoms(:)%blkid = blkids(:)
+   self%atoms(:)%typeidx = typeidcs(:)
 
-end subroutine set_blkids
+end subroutine set_typeidcs
 
 function get_center(self) result(cntrcoords)
 ! Purpose: Get the centroid coordinates
@@ -194,37 +209,37 @@ end function get_center
 
 function get_blocks(self) result(blocks)
    class(Molecule), intent(in) :: self
-   type(Block) :: blocks(self%nblock)
-   integer :: h, i, k(self%nblock)
+   type(Block) :: blocks(size(self%typeaggs))
+   integer :: h, i, k(size(self%typeaggs))
 
    k(:) = 0
 
-   do h = 1, self%nblock
-      allocate(blocks(h)%atmid(self%blklens(h)))
+   do h = 1, size(self%typeaggs)
+      allocate(blocks(h)%atomidx(self%typeaggs(h)))
    end do
 
    do i = 1, self%natom
-      k(self%atoms(i)%blkid) = k(self%atoms(i)%blkid) + 1
-      blocks(self%atoms(i)%blkid)%atmid(k(self%atoms(i)%blkid)) = i
+      k(self%atoms(i)%typeidx) = k(self%atoms(i)%typeidx) + 1
+      blocks(self%atoms(i)%typeidx)%atomidx(k(self%atoms(i)%typeidx)) = i
    end do
 
 end function get_blocks
 
-function get_blkids(self) result(blkids)
+function get_typeidcs(self) result(typeidcs)
    class(Molecule), intent(in) :: self
-   integer :: blkids(self%natom)
+   integer :: typeidcs(self%natom)
 
-   blkids(:) = self%atoms(:)%blkid
+   typeidcs(:) = self%atoms(:)%typeidx
 
-end function get_blkids
+end function get_typeidcs
 
-function get_eqvids(self) result(eqvids)
+function get_equividcs(self) result(equividcs)
    class(Molecule), intent(in) :: self
-   integer :: eqvids(self%natom)
+   integer :: equividcs(self%natom)
 
-   eqvids(:) = self%atoms(:)%eqvid
+   equividcs(:) = self%atoms(:)%equividx
 
-end function get_eqvids
+end function get_equividcs
 
 function get_weights(self) result(weights)
    class(Molecule), intent(in) :: self
@@ -297,44 +312,46 @@ function get_adjmat(self) result(adjmat)
 
    do i = 1, self%natom
       iatom = self%atoms(i)
-      do k = 1, iatom%nadj
-         adjmat(i, iatom%adjlist(k)) = .true.
+      do k = 1, iatom%coonum
+         adjmat(i, iatom%neighbors(k)) = .true.
       end do
    end do
 
 end function get_adjmat
 
-function get_nadjs(self) result(nadjs)
+function get_coonums(self) result(coonums)
    class(Molecule), intent(in) :: self
-   integer :: nadjs(self%natom)
+   integer, allocatable :: coonums(:)
 
-   nadjs = self%atoms(:)%nadj
+   coonums = self%atoms(:)%coonum
 
-end function get_nadjs
+end function get_coonums
 
-subroutine set_adjlists(self, nadjs, adjlists)
+subroutine set_neighbors(self, coonums, neighbors)
    class(Molecule), intent(inout) :: self
-   integer, intent(in) :: nadjs(self%natom)
-   integer, intent(in) :: adjlists(maxcoord, self%natom)
+   integer, intent(in) :: coonums(:)
+   integer, intent(in) :: neighbors(:, :)
    integer :: i
 
    do i = 1, self%natom
-      self%atoms(i)%nadj = nadjs(i)
-      self%atoms(i)%adjlist = adjlists(:nadjs(i), i)
+      self%atoms(i)%coonum = coonums(i)
+      self%atoms(i)%neighbors = neighbors(:coonums(i), i)
    end do
 
-end subroutine set_adjlists
+end subroutine set_neighbors
 
-function get_adjlists(self) result(adjlists)
+function get_neighbors(self) result(neighbors)
    class(Molecule), intent(in) :: self
-   integer :: adjlists(maxcoord, self%natom)
+   integer, allocatable :: neighbors(:, :)
    integer :: i
 
+   allocate(neighbors(maxcoord, self%natom))
+
    do i = 1, self%natom
-      adjlists(:self%atoms(i)%nadj, i) = self%atoms(i)%adjlist
+      neighbors(:self%atoms(i)%coonum, i) = self%atoms(i)%neighbors
    end do
 
-end function get_adjlists
+end function get_neighbors
 
 function get_fragroot(self) result(fragroots)
    class(Molecule), intent(in) :: self
@@ -360,31 +377,31 @@ subroutine print_atom(self, ind, outLvl)
    select case (outLevel)
 
    case (1)
-      if (self%nadj == 0) then
+      if (self%coonum == 0) then
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a)'
-         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%blkid, &
+         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%typeidx, &
                      self%weight, " {", self%coords(:), " }"
       else
-         write (num, '(i0)') self%nadj
+         write (num, '(i0)') self%coonum
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a,'//num//'i3,a)'
-         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%blkid, &
+         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%typeidx, &
                self%weight, " {", self%coords(:), " } [", &
-               self%adjlist(:self%nadj), " ]"
+               self%neighbors(:self%coonum), " ]"
       end if
 
 !  case (2)
 !
    case default
-      if (self%nadj == 0) then
+      if (self%coonum == 0) then
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a)'
-         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%blkid, &
+         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%typeidx, &
                      self%weight, " {", self%coords(:), " }"
       else
-         write (num, '(i0)') self%nadj
+         write (num, '(i0)') self%coonum
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a,'//num//'i3,a)'
-         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%blkid, &
+         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%typeidx, &
                self%weight, " {", self%coords(:), " } [", &
-               self%adjlist(:self%nadj), " ]"
+               self%neighbors(:self%coonum), " ]"
       end if
    end select
 
@@ -399,8 +416,8 @@ subroutine print_molecule(self)
    write (stderr, '(a,i0,a)') "Contents of molecule structure:   (", &
                                          self%natom, " atoms)"
    write (stderr, '(2a)') 'Title: ', self%title
-   write (stderr, '(a,a4,a5,a6,a7,2a17)') "ind:", "lbl", "znum", "blkid", &
-                                          "weight", "{ coords }", "[ adjlists ]"
+   write (stderr, '(a,a4,a5,a6,a7,2a17)') "ind:", "lbl", "znum", "typeidx", &
+                                          "weight", "{ coords }", "[ neighbors ]"
 
    do i = 1, self%natom
       call self%atoms(i)%print(i)
@@ -418,15 +435,15 @@ function bonded(self, ind1, ind2) result(isbond)
    found1 = .false.
    found2 = .false.
 
-! check cross reference of ind1 and ind2 in both adjlists
-   do i = 1, self%atoms(ind1)%nadj
-      if (ind2 == self%atoms(ind1)%adjlist(i)) then
+! check cross reference of ind1 and ind2 in both neighbors
+   do i = 1, self%atoms(ind1)%coonum
+      if (ind2 == self%atoms(ind1)%neighbors(i)) then
          found1 = .true.
          exit
       end if
    end do
-   do i = 1, self%atoms(ind2)%nadj
-      if (ind1 == self%atoms(ind2)%adjlist(i)) then
+   do i = 1, self%atoms(ind2)%coonum
+      if (ind1 == self%atoms(ind2)%neighbors(i)) then
          found2 = .true.
          exit
       end if
@@ -450,18 +467,18 @@ subroutine remove_bond(self, ind1, ind2)
    integer :: i, pos1, pos2
 
 ! initialization
-   pos1 = 0   ! position of ind2 in adjlist of atom 1
-   pos2 = 0   ! position of ind1 in adjlist of atom 2
+   pos1 = 0   ! position of ind2 in neighbors of atom 1
+   pos2 = 0   ! position of ind1 in neighbors of atom 2
 
-! find position of ind2 and ind1 in adjlists of atoms ind1 and ind2, resp.
-   do i = 1, self%atoms(ind1)%nadj
-      if (ind2 == self%atoms(ind1)%adjlist(i)) then
+! find position of ind2 and ind1 in neighbors of atoms ind1 and ind2, resp.
+   do i = 1, self%atoms(ind1)%coonum
+      if (ind2 == self%atoms(ind1)%neighbors(i)) then
          pos1 = i
          exit
       end if
    end do
-   do i = 1, self%atoms(ind2)%nadj
-      if (ind1 == self%atoms(ind2)%adjlist(i)) then
+   do i = 1, self%atoms(ind2)%coonum
+      if (ind1 == self%atoms(ind2)%neighbors(i)) then
          pos2 = i
          exit
       end if
@@ -469,13 +486,13 @@ subroutine remove_bond(self, ind1, ind2)
 
 ! delete ind2 and ind1 from the ajdlists where they appear
    if ((pos1 /= 0) .and. (pos2 /= 0)) then
-      self%atoms(ind1)%nadj = self%atoms(ind1)%nadj - 1
-      do i = pos1, self%atoms(ind1)%nadj
-         self%atoms(ind1)%adjlist(i) = self%atoms(ind1)%adjlist(i+1)
+      self%atoms(ind1)%coonum = self%atoms(ind1)%coonum - 1
+      do i = pos1, self%atoms(ind1)%coonum
+         self%atoms(ind1)%neighbors(i) = self%atoms(ind1)%neighbors(i+1)
       end do
-      self%atoms(ind2)%nadj = self%atoms(ind2)%nadj - 1
-      do i = pos2, self%atoms(ind2)%nadj
-         self%atoms(ind2)%adjlist(i) = self%atoms(ind2)%adjlist(i+1)
+      self%atoms(ind2)%coonum = self%atoms(ind2)%coonum - 1
+      do i = pos2, self%atoms(ind2)%coonum
+         self%atoms(ind2)%neighbors(i) = self%atoms(ind2)%neighbors(i+1)
       end do
    else
       write (stderr, '(a,i0,2x,i0)') 'Error: atoms not bonded: ', ind1, ind2
@@ -489,64 +506,66 @@ subroutine add_bond(self, ind1, ind2)
    integer :: pos1, pos2
 
 ! initialization
-   pos1 = self%atoms(ind1)%nadj
-   pos2 = self%atoms(ind2)%nadj
+   pos1 = self%atoms(ind1)%coonum
+   pos2 = self%atoms(ind2)%coonum
 
    if (.not. self%bonded(ind1, ind2)) then
-! indices in adjlists are supposed to be sorted; inserting new indices
-      self%atoms(ind1)%nadj = self%atoms(ind1)%nadj + 1
+! indices in neighbors are supposed to be sorted; inserting new indices
+      self%atoms(ind1)%coonum = self%atoms(ind1)%coonum + 1
 ! find position to insert ind2 and shift indices greater than ind2
-      do while ((pos1 >= 1) .and. (ind2 < self%atoms(ind1)%adjlist(pos1)))
-         self%atoms(ind1)%adjlist(pos1+1) = self%atoms(ind1)%adjlist(pos1)
+      do while ((pos1 >= 1) .and. (ind2 < self%atoms(ind1)%neighbors(pos1)))
+         self%atoms(ind1)%neighbors(pos1+1) = self%atoms(ind1)%neighbors(pos1)
          pos1 = pos1 - 1
       end do
-      self%atoms(ind1)%adjlist(pos1+1) = ind2
+      self%atoms(ind1)%neighbors(pos1+1) = ind2
       
-      self%atoms(ind2)%nadj = self%atoms(ind2)%nadj + 1
+      self%atoms(ind2)%coonum = self%atoms(ind2)%coonum + 1
 ! find position to insert ind1 and shift indices greater than ind1
-      do while ((pos2 >= 1) .and. (ind1 < self%atoms(ind2)%adjlist(pos2)))
-         self%atoms(ind2)%adjlist(pos2+1) = self%atoms(ind2)%adjlist(pos2)
+      do while ((pos2 >= 1) .and. (ind1 < self%atoms(ind2)%neighbors(pos2)))
+         self%atoms(ind2)%neighbors(pos2+1) = self%atoms(ind2)%neighbors(pos2)
          pos2 = pos2 - 1
       end do
-      self%atoms(ind2)%adjlist(pos2+1) = ind1
+      self%atoms(ind2)%neighbors(pos2+1) = ind1
    else
       write (stderr, '(a,i0,2x,i0)') "Error: atoms already bonded: ", ind1, ind2
    end if
 
 end subroutine add_bond
 
-integer function get_blklen(self, blkid) result(blklen)
+function get_typeaggs(self) result(typeaggs)
    class(Molecule), intent(in) :: self
-   integer, intent(in) :: blkid
-   integer :: i
+   integer, allocatable :: typeaggs(:)
 
-   blklen = self%blklens(blkid)
+   typeaggs = self%typeaggs
 
-end function get_blklen
+end function get_typeaggs
 
-function get_blklens(self) result(blklens)
+subroutine set_typeaggs(self, ntype, typeaggs)
+   class(Molecule), intent(inout) :: self
+   integer, intent(in) :: ntype
+   integer, intent(in) :: typeaggs(:)
+
+!   allocate(self%typeaggs(ntype))
+   self%typeaggs = typeaggs(:ntype)
+
+end subroutine set_typeaggs
+
+function get_equivaggs(self) result(equivaggs)
    class(Molecule), intent(in) :: self
-   integer, allocatable :: blklens(:)
+   integer, allocatable :: equivaggs(:)
 
-   blklens = self%blklens
+   equivaggs = self%equivaggs
 
-end function get_blklens
+end function get_equivaggs
 
-integer function get_eqvlen(self, eqvid) result(eqvlen)
-   class(Molecule), intent(in) :: self
-   integer, intent(in) :: eqvid
-   integer :: i
+subroutine set_equivaggs(self, nequiv, equivaggs)
+   class(Molecule), intent(inout) :: self
+   integer, intent(in) :: nequiv
+   integer, intent(in) :: equivaggs(:)
 
-   eqvlen = self%eqvlens(eqvid)
+!   allocate(self%equivaggs(nequiv))
+   self%equivaggs = equivaggs(:nequiv)
 
-end function get_eqvlen
-
-function get_eqvlens(self) result(eqvlens)
-   class(Molecule), intent(in) :: self
-   integer, allocatable :: eqvlens(:)
-
-   eqvlens = self%eqvlens
-
-end function get_eqvlens
+end subroutine set_equivaggs
 
 end module
