@@ -340,13 +340,14 @@ function get_coonums(self) result(coonums)
 
 end function get_coonums
 
-subroutine set_neighbors_atom(self, neighbors)
+subroutine set_neighbors_atom(self, coonum, neighbors)
    class(Atom), intent(inout) :: self
-   integer, dimension(:), intent(in) :: neighbors
+   integer, intent(in) :: coonum
+   integer, dimension(coonum), intent(in) :: neighbors
 
    self%neighbors = neighbors
 ! provisional:
-   self%coonum = size(self%neighbors)
+   self%coonum = coonum
 
 end subroutine set_neighbors_atom
 
@@ -369,7 +370,7 @@ subroutine set_neighbors_molecule(self, coonums, neighbors)
 !      self%atoms(i)%coonum = coonums(i)
 !      self%atoms(i)%neighbors = neighbors(:coonums(i), i)
 ! new code:
-      call self%atoms(i)%set_neighbors(neighbors(:coonums(i), i))
+      call self%atoms(i)%set_neighbors(coonums(i), neighbors(:coonums(i), i))
    end do
 
 end subroutine set_neighbors_molecule
@@ -544,8 +545,8 @@ subroutine remove_bond(self, ind1, ind2)
          neighbors2(i) = neighbors2(i+1)
       end do
 ! update neighbor arrays for atoms ind1 and ind2
-      call self%atoms(ind1)%set_neighbors(neighbors1(:coonum1))
-      call self%atoms(ind2)%set_neighbors(neighbors2(:coonum2))
+      call self%atoms(ind1)%set_neighbors(coonum1, neighbors1(:coonum1))
+      call self%atoms(ind2)%set_neighbors(coonum2, neighbors2(:coonum2))
    else
       write (stderr, '(a,i0,2x,i0)') 'Error: atoms not bonded: ', ind1, ind2
    end if
@@ -587,8 +588,8 @@ subroutine add_bond(self, ind1, ind2)
       end do
       neighbors2(pos2+1) = ind1
 ! update neighbor arrays for atoms in ind1 and ind2
-      call self%atoms(ind1)%set_neighbors(neighbors1(:coonum1))
-      call self%atoms(ind2)%set_neighbors(neighbors2(:coonum2))
+      call self%atoms(ind1)%set_neighbors(coonum1, neighbors1(:coonum1))
+      call self%atoms(ind2)%set_neighbors(coonum2, neighbors2(:coonum2))
    else
       write (stderr, '(a,i0,2x,i0)') "Error: atoms already bonded: ", ind1, ind2
    end if
