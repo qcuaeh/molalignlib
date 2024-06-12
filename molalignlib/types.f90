@@ -29,6 +29,9 @@ type :: Atom
    integer, allocatable :: neimnalens(:)
 contains
    procedure :: print => print_atom
+   procedure :: get_neighbors => get_neighbors_atom
+   procedure :: set_neighbors => set_neighbors_atom
+   procedure :: get_coonum
 end type
 
 type, public :: Molecule
@@ -64,8 +67,8 @@ contains
    procedure :: set_labels
    procedure :: get_adjmat
    procedure :: get_coonums
-   procedure :: get_neighbors
-   procedure :: set_neighbors
+   procedure :: get_neighbors => get_neighbors_molecule
+   procedure :: set_neighbors => set_neighbors_molecule
    procedure :: get_fragroot
    procedure :: get_blocks
    procedure :: mirror_coords
@@ -319,6 +322,16 @@ function get_adjmat(self) result(adjmat)
 
 end function get_adjmat
 
+function get_coonum(self) result(coonum)
+   class(Atom), intent(in) :: self
+   integer :: coonum
+
+!CZGC provisional:
+   coonum = self%coonum
+!   coonum = size(self%neighbors)
+
+end function get_coonum
+
 function get_coonums(self) result(coonums)
    class(Molecule), intent(in) :: self
    integer, allocatable :: coonums(:)
@@ -327,20 +340,41 @@ function get_coonums(self) result(coonums)
 
 end function get_coonums
 
-subroutine set_neighbors(self, coonums, neighbors)
+subroutine set_neighbors_atom(self, neighbors)
+   class(Atom), intent(inout) :: self
+   integer, dimension(:), intent(in) :: neighbors
+
+   self%neighbors = neighbors
+! provisional:
+   self%coonum = size(self%neighbors)
+
+end subroutine set_neighbors_atom
+
+function get_neighbors_atom(self) result(neighbors)
+   class(Atom), intent(in) :: self
+   integer, dimension(:), allocatable :: neighbors
+
+   neighbors = self%neighbors
+
+end function get_neighbors_atom
+
+subroutine set_neighbors_molecule(self, coonums, neighbors)
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: coonums(:)
    integer, intent(in) :: neighbors(:, :)
    integer :: i
 
    do i = 1, self%natom
-      self%atoms(i)%coonum = coonums(i)
-      self%atoms(i)%neighbors = neighbors(:coonums(i), i)
+!CZGC original code:
+!      self%atoms(i)%coonum = coonums(i)
+!      self%atoms(i)%neighbors = neighbors(:coonums(i), i)
+! new code:
+      call self%atoms(i)%set_neighbors(neighbors(:coonums(i), i))
    end do
 
-end subroutine set_neighbors
+end subroutine set_neighbors_molecule
 
-function get_neighbors(self) result(neighbors)
+function get_neighbors_molecule(self) result(neighbors)
    class(Molecule), intent(in) :: self
    integer, allocatable :: neighbors(:, :)
    integer :: i
@@ -348,10 +382,13 @@ function get_neighbors(self) result(neighbors)
    allocate(neighbors(maxcoord, self%natom))
 
    do i = 1, self%natom
-      neighbors(:self%atoms(i)%coonum, i) = self%atoms(i)%neighbors
+!CZGC original code:
+!      neighbors(:self%atoms(i)%coonum, i) = self%atoms(i)%neighbors
+! provisional
+      neighbors(:self%atoms(i)%coonum, i) = self%atoms(i)%get_neighbors()
    end do
 
-end function get_neighbors
+end function get_neighbors_molecule
 
 function get_fragroot(self) result(fragroots)
    class(Molecule), intent(in) :: self
@@ -428,22 +465,27 @@ end subroutine print_molecule
 function bonded(self, ind1, ind2) result(isbond)
    class(Molecule), intent(in) :: self
    integer, intent(in) :: ind1, ind2
+   integer, dimension(maxcoord) :: neighbors1, neighbors2
    integer :: i
    logical :: isbond, found1, found2
+
+! copy arrays of neighbors
+   neighbors1 = self%atoms(ind1)%get_neighbors()
+   neighbors2 = self%atoms(ind2)%get_neighbors()
 
 ! initialization
    found1 = .false.
    found2 = .false.
 
 ! check cross reference of ind1 and ind2 in both neighbors
-   do i = 1, self%atoms(ind1)%coonum
-      if (ind2 == self%atoms(ind1)%neighbors(i)) then
+   do i = 1, self%atoms(ind1)%get_coonum()
+      if (ind2 == neighbors1(i)) then
          found1 = .true.
          exit
       end if
    end do
-   do i = 1, self%atoms(ind2)%coonum
-      if (ind1 == self%atoms(ind2)%neighbors(i)) then
+   do i = 1, self%atoms(ind2)%get_coonum()
+      if (ind1 == neighbors2(i)) then
          found2 = .true.
          exit
       end if
@@ -464,21 +506,28 @@ end function bonded
 subroutine remove_bond(self, ind1, ind2)
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: ind1, ind2
-   integer :: i, pos1, pos2
+   integer, dimension(maxcoord) :: neighbors1, neighbors2
+   integer :: i, pos1, pos2, coonum1, coonum2
+
+! copy neighbors arrays
+   coonum1 = self%atoms(ind1)%get_coonum()
+   coonum2 = self%atoms(ind2)%get_coonum()
+   neighbors1 = self%atoms(ind1)%get_neighbors()
+   neighbors2 = self%atoms(ind2)%get_neighbors()
 
 ! initialization
    pos1 = 0   ! position of ind2 in neighbors of atom 1
    pos2 = 0   ! position of ind1 in neighbors of atom 2
 
 ! find position of ind2 and ind1 in neighbors of atoms ind1 and ind2, resp.
-   do i = 1, self%atoms(ind1)%coonum
-      if (ind2 == self%atoms(ind1)%neighbors(i)) then
+   do i = 1, coonum1
+      if (ind2 == neighbors1(i)) then
          pos1 = i
          exit
       end if
    end do
-   do i = 1, self%atoms(ind2)%coonum
-      if (ind1 == self%atoms(ind2)%neighbors(i)) then
+   do i = 1, coonum2
+      if (ind1 == neighbors2(i)) then
          pos2 = i
          exit
       end if
@@ -486,14 +535,17 @@ subroutine remove_bond(self, ind1, ind2)
 
 ! delete ind2 and ind1 from the ajdlists where they appear
    if ((pos1 /= 0) .and. (pos2 /= 0)) then
-      self%atoms(ind1)%coonum = self%atoms(ind1)%coonum - 1
-      do i = pos1, self%atoms(ind1)%coonum
-         self%atoms(ind1)%neighbors(i) = self%atoms(ind1)%neighbors(i+1)
+      coonum1 = coonum1 - 1
+      do i = pos1, coonum1
+         neighbors1(i) = neighbors1(i+1)
       end do
-      self%atoms(ind2)%coonum = self%atoms(ind2)%coonum - 1
-      do i = pos2, self%atoms(ind2)%coonum
-         self%atoms(ind2)%neighbors(i) = self%atoms(ind2)%neighbors(i+1)
+      coonum2 = coonum2 - 1
+      do i = pos2, coonum2
+         neighbors2(i) = neighbors2(i+1)
       end do
+! update neighbor arrays for atoms ind1 and ind2
+      call self%atoms(ind1)%set_neighbors(neighbors1(:coonum1))
+      call self%atoms(ind2)%set_neighbors(neighbors2(:coonum2))
    else
       write (stderr, '(a,i0,2x,i0)') 'Error: atoms not bonded: ', ind1, ind2
    end if
@@ -503,29 +555,40 @@ end subroutine remove_bond
 subroutine add_bond(self, ind1, ind2)
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: ind1, ind2
-   integer :: pos1, pos2
+   integer, dimension(maxcoord) :: neighbors1, neighbors2
+   integer :: pos1, pos2, coonum1, coonum2
+
+! copy array of neighbors
+   coonum1 = self%atoms(ind1)%get_coonum()
+   coonum2 = self%atoms(ind2)%get_coonum()
+   neighbors1 = self%atoms(ind1)%get_neighbors()
+   neighbors2 = self%atoms(ind2)%get_neighbors()
 
 ! initialization
-   pos1 = self%atoms(ind1)%coonum
-   pos2 = self%atoms(ind2)%coonum
+   pos1 = coonum1
+   pos2 = coonum2
 
    if (.not. self%bonded(ind1, ind2)) then
 ! indices in neighbors are supposed to be sorted; inserting new indices
-      self%atoms(ind1)%coonum = self%atoms(ind1)%coonum + 1
+!      self%atoms(ind1)%coonum = self%atoms(ind1)%coonum + 1
+      coonum1 = coonum1 + 1
 ! find position to insert ind2 and shift indices greater than ind2
-      do while ((pos1 >= 1) .and. (ind2 < self%atoms(ind1)%neighbors(pos1)))
-         self%atoms(ind1)%neighbors(pos1+1) = self%atoms(ind1)%neighbors(pos1)
+      do while ((pos1 >= 1) .and. (ind2 < neighbors1(pos1)))
+         neighbors1(pos1+1) = neighbors1(pos1)
          pos1 = pos1 - 1
       end do
-      self%atoms(ind1)%neighbors(pos1+1) = ind2
+      neighbors1(pos1+1) = ind2
       
-      self%atoms(ind2)%coonum = self%atoms(ind2)%coonum + 1
+      coonum2 = coonum2 + 1
 ! find position to insert ind1 and shift indices greater than ind1
-      do while ((pos2 >= 1) .and. (ind1 < self%atoms(ind2)%neighbors(pos2)))
-         self%atoms(ind2)%neighbors(pos2+1) = self%atoms(ind2)%neighbors(pos2)
+      do while ((pos2 >= 1) .and. (ind1 < neighbors2(pos2)))
+         neighbors2(pos2+1) = neighbors2(pos2)
          pos2 = pos2 - 1
       end do
-      self%atoms(ind2)%neighbors(pos2+1) = ind1
+      neighbors2(pos2+1) = ind1
+! update neighbor arrays for atoms in ind1 and ind2
+      call self%atoms(ind1)%set_neighbors(neighbors1(:coonum1))
+      call self%atoms(ind2)%set_neighbors(neighbors2(:coonum2))
    else
       write (stderr, '(a,i0,2x,i0)') "Error: atoms already bonded: ", ind1, ind2
    end if
