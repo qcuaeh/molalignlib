@@ -21,56 +21,55 @@ type :: Atom
    integer, allocatable, private :: mnaid(:)
    real(wp), private :: weight
    real(wp), private :: coords(3)
-   integer, private :: coonum
-   integer, allocatable, private :: neighbors(:)
-   integer :: nneieqv
-   integer, allocatable :: neieqvlens(:)
-   integer :: nneimna
-   integer, allocatable :: neimnalens(:)
+   integer, private :: nadj
+   integer, allocatable, private :: adjlist(:)
+   integer, allocatable :: adeqlenlist(:)
+   integer, allocatable :: mnalenlist(:)
 contains
    procedure :: print => print_atom
-   procedure :: get_neighbors => get_neighbors_atom
-   procedure :: set_neighbors => set_neighbors_atom
-   procedure :: get_coonum
+   procedure :: get_adjlist
+   procedure :: set_adjlist
 end type
 
 type, public :: Molecule
    character(:), allocatable :: title
    integer :: natom
    type(Atom), allocatable :: atoms(:)
-   integer, allocatable :: typeaggs(:)
-   integer, allocatable :: equivaggs(:)
+   integer, allocatable :: typelenlist(:)
+   integer, allocatable :: equivlenlist(:)
    integer :: nfrag
    integer, allocatable :: fragroots(:)
-   integer :: nmna
    type(MNA), allocatable :: mnas(:)
 contains
    procedure :: get_natom
    procedure :: get_ntype
    procedure :: get_nequiv
-   procedure :: get_znums
-   procedure :: set_znums
-   procedure :: get_center
-   procedure :: get_weights
-   procedure :: set_weights
+   procedure :: get_nadjs
+   procedure :: get_nadeqs
    procedure :: get_typeidcs
    procedure :: set_typeidcs
    procedure :: get_equividcs
    procedure :: set_equividcs
-   procedure :: get_typeaggs
-   procedure :: set_typeaggs
-   procedure :: get_equivaggs
-   procedure :: set_equivaggs
+   procedure :: get_typelenlist
+   procedure :: set_typelenlist
+   procedure :: get_equivlenlist
+   procedure :: set_equivlenlist
+   procedure :: get_adeqlenlists
+   procedure :: set_adeqlenlists
    procedure :: get_coords
    procedure :: set_coords
    procedure :: get_labels
    procedure :: set_labels
    procedure :: get_adjmat
-   procedure :: get_coonums
-   procedure :: get_neighbors => get_neighbors_molecule
-   procedure :: set_neighbors => set_neighbors_molecule
+   procedure :: get_adjlists
+   procedure :: set_adjlists
    procedure :: get_fragroot
    procedure :: get_blocks
+   procedure :: get_znums
+   procedure :: set_znums
+   procedure :: get_weights
+   procedure :: set_weights
+   procedure :: get_center
    procedure :: mirror_coords
    procedure, private :: matrix_rotate_coords
    procedure, private :: quater_rotate_coords
@@ -99,14 +98,14 @@ end function get_natom
 integer function get_ntype(self) result(ntype)
    class(Molecule), intent(in) :: self
 
-   ntype = size(self%typeaggs)
+   ntype = size(self%typelenlist)
 
 end function get_ntype
 
 integer function get_nequiv(self) result(nequiv)
    class(Molecule), intent(in) :: self
 
-   nequiv = size(self%equivaggs)
+   nequiv = size(self%equivlenlist)
 
 end function get_nequiv
 
@@ -153,8 +152,8 @@ subroutine permutate_atoms(self, order)
    invorder = inverse_permut(order)
    self%atoms = self%atoms(order(:))
    do i = 1, self%natom
-      do k = 1, self%atoms(i)%coonum
-         self%atoms(i)%neighbors(k) = invorder(self%atoms(i)%neighbors(k))
+      do k = 1, self%atoms(i)%nadj
+         self%atoms(i)%adjlist(k) = invorder(self%atoms(i)%adjlist(k))
       end do
    end do
 
@@ -212,13 +211,13 @@ end function get_center
 
 function get_blocks(self) result(blocks)
    class(Molecule), intent(in) :: self
-   type(Block) :: blocks(size(self%typeaggs))
-   integer :: h, i, k(size(self%typeaggs))
+   type(Block) :: blocks(size(self%typelenlist))
+   integer :: h, i, k(size(self%typelenlist))
 
    k(:) = 0
 
-   do h = 1, size(self%typeaggs)
-      allocate(blocks(h)%atomidx(self%typeaggs(h)))
+   do h = 1, size(self%typelenlist)
+      allocate(blocks(h)%atomidx(self%typelenlist(h)))
    end do
 
    do i = 1, self%natom
@@ -315,81 +314,110 @@ function get_adjmat(self) result(adjmat)
 
    do i = 1, self%natom
       iatom = self%atoms(i)
-      do k = 1, iatom%coonum
-         adjmat(i, iatom%neighbors(k)) = .true.
+      do k = 1, size(iatom%adjlist)
+         adjmat(i, iatom%adjlist(k)) = .true.
       end do
    end do
 
 end function get_adjmat
 
-function get_coonum(self) result(coonum)
-   class(Atom), intent(in) :: self
-   integer :: coonum
-
-!CZGC provisional:
-   coonum = self%coonum
-!   coonum = size(self%neighbors)
-
-end function get_coonum
-
-function get_coonums(self) result(coonums)
+function get_nadjs(self) result(nadjs)
    class(Molecule), intent(in) :: self
-   integer, allocatable :: coonums(:)
+   integer, allocatable :: nadjs(:)
+   integer :: i
 
-   coonums = self%atoms(:)%coonum
+   allocate(nadjs(size(self%atoms)))
+   do i = 1, size(self%atoms)
+      nadjs(i) = size(self%atoms(i)%adjlist)
+   end do
 
-end function get_coonums
+end function get_nadjs
 
-subroutine set_neighbors_atom(self, coonum, neighbors)
+subroutine set_adjlist(self, nadj, adjlist)
    class(Atom), intent(inout) :: self
-   integer, intent(in) :: coonum
-   integer, dimension(coonum), intent(in) :: neighbors
+   integer, intent(in) :: nadj
+   integer, dimension(nadj), intent(in) :: adjlist
 
-   self%neighbors = neighbors
+   self%adjlist = adjlist
 ! provisional:
-   self%coonum = coonum
+   self%nadj = nadj
 
-end subroutine set_neighbors_atom
+end subroutine set_adjlist
 
-function get_neighbors_atom(self) result(neighbors)
+function get_adjlist(self) result(adjlist)
    class(Atom), intent(in) :: self
-   integer, dimension(:), allocatable :: neighbors
+   integer, dimension(:), allocatable :: adjlist
 
-   neighbors = self%neighbors
+   adjlist = self%adjlist
 
-end function get_neighbors_atom
+end function get_adjlist
 
-subroutine set_neighbors_molecule(self, coonums, neighbors)
+subroutine set_adjlists(self, nadjs, adjlists)
    class(Molecule), intent(inout) :: self
-   integer, intent(in) :: coonums(:)
-   integer, intent(in) :: neighbors(:, :)
+   integer, intent(in) :: nadjs(:)
+   integer, intent(in) :: adjlists(:, :)
    integer :: i
 
    do i = 1, self%natom
-!CZGC original code:
-!      self%atoms(i)%coonum = coonums(i)
-!      self%atoms(i)%neighbors = neighbors(:coonums(i), i)
-! new code:
-      call self%atoms(i)%set_neighbors(coonums(i), neighbors(:coonums(i), i))
+      self%atoms(i)%nadj = nadjs(i)
+      self%atoms(i)%adjlist = adjlists(:nadjs(i), i)
    end do
 
-end subroutine set_neighbors_molecule
+end subroutine set_adjlists
 
-function get_neighbors_molecule(self) result(neighbors)
+function get_adjlists(self) result(adjlists)
    class(Molecule), intent(in) :: self
-   integer, allocatable :: neighbors(:, :)
+   integer, allocatable :: adjlists(:, :)
    integer :: i
 
-   allocate(neighbors(maxcoord, self%natom))
+   allocate(adjlists(maxcoord, self%natom))
 
    do i = 1, self%natom
-!CZGC original code:
-!      neighbors(:self%atoms(i)%coonum, i) = self%atoms(i)%neighbors
-! provisional
-      neighbors(:self%atoms(i)%coonum, i) = self%atoms(i)%get_neighbors()
+      adjlists(:self%atoms(i)%nadj, i) = self%atoms(i)%adjlist
    end do
 
-end function get_neighbors_molecule
+end function get_adjlists
+
+subroutine set_adeqlenlists(self, nadeqs, adeqlenlists)
+   class(Molecule), intent(inout) :: self
+   integer, intent(in) :: nadeqs(:)
+   integer, intent(in) :: adeqlenlists(:, :)
+   integer :: i
+
+   do i = 1, size(self%atoms)
+      if (.not. allocated(self%atoms(i)%adeqlenlist)) then
+         allocate(self%atoms(i)%adeqlenlist(nadeqs(i)))
+      end if
+      self%atoms(i)%adeqlenlist = adeqlenlists(:nadeqs(i), i)
+   end do
+
+end subroutine set_adeqlenlists
+
+function get_adeqlenlists(self) result(adeqlenlists)
+   class(Molecule), intent(inout) :: self
+   integer, allocatable :: adeqlenlists(:, :)
+   integer :: i
+
+   allocate(adeqlenlists(maxcoord, size(self%atoms)))
+
+   do i = 1, size(self%atoms)
+      adeqlenlists(:size(self%atoms(i)%adeqlenlist), i) = self%atoms(i)%adeqlenlist
+   end do
+
+end function get_adeqlenlists
+
+function get_nadeqs(self) result(nadeqs)
+   class(Molecule), intent(inout) :: self
+   integer, allocatable :: nadeqs(:)
+   integer :: i
+
+   allocate(nadeqs(size(self%atoms)))
+
+   do i = 1, size(self%atoms)
+      nadeqs(i) = size(self%atoms(i)%adeqlenlist)
+   end do
+
+end function get_nadeqs
 
 function get_fragroot(self) result(fragroots)
    class(Molecule), intent(in) :: self
@@ -415,31 +443,31 @@ subroutine print_atom(self, ind, outLvl)
    select case (outLevel)
 
    case (1)
-      if (self%coonum == 0) then
+      if (self%nadj == 0) then
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a)'
          write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%typeidx, &
                      self%weight, " {", self%coords(:), " }"
       else
-         write (num, '(i0)') self%coonum
+         write (num, '(i0)') self%nadj
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a,'//num//'i3,a)'
          write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%typeidx, &
                self%weight, " {", self%coords(:), " } [", &
-               self%neighbors(:self%coonum), " ]"
+               self%adjlist(:self%nadj), " ]"
       end if
 
 !  case (2)
 !
    case default
-      if (self%coonum == 0) then
+      if (self%nadj == 0) then
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a)'
          write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%typeidx, &
                      self%weight, " {", self%coords(:), " }"
       else
-         write (num, '(i0)') self%coonum
+         write (num, '(i0)') self%nadj
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a,'//num//'i3,a)'
          write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%typeidx, &
                self%weight, " {", self%coords(:), " } [", &
-               self%neighbors(:self%coonum), " ]"
+               self%adjlist(:self%nadj), " ]"
       end if
    end select
 
@@ -455,7 +483,7 @@ subroutine print_molecule(self)
                                          self%natom, " atoms)"
    write (stderr, '(2a)') 'Title: ', self%title
    write (stderr, '(a,a4,a5,a6,a7,2a17)') "ind:", "lbl", "znum", "typeidx", &
-                                          "weight", "{ coords }", "[ neighbors ]"
+                                          "weight", "{ coords }", "[ adjlist ]"
 
    do i = 1, self%natom
       call self%atoms(i)%print(i)
@@ -463,30 +491,30 @@ subroutine print_molecule(self)
 
 end subroutine print_molecule
 
-function bonded(self, ind1, ind2) result(isbond)
+function bonded(self, idx1, idx2) result(isbond)
    class(Molecule), intent(in) :: self
-   integer, intent(in) :: ind1, ind2
-   integer, dimension(maxcoord) :: neighbors1, neighbors2
+   integer, intent(in) :: idx1, idx2
+   integer, dimension(maxcoord) :: adjlist1, adjlist2
    integer :: i
    logical :: isbond, found1, found2
 
-! copy arrays of neighbors
-   neighbors1 = self%atoms(ind1)%get_neighbors()
-   neighbors2 = self%atoms(ind2)%get_neighbors()
+! copy arrays of adjlist
+   adjlist1 = self%atoms(idx1)%get_adjlist()
+   adjlist2 = self%atoms(idx2)%get_adjlist()
 
 ! initialization
    found1 = .false.
    found2 = .false.
 
-! check cross reference of ind1 and ind2 in both neighbors
-   do i = 1, self%atoms(ind1)%get_coonum()
-      if (ind2 == neighbors1(i)) then
+! check cross reference of idx1 and idx2 in both adjlists
+   do i = 1, size(self%atoms(idx1)%adjlist)
+      if (idx2 == adjlist1(i)) then
          found1 = .true.
          exit
       end if
    end do
-   do i = 1, self%atoms(ind2)%get_coonum()
-      if (ind1 == neighbors2(i)) then
+   do i = 1, size(self%atoms(idx2)%adjlist)
+      if (idx1 == adjlist2(i)) then
          found2 = .true.
          exit
       end if
@@ -496,7 +524,7 @@ function bonded(self, ind1, ind2) result(isbond)
    if (found1 .and. found2) then
       isbond = .true.
    else if (found1 .or. found2) then
-      write (stderr, '(a,i0,2x,i0)') 'Inconsistent bond for atoms: ', ind1, ind2
+      write (stderr, '(a,i0,2x,i0)') 'Inconsistent bond for atoms: ', idx1, idx2
       stop
    else
       isbond = .false.
@@ -504,132 +532,132 @@ function bonded(self, ind1, ind2) result(isbond)
 
 end function bonded
 
-subroutine remove_bond(self, ind1, ind2)
+subroutine remove_bond(self, idx1, idx2)
    class(Molecule), intent(inout) :: self
-   integer, intent(in) :: ind1, ind2
-   integer, dimension(maxcoord) :: neighbors1, neighbors2
-   integer :: i, pos1, pos2, coonum1, coonum2
+   integer, intent(in) :: idx1, idx2
+   integer, dimension(maxcoord) :: adjlist1, adjlist2
+   integer :: i, pos1, pos2, nadj1, nadj2
 
-! copy neighbors arrays
-   coonum1 = self%atoms(ind1)%get_coonum()
-   coonum2 = self%atoms(ind2)%get_coonum()
-   neighbors1 = self%atoms(ind1)%get_neighbors()
-   neighbors2 = self%atoms(ind2)%get_neighbors()
+! copy adjlist arrays
+   nadj1 = size(self%atoms(idx1)%adjlist)
+   nadj2 = size(self%atoms(idx2)%adjlist)
+   adjlist1 = self%atoms(idx1)%get_adjlist()
+   adjlist2 = self%atoms(idx2)%get_adjlist()
 
 ! initialization
-   pos1 = 0   ! position of ind2 in neighbors of atom 1
-   pos2 = 0   ! position of ind1 in neighbors of atom 2
+   pos1 = 0   ! position of idx2 in adjlist of atom 1
+   pos2 = 0   ! position of idx1 in adjlist of atom 2
 
-! find position of ind2 and ind1 in neighbors of atoms ind1 and ind2, resp.
-   do i = 1, coonum1
-      if (ind2 == neighbors1(i)) then
+! find position of idx2 and idx1 in adjlist of atoms idx1 and idx2, resp.
+   do i = 1, nadj1
+      if (idx2 == adjlist1(i)) then
          pos1 = i
          exit
       end if
    end do
-   do i = 1, coonum2
-      if (ind1 == neighbors2(i)) then
+   do i = 1, nadj2
+      if (idx1 == adjlist2(i)) then
          pos2 = i
          exit
       end if
    end do
 
-! delete ind2 and ind1 from the ajdlists where they appear
+! delete idx2 and idx1 from the ajdlists where they appear
    if ((pos1 /= 0) .and. (pos2 /= 0)) then
-      coonum1 = coonum1 - 1
-      do i = pos1, coonum1
-         neighbors1(i) = neighbors1(i+1)
+      nadj1 = nadj1 - 1
+      do i = pos1, nadj1
+         adjlist1(i) = adjlist1(i+1)
       end do
-      coonum2 = coonum2 - 1
-      do i = pos2, coonum2
-         neighbors2(i) = neighbors2(i+1)
+      nadj2 = nadj2 - 1
+      do i = pos2, nadj2
+         adjlist2(i) = adjlist2(i+1)
       end do
-! update neighbor arrays for atoms ind1 and ind2
-      call self%atoms(ind1)%set_neighbors(coonum1, neighbors1(:coonum1))
-      call self%atoms(ind2)%set_neighbors(coonum2, neighbors2(:coonum2))
+! update neighbor arrays for atoms idx1 and idx2
+      call self%atoms(idx1)%set_adjlist(nadj1, adjlist1(:nadj1))
+      call self%atoms(idx2)%set_adjlist(nadj2, adjlist2(:nadj2))
    else
-      write (stderr, '(a,i0,2x,i0)') 'Error: atoms not bonded: ', ind1, ind2
+      write (stderr, '(a,i0,2x,i0)') 'Error: atoms not bonded: ', idx1, idx2
    end if
 
 end subroutine remove_bond
 
-subroutine add_bond(self, ind1, ind2)
+subroutine add_bond(self, idx1, idx2)
    class(Molecule), intent(inout) :: self
-   integer, intent(in) :: ind1, ind2
-   integer, dimension(maxcoord) :: neighbors1, neighbors2
-   integer :: pos1, pos2, coonum1, coonum2
+   integer, intent(in) :: idx1, idx2
+   integer, dimension(maxcoord) :: adjlist1, adjlist2
+   integer :: pos1, pos2, nadj1, nadj2
 
-! copy array of neighbors
-   coonum1 = self%atoms(ind1)%get_coonum()
-   coonum2 = self%atoms(ind2)%get_coonum()
-   neighbors1 = self%atoms(ind1)%get_neighbors()
-   neighbors2 = self%atoms(ind2)%get_neighbors()
+! copy array of adjlist
+   nadj1 = size(self%atoms(idx1)%adjlist)
+   nadj2 = size(self%atoms(idx2)%adjlist)
+   adjlist1 = self%atoms(idx1)%get_adjlist()
+   adjlist2 = self%atoms(idx2)%get_adjlist()
 
 ! initialization
-   pos1 = coonum1
-   pos2 = coonum2
+   pos1 = nadj1
+   pos2 = nadj2
 
-   if (.not. self%bonded(ind1, ind2)) then
-! indices in neighbors are supposed to be sorted; inserting new indices
-!      self%atoms(ind1)%coonum = self%atoms(ind1)%coonum + 1
-      coonum1 = coonum1 + 1
-! find position to insert ind2 and shift indices greater than ind2
-      do while ((pos1 >= 1) .and. (ind2 < neighbors1(pos1)))
-         neighbors1(pos1+1) = neighbors1(pos1)
+   if (.not. self%bonded(idx1, idx2)) then
+! indices in adjlist are supposed to be sorted; inserting new indices
+!      self%atoms(idx1)%nadj = self%atoms(idx1)%nadj + 1
+      nadj1 = nadj1 + 1
+! find position to insert idx2 and shift indices greater than idx2
+      do while ((pos1 >= 1) .and. (idx2 < adjlist1(pos1)))
+         adjlist1(pos1+1) = adjlist1(pos1)
          pos1 = pos1 - 1
       end do
-      neighbors1(pos1+1) = ind2
+      adjlist1(pos1+1) = idx2
       
-      coonum2 = coonum2 + 1
-! find position to insert ind1 and shift indices greater than ind1
-      do while ((pos2 >= 1) .and. (ind1 < neighbors2(pos2)))
-         neighbors2(pos2+1) = neighbors2(pos2)
+      nadj2 = nadj2 + 1
+! find position to insert idx1 and shift indices greater than idx1
+      do while ((pos2 >= 1) .and. (idx1 < adjlist2(pos2)))
+         adjlist2(pos2+1) = adjlist2(pos2)
          pos2 = pos2 - 1
       end do
-      neighbors2(pos2+1) = ind1
-! update neighbor arrays for atoms in ind1 and ind2
-      call self%atoms(ind1)%set_neighbors(coonum1, neighbors1(:coonum1))
-      call self%atoms(ind2)%set_neighbors(coonum2, neighbors2(:coonum2))
+      adjlist2(pos2+1) = idx1
+! update neighbor arrays for atoms in idx1 and idx2
+      call self%atoms(idx1)%set_adjlist(nadj1, adjlist1(:nadj1))
+      call self%atoms(idx2)%set_adjlist(nadj2, adjlist2(:nadj2))
    else
-      write (stderr, '(a,i0,2x,i0)') "Error: atoms already bonded: ", ind1, ind2
+      write (stderr, '(a,i0,2x,i0)') "Error: atoms already bonded: ", idx1, idx2
    end if
 
 end subroutine add_bond
 
-function get_typeaggs(self) result(typeaggs)
+function get_typelenlist(self) result(typelenlist)
    class(Molecule), intent(in) :: self
-   integer, allocatable :: typeaggs(:)
+   integer, allocatable :: typelenlist(:)
 
-   typeaggs = self%typeaggs
+   typelenlist = self%typelenlist
 
-end function get_typeaggs
+end function get_typelenlist
 
-subroutine set_typeaggs(self, ntype, typeaggs)
+subroutine set_typelenlist(self, ntype, typelenlist)
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: ntype
-   integer, intent(in) :: typeaggs(:)
+   integer, intent(in) :: typelenlist(:)
 
-!   allocate(self%typeaggs(ntype))
-   self%typeaggs = typeaggs(:ntype)
+   allocate(self%typelenlist(ntype))
+   self%typelenlist = typelenlist(:ntype)
 
-end subroutine set_typeaggs
+end subroutine set_typelenlist
 
-function get_equivaggs(self) result(equivaggs)
+function get_equivlenlist(self) result(equivlenlist)
    class(Molecule), intent(in) :: self
-   integer, allocatable :: equivaggs(:)
+   integer, allocatable :: equivlenlist(:)
 
-   equivaggs = self%equivaggs
+   equivlenlist = self%equivlenlist
 
-end function get_equivaggs
+end function get_equivlenlist
 
-subroutine set_equivaggs(self, nequiv, equivaggs)
+subroutine set_equivlenlist(self, nequiv, equivlenlist)
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: nequiv
-   integer, intent(in) :: equivaggs(:)
+   integer, intent(in) :: equivlenlist(:)
 
-!   allocate(self%equivaggs(nequiv))
-   self%equivaggs = equivaggs(:nequiv)
+   allocate(self%equivlenlist(nequiv))
+   self%equivlenlist = equivlenlist(:nequiv)
 
-end subroutine set_equivaggs
+end subroutine set_equivlenlist
 
 end module

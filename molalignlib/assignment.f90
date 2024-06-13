@@ -30,11 +30,11 @@ public mapatoms_bonded
 public proc_mapatoms
 
 abstract interface
-   subroutine proc_mapatoms(natom, ntype, typeaggs, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
+   subroutine proc_mapatoms(natom, ntype, typelenlist, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
       nadjmna1, adjmnalen1, adjmnalist1, coords1, weights, equivmat, biasmat, mapping)
       use kinds
       integer, intent(in) :: natom, ntype
-      integer, dimension(:), intent(in) :: typeaggs
+      integer, dimension(:), intent(in) :: typelenlist
       integer, dimension(:, :), intent(in) :: nadjmna0, nadjmna1
       integer, dimension(:, :, :), intent(in) :: adjmnalen0, adjmnalen1
       integer, dimension(:, :, :), intent(in) :: adjmnalist0, adjmnalist1
@@ -50,11 +50,11 @@ procedure(proc_mapatoms), pointer :: mapatoms
 
 contains
 
-subroutine mapatoms_free(natom, ntype, typeaggs, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
+subroutine mapatoms_free(natom, ntype, typelenlist, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
    nadjmna1, adjmnalen1, adjmnalist1, coords1, weights, equivmat, biasmat, mapping)
 ! Find best correspondence between points sets with fixed orientation
    integer, intent(in) :: natom, ntype
-   integer, dimension(:), intent(in) :: typeaggs
+   integer, dimension(:), intent(in) :: typelenlist
    integer, dimension(:, :), intent(in) :: nadjmna0, nadjmna1
    integer, dimension(:, :, :), intent(in) :: adjmnalen0, adjmnalen1
    integer, dimension(:, :, :), intent(in) :: adjmnalist0, adjmnalist1
@@ -72,19 +72,19 @@ subroutine mapatoms_free(natom, ntype, typeaggs, nadjmna0, adjmnalen0, adjmnalis
    offset = 0
 
    do h = 1, ntype
-      call minperm(typeaggs(h), coords0(:, offset+1:offset+typeaggs(h)), coords1(:, offset+1:offset+typeaggs(h)), &
-         biasmat(offset+1:offset+typeaggs(h), offset+1:offset+typeaggs(h)), mapping(offset+1:), dummy)
-      mapping(offset+1:offset+typeaggs(h)) = mapping(offset+1:offset+typeaggs(h)) + offset
-      offset = offset + typeaggs(h)
+      call minperm(typelenlist(h), coords0(:, offset+1:offset+typelenlist(h)), coords1(:, offset+1:offset+typelenlist(h)), &
+         biasmat(offset+1:offset+typelenlist(h), offset+1:offset+typelenlist(h)), mapping(offset+1:), dummy)
+      mapping(offset+1:offset+typelenlist(h)) = mapping(offset+1:offset+typelenlist(h)) + offset
+      offset = offset + typelenlist(h)
    end do
 
 end subroutine
 
-subroutine mapatoms_bonded(natom, ntype, typeaggs, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
+subroutine mapatoms_bonded(natom, ntype, typelenlist, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
    nadjmna1, adjmnalen1, adjmnalist1, coords1, weights, equivmat, biasmat, mapping)
 ! Find best correspondence between points sets with fixed orientation
    integer, intent(in) :: natom, ntype
-   integer, dimension(:), intent(in) :: typeaggs
+   integer, dimension(:), intent(in) :: typelenlist
    integer, dimension(:, :), intent(in) :: nadjmna0, nadjmna1
    integer, dimension(:, :, :), intent(in) :: adjmnalen0, adjmnalen1
    integer, dimension(:, :, :), intent(in) :: adjmnalist0, adjmnalist1
@@ -103,8 +103,8 @@ subroutine mapatoms_bonded(natom, ntype, typeaggs, nadjmna0, adjmnalen0, adjmnal
 
    offset = 0
    do h = 1, ntype
-      do i = offset + 1, offset + typeaggs(h)
-         do j = offset + 1, offset + typeaggs(h)
+      do i = offset + 1, offset + typelenlist(h)
+         do j = offset + 1, offset + typelenlist(h)
 !            costs(i, j) = sum((coords0(:, i) - coords1(:, j))**2)
             costs(i, j) = biasmat(j, i) + sum((coords0(:, i) - coords1(:, j))**2)
 !            costs(i, j) = biasmat(j, i) &
@@ -112,9 +112,9 @@ subroutine mapatoms_bonded(natom, ntype, typeaggs, nadjmna0, adjmnalen0, adjmnal
 !                             coords0, nadjmna1, adjmnalen1, adjmnalist1, coords1, weights)
          end do
       end do
-      call assndx(1, costs(offset+1:, offset+1:), typeaggs(h), typeaggs(h), mapping(offset+1:), dummy)
-      mapping(offset+1:offset+typeaggs(h)) = mapping(offset+1:offset+typeaggs(h)) + offset
-      offset = offset + typeaggs(h)
+      call assndx(1, costs(offset+1:, offset+1:), typelenlist(h), typelenlist(h), mapping(offset+1:), dummy)
+      mapping(offset+1:offset+typelenlist(h)) = mapping(offset+1:offset+typelenlist(h)) + offset
+      offset = offset + typelenlist(h)
    end do
 
 end subroutine
@@ -154,7 +154,7 @@ recursive subroutine recursivemap(i, j, level, maxlevel, nadjmna0, adjmnalen0, a
    logical, dimension(:), intent(inout) :: mapped0, mapped1
 
    integer :: h, k, l, m, n, offset
-   integer, dimension(maxcoord) :: mapping, index0, index1
+   integer, dimension(maxcoord) :: mapping, idx0, idx1
    real(wp) :: distmat(maxcoord, maxcoord)
    real(wp) :: dummy
 
@@ -177,14 +177,14 @@ recursive subroutine recursivemap(i, j, level, maxlevel, nadjmna0, adjmnalen0, a
             if (.not. mapped0(adjmnalist0(k, i, maxlevel - level))) then
 !!               print *, 'not mapped0:', adjmnalist0(k, i, maxlevel - level)
                m = m + 1
-               index0(m) = adjmnalist0(k, i, maxlevel - level)
+               idx0(m) = adjmnalist0(k, i, maxlevel - level)
                n = 0
                do l = offset + 1, offset + adjmnalen1(h, j, maxlevel - level)
                   if (.not. mapped1(adjmnalist1(l, j, maxlevel - level))) then
 !!                     print *, 'not mapped1:', adjmnalist1(l, j, maxlevel - level)
                      n = n + 1
-                     index1(n) = adjmnalist1(l, j, maxlevel - level)
-                     distmat(m, n) = sum((coords0(:, index0(m)) - coords1(:, index1(n)))**2)
+                     idx1(n) = adjmnalist1(l, j, maxlevel - level)
+                     distmat(m, n) = sum((coords0(:, idx0(m)) - coords1(:, idx1(n)))**2)
 !!                  else
 !!                     print *, 'mapped1:', adjmnalist1(l, j, maxlevel - level)
                   end if
@@ -196,7 +196,7 @@ recursive subroutine recursivemap(i, j, level, maxlevel, nadjmna0, adjmnalen0, a
          if (m > 0) then
             call assndx(1, distmat, m, m, mapping, dummy)
             do n = 1, m
-               call recursivemap(index0(n), index1(mapping(n)), level + 1, maxlevel, &
+               call recursivemap(idx0(n), idx1(mapping(n)), level + 1, maxlevel, &
                   nadjmna0, adjmnalen0, adjmnalist0, coords0, nadjmna1, adjmnalen1, adjmnalist1, &
                   coords1, weights, totdist, totweight, mapped0, mapped1)
             end do
