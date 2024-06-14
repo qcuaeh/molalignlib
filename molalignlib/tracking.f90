@@ -16,15 +16,15 @@ contains
 subroutine findmolfrags (mol)
 !subroutine findmolfrags (mol, nfrag, fragroots)
 !CZGC: old definition
-!subroutine findmolfrags (natom, nadjs, adjlists, ntype, typelenlist, &
-!                  nequiv, equivlenlist, nfrag, fragroots)
+!subroutine findmolfrags (natom, nadjs, adjlists, natomtype, atomtypelenlist, &
+!                  natomequiv, atomequivlenlist, nfrag, fragroots)
 
    type(Molecule), intent(inout) :: mol
-   integer :: natom, ntype, nequiv
-   integer, dimension(mol%natom) :: nadjs, typelenlist, equivlenlist
+   integer :: natom, natomtype, natomequiv
+   integer, dimension(mol%natom) :: nadjs, atomtypelenlist, atomequivlenlist
    integer, dimension(maxcoord, mol%natom) :: adjlists
-!   integer, intent(in) :: natom, ntype, nequiv
-!   integer, dimension(:), intent(in) :: nadjs, typelenlist, equivlenlist
+!   integer, intent(in) :: natom, natomtype, natomequiv
+!   integer, dimension(:), intent(in) :: nadjs, atomtypelenlist, atomequivlenlist
 !   integer, dimension(:, :), intent(in) :: adjlists
 !   integer, intent(out) :: nfrag, fragroots(mol%natom)
    integer :: nfrag, fragroots(mol%natom)
@@ -42,27 +42,27 @@ subroutine findmolfrags (mol)
 
 !CZGC: temporal variable
    natom = mol%natom
-   ntype = mol%get_ntype()
-   typelenlist = mol%get_typelenlist()
-   nequiv = mol%get_nequiv()
-   equivlenlist = mol%get_equivlenlist()
+   natomtype = mol%get_natomtype()
+   atomtypelenlist = mol%get_atomtypelenlist()
+   natomequiv = mol%get_natomequiv()
+   atomequivlenlist = mol%get_atomequivlenlist()
    nadjs = mol%get_nadjs()
    adjlists = mol%get_adjlists()
 
    ! set atoms block indices
 
    offset = 0
-   do h = 1, ntype
-      blkidx(offset+1:offset+typelenlist(h)) = h
-      offset = offset + typelenlist(h)
+   do h = 1, natomtype
+      blkidx(offset+1:offset+atomtypelenlist(h)) = h
+      offset = offset + atomtypelenlist(h)
    end do
 
    ! set atoms equivalence indices
 
    offset = 0
-   do h = 1, nequiv
-      eqvidx(offset+1:offset+equivlenlist(h)) = h
-      offset = offset + equivlenlist(h)
+   do h = 1, natomequiv
+      eqvidx(offset+1:offset+atomequivlenlist(h)) = h
+      offset = offset + atomequivlenlist(h)
    end do
 
    ! initialization
@@ -107,7 +107,7 @@ subroutine findmolfrags (mol)
       end do
    end if
 
-   ! sorts sequentially by typelenlist, equivlenlist, and nadjs for each fragment
+   ! sorts sequentially by atomtypelenlist, atomequivlenlist, and nadjs for each fragment
    order = [ (n, n = 1, natom) ]
    do f = 1, nfrag
       firstn = fragsize(f)
@@ -165,8 +165,8 @@ contains
       fragsize(nfrag) = fragsize(nfrag) + 1
       fragid(n) = nfrag
       fragind(fragsize(nfrag),nfrag) = n
-      fragblock(fragsize(nfrag),nfrag) = typelenlist(blkidx(n))
-      fragequiv(fragsize(nfrag),nfrag) = equivlenlist(eqvidx(n))
+      fragblock(fragsize(nfrag),nfrag) = atomtypelenlist(blkidx(n))
+      fragequiv(fragsize(nfrag),nfrag) = atomequivlenlist(eqvidx(n))
       fragcoord(fragsize(nfrag),nfrag) = nadjs(n)
       
       do i = 1, nadjs(n)

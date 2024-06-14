@@ -16,15 +16,14 @@ end type
 type :: Atom
    character(:), allocatable, private :: label
    integer, private :: znum
-   integer, private :: typeidx
-   integer, private :: equividx
+   integer, private :: atomtypeidx
+   integer, private :: atomequividx
    integer, allocatable, private :: mnaid(:)
    real(wp), private :: weight
    real(wp), private :: coords(3)
    integer, private :: nadj
    integer, allocatable, private :: adjlist(:)
-   integer, allocatable :: adeqlenlist(:)
-   integer, allocatable :: mnalenlist(:)
+   integer, allocatable :: adjequivlenlist(:)
 contains
    procedure :: print => print_atom
 end type
@@ -33,27 +32,27 @@ type, public :: Molecule
    character(:), allocatable :: title
    integer :: natom
    type(Atom), allocatable :: atoms(:)
-   integer, allocatable :: typelenlist(:)
-   integer, allocatable :: equivlenlist(:)
+   integer, allocatable :: atomtypelenlist(:)
+   integer, allocatable :: atomequivlenlist(:)
    integer :: nfrag
    integer, allocatable :: fragroots(:)
    type(MNA), allocatable :: mnas(:)
 contains
    procedure :: get_natom
-   procedure :: get_ntype
-   procedure :: get_nequiv
+   procedure :: get_natomtype
+   procedure :: get_natomequiv
    procedure :: get_nadjs
-   procedure :: get_nadeqs
-   procedure :: get_typeidcs
-   procedure :: set_typeidcs
-   procedure :: get_equividcs
-   procedure :: set_equividcs
-   procedure :: get_typelenlist
-   procedure :: set_typelenlist
-   procedure :: get_equivlenlist
-   procedure :: set_equivlenlist
-   procedure :: get_adeqlenlists
-   procedure :: set_adeqlenlists
+   procedure :: get_nadjequivs
+   procedure :: get_atomtypeidcs
+   procedure :: set_atomtypeidcs
+   procedure :: get_atomequividcs
+   procedure :: set_atomequividcs
+   procedure :: get_atomtypelenlist
+   procedure :: set_atomtypelenlist
+   procedure :: get_atomequivlenlist
+   procedure :: set_atomequivlenlist
+   procedure :: get_adjequivlenlists
+   procedure :: set_adjequivlenlists
    procedure :: get_coords
    procedure :: set_coords
    procedure :: get_labels
@@ -93,19 +92,19 @@ integer function get_natom(self) result(natom)
 
 end function get_natom
 
-integer function get_ntype(self) result(ntype)
+integer function get_natomtype(self) result(natomtype)
    class(Molecule), intent(in) :: self
 
-   ntype = size(self%typelenlist)
+   natomtype = size(self%atomtypelenlist)
 
-end function get_ntype
+end function get_natomtype
 
-integer function get_nequiv(self) result(nequiv)
+integer function get_natomequiv(self) result(natomequiv)
    class(Molecule), intent(in) :: self
 
-   nequiv = size(self%equivlenlist)
+   natomequiv = size(self%atomequivlenlist)
 
-end function get_nequiv
+end function get_natomequiv
 
 subroutine mirror_coords(self)
    class(Molecule), intent(inout) :: self
@@ -173,21 +172,21 @@ subroutine set_znums(self, znums)
 
 end subroutine set_znums
 
-subroutine set_equividcs(self, equividcs)
+subroutine set_atomequividcs(self, atomequividcs)
    class(Molecule), intent(inout) :: self
-   integer, intent(in) :: equividcs(self%natom)
+   integer, intent(in) :: atomequividcs(self%natom)
 
-   self%atoms(:)%equividx = equividcs(:)
+   self%atoms(:)%atomequividx = atomequividcs(:)
 
-end subroutine set_equividcs
+end subroutine set_atomequividcs
 
-subroutine set_typeidcs(self, typeidcs)
+subroutine set_atomtypeidcs(self, atomtypeidcs)
    class(Molecule), intent(inout) :: self
-   integer, intent(in) :: typeidcs(self%natom)
+   integer, intent(in) :: atomtypeidcs(self%natom)
 
-   self%atoms(:)%typeidx = typeidcs(:)
+   self%atoms(:)%atomtypeidx = atomtypeidcs(:)
 
-end subroutine set_typeidcs
+end subroutine set_atomtypeidcs
 
 function get_center(self) result(cntrcoords)
 ! Purpose: Get the centroid coordinates
@@ -209,37 +208,37 @@ end function get_center
 
 function get_blocks(self) result(blocks)
    class(Molecule), intent(in) :: self
-   type(Block) :: blocks(size(self%typelenlist))
-   integer :: h, i, k(size(self%typelenlist))
+   type(Block) :: blocks(size(self%atomtypelenlist))
+   integer :: h, i, k(size(self%atomtypelenlist))
 
    k(:) = 0
 
-   do h = 1, size(self%typelenlist)
-      allocate(blocks(h)%atomidx(self%typelenlist(h)))
+   do h = 1, size(self%atomtypelenlist)
+      allocate(blocks(h)%atomidx(self%atomtypelenlist(h)))
    end do
 
    do i = 1, self%natom
-      k(self%atoms(i)%typeidx) = k(self%atoms(i)%typeidx) + 1
-      blocks(self%atoms(i)%typeidx)%atomidx(k(self%atoms(i)%typeidx)) = i
+      k(self%atoms(i)%atomtypeidx) = k(self%atoms(i)%atomtypeidx) + 1
+      blocks(self%atoms(i)%atomtypeidx)%atomidx(k(self%atoms(i)%atomtypeidx)) = i
    end do
 
 end function get_blocks
 
-function get_typeidcs(self) result(typeidcs)
+function get_atomtypeidcs(self) result(atomtypeidcs)
    class(Molecule), intent(in) :: self
-   integer :: typeidcs(self%natom)
+   integer :: atomtypeidcs(self%natom)
 
-   typeidcs(:) = self%atoms(:)%typeidx
+   atomtypeidcs(:) = self%atoms(:)%atomtypeidx
 
-end function get_typeidcs
+end function get_atomtypeidcs
 
-function get_equividcs(self) result(equividcs)
+function get_atomequividcs(self) result(atomequividcs)
    class(Molecule), intent(in) :: self
-   integer :: equividcs(self%natom)
+   integer :: atomequividcs(self%natom)
 
-   equividcs(:) = self%atoms(:)%equividx
+   atomequividcs(:) = self%atoms(:)%atomequividx
 
-end function get_equividcs
+end function get_atomequividcs
 
 function get_weights(self) result(weights)
    class(Molecule), intent(in) :: self
@@ -357,46 +356,46 @@ function get_adjlists(self) result(adjlists)
 
 end function get_adjlists
 
-subroutine set_adeqlenlists(self, nadeqs, adeqlenlists)
+subroutine set_adjequivlenlists(self, nadjequivs, adjequivlenlists)
    class(Molecule), intent(inout) :: self
-   integer, intent(in) :: nadeqs(:)
-   integer, intent(in) :: adeqlenlists(:, :)
+   integer, intent(in) :: nadjequivs(:)
+   integer, intent(in) :: adjequivlenlists(:, :)
    integer :: i
 
    do i = 1, size(self%atoms)
-      if (.not. allocated(self%atoms(i)%adeqlenlist)) then
-         allocate(self%atoms(i)%adeqlenlist(nadeqs(i)))
+      if (.not. allocated(self%atoms(i)%adjequivlenlist)) then
+         allocate(self%atoms(i)%adjequivlenlist(nadjequivs(i)))
       end if
-      self%atoms(i)%adeqlenlist = adeqlenlists(:nadeqs(i), i)
+      self%atoms(i)%adjequivlenlist = adjequivlenlists(:nadjequivs(i), i)
    end do
 
-end subroutine set_adeqlenlists
+end subroutine set_adjequivlenlists
 
-function get_adeqlenlists(self) result(adeqlenlists)
+function get_adjequivlenlists(self) result(adjequivlenlists)
    class(Molecule), intent(inout) :: self
-   integer, allocatable :: adeqlenlists(:, :)
+   integer, allocatable :: adjequivlenlists(:, :)
    integer :: i
 
-   allocate(adeqlenlists(maxcoord, size(self%atoms)))
+   allocate(adjequivlenlists(maxcoord, size(self%atoms)))
 
    do i = 1, size(self%atoms)
-      adeqlenlists(:size(self%atoms(i)%adeqlenlist), i) = self%atoms(i)%adeqlenlist
+      adjequivlenlists(:size(self%atoms(i)%adjequivlenlist), i) = self%atoms(i)%adjequivlenlist
    end do
 
-end function get_adeqlenlists
+end function get_adjequivlenlists
 
-function get_nadeqs(self) result(nadeqs)
+function get_nadjequivs(self) result(nadjequivs)
    class(Molecule), intent(inout) :: self
-   integer, allocatable :: nadeqs(:)
+   integer, allocatable :: nadjequivs(:)
    integer :: i
 
-   allocate(nadeqs(size(self%atoms)))
+   allocate(nadjequivs(size(self%atoms)))
 
    do i = 1, size(self%atoms)
-      nadeqs(i) = size(self%atoms(i)%adeqlenlist)
+      nadjequivs(i) = size(self%atoms(i)%adjequivlenlist)
    end do
 
-end function get_nadeqs
+end function get_nadjequivs
 
 function get_fragroot(self) result(fragroots)
    class(Molecule), intent(in) :: self
@@ -424,12 +423,12 @@ subroutine print_atom(self, ind, outLvl)
    case (1)
       if (self%nadj == 0) then
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a)'
-         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%typeidx, &
+         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%atomtypeidx, &
                      self%weight, " {", self%coords(:), " }"
       else
          write (num, '(i0)') self%nadj
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a,'//num//'i3,a)'
-         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%typeidx, &
+         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%atomtypeidx, &
                self%weight, " {", self%coords(:), " } [", &
                self%adjlist(:self%nadj), " ]"
       end if
@@ -439,12 +438,12 @@ subroutine print_atom(self, ind, outLvl)
    case default
       if (self%nadj == 0) then
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a)'
-         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%typeidx, &
+         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%atomtypeidx, &
                      self%weight, " {", self%coords(:), " }"
       else
          write (num, '(i0)') self%nadj
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a,'//num//'i3,a)'
-         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%typeidx, &
+         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%atomtypeidx, &
                self%weight, " {", self%coords(:), " } [", &
                self%adjlist(:self%nadj), " ]"
       end if
@@ -461,7 +460,7 @@ subroutine print_molecule(self)
    write (stderr, '(a,i0,a)') "Contents of molecule structure:   (", &
                                          self%natom, " atoms)"
    write (stderr, '(2a)') 'Title: ', self%title
-   write (stderr, '(a,a4,a5,a6,a7,2a17)') "ind:", "lbl", "znum", "typeidx", &
+   write (stderr, '(a,a4,a5,a6,a7,2a17)') "ind:", "lbl", "znum", "atomtypeidx", &
                                           "weight", "{ coords }", "[ adjlist ]"
 
    do i = 1, self%natom
@@ -603,40 +602,40 @@ subroutine add_bond(self, idx1, idx2)
 
 end subroutine add_bond
 
-function get_typelenlist(self) result(typelenlist)
+function get_atomtypelenlist(self) result(atomtypelenlist)
    class(Molecule), intent(in) :: self
-   integer, allocatable :: typelenlist(:)
+   integer, allocatable :: atomtypelenlist(:)
 
-   typelenlist = self%typelenlist
+   atomtypelenlist = self%atomtypelenlist
 
-end function get_typelenlist
+end function get_atomtypelenlist
 
-subroutine set_typelenlist(self, ntype, typelenlist)
+subroutine set_atomtypelenlist(self, natomtype, atomtypelenlist)
    class(Molecule), intent(inout) :: self
-   integer, intent(in) :: ntype
-   integer, intent(in) :: typelenlist(:)
+   integer, intent(in) :: natomtype
+   integer, intent(in) :: atomtypelenlist(:)
 
-   allocate(self%typelenlist(ntype))
-   self%typelenlist = typelenlist(:ntype)
+   allocate(self%atomtypelenlist(natomtype))
+   self%atomtypelenlist = atomtypelenlist(:natomtype)
 
-end subroutine set_typelenlist
+end subroutine set_atomtypelenlist
 
-function get_equivlenlist(self) result(equivlenlist)
+function get_atomequivlenlist(self) result(atomequivlenlist)
    class(Molecule), intent(in) :: self
-   integer, allocatable :: equivlenlist(:)
+   integer, allocatable :: atomequivlenlist(:)
 
-   equivlenlist = self%equivlenlist
+   atomequivlenlist = self%atomequivlenlist
 
-end function get_equivlenlist
+end function get_atomequivlenlist
 
-subroutine set_equivlenlist(self, nequiv, equivlenlist)
+subroutine set_atomequivlenlist(self, natomequiv, atomequivlenlist)
    class(Molecule), intent(inout) :: self
-   integer, intent(in) :: nequiv
-   integer, intent(in) :: equivlenlist(:)
+   integer, intent(in) :: natomequiv
+   integer, intent(in) :: atomequivlenlist(:)
 
-   allocate(self%equivlenlist(nequiv))
-   self%equivlenlist = equivlenlist(:nequiv)
+   allocate(self%atomequivlenlist(natomequiv))
+   self%atomequivlenlist = atomequivlenlist(:natomequiv)
 
-end subroutine set_equivlenlist
+end subroutine set_atomequivlenlist
 
 end module

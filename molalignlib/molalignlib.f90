@@ -97,8 +97,8 @@ subroutine remap_atoms( &
 
    ! Get atom order
 
-   atomorder0 = sorted_order(mol0%get_equividcs(), mol0%natom)
-   atomorder1 = sorted_order(mol1%get_equividcs(), mol1%natom)
+   atomorder0 = sorted_order(mol0%get_atomequividcs(), mol0%natom)
+   atomorder1 = sorted_order(mol1%get_atomequividcs(), mol1%natom)
 
    ! Get inverse atom order
 
@@ -120,7 +120,7 @@ subroutine remap_atoms( &
 
    ! Abort if there are conflicting atomic types
 
-   if (any(mol0%get_typeidcs() /= mol1%get_typeidcs())) then
+   if (any(mol0%get_atomtypeidcs() /= mol1%get_atomtypeidcs())) then
       write (stderr, '(a)') 'Error: There are conflicting atomic types'
       error = 1
       return
@@ -230,7 +230,7 @@ subroutine align_atoms( &
 
    ! Abort if there are conflicting atomic types
 
-   if (any(sorted(mol0%get_typeidcs(), mol0%natom) /= sorted(mol1%get_typeidcs(), mol1%natom))) then
+   if (any(sorted(mol0%get_atomtypeidcs(), mol0%natom) /= sorted(mol1%get_atomtypeidcs(), mol1%natom))) then
       write (stderr, '(a)') 'Error: There are conflicting atomic types'
       error = 1
       return
@@ -238,7 +238,7 @@ subroutine align_atoms( &
 
    ! Abort if atomic types are not ordered
 
-   if (any(mol0%get_typeidcs() /= mol1%get_typeidcs())) then
+   if (any(mol0%get_atomtypeidcs() /= mol1%get_atomtypeidcs())) then
       write (stderr, '(a)') 'Error: Atomic types are not in the same order'
       error = 1
       return

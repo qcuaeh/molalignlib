@@ -35,10 +35,10 @@ subroutine assort_atoms(mol)
    type(Molecule), intent(inout) :: mol
 
    integer :: i, j
-   integer :: ntype, ztype
-   integer :: typeidcs(mol%natom)
+   integer :: natomtype, ztype
+   integer :: atomtypeidcs(mol%natom)
    logical :: remaining(mol%natom)
-   integer, dimension(mol%natom) :: typelenlist, blkznum, blkynum
+   integer, dimension(mol%natom) :: atomtypelenlist, blkznum, blkynum
    integer, dimension(mol%natom) :: order, idorder
 
    integer, allocatable :: znums(:)
@@ -47,7 +47,7 @@ subroutine assort_atoms(mol)
 
    ! Initialization
 
-   ntype = 0
+   natomtype = 0
    remaining = .true.
    labels = mol%get_labels()
 !   weights = mol%get_weights()
@@ -63,22 +63,22 @@ subroutine assort_atoms(mol)
          call readlabel(labels(i), znums(i), ztype)
          weights = weight_func(znums(i))
 
-         ntype = ntype + 1
-         typeidcs(i) = ntype
-         typelenlist(ntype) = 1
-         blkznum(ntype) = znums(i)
-         blkynum(ntype) = ztype
+         natomtype = natomtype + 1
+         atomtypeidcs(i) = natomtype
+         atomtypelenlist(natomtype) = 1
+         blkznum(natomtype) = znums(i)
+         blkynum(natomtype) = ztype
          remaining(i) = .false.
 
          do j = 1, mol%natom
             if (remaining(j)) then
                if (labels(i) == labels(j)) then
 !                  if (weights(i) == weights(j)) then
-                     typeidcs(j) = ntype
+                     atomtypeidcs(j) = natomtype
                      znums(j) = znums(i)
                      weights(j) = weights(i)
                      remaining(j) = .false.
-                     typelenlist(ntype) = typelenlist(ntype) + 1
+                     atomtypelenlist(natomtype) = atomtypelenlist(natomtype) + 1
 !                  else
 !                     ! Abort if there are inconsistent weights
 !                     write (stderr, '(a)') 'Error: There are incosistent weights'
@@ -94,22 +94,22 @@ subroutine assort_atoms(mol)
 
    ! Order blocks by type number
 
-   order(:ntype) = sorted_order(blkynum, ntype)
-   idorder(:ntype) = inverse_permut(order(:ntype))
-   typelenlist(:ntype) = typelenlist(order(:ntype))
-   typeidcs = idorder(typeidcs)
+   order(:natomtype) = sorted_order(blkynum, natomtype)
+   idorder(:natomtype) = inverse_permut(order(:natomtype))
+   atomtypelenlist(:natomtype) = atomtypelenlist(order(:natomtype))
+   atomtypeidcs = idorder(atomtypeidcs)
 
    ! Order blocks by atomic number
 
-   order(:ntype) = sorted_order(blkznum, ntype)
-   idorder(:ntype) = inverse_permut(order(:ntype))
-   typelenlist(:ntype) = typelenlist(order(:ntype))
-   typeidcs = idorder(typeidcs)
+   order(:natomtype) = sorted_order(blkznum, natomtype)
+   idorder(:natomtype) = inverse_permut(order(:natomtype))
+   atomtypelenlist(:natomtype) = atomtypelenlist(order(:natomtype))
+   atomtypeidcs = idorder(atomtypeidcs)
 
    call mol%set_znums(znums)
    call mol%set_weights(weights)
-   call mol%set_typeidcs(typeidcs) 
-   call mol%set_typelenlist(ntype, typelenlist)
+   call mol%set_atomtypeidcs(atomtypeidcs) 
+   call mol%set_atomtypelenlist(natomtype, atomtypelenlist)
 
 end subroutine
 
@@ -117,40 +117,40 @@ subroutine set_equiv_atoms(mol)
 ! Group atoms by MNA type at infinite level
    type(Molecule), intent(inout) :: mol
 
-   integer i, nin, nequiv
-   integer, dimension(mol%natom) :: equividcs, equivlenlist
+   integer i, nin, natomequiv
+   integer, dimension(mol%natom) :: atomequividcs, atomequivlenlist
    integer, dimension(mol%natom) :: intype, uptype, basetype
    integer, dimension(mol%natom) :: order, idorder
 
    ! Determine MNA types iteratively
 
-   nin = mol%get_ntype()
-   intype = mol%get_typeidcs()
+   nin = mol%get_natomtype()
+   intype = mol%get_atomtypeidcs()
    basetype = [(i, i=1, mol%natom)]
 
    do
 
-      call getmnatypes(mol, nin, intype, nequiv, equividcs, equivlenlist, uptype)
-      basetype(:nequiv) = basetype(uptype(:nequiv))
+      call getmnatypes(mol, nin, intype, natomequiv, atomequividcs, atomequivlenlist, uptype)
+      basetype(:natomequiv) = basetype(uptype(:natomequiv))
 
-      if (all(equividcs == intype)) exit
+      if (all(atomequividcs == intype)) exit
 
-      nin = nequiv
-      intype = equividcs
+      nin = natomequiv
+      intype = atomequividcs
 
    end do
 
-   order(:nequiv) = sorted_order(basetype, nequiv)
-   idorder(:nequiv) = inverse_permut(order(:nequiv))
-   equivlenlist(:nequiv) = equivlenlist(order(:nequiv))
-   equividcs = idorder(equividcs)
+   order(:natomequiv) = sorted_order(basetype, natomequiv)
+   idorder(:natomequiv) = inverse_permut(order(:natomequiv))
+   atomequivlenlist(:natomequiv) = atomequivlenlist(order(:natomequiv))
+   atomequividcs = idorder(atomequividcs)
 
 !    do i = 1, mol%natom
-!        print *, i, elsym(znum(i)), equividcs(i)
+!        print *, i, elsym(znum(i)), atomequividcs(i)
 !    end do
 
-   call mol%set_equividcs(equividcs)
-   call mol%set_equivlenlist(nequiv, equivlenlist)
+   call mol%set_atomequividcs(atomequividcs)
+   call mol%set_atomequivlenlist(natomequiv, atomequivlenlist)
 
 end subroutine
 
@@ -210,22 +210,22 @@ subroutine assort_neighbors(mol)
 
    integer :: i, h
    integer :: nadjs(mol%natom), adjlists(maxcoord, mol%natom)
-   integer :: nadeqs(mol%natom), adeqlenlists(maxcoord, mol%natom)
-   integer :: adjeqvid(maxcoord), atomorder(maxcoord), equividcs(mol%natom)
+   integer :: nadjequivs(mol%natom), adjequivlenlists(maxcoord, mol%natom)
+   integer :: adjeqvid(maxcoord), atomorder(maxcoord), atomequividcs(mol%natom)
 
    nadjs = mol%get_nadjs()
    adjlists = mol%get_adjlists()
-   equividcs = mol%get_equividcs()
+   atomequividcs = mol%get_atomequividcs()
 
    do i = 1, mol%natom
-      call groupbytype(nadjs(i), adjlists(:, i), equividcs, &
-            nadeqs(i), adeqlenlists(:, i), adjeqvid)
+      call groupbytype(nadjs(i), adjlists(:, i), atomequividcs, &
+            nadjequivs(i), adjequivlenlists(:, i), adjeqvid)
       atomorder(:nadjs(i)) = sorted_order(adjeqvid, nadjs(i))
       adjlists(:nadjs(i), i) = adjlists(atomorder(:nadjs(i)), i)
    end do
 
    call mol%set_adjlists(nadjs, adjlists)
-   call mol%set_adeqlenlists(nadeqs, adeqlenlists)
+   call mol%set_adjequivlenlists(nadjequivs, adjequivlenlists)
 
 end subroutine
 
@@ -280,8 +280,8 @@ subroutine calcequivmat(mol0, mol1, nadjmna0, adjmnalen0, adjmnalist0, &
    integer, dimension(:, :, :), intent(out) :: adjmnalist0, adjmnalist1
    integer, dimension(:, :), intent(out) :: equivmat
 
-   integer :: natom, ntype
-   integer, allocatable :: typelenlist(:)
+   integer :: natom, natomtype
+   integer, allocatable :: atomtypelenlist(:)
    integer, dimension(:), allocatable :: nadjs0, nadjs1
    integer, dimension(:, :), allocatable :: adjlists0, adjlists1
 
@@ -290,30 +290,30 @@ subroutine calcequivmat(mol0, mol1, nadjmna0, adjmnalen0, adjmnalist0, &
    integer, dimension(maxcoord) :: indices, atomorder
 
    natom = mol0%get_natom()
-   ntype = mol0%get_ntype()
-   typelenlist = mol0%get_typelenlist()
+   natomtype = mol0%get_natomtype()
+   atomtypelenlist = mol0%get_atomtypelenlist()
    nadjs0 = mol0%get_nadjs()
    nadjs1 = mol1%get_nadjs()
    adjlists0 = mol0%get_adjlists()
    adjlists1 = mol1%get_adjlists()
 
-   nin = ntype
-   intype0 = mol0%get_typeidcs()
-   intype1 = mol1%get_typeidcs()
+   nin = natomtype
+   intype0 = mol0%get_atomtypeidcs()
+   intype1 = mol1%get_atomtypeidcs()
    level = 1
 
    do
 
       offset = 0
-      do h = 1, ntype
-         do i = offset + 1, offset + typelenlist(h)
-            do j = offset + 1, offset + typelenlist(h)
+      do h = 1, natomtype
+         do i = offset + 1, offset + atomtypelenlist(h)
+            do j = offset + 1, offset + atomtypelenlist(h)
                if (intype0(i) == intype1(j)) then
                   equivmat(j, i) = level
                end if
             end do
          end do
-         offset = offset + typelenlist(h)
+         offset = offset + atomtypelenlist(h)
       end do
 
       do i = 1, natom
@@ -412,14 +412,14 @@ subroutine getmnacrosstypes(natom, nin, intype0, nadjs0, adjlists0, intype1, nad
 
 end subroutine
 
-function same_adjacency(ntype, atomtype0, nadjs0, adjlists0, atomtype1, nadjs1, adjlists1) result(sameadj)
-   integer, intent(in) :: ntype, nadjs0, nadjs1
+function same_adjacency(natomtype, atomtype0, nadjs0, adjlists0, atomtype1, nadjs1, adjlists1) result(sameadj)
+   integer, intent(in) :: natomtype, nadjs0, nadjs1
    integer, dimension(:), intent(in) :: adjlists0, adjlists1
    integer, dimension(:) :: atomtype0, atomtype1
    logical :: sameadj
 
    integer :: i0, i1
-   integer, dimension(ntype) :: n0, n1
+   integer, dimension(natomtype) :: n0, n1
 !   real :: atoms0(3, maxcoord), atoms1(3, maxcoord)
 !   integer :: typelist0(maxcoord, nin), typelist1(maxcoord, nin)
 

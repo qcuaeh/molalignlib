@@ -15,14 +15,14 @@ public eqvatomperm
 
 contains
 
-subroutine minadjdiff (natom, weights, ntype, typelenlist, coords0, nadjs0, adjlists0, adjmat0, nequiv0, &
-   equivlenlist0, coords1, nadjs1, adjlists1, adjmat1, nequiv1, equivlenlist1, mapping, nfrag0, fragroot0)
+subroutine minadjdiff (natom, weights, natomtype, atomtypelenlist, coords0, nadjs0, adjlists0, adjmat0, natomequiv0, &
+   atomequivlenlist0, coords1, nadjs1, adjlists1, adjmat1, natomequiv1, atomequivlenlist1, mapping, nfrag0, fragroot0)
 ! Purpose: Find best correspondence between points of graphs
 
-   integer, intent(in) :: natom, ntype, nequiv0, nequiv1
-   integer, dimension(:), intent(in) :: typelenlist, nadjs0, nadjs1
+   integer, intent(in) :: natom, natomtype, natomequiv0, natomequiv1
+   integer, dimension(:), intent(in) :: atomtypelenlist, nadjs0, nadjs1
    integer, dimension(:, :), intent(in) :: adjlists0, adjlists1
-   integer, dimension(:), intent(in) :: equivlenlist0, equivlenlist1
+   integer, dimension(:), intent(in) :: atomequivlenlist0, atomequivlenlist1
    real(wp), dimension(:), intent(in) :: weights
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
    logical, dimension(:, :), intent(in) :: adjmat0, adjmat1
@@ -43,23 +43,23 @@ subroutine minadjdiff (natom, weights, ntype, typelenlist, coords0, nadjs0, adjl
    ! set atoms block indices
 
    offset = 0
-   do h = 1, ntype
-      blkidx(offset+1:offset+typelenlist(h)) = h
-      offset = offset + typelenlist(h)
+   do h = 1, natomtype
+      blkidx(offset+1:offset+atomtypelenlist(h)) = h
+      offset = offset + atomtypelenlist(h)
    end do
 
    ! set atoms equivalence indices
 
    offset = 0
-   do h = 1, nequiv0
-      eqvidx0(offset+1:offset+equivlenlist0(h)) = h
-      offset = offset + equivlenlist0(h)
+   do h = 1, natomequiv0
+      eqvidx0(offset+1:offset+atomequivlenlist0(h)) = h
+      offset = offset + atomequivlenlist0(h)
    end do
 
    offset = 0
-   do h = 1, nequiv1
-      eqvidx1(offset+1:offset+equivlenlist1(h)) = h
-      offset = offset + equivlenlist1(h)
+   do h = 1, natomequiv1
+      eqvidx1(offset+1:offset+atomequivlenlist1(h)) = h
+      offset = offset + atomequivlenlist1(h)
    end do
 
    !  initialization
@@ -250,13 +250,13 @@ subroutine minadjdiff (natom, weights, ntype, typelenlist, coords0, nadjs0, adjl
 
 end subroutine
 
-subroutine eqvatomperm (natom, weights, coords, adjmat, adjlists, nequiv, equivlenlist, &
-   nadeqs, adeqlenlists, refcoords, refadjmat, mapping, nfrag, fragroots)
+subroutine eqvatomperm (natom, weights, coords, adjmat, adjlists, natomequiv, atomequivlenlist, &
+   nadjequivs, adjequivlenlists, refcoords, refadjmat, mapping, nfrag, fragroots)
 ! Purpose: Find best correspondence between points of graphs
 
-   integer, intent(in) :: natom, nequiv
-   integer, dimension(:), intent(in) :: equivlenlist, nadeqs
-   integer, dimension(:, :), intent(in) :: adjlists, adeqlenlists
+   integer, intent(in) :: natom, natomequiv
+   integer, dimension(:), intent(in) :: atomequivlenlist, nadjequivs
+   integer, dimension(:, :), intent(in) :: adjlists, adjequivlenlists
    integer, dimension(:), intent(inout) :: mapping
    real(wp), dimension(:), intent(in) :: weights
    real(wp), dimension(:, :), intent(in) :: coords, refcoords
@@ -275,14 +275,14 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlists, nequiv, equivl
    ! set equivalence group offsets
 
    eqvos(1) = 0
-   do h = 1, nequiv - 1
-      eqvos(h+1) = eqvos(h) + equivlenlist(h)
+   do h = 1, natomequiv - 1
+      eqvos(h+1) = eqvos(h) + atomequivlenlist(h)
    end do
 
    ! set atoms equivalence indices
 
-   do h = 1, nequiv
-      eqvidx(eqvos(h)+1:eqvos(h)+equivlenlist(h)) = h
+   do h = 1, natomequiv
+      eqvidx(eqvos(h)+1:eqvos(h)+atomequivlenlist(h)) = h
    end do
 
    ! print equiv types
@@ -295,9 +295,9 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlists, nequiv, equivl
 
 !   do i = 1, natom
 !      offset = 0
-!      do h = 1, nadeqs(i)
-!         print *, i, ':', adjlists(offset+1:offset+adeqlenlists(h, i), i)
-!         offset = offset + adeqlenlists(h, i)
+!      do h = 1, nadjequivs(i)
+!         print *, i, ':', adjlists(offset+1:offset+adjequivlenlists(h, i), i)
+!         offset = offset + adjequivlenlists(h, i)
 !      end do
 !   end do
 
@@ -341,13 +341,13 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlists, nequiv, equivl
       integer h, i, offset, first, last
 
       first = eqvos(eqvidx(nodea)) + 1
-      last = eqvos(eqvidx(nodea)) + equivlenlist(eqvidx(nodea))
+      last = eqvos(eqvidx(nodea)) + atomequivlenlist(eqvidx(nodea))
       held(first:last) = .true.
       offset = 0
-      do h = 1, nadeqs(nodea)
+      do h = 1, nadjequivs(nodea)
          ! find not tracked adjlists in group
          meqvnei = 0
-         do i = 1, adeqlenlists(h, nodea)
+         do i = 1, adjequivlenlists(h, nodea)
             if (.not. held(adjlists(offset+i, nodea))) then 
                meqvnei = meqvnei + 1
                equiva(meqvnei) = adjlists(offset+meqvnei, nodea)
@@ -362,7 +362,7 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlists, nequiv, equivl
                   mapping, locked_c)
             end if
          end do
-         offset = offset + adeqlenlists(h, nodea)
+         offset = offset + adjequivlenlists(h, nodea)
       end do
    end subroutine recursive_remap
 
@@ -395,15 +395,15 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlists, nequiv, equivl
 
       ! reserves atoms with the same type as n
       first = eqvos(eqvidx(node)) + 1
-      last = eqvos(eqvidx(node)) + equivlenlist(eqvidx(node))
+      last = eqvos(eqvidx(node)) + atomequivlenlist(eqvidx(node))
       held(first:last) = .true.
 
       offset = 0
       ! run over groups of atoms with equivalent type
-      do h = 1, nadeqs(node)
+      do h = 1, nadjequivs(node)
          ! find not tracked adjlists in group
          meqvnei = 0
-         do i = 1, adeqlenlists(h, node)
+         do i = 1, adjequivlenlists(h, node)
             if (.not. tracked(adjlists(offset+i, node)) &
                .and. .not. held(adjlists(offset+i, node))) then
                meqvnei = meqvnei + 1
@@ -479,7 +479,7 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlists, nequiv, equivl
                                 locked_c, ntrack, track)
             end do
          end if
-         offset = offset + adeqlenlists(h, node)
+         offset = offset + adjequivlenlists(h, node)
       end do
    end subroutine
 

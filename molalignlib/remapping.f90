@@ -44,26 +44,26 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 !subroutine optimize_mapping( &
 !   mol0, &
 !   mol1, &
-!   ntype, &
-!   typelenlist, &
-!   nequiv0, &
-!   equivlenlist0, &
-!   nequiv1, &
-!   equivlenlist1, &
+!   natomtype, &
+!   atomtypelenlist, &
+!   natomequiv0, &
+!   atomequivlenlist0, &
+!   natomequiv1, &
+!   atomequivlenlist1, &
 !   maplist, &
 !   countlist, &
 !   nrec)
 
    type(Molecule), intent(inout) :: mol0, mol1
-   integer :: ntype
-   integer, dimension(mol0%natom) :: typelenlist
-   integer :: nequiv0, nequiv1
-   integer, dimension(mol0%natom) :: equivlenlist0
-   integer, dimension(mol1%natom) :: equivlenlist1
-!   integer, intent(in) :: ntype
-!   integer, dimension(:), intent(in) :: typelenlist
-!   integer, intent(in) :: nequiv0, nequiv1
-!   integer, dimension(:), intent(in) :: equivlenlist0, equivlenlist1
+   integer :: natomtype
+   integer, dimension(mol0%natom) :: atomtypelenlist
+   integer :: natomequiv0, natomequiv1
+   integer, dimension(mol0%natom) :: atomequivlenlist0
+   integer, dimension(mol1%natom) :: atomequivlenlist1
+!   integer, intent(in) :: natomtype
+!   integer, dimension(:), intent(in) :: atomtypelenlist
+!   integer, intent(in) :: natomequiv0, natomequiv1
+!   integer, dimension(:), intent(in) :: atomequivlenlist0, atomequivlenlist1
    integer, intent(out) :: maplist(:, :)
    integer, intent(out) :: countlist(:)
    integer, intent(out) :: nrec
@@ -84,10 +84,10 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
    integer, dimension(maxcoord, mol1%natom, maxlevel) :: adjmnalen1
    integer, dimension(maxcoord, mol0%natom, maxlevel) :: adjmnalist0
    integer, dimension(maxcoord, mol1%natom, maxlevel) :: adjmnalist1
-   integer, dimension(mol0%natom) :: nadeqs0
-   integer, dimension(mol1%natom) :: nadeqs1
-   integer, dimension(maxcoord, mol0%natom) :: adeqlenlists0
-   integer, dimension(maxcoord, mol1%natom) :: adeqlenlists1
+   integer, dimension(mol0%natom) :: nadjequivs0
+   integer, dimension(mol1%natom) :: nadjequivs1
+   integer, dimension(maxcoord, mol0%natom) :: adjequivlenlists0
+   integer, dimension(maxcoord, mol1%natom) :: adjequivlenlists1
    integer, dimension(mol0%natom) :: fragroot0
    integer, dimension(mol1%natom) :: fragroot1
    integer :: equivmat(mol0%natom, mol1%natom)
@@ -112,23 +112,23 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
    adjmat0 = mol0%get_adjmat()
    adjmat1 = mol1%get_adjmat()
 
-   ntype = mol0%get_ntype()
-   typelenlist = mol0%get_typelenlist()
+   natomtype = mol0%get_natomtype()
+   atomtypelenlist = mol0%get_atomtypelenlist()
 
    nadjs0 = mol0%get_nadjs()
    nadjs1 = mol1%get_nadjs()
    adjlists0 = mol0%get_adjlists()
    adjlists1 = mol1%get_adjlists()
 
-   nequiv0 = mol0%get_nequiv()
-   nequiv1 = mol1%get_nequiv()
-   equivlenlist0 = mol0%get_equivlenlist()
-   equivlenlist1 = mol1%get_equivlenlist()
+   natomequiv0 = mol0%get_natomequiv()
+   natomequiv1 = mol1%get_natomequiv()
+   atomequivlenlist0 = mol0%get_atomequivlenlist()
+   atomequivlenlist1 = mol1%get_atomequivlenlist()
 
-   nadeqs0 = mol0%get_nadeqs()
-   nadeqs1 = mol1%get_nadeqs()
-   adeqlenlists0 = mol0%get_adeqlenlists()
-   adeqlenlists1 = mol1%get_adeqlenlists()
+   nadjequivs0 = mol0%get_nadjequivs()
+   nadjequivs1 = mol1%get_nadjequivs()
+   adjequivlenlists0 = mol0%get_adjequivlenlists()
+   adjequivlenlists1 = mol1%get_adjequivlenlists()
 
    ! Detect fragments and root atoms
 
@@ -147,26 +147,26 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
    nfrag1 = mol1%nfrag
    fragroot1 = mol1%get_fragroot()
 !CZGC: old call
-!   call findmolfrags(natom, nadjs0, adjlists0, ntype, typelenlist, nequiv0, equivlenlist0, nfrag0, fragroot0)
-!   call findmolfrags(natom, nadjs1, adjlists1, ntype, typelenlist, nequiv1, equivlenlist1, nfrag1, fragroot1)
+!   call findmolfrags(natom, nadjs0, adjlists0, natomtype, atomtypelenlist, natomequiv0, atomequivlenlist0, nfrag0, fragroot0)
+!   call findmolfrags(natom, nadjs1, adjlists1, natomtype, atomtypelenlist, natomequiv1, atomequivlenlist1, nfrag1, fragroot1)
 
    ! Calculate MNA equivalence matrix
 
 !CZGC: new call
    call calcequivmat(mol0, mol1, nadjmna0, adjmnalen0, adjmnalist0, nadjmna1, adjmnalen1, adjmnalist1, equivmat)
 !CZGC: old call
-!   call calcequivmat(natom, ntype, typelenlist, nadjs0, adjlists0, nadjmna0, adjmnalen0, adjmnalist0, &
+!   call calcequivmat(natom, natomtype, atomtypelenlist, nadjs0, adjlists0, nadjmna0, adjmnalen0, adjmnalist0, &
 !      nadjs1, adjlists1, nadjmna1, adjmnalen1, adjmnalist1, equivmat)
 
    ! Print equivalence matrix
 
 !   offset = 0
-!   do h = 1, ntype
+!   do h = 1, natomtype
 !      print *, h
-!      do i = offset + 1, offset + typelenlist(h)
-!         print '(100(1x, i3))', equivmat(offset+1:offset+typelenlist(h), i)
+!      do i = offset + 1, offset + atomtypelenlist(h)
+!         print '(100(1x, i3))', equivmat(offset+1:offset+atomtypelenlist(h), i)
 !      end do
-!      offset = offset + typelenlist(h)
+!      offset = offset + atomtypelenlist(h)
 !      print *
 !   end do
 
@@ -176,22 +176,22 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 !CZGC: new call
 !   call setcrossbias(mol0, mol1, equivmat, biasmat)
 !CZGC: old call
-   call setcrossbias(natom, ntype, typelenlist, coords0, coords1, equivmat, biasmat)
+   call setcrossbias(natom, natomtype, atomtypelenlist, coords0, coords1, equivmat, biasmat)
 
    ! Print biases
 
 !   offset = 0
 !   do h = 1, blockcount0
-!      do i = offset+1, offset+typelenlist(h)
+!      do i = offset+1, offset+atomtypelenlist(h)
 !         write (stdout, '(i0,":")', advance='no') i
-!         do j = offset+1, offset+typelenlist(h)
+!         do j = offset+1, offset+atomtypelenlist(h)
 !            if (biasmat(i, j) == 0) then
 !               write (stdout, '(1x,i0)', advance='no') j
 !            end if
 !         end do
 !         print *
 !      end do
-!      offset = offset + typelenlist(h)
+!      offset = offset + atomtypelenlist(h)
 !   end do
 
    ! Calculate assignment frequencies
@@ -202,7 +202,7 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 !         randcoords0(:, i) = randarray(3)
 !         randcoords1(:, i) = randarray(3)
 !      end do
-!      call mapatoms(natom, randcoords0, randcoords1, ntype, typelenlist, biasmat, mapping)
+!      call mapatoms(natom, randcoords0, randcoords1, natomtype, atomtypelenlist, biasmat, mapping)
 !      print *, adjacencydiff(natom, adjmat0, adjmat1, mapping)
 !      do i = 1, natom
 !         votes(mapping(i), i) = votes(mapping(i), i) + 1
@@ -210,12 +210,12 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 !   end do
 !   print *
 !   offset = 0
-!   do h = 1, ntype
+!   do h = 1, natomtype
 !      print *, h
-!      do i = offset + 1, offset + typelenlist(h)
-!         print '(100(1x, i3))', votes(offset+1:offset+typelenlist(h), i)
+!      do i = offset + 1, offset + atomtypelenlist(h)
+!         print '(100(1x, i3))', votes(offset+1:offset+atomtypelenlist(h), i)
 !      end do
-!      offset = offset + typelenlist(h)
+!      offset = offset + atomtypelenlist(h)
 !      print *
 !   end do
 
@@ -243,7 +243,7 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 
       ! Minimize the euclidean distance
 
-      call mapatoms(natom, ntype, typelenlist, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
+      call mapatoms(natom, natomtype, atomtypelenlist, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
          nadjmna1, adjmnalen1, adjmnalist1, workcoords1, weights, equivmat, biasmat, mapping)
       rotquat = leastrotquat(natom, weights, coords0, workcoords1, mapping)
       prodquat = rotquat
@@ -253,7 +253,7 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
       steps = 1
 
       do while (iter_flag)
-         call mapatoms(natom, ntype, typelenlist, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
+         call mapatoms(natom, natomtype, atomtypelenlist, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
             nadjmna1, adjmnalen1, adjmnalist1, workcoords1, weights, equivmat, biasmat, newmapping)
          if (all(newmapping == mapping)) exit
          rotquat = leastrotquat(natom, weights, coords0, workcoords1, newmapping)
@@ -268,11 +268,11 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 
       if (back_flag) then
 
-         call minadjdiff(natom, weights, ntype, typelenlist, coords0, nadjs0, adjlists0, adjmat0, nequiv0, &
-            equivlenlist0, workcoords1, nadjs1, adjlists1, adjmat1, nequiv1, equivlenlist1, mapping, nfrag0, fragroot0)
+         call minadjdiff(natom, weights, natomtype, atomtypelenlist, coords0, nadjs0, adjlists0, adjmat0, natomequiv0, &
+            atomequivlenlist0, workcoords1, nadjs1, adjlists1, adjmat1, natomequiv1, atomequivlenlist1, mapping, nfrag0, fragroot0)
 
-         call eqvatomperm(natom, weights, coords0, adjmat0, adjlists0, nequiv0, equivlenlist0, &
-            nadeqs0, adeqlenlists0, workcoords1, adjmat1, mapping, nfrag0, fragroot0)
+         call eqvatomperm(natom, weights, coords0, adjmat0, adjlists0, natomequiv0, atomequivlenlist0, &
+            nadjequivs0, adjequivlenlists0, workcoords1, adjmat1, mapping, nfrag0, fragroot0)
 
       end if
 
@@ -345,7 +345,7 @@ subroutine find_reactive_sites(mol0, mol1, mapping)
    integer :: natom
    integer :: h, i, j, k, m, n
    integer, dimension(:), allocatable :: znums0, znums1
-   integer, dimension(:), allocatable :: typeidcs0, typeidcs1
+   integer, dimension(:), allocatable :: atomtypeidcs0, atomtypeidcs1
    real(wp), dimension(:, :), allocatable :: coords0, coords1
    logical, dimension(:, :), allocatable :: adjmat0, adjmat1
    type(Block), dimension(:), allocatable :: blocks0, blocks1
@@ -364,25 +364,25 @@ subroutine find_reactive_sites(mol0, mol1, mapping)
    adjmat1 = mol1%get_adjmat()
    blocks0 = mol0%get_blocks()
    blocks1 = mol1%get_blocks()
-   typeidcs0 = mol0%get_typeidcs()
-   typeidcs1 = mol1%get_typeidcs()
+   atomtypeidcs0 = mol0%get_atomtypeidcs()
+   atomtypeidcs1 = mol1%get_atomtypeidcs()
 
    ! Remove reactive bonds
 
    do i = 1, mol0%natom
-      m = typeidcs0(i)
+      m = atomtypeidcs0(i)
       do j = i + 1, mol0%natom
-         n = typeidcs0(j)
+         n = atomtypeidcs0(j)
          if (adjmat0(i, j) .neqv. adjmat1(mapping(i), mapping(j))) then
             call remove_reactive_bond(i, j, mol0, mol1, mapping)
-            do k = 1, mol0%typelenlist(m)
+            do k = 1, mol0%atomtypelenlist(m)
                if (sum((coords0(:, i) - coords1(:, mapping(blocks1(m)%atomidx(k))))**2) < 2.0 &
                   .or. sum((coords0(:, blocks0(m)%atomidx(k)) - coords1(:, mapping(i)))**2) < 2.0 &
                ) then
                   call remove_reactive_bond(blocks0(m)%atomidx(k), j, mol0, mol1, mapping)
                end if
             end do
-            do k = 1, mol0%typelenlist(n)
+            do k = 1, mol0%atomtypelenlist(n)
                if (sum((coords0(:, j) - coords1(:, mapping(blocks1(n)%atomidx(k))))**2) < 2.0 &
                   .or. sum((coords0(:, blocks0(n)%atomidx(k)) - coords1(:, mapping(j)))**2) < 2.0 &
                ) then
