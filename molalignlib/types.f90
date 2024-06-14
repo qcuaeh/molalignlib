@@ -27,8 +27,6 @@ type :: Atom
    integer, allocatable :: mnalenlist(:)
 contains
    procedure :: print => print_atom
-   procedure :: get_adjlist
-   procedure :: set_adjlist
 end type
 
 type, public :: Molecule
@@ -333,25 +331,6 @@ function get_nadjs(self) result(nadjs)
 
 end function get_nadjs
 
-subroutine set_adjlist(self, nadj, adjlist)
-   class(Atom), intent(inout) :: self
-   integer, intent(in) :: nadj
-   integer, dimension(nadj), intent(in) :: adjlist
-
-   self%adjlist = adjlist
-! provisional:
-   self%nadj = nadj
-
-end subroutine set_adjlist
-
-function get_adjlist(self) result(adjlist)
-   class(Atom), intent(in) :: self
-   integer, dimension(:), allocatable :: adjlist
-
-   adjlist = self%adjlist
-
-end function get_adjlist
-
 subroutine set_adjlists(self, nadjs, adjlists)
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: nadjs(:)
@@ -499,8 +478,8 @@ function bonded(self, idx1, idx2) result(isbond)
    logical :: isbond, found1, found2
 
 ! copy arrays of adjlist
-   adjlist1 = self%atoms(idx1)%get_adjlist()
-   adjlist2 = self%atoms(idx2)%get_adjlist()
+   adjlist1 = self%atoms(idx1)%adjlist
+   adjlist2 = self%atoms(idx2)%adjlist
 
 ! initialization
    found1 = .false.
@@ -541,8 +520,8 @@ subroutine remove_bond(self, idx1, idx2)
 ! copy adjlist arrays
    nadj1 = size(self%atoms(idx1)%adjlist)
    nadj2 = size(self%atoms(idx2)%adjlist)
-   adjlist1 = self%atoms(idx1)%get_adjlist()
-   adjlist2 = self%atoms(idx2)%get_adjlist()
+   adjlist1 = self%atoms(idx1)%adjlist
+   adjlist2 = self%atoms(idx2)%adjlist
 
 ! initialization
    pos1 = 0   ! position of idx2 in adjlist of atom 1
@@ -573,8 +552,8 @@ subroutine remove_bond(self, idx1, idx2)
          adjlist2(i) = adjlist2(i+1)
       end do
 ! update neighbor arrays for atoms idx1 and idx2
-      call self%atoms(idx1)%set_adjlist(nadj1, adjlist1(:nadj1))
-      call self%atoms(idx2)%set_adjlist(nadj2, adjlist2(:nadj2))
+      self%atoms(idx1)%adjlist = adjlist1(:nadj1)
+      self%atoms(idx2)%adjlist = adjlist2(:nadj2)
    else
       write (stderr, '(a,i0,2x,i0)') 'Error: atoms not bonded: ', idx1, idx2
    end if
@@ -590,8 +569,8 @@ subroutine add_bond(self, idx1, idx2)
 ! copy array of adjlist
    nadj1 = size(self%atoms(idx1)%adjlist)
    nadj2 = size(self%atoms(idx2)%adjlist)
-   adjlist1 = self%atoms(idx1)%get_adjlist()
-   adjlist2 = self%atoms(idx2)%get_adjlist()
+   adjlist1 = self%atoms(idx1)%adjlist
+   adjlist2 = self%atoms(idx2)%adjlist
 
 ! initialization
    pos1 = nadj1
@@ -616,8 +595,8 @@ subroutine add_bond(self, idx1, idx2)
       end do
       adjlist2(pos2+1) = idx1
 ! update neighbor arrays for atoms in idx1 and idx2
-      call self%atoms(idx1)%set_adjlist(nadj1, adjlist1(:nadj1))
-      call self%atoms(idx2)%set_adjlist(nadj2, adjlist2(:nadj2))
+      self%atoms(idx1)%adjlist = adjlist1(:nadj1)
+      self%atoms(idx2)%adjlist = adjlist2(:nadj2)
    else
       write (stderr, '(a,i0,2x,i0)') "Error: atoms already bonded: ", idx1, idx2
    end if
