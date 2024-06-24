@@ -458,7 +458,7 @@ subroutine print_molecule(self)
    write (stderr, '(a,i0,a)') "Contents of molecule structure:   (", &
                                          self%natom, " atoms)"
    write (stderr, '(2a)') 'Title: ', self%title
-   write (stderr, '(a,a4,a5,a6,a7,2a17)') "ind:", "lbl", "znum", "atomtypeidx", &
+   write (stderr, '(a,a4,a5,a12,a7,2a14)') "ind:", "lbl", "znum", "atomtypeidx", &
                                           "weight", "{ coords }", "[ adjlist ]"
 
    do i = 1, self%natom
