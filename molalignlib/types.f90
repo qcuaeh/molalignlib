@@ -21,7 +21,6 @@ type :: Atom
    integer, allocatable, private :: mnaid(:)
    real(wp), private :: weight
    real(wp), private :: coords(3)
-   integer, private :: nadj
    integer, allocatable, private :: adjlist(:)
    integer, allocatable :: adjequivlenlist(:)
 contains
@@ -149,7 +148,7 @@ subroutine permutate_atoms(self, order)
    invorder = inverse_permut(order)
    self%atoms = self%atoms(order(:))
    do i = 1, self%natom
-      do k = 1, self%atoms(i)%nadj
+      do k = 1, size(self%atoms(i)%adjlist)
          self%atoms(i)%adjlist(k) = invorder(self%atoms(i)%adjlist(k))
       end do
    end do
@@ -337,7 +336,6 @@ subroutine set_adjlists(self, nadjs, adjlists)
    integer :: i
 
    do i = 1, self%natom
-      self%atoms(i)%nadj = nadjs(i)
       self%atoms(i)%adjlist = adjlists(:nadjs(i), i)
    end do
 
@@ -351,7 +349,7 @@ function get_adjlists(self) result(adjlists)
    allocate(adjlists(maxcoord, self%natom))
 
    do i = 1, self%natom
-      adjlists(:self%atoms(i)%nadj, i) = self%atoms(i)%adjlist
+      adjlists(:size(self%atoms(i)%adjlist), i) = self%atoms(i)%adjlist
    end do
 
 end function get_adjlists
@@ -421,31 +419,31 @@ subroutine print_atom(self, ind, outLvl)
    select case (outLevel)
 
    case (1)
-      if (self%nadj == 0) then
+      if (size(self%adjlist) == 0) then
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a)'
          write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%atomtypeidx, &
                      self%weight, " {", self%coords(:), " }"
       else
-         write (num, '(i0)') self%nadj
+         write (num, '(i0)') size(self%adjlist)
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a,'//num//'i3,a)'
          write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%atomtypeidx, &
                self%weight, " {", self%coords(:), " } [", &
-               self%adjlist(:self%nadj), " ]"
+               self%adjlist(:size(self%adjlist)), " ]"
       end if
 
 !  case (2)
 !
    case default
-      if (self%nadj == 0) then
+      if (size(self%adjlist) == 0) then
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a)'
          write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%atomtypeidx, &
                      self%weight, " {", self%coords(:), " }"
       else
-         write (num, '(i0)') self%nadj
+         write (num, '(i0)') size(self%adjlist)
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a,'//num//'i3,a)'
          write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%atomtypeidx, &
                self%weight, " {", self%coords(:), " } [", &
-               self%adjlist(:self%nadj), " ]"
+               self%adjlist(:size(self%adjlist)), " ]"
       end if
    end select
 
@@ -577,7 +575,7 @@ subroutine add_bond(self, idx1, idx2)
 
    if (.not. self%bonded(idx1, idx2)) then
 ! indices in adjlist are supposed to be sorted; inserting new indices
-!      self%atoms(idx1)%nadj = self%atoms(idx1)%nadj + 1
+!      size(self%atoms(idx1)%adjlist) = size(self%atoms(idx1)%adjlist) + 1
       nadj1 = nadj1 + 1
 ! find position to insert idx2 and shift indices greater than idx2
       do while ((pos1 >= 1) .and. (idx2 < adjlist1(pos1)))
