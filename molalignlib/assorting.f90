@@ -95,14 +95,14 @@ subroutine assort_atoms(mol)
    ! Order blocks by type number
 
    order(:natomtype) = sorted_order(blkynum, natomtype)
-   idorder(:natomtype) = inverse_permut(order(:natomtype))
+   idorder(:natomtype) = inverse_mapping(order(:natomtype))
    atomtypelenlist(:natomtype) = atomtypelenlist(order(:natomtype))
    atomtypeidcs = idorder(atomtypeidcs)
 
    ! Order blocks by atomic number
 
    order(:natomtype) = sorted_order(blkznum, natomtype)
-   idorder(:natomtype) = inverse_permut(order(:natomtype))
+   idorder(:natomtype) = inverse_mapping(order(:natomtype))
    atomtypelenlist(:natomtype) = atomtypelenlist(order(:natomtype))
    atomtypeidcs = idorder(atomtypeidcs)
 
@@ -141,7 +141,7 @@ subroutine set_equiv_atoms(mol)
    end do
 
    order(:natomequiv) = sorted_order(basetype, natomequiv)
-   idorder(:natomequiv) = inverse_permut(order(:natomequiv))
+   idorder(:natomequiv) = inverse_mapping(order(:natomequiv))
    atomequivlenlist(:natomequiv) = atomequivlenlist(order(:natomequiv))
    atomequividcs = idorder(atomequividcs)
 
@@ -194,7 +194,7 @@ subroutine groupbytype(nelem, elements, types, ngroup, groupsize, groupid)
 ! Order groups by category type 
 
     order(:ngroup) = sorted_order(grouptype, ngroup)
-    idorder(:ngroup) = inverse_permut(order(:ngroup))
+    idorder(:ngroup) = inverse_mapping(order(:ngroup))
     grouptype(:ngroup) = grouptype(order(:ngroup))
     groupsize(:ngroup) = groupsize(order(:ngroup))
     groupid(:nelem) = idorder(groupid(:nelem))

@@ -20,7 +20,7 @@ implicit none
 
 contains
 
-function identity_perm(n) result(idenperm)
+function identitymap(n) result(idenperm)
 ! Purpose: Get an identity permutation
    integer, intent(in) :: n
    integer :: idenperm(n)
@@ -32,7 +32,7 @@ function identity_perm(n) result(idenperm)
 
 end function
 
-function inverse_permut(perm) result(invperm)
+function inverse_mapping(perm) result(invperm)
 ! Purpose: Get the inverse permutation
    integer, intent(in) :: perm(:)
    integer :: invperm(size(perm))
@@ -44,7 +44,7 @@ function inverse_permut(perm) result(invperm)
 
 end function
 
-logical function is_perm(arr, n) result(flag)
+logical function is_permutation(arr, n) result(flag)
 ! Purpose: Check if array is a valid permutation
    integer, intent(in) :: n
    integer, dimension(n), intent(in) :: arr

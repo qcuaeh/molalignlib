@@ -102,8 +102,8 @@ subroutine remap_atoms( &
 
    ! Get inverse atom order
 
-   backorder0 = inverse_permut(atomorder0)
-   backorder1 = inverse_permut(atomorder1)
+   backorder0 = inverse_mapping(atomorder0)
+   backorder1 = inverse_mapping(atomorder1)
 
    ! Reorder data arrays
 
@@ -260,7 +260,7 @@ subroutine align_atoms( &
       mol0%get_weights(), &
       translated(mol0%natom, mol0%get_coords(), travec0), &
       translated(mol1%natom, mol1%get_coords(), travec1), &
-      identity_perm(mol0%natom) &
+      identitymap(mol0%natom) &
    )
 
    rotmat = quat2rotmat(rotquat)
@@ -275,7 +275,7 @@ function get_rmsd(mol0, mol1) result(rmsd)
    type(Molecule), intent(in) :: mol0, mol1
    real(wp) :: rmsd
 
-   rmsd = sqrt(squaredist(mol0%natom, mol0%get_weights(), mol0%get_coords(), mol1%get_coords(), identity_perm(mol0%natom)) &
+   rmsd = sqrt(squaredist(mol0%natom, mol0%get_weights(), mol0%get_coords(), mol1%get_coords(), identitymap(mol0%natom)) &
         / sum(mol0%get_weights()))
 
 end function
@@ -284,7 +284,7 @@ function get_adjd(mol0, mol1) result(adjd)
    type(Molecule), intent(in) :: mol0, mol1
    integer :: adjd
 
-   adjd = adjacencydiff(mol0%natom, mol0%get_adjmat(), mol1%get_adjmat(), identity_perm(mol0%natom))
+   adjd = adjacencydiff(mol0%natom, mol0%get_adjmat(), mol1%get_adjmat(), identitymap(mol0%natom))
 
 end function
 

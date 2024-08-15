@@ -20,8 +20,8 @@ end type
 type :: Atom
    character(:), allocatable, private :: label
    integer, private :: znum
-   integer, private :: atomtypeidx
-   integer, private :: atomequividx
+   integer, private :: typeidx
+   integer, private :: equividx
    integer, allocatable, private :: mnaid(:)
    real(wp), private :: weight
    real(wp), private :: coords(3)
@@ -147,7 +147,7 @@ subroutine permutate_atoms(self, order)
    integer :: i, k
    integer :: invorder(self%natom)
 
-   invorder = inverse_permut(order)
+   invorder = inverse_mapping(order)
    self%atoms = self%atoms(order(:))
    do i = 1, self%natom
       do k = 1, size(self%atoms(i)%adjlist)
@@ -179,8 +179,8 @@ subroutine set_atomequividcs(self, atomequividcs)
 
    allocate(self%atomequivmap(self%natom))
 
-   self%atoms(:)%atomequividx = atomequividcs(:)
-   self%atomequivmap = inverse_permut(sorted_order(atomequividcs, self%natom))
+   self%atoms(:)%equividx = atomequividcs(:)
+   self%atomequivmap = inverse_mapping(sorted_order(atomequividcs, self%natom))
 
 end subroutine set_atomequividcs
 
@@ -188,7 +188,7 @@ subroutine set_atomtypeidcs(self, atomtypeidcs)
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: atomtypeidcs(self%natom)
 
-   self%atoms(:)%atomtypeidx = atomtypeidcs(:)
+   self%atoms(:)%typeidx = atomtypeidcs(:)
 
 end subroutine set_atomtypeidcs
 
@@ -229,7 +229,7 @@ function get_atomtypeidcs(self) result(atomtypeidcs)
    class(Molecule), intent(in) :: self
    integer :: atomtypeidcs(self%natom)
 
-   atomtypeidcs(:) = self%atoms(:)%atomtypeidx
+   atomtypeidcs(:) = self%atoms(:)%typeidx
 
 end function get_atomtypeidcs
 
@@ -237,7 +237,7 @@ function get_atomequividcs(self) result(atomequividcs)
    class(Molecule), intent(in) :: self
    integer :: atomequividcs(self%natom)
 
-   atomequividcs(:) = self%atoms(:)%atomequividx
+   atomequividcs(:) = self%atoms(:)%equividx
 
 end function get_atomequividcs
 
@@ -423,12 +423,12 @@ subroutine print_atom(self, ind, outLvl)
    case (1)
       if (size(self%adjlist) == 0) then
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a)'
-         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%atomtypeidx, &
+         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%typeidx, &
                      self%weight, " {", self%coords(:), " }"
       else
          write (num, '(i0)') size(self%adjlist)
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a,'//num//'i3,a)'
-         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%atomtypeidx, &
+         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%typeidx, &
                self%weight, " {", self%coords(:), " } [", &
                self%adjlist(:size(self%adjlist)), " ]"
       end if
@@ -438,12 +438,12 @@ subroutine print_atom(self, ind, outLvl)
    case default
       if (size(self%adjlist) == 0) then
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a)'
-         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%atomtypeidx, &
+         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%typeidx, &
                      self%weight, " {", self%coords(:), " }"
       else
          write (num, '(i0)') size(self%adjlist)
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a,'//num//'i3,a)'
-         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%atomtypeidx, &
+         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%typeidx, &
                self%weight, " {", self%coords(:), " } [", &
                self%adjlist(:size(self%adjlist)), " ]"
       end if
@@ -460,7 +460,7 @@ subroutine print_molecule(self)
    write (stderr, '(a,i0,a)') "Contents of molecule structure:   (", &
                                          self%natom, " atoms)"
    write (stderr, '(2a)') 'Title: ', self%title
-   write (stderr, '(a,a4,a5,a12,a7,2a14)') "ind:", "lbl", "znum", "atomtypeidx", &
+   write (stderr, '(a,a4,a5,a12,a7,2a14)') "ind:", "lbl", "znum", "typeidx", &
                                           "weight", "{ coords }", "[ adjlist ]"
 
    do i = 1, self%natom
@@ -628,8 +628,8 @@ subroutine set_atomtypelenlist(self, natomtype, atomtypelenlist)
    k(:) = 0
 
    do i = 1, self%natom
-      k(self%atoms(i)%atomtypeidx) = k(self%atoms(i)%atomtypeidx) + 1
-      self%atomtypeblocks(self%atoms(i)%atomtypeidx)%atomidx(k(self%atoms(i)%atomtypeidx)) = i
+      k(self%atoms(i)%typeidx) = k(self%atoms(i)%typeidx) + 1
+      self%atomtypeblocks(self%atoms(i)%typeidx)%atomidx(k(self%atoms(i)%typeidx)) = i
    end do
 
 end subroutine set_atomtypelenlist
