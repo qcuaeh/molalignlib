@@ -9,6 +9,10 @@ use bounds
 implicit none
 private
 
+type, public :: Block
+   integer, allocatable :: atomidx(:)
+end type
+
 type :: MNA
    integer, allocatable :: lengths(:)
 end type
@@ -33,6 +37,8 @@ type, public :: Molecule
    type(Atom), allocatable :: atoms(:)
    integer, allocatable :: atomtypelenlist(:)
    integer, allocatable :: atomequivlenlist(:)
+   integer, allocatable :: atomequivmap(:)
+   type(Block), allocatable :: atomtypeblocks(:)
    integer :: nfrag
    integer, allocatable :: fragroots(:)
    type(MNA), allocatable :: mnas(:)
@@ -76,10 +82,6 @@ contains
    procedure :: bonded
    procedure :: remove_bond
    procedure :: add_bond
-end type
-
-type, public :: Block
-   integer, allocatable :: atomidx(:)
 end type
 
 contains
@@ -175,7 +177,10 @@ subroutine set_atomequividcs(self, atomequividcs)
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: atomequividcs(self%natom)
 
+   allocate(self%atomequivmap(self%natom))
+
    self%atoms(:)%atomequividx = atomequividcs(:)
+   self%atomequivmap = inverse_permut(sorted_order(atomequividcs, self%natom))
 
 end subroutine set_atomequividcs
 
@@ -207,18 +212,15 @@ end function get_center
 
 function get_blocks(self) result(blocks)
    class(Molecule), intent(in) :: self
-   type(Block) :: blocks(size(self%atomtypelenlist))
-   integer :: h, i, k(size(self%atomtypelenlist))
+   type(Block), allocatable :: blocks(:)
 
-   k(:) = 0
+   integer :: i
+   integer :: k(size(self%atomtypelenlist))
 
-   do h = 1, size(self%atomtypelenlist)
-      allocate(blocks(h)%atomidx(self%atomtypelenlist(h)))
-   end do
+   allocate(blocks(size(self%atomtypeblocks)))
 
-   do i = 1, self%natom
-      k(self%atoms(i)%atomtypeidx) = k(self%atoms(i)%atomtypeidx) + 1
-      blocks(self%atoms(i)%atomtypeidx)%atomidx(k(self%atoms(i)%atomtypeidx)) = i
+   do i = 1, size(self%atomtypeblocks)
+      blocks(i)%atomidx = self%atomequivmap(self%atomtypeblocks(i)%atomidx)
    end do
 
 end function get_blocks
@@ -612,9 +614,23 @@ subroutine set_atomtypelenlist(self, natomtype, atomtypelenlist)
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: natomtype
    integer, intent(in) :: atomtypelenlist(:)
+   integer :: h, i, k(natomtype)
 
    allocate(self%atomtypelenlist(natomtype))
    self%atomtypelenlist = atomtypelenlist(:natomtype)
+
+   allocate(self%atomtypeblocks(natomtype))
+
+   do h = 1, natomtype
+      allocate(self%atomtypeblocks(h)%atomidx(atomtypelenlist(h)))
+   end do
+
+   k(:) = 0
+
+   do i = 1, self%natom
+      k(self%atoms(i)%atomtypeidx) = k(self%atoms(i)%atomtypeidx) + 1
+      self%atomtypeblocks(self%atoms(i)%atomtypeidx)%atomidx(k(self%atoms(i)%atomtypeidx)) = i
+   end do
 
 end subroutine set_atomtypelenlist
 

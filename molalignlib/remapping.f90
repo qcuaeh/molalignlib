@@ -376,17 +376,19 @@ subroutine find_reactive_sites(mol0, mol1, mapping)
          if (adjmat0(i, j) .neqv. adjmat1(mapping(i), mapping(j))) then
             call remove_reactive_bond(i, j, mol0, mol1, mapping)
             do k = 1, mol0%atomtypelenlist(m)
-               if (sum((coords0(:, i) - coords1(:, mapping(blocks1(m)%atomidx(k))))**2) < 2.0 &
-                  .or. sum((coords0(:, blocks0(m)%atomidx(k)) - coords1(:, mapping(i)))**2) < 2.0 &
-               ) then
+               if (sum((coords0(:, i) - coords1(:, mapping(blocks1(m)%atomidx(k))))**2) < 2.0) then
+                  call remove_reactive_bond(blocks1(m)%atomidx(k), j, mol0, mol1, mapping)
+               end if
+               if (sum((coords0(:, blocks0(m)%atomidx(k)) - coords1(:, mapping(i)))**2) < 2.0) then
                   call remove_reactive_bond(blocks0(m)%atomidx(k), j, mol0, mol1, mapping)
                end if
             end do
             do k = 1, mol0%atomtypelenlist(n)
-               if (sum((coords0(:, j) - coords1(:, mapping(blocks1(n)%atomidx(k))))**2) < 2.0 &
-                  .or. sum((coords0(:, blocks0(n)%atomidx(k)) - coords1(:, mapping(j)))**2) < 2.0 &
-               ) then
+               if (sum((coords0(:, j) - coords1(:, mapping(blocks1(n)%atomidx(k))))**2) < 2.0) then
                   call remove_reactive_bond(i, blocks1(n)%atomidx(k), mol0, mol1, mapping)
+               end if
+               if (sum((coords0(:, blocks0(n)%atomidx(k)) - coords1(:, mapping(j)))**2) < 2.0) then
+                  call remove_reactive_bond(i, blocks0(n)%atomidx(k), mol0, mol1, mapping)
                end if
             end do
          end if
