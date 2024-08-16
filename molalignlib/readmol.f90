@@ -19,8 +19,10 @@ use stdio
 use types
 use flags
 use bounds
+use pointers
 use strutils
 use chemdata
+use chemutils
 
 implicit none
 
@@ -30,14 +32,18 @@ subroutine readxyz(unit, mol)
    integer, intent(in) :: unit
    type(Molecule), intent(out) :: mol
    character(ll) :: buffer
-   character(wl), allocatable :: labels(:)
+   character(wl) :: label
+   integer, allocatable :: znums(:), ynums(:)
+   real(wp), allocatable :: weights(:)
    real(wp), allocatable :: coords(:, :)
 
    integer :: i
 
    read (unit, *, end=99) mol%natom
 
-   allocate(labels(mol%natom))
+   allocate(znums(mol%natom))
+   allocate(ynums(mol%natom))
+   allocate(weights(mol%natom))
    allocate(coords(3, mol%natom))
    allocate(mol%atoms(mol%natom))
 
@@ -45,10 +51,14 @@ subroutine readxyz(unit, mol)
    mol%title = trim(buffer)
 
    do i = 1, mol%natom
-      read (unit, *, end=99) labels(i), coords(:, i)
+      read (unit, *, end=99) label, coords(:, i)
+      call readlabel(label, znums(i), ynums(i))
+      weights(i) = weight_func(znums(i))
    end do
 
-   call mol%set_labels(labels)
+   call mol%set_znums(znums)
+   call mol%set_ynums(ynums)
+   call mol%set_weights(weights)
    call mol%set_coords(coords)
 
    return
@@ -65,9 +75,11 @@ subroutine readmol2(unit, mol)
    character(ll) :: buffer
    integer :: i, id
    integer :: atom1, atom2, bondorder, nbond
-   character(wl), allocatable :: labels(:)
-   integer, allocatable :: nadjs(:), adjlists(:, :)
+   character(wl) :: label
+   integer, allocatable :: znums(:), ynums(:)
+   real(wp), allocatable :: weights(:)
    real(wp), allocatable :: coords(:, :)
+   integer, allocatable :: nadjs(:), adjlists(:, :)
 
    do
       read (unit, '(a)', end=99) buffer
@@ -78,7 +90,9 @@ subroutine readmol2(unit, mol)
    mol%title = trim(buffer)
    read (unit, *, end=99) mol%natom, nbond
 
-   allocate(labels(mol%natom))
+   allocate(znums(mol%natom))
+   allocate(ynums(mol%natom))
+   allocate(weights(mol%natom))
    allocate(coords(3, mol%natom))
    allocate(nadjs(mol%natom))
    allocate(adjlists(mol%natom, mol%natom))
@@ -90,7 +104,9 @@ subroutine readmol2(unit, mol)
    end do
 
    do i = 1, mol%natom
-      read (unit, *, end=99) id, labels(i), coords(:, i)
+      read (unit, *, end=99) id, label, coords(:, i)
+      call readlabel(label, znums(i), ynums(i))
+      weights(i) = weight_func(znums(i))
    end do
 
    do
@@ -116,7 +132,9 @@ subroutine readmol2(unit, mol)
       adjlists(nadjs(atom2), atom2) = atom1
    end do
 
-   call mol%set_labels(labels)
+   call mol%set_znums(znums)
+   call mol%set_ynums(ynums)
+   call mol%set_weights(weights)
    call mol%set_coords(coords)
    call mol%set_adjlists(nadjs, adjlists)
 
@@ -132,8 +150,9 @@ subroutine set_bonds(mol)
    type(Molecule), intent(inout) :: mol
 
    integer :: i, j
+   integer :: nadjs(mol%natom)
+   integer :: adjlists(maxcoord, mol%natom)
    integer, allocatable :: znums(:)
-   integer :: nadjs(mol%natom), adjlists(maxcoord, mol%natom)
    real(wp) :: atomdist
    real(wp), allocatable :: adjrads(:)
    real(wp), allocatable :: coords(:, :)

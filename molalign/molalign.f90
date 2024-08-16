@@ -233,16 +233,16 @@ if (remap_flag) then
       rmsd = get_rmsd(mol0, mol1)
       minrmsd = min(minrmsd, rmsd)
 
-      mol1%title = 'Map='//istr(i)//' RMSD='//rstr(rmsd, 4)
+      mol1%title = 'Map='//intstr(i)//' RMSD='//realstr(rmsd, 4)
       call writefile(write_unit, fmtout, mol1)
 
    end do
 
    if (.not. stats_flag) then
       if (bond_flag) then
-         write (stderr, '(a,",",a)') istr(minadjd), rstr(minrmsd, 4)
+         write (stderr, '(a,",",a)') intstr(minadjd), realstr(minrmsd, 4)
       else
-         write (stderr, '(a)') rstr(minrmsd, 4)
+         write (stderr, '(a)') realstr(minrmsd, 4)
       end if
    end if
 
@@ -266,12 +266,12 @@ else
    rmsd = get_rmsd(mol0, mol1)
 
    if (bond_flag) then
-      write (stderr, '(a,",",a)') istr(adjd), rstr(rmsd, 4)
+      write (stderr, '(a,",",a)') intstr(adjd), realstr(rmsd, 4)
    else
-      write (stderr, '(a)') rstr(rmsd, 4)
+      write (stderr, '(a)') realstr(rmsd, 4)
    end if
 
-   mol1%title = 'RMSD='//rstr(rmsd, 4)
+   mol1%title = 'RMSD='//realstr(rmsd, 4)
    call writefile(write_unit, fmtout, mol1)
 
 end if

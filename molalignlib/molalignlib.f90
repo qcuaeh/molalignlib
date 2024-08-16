@@ -59,7 +59,6 @@ subroutine remap_atoms( &
    integer :: nbond0, bonds0(2, maxcoord*mol0%natom)
    integer :: nbond1, bonds1(2, maxcoord*mol1%natom)
 
-
    ! Set error code to 0 by default
 
    error = 0

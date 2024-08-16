@@ -20,11 +20,9 @@ use kinds
 use types
 use flags
 use bounds
-use pointers
 use discrete
 use sorting
 use chemdata
-use chemutils
 
 implicit none
 
@@ -38,21 +36,19 @@ subroutine assort_atoms(mol)
    integer :: natomtype, ztype
    integer :: atomtypeidcs(mol%natom)
    logical :: remaining(mol%natom)
-   integer, dimension(mol%natom) :: atomtypelenlist, blkznum, blkynum
+   integer, dimension(mol%natom) :: atomtypelenlist, blkznums, blkynums
    integer, dimension(mol%natom) :: order, idorder
 
-   integer, allocatable :: znums(:)
+   integer, allocatable :: znums(:), ynums(:)
    real(wp), allocatable :: weights(:)
-   character(wl), allocatable :: labels(:)
 
    ! Initialization
 
    natomtype = 0
    remaining = .true.
-   labels = mol%get_labels()
-!   weights = mol%get_weights()
-   allocate(znums(mol%natom))
-   allocate(weights(mol%natom))
+   znums = mol%get_znums()
+   ynums = mol%get_ynums()
+   weights = mol%get_weights()
 
    ! Create block list
 
@@ -60,19 +56,16 @@ subroutine assort_atoms(mol)
 
       if (remaining(i)) then
 
-         call readlabel(labels(i), znums(i), ztype)
-         weights = weight_func(znums(i))
-
          natomtype = natomtype + 1
          atomtypeidcs(i) = natomtype
          atomtypelenlist(natomtype) = 1
-         blkznum(natomtype) = znums(i)
-         blkynum(natomtype) = ztype
+         blkznums(natomtype) = znums(i)
+         blkynums(natomtype) = ynums(i)
          remaining(i) = .false.
 
          do j = 1, mol%natom
             if (remaining(j)) then
-               if (labels(i) == labels(j)) then
+               if (znums(i) == znums(j) .and. ynums(i) == ynums(j)) then
 !                  if (weights(i) == weights(j)) then
                      atomtypeidcs(j) = natomtype
                      znums(j) = znums(i)
@@ -94,20 +87,18 @@ subroutine assort_atoms(mol)
 
    ! Order blocks by type number
 
-   order(:natomtype) = sorted_order(blkynum, natomtype)
+   order(:natomtype) = sorted_order(blkynums, natomtype)
    idorder(:natomtype) = inverse_mapping(order(:natomtype))
    atomtypelenlist(:natomtype) = atomtypelenlist(order(:natomtype))
    atomtypeidcs = idorder(atomtypeidcs)
 
    ! Order blocks by atomic number
 
-   order(:natomtype) = sorted_order(blkznum, natomtype)
+   order(:natomtype) = sorted_order(blkznums, natomtype)
    idorder(:natomtype) = inverse_mapping(order(:natomtype))
    atomtypelenlist(:natomtype) = atomtypelenlist(order(:natomtype))
    atomtypeidcs = idorder(atomtypeidcs)
 
-   call mol%set_znums(znums)
-   call mol%set_weights(weights)
    call mol%set_atomtypeidcs(atomtypeidcs) 
    call mol%set_atomtypepart(natomtype, atomtypelenlist)
 

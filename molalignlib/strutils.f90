@@ -22,8 +22,8 @@ implicit none
 private
 public lowercase
 public uppercase
-public istr
-public rstr
+public intstr
+public realstr
 public baseext
 
 contains
@@ -54,7 +54,7 @@ function uppercase(str)
    end do
 end function
 
-function istr(x) result(str)
+function intstr(x) result(str)
    integer, intent(in) :: x
    character(:), allocatable :: str
    integer :: l
@@ -64,7 +64,7 @@ function istr(x) result(str)
    write (str, '(i0)') x
 end function
 
-function rstr(x, n) result(str)
+function realstr(x, n) result(str)
    real(wp), intent(in) :: x
    integer, intent(in) :: n
    integer :: l

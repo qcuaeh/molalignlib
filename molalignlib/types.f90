@@ -5,6 +5,7 @@ use rotation
 use translation
 use adjacency
 use alignment
+use strutils
 use bounds
 implicit none
 private
@@ -24,8 +25,8 @@ type :: MNA
 end type
 
 type :: Atom
-   character(:), allocatable, private :: label
    integer, private :: znum
+   integer, private :: ynum
    integer, private :: typeidx
    integer, private :: equividx
    integer, allocatable, private :: mnaid(:)
@@ -66,7 +67,6 @@ contains
    procedure :: get_coords
    procedure :: set_coords
    procedure :: get_labels
-   procedure :: set_labels
    procedure :: get_adjmat
    procedure :: get_adjlists
    procedure :: set_adjlists
@@ -75,6 +75,8 @@ contains
    procedure, private :: get_znums_sorted
    procedure, private :: get_znums_unsorted
    procedure :: set_znums
+   procedure :: set_ynums
+   procedure :: get_ynums
    procedure :: get_weights
    procedure :: set_weights
    procedure :: get_center
@@ -188,6 +190,22 @@ subroutine set_znums(self, znums)
    self%atoms(:)%znum = znums(:)
 
 end subroutine set_znums
+
+function get_ynums(self) result(ynums)
+   class(Molecule), intent(in) :: self
+   integer, allocatable :: ynums(:)
+
+   ynums = self%atoms(:)%ynum
+
+end function get_ynums
+
+subroutine set_ynums(self, ynums)
+   class(Molecule), intent(inout) :: self
+   integer, intent(in) :: ynums(:)
+
+   self%atoms(:)%ynum = ynums(:)
+
+end subroutine set_ynums
 
 subroutine set_atomequividcs(self, atomequividcs)
    class(Molecule), intent(inout) :: self
@@ -304,21 +322,10 @@ function get_labels(self) result(labels)
    integer :: i
 
    do i = 1, self%natom
-      labels(i) = self%atoms(i)%label
+      labels(i) = elsym(self%atoms(i)%znum) // intstr(self%atoms(i)%ynum)
    end do
 
 end function get_labels
-
-subroutine set_labels(self, labels)
-   class(Molecule), intent(inout) :: self
-   character(wl), intent(in) :: labels(self%natom)
-   integer :: i
-
-   do i = 1, self%natom
-      self%atoms(i)%label = labels(i)
-   end do
-
-end subroutine set_labels
 
 function get_adjmat(self) result(adjmat)
    class(Molecule), intent(in) :: self
@@ -441,12 +448,12 @@ subroutine print_atom(self, ind, outLvl)
    case (1)
       if (size(self%adjlist) == 0) then
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a)'
-         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%typeidx, &
+         write (stderr, frmt) ind, ": ", self%znum, self%ynum, self%typeidx, &
                      self%weight, " {", self%coords(:), " }"
       else
          write (num, '(i0)') size(self%adjlist)
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a,'//num//'i3,a)'
-         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%typeidx, &
+         write (stderr, frmt) ind, ": ", self%znum, self%ynum, self%typeidx, &
                self%weight, " {", self%coords(:), " } [", &
                self%adjlist(:size(self%adjlist)), " ]"
       end if
@@ -456,12 +463,12 @@ subroutine print_atom(self, ind, outLvl)
    case default
       if (size(self%adjlist) == 0) then
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a)'
-         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%typeidx, &
+         write (stderr, frmt) ind, ": ", self%znum, self%ynum, self%typeidx, &
                      self%weight, " {", self%coords(:), " }"
       else
          write (num, '(i0)') size(self%adjlist)
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a,'//num//'i3,a)'
-         write (stderr, frmt) ind, ": ", self%label(:2), self%znum, self%typeidx, &
+         write (stderr, frmt) ind, ": ", self%znum, self%ynum, self%typeidx, &
                self%weight, " {", self%coords(:), " } [", &
                self%adjlist(:size(self%adjlist)), " ]"
       end if
