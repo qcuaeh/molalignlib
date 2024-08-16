@@ -109,7 +109,7 @@ subroutine assort_atoms(mol)
    call mol%set_znums(znums)
    call mol%set_weights(weights)
    call mol%set_atomtypeidcs(atomtypeidcs) 
-   call mol%set_atomtypelenlist(natomtype, atomtypelenlist)
+   call mol%set_atomtypepart(natomtype, atomtypelenlist)
 
 end subroutine
 
@@ -150,7 +150,7 @@ subroutine set_equiv_atoms(mol)
 !    end do
 
    call mol%set_atomequividcs(atomequividcs)
-   call mol%set_atomequivlenlist(natomequiv, atomequivlenlist)
+   call mol%set_atomequivpart(natomequiv, atomequivlenlist)
 
 end subroutine
 

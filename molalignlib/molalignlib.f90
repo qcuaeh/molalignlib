@@ -105,6 +105,11 @@ subroutine remap_atoms( &
    backorder0 = inverse_mapping(atomorder0)
    backorder1 = inverse_mapping(atomorder1)
 
+   ! Backup atoms before reordering
+
+   mol0%newatoms = mol0%atoms
+   mol1%newatoms = mol1%atoms
+
    ! Reorder data arrays
 
    call mol0%permutate_atoms(atomorder0)
@@ -112,7 +117,7 @@ subroutine remap_atoms( &
 
    ! Abort if molecules are not isomers
 
-   if (any(mol0%get_znums() /= mol1%get_znums())) then
+   if (any(mol0%get_znums(mol0%atomequivpart) /= mol1%get_znums(mol1%atomequivpart))) then
       write (stderr, '(a)') 'Error: The molecules are not isomers'
       error = 1
       return

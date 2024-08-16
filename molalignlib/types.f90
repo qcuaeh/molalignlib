@@ -10,7 +10,13 @@ implicit none
 private
 
 type, public :: Block
-   integer, allocatable :: atomidx(:)
+   integer, allocatable :: atomidcs(:)
+end type
+
+type, public :: Partition
+   integer, allocatable :: fororder(:)
+   integer, allocatable :: backorder(:)
+   type(Block), allocatable :: blocks(:)
 end type
 
 type :: MNA
@@ -35,10 +41,9 @@ type, public :: Molecule
    character(:), allocatable :: title
    integer :: natom
    type(Atom), allocatable :: atoms(:)
-   integer, allocatable :: atomtypelenlist(:)
-   integer, allocatable :: atomequivlenlist(:)
-   integer, allocatable :: atomequivmap(:)
-   type(Block), allocatable :: atomtypeblocks(:)
+   type(Atom), allocatable :: newatoms(:)
+   type(Partition) :: atomtypepart
+   type(Partition) :: atomequivpart
    integer :: nfrag
    integer, allocatable :: fragroots(:)
    type(MNA), allocatable :: mnas(:)
@@ -53,9 +58,9 @@ contains
    procedure :: get_atomequividcs
    procedure :: set_atomequividcs
    procedure :: get_atomtypelenlist
-   procedure :: set_atomtypelenlist
+   procedure :: set_atomtypepart
    procedure :: get_atomequivlenlist
-   procedure :: set_atomequivlenlist
+   procedure :: set_atomequivpart
    procedure :: get_adjequivlenlists
    procedure :: set_adjequivlenlists
    procedure :: get_coords
@@ -66,8 +71,9 @@ contains
    procedure :: get_adjlists
    procedure :: set_adjlists
    procedure :: get_fragroot
-   procedure :: get_blocks
-   procedure :: get_znums
+   procedure :: get_atomtypeblks
+   procedure, private :: get_znums_sorted
+   procedure, private :: get_znums_unsorted
    procedure :: set_znums
    procedure :: get_weights
    procedure :: set_weights
@@ -75,13 +81,14 @@ contains
    procedure :: mirror_coords
    procedure, private :: matrix_rotate_coords
    procedure, private :: quater_rotate_coords
-   generic, public :: rotate_coords => matrix_rotate_coords, quater_rotate_coords
    procedure :: translate_coords
    procedure :: permutate_atoms
    procedure :: print => print_molecule
    procedure :: bonded
    procedure :: remove_bond
    procedure :: add_bond
+   generic :: get_znums => get_znums_sorted, get_znums_unsorted
+   generic :: rotate_coords => matrix_rotate_coords, quater_rotate_coords
 end type
 
 contains
@@ -96,14 +103,14 @@ end function get_natom
 integer function get_natomtype(self) result(natomtype)
    class(Molecule), intent(in) :: self
 
-   natomtype = size(self%atomtypelenlist)
+   natomtype = size(self%atomtypepart%blocks)
 
 end function get_natomtype
 
 integer function get_natomequiv(self) result(natomequiv)
    class(Molecule), intent(in) :: self
 
-   natomequiv = size(self%atomequivlenlist)
+   natomequiv = size(self%atomequivpart%blocks)
 
 end function get_natomequiv
 
@@ -157,17 +164,26 @@ subroutine permutate_atoms(self, order)
 
 end subroutine permutate_atoms
 
-function get_znums(self) result(znums)
+function get_znums_unsorted(self) result(znums)
    class(Molecule), intent(in) :: self
-   integer :: znums(self%natom)
+   integer, allocatable :: znums(:)
 
-   znums(:) = self%atoms(:)%znum
+   znums = self%atoms(:)%znum
 
-end function get_znums
+end function get_znums_unsorted
+
+function get_znums_sorted(self, atompart) result(znums)
+   class(Molecule), intent(in) :: self
+   class(Partition), intent(in) :: atompart
+   integer, allocatable :: znums(:)
+
+   znums = self%newatoms(atompart%fororder(:))%znum
+
+end function get_znums_sorted
 
 subroutine set_znums(self, znums)
    class(Molecule), intent(inout) :: self
-   integer, intent(in) :: znums(self%natom)
+   integer, intent(in) :: znums(:)
 
    self%atoms(:)%znum = znums(:)
 
@@ -177,16 +193,18 @@ subroutine set_atomequividcs(self, atomequividcs)
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: atomequividcs(self%natom)
 
-   allocate(self%atomequivmap(self%natom))
+   allocate(self%atomequivpart%fororder(self%natom))
+   allocate(self%atomequivpart%backorder(self%natom))
 
    self%atoms(:)%equividx = atomequividcs(:)
-   self%atomequivmap = inverse_mapping(sorted_order(atomequividcs, self%natom))
+   self%atomequivpart%fororder = sorted_order(atomequividcs, self%natom)
+   self%atomequivpart%backorder = inverse_mapping(self%atomequivpart%fororder)
 
 end subroutine set_atomequividcs
 
 subroutine set_atomtypeidcs(self, atomtypeidcs)
    class(Molecule), intent(inout) :: self
-   integer, intent(in) :: atomtypeidcs(self%natom)
+   integer, intent(in) :: atomtypeidcs(:)
 
    self%atoms(:)%typeidx = atomtypeidcs(:)
 
@@ -210,20 +228,20 @@ function get_center(self) result(cntrcoords)
 
 end function get_center
 
-function get_blocks(self) result(blocks)
+function get_atomtypeblks(self) result(blocks)
    class(Molecule), intent(in) :: self
    type(Block), allocatable :: blocks(:)
 
    integer :: i
-   integer :: k(size(self%atomtypelenlist))
+   integer :: k(size(self%atomtypepart%blocks))
 
-   allocate(blocks(size(self%atomtypeblocks)))
+   allocate(blocks(size(self%atomtypepart%blocks)))
 
-   do i = 1, size(self%atomtypeblocks)
-      blocks(i)%atomidx = self%atomequivmap(self%atomtypeblocks(i)%atomidx)
+   do i = 1, size(self%atomtypepart%blocks)
+      blocks(i)%atomidcs = self%atomequivpart%backorder(self%atomtypepart%blocks(i)%atomidcs(:))
    end do
 
-end function get_blocks
+end function get_atomtypeblks
 
 function get_atomtypeidcs(self) result(atomtypeidcs)
    class(Molecule), intent(in) :: self
@@ -605,51 +623,75 @@ end subroutine add_bond
 function get_atomtypelenlist(self) result(atomtypelenlist)
    class(Molecule), intent(in) :: self
    integer, allocatable :: atomtypelenlist(:)
+   integer :: i
 
-   atomtypelenlist = self%atomtypelenlist
+   allocate(atomtypelenlist(size(self%atomtypepart%blocks)))
+
+   do i = 1, size(self%atomtypepart%blocks)
+      atomtypelenlist(i) = size(self%atomtypepart%blocks(i)%atomidcs)
+   end do
 
 end function get_atomtypelenlist
 
-subroutine set_atomtypelenlist(self, natomtype, atomtypelenlist)
+subroutine set_atomtypepart(self, natomtype, atomtypelenlist)
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: natomtype
    integer, intent(in) :: atomtypelenlist(:)
-   integer :: h, i, k(natomtype)
 
-   allocate(self%atomtypelenlist(natomtype))
-   self%atomtypelenlist = atomtypelenlist(:natomtype)
+   integer :: i
+   integer, allocatable :: k(:)
 
-   allocate(self%atomtypeblocks(natomtype))
+   allocate(k(natomtype))
+   allocate(self%atomtypepart%blocks(natomtype))
 
-   do h = 1, natomtype
-      allocate(self%atomtypeblocks(h)%atomidx(atomtypelenlist(h)))
+   do i = 1, natomtype
+      allocate(self%atomtypepart%blocks(i)%atomidcs(atomtypelenlist(i)))
    end do
 
    k(:) = 0
 
    do i = 1, self%natom
       k(self%atoms(i)%typeidx) = k(self%atoms(i)%typeidx) + 1
-      self%atomtypeblocks(self%atoms(i)%typeidx)%atomidx(k(self%atoms(i)%typeidx)) = i
+      self%atomtypepart%blocks(self%atoms(i)%typeidx)%atomidcs(k(self%atoms(i)%typeidx)) = i
    end do
 
-end subroutine set_atomtypelenlist
+end subroutine set_atomtypepart
 
 function get_atomequivlenlist(self) result(atomequivlenlist)
    class(Molecule), intent(in) :: self
    integer, allocatable :: atomequivlenlist(:)
+   integer :: i
 
-   atomequivlenlist = self%atomequivlenlist
+   allocate(atomequivlenlist(size(self%atomequivpart%blocks)))
+
+   do i = 1, size(self%atomequivpart%blocks)
+      atomequivlenlist(i) = size(self%atomequivpart%blocks(i)%atomidcs)
+   end do
 
 end function get_atomequivlenlist
 
-subroutine set_atomequivlenlist(self, natomequiv, atomequivlenlist)
+subroutine set_atomequivpart(self, natomequiv, atomequivlenlist)
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: natomequiv
    integer, intent(in) :: atomequivlenlist(:)
 
-   allocate(self%atomequivlenlist(natomequiv))
-   self%atomequivlenlist = atomequivlenlist(:natomequiv)
+   integer :: i
+   integer, allocatable :: k(:)
 
-end subroutine set_atomequivlenlist
+   allocate(k(natomequiv))
+   allocate(self%atomequivpart%blocks(natomequiv))
+
+   do i = 1, natomequiv
+      allocate(self%atomequivpart%blocks(i)%atomidcs(atomequivlenlist(i)))
+   end do
+
+   k(:) = 0
+
+   do i = 1, self%natom
+      k(self%atoms(i)%equividx) = k(self%atoms(i)%equividx) + 1
+      self%atomequivpart%blocks(self%atoms(i)%equividx)%atomidcs(k(self%atoms(i)%equividx)) = i
+   end do
+
+end subroutine set_atomequivpart
 
 end module
