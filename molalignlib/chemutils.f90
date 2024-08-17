@@ -45,23 +45,23 @@ real(wp) function valency(z) result(res)
    res = real(valencies(z), wp)
 end function
 
-subroutine readlabel(label, znum, ztype)
+subroutine readlabel(label, atomnum, atomtag)
    character(*), intent(in) :: label
-   integer, intent(out) :: znum, ztype
+   integer, intent(out) :: atomnum, atomtag
    integer :: m, n
 
    n = len_trim(label)
    m = verify(uppercase(trim(label)), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ')
 
    if (m == 0) then
-      ztype = 0
-      znum = atomic_number(label)
+      atomtag = 0
+      atomnum = atomic_number(label)
    else if (verify(label(m:n), '1234567890') == 0) then
-      read (label(m:n), *) ztype
-      znum = atomic_number(label(1:m-1))
+      read (label(m:n), *) atomtag
+      atomnum = atomic_number(label(1:m-1))
    else
-      ztype = -1
-      znum = atomic_number(label(1:m-1))
+      atomtag = -1
+      atomnum = atomic_number(label(1:m-1))
    end if
 
 end subroutine

@@ -33,21 +33,21 @@ subroutine assort_atoms(mol)
    type(Molecule), intent(inout) :: mol
 
    integer :: i, j
-   integer :: natomtype, ztype
+   integer :: natomtype
    integer :: atomtypeidcs(mol%natom)
    logical :: remaining(mol%natom)
-   integer, dimension(mol%natom) :: atomtypelenlist, blkznums, blkynums
+   integer, dimension(mol%natom) :: atomtypelenlist, blkatomnums, blkynums
    integer, dimension(mol%natom) :: order, idorder
 
-   integer, allocatable :: znums(:), ynums(:)
+   integer, allocatable :: atomnums(:), atomtags(:)
    real(wp), allocatable :: weights(:)
 
    ! Initialization
 
    natomtype = 0
    remaining = .true.
-   znums = mol%get_znums()
-   ynums = mol%get_ynums()
+   atomnums = mol%get_atomnums()
+   atomtags = mol%get_atomtags()
    weights = mol%get_weights()
 
    ! Create block list
@@ -59,16 +59,16 @@ subroutine assort_atoms(mol)
          natomtype = natomtype + 1
          atomtypeidcs(i) = natomtype
          atomtypelenlist(natomtype) = 1
-         blkznums(natomtype) = znums(i)
-         blkynums(natomtype) = ynums(i)
+         blkatomnums(natomtype) = atomnums(i)
+         blkynums(natomtype) = atomtags(i)
          remaining(i) = .false.
 
          do j = 1, mol%natom
             if (remaining(j)) then
-               if (znums(i) == znums(j) .and. ynums(i) == ynums(j)) then
+               if (atomnums(i) == atomnums(j) .and. atomtags(i) == atomtags(j)) then
 !                  if (weights(i) == weights(j)) then
                      atomtypeidcs(j) = natomtype
-                     znums(j) = znums(i)
+                     atomnums(j) = atomnums(i)
                      weights(j) = weights(i)
                      remaining(j) = .false.
                      atomtypelenlist(natomtype) = atomtypelenlist(natomtype) + 1
@@ -94,7 +94,7 @@ subroutine assort_atoms(mol)
 
    ! Order blocks by atomic number
 
-   order(:natomtype) = sorted_order(blkznums, natomtype)
+   order(:natomtype) = sorted_order(blkatomnums, natomtype)
    idorder(:natomtype) = inverse_mapping(order(:natomtype))
    atomtypelenlist(:natomtype) = atomtypelenlist(order(:natomtype))
    atomtypeidcs = idorder(atomtypeidcs)
@@ -137,7 +137,7 @@ subroutine set_equiv_atoms(mol)
    atomequividcs = idorder(atomequividcs)
 
 !    do i = 1, mol%natom
-!        print *, i, elsym(znum(i)), atomequividcs(i)
+!        print *, i, elsym(atomnum(i)), atomequividcs(i)
 !    end do
 
    call mol%set_atomequividcs(atomequividcs)

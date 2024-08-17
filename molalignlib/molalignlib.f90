@@ -18,6 +18,7 @@ module molalignlib
 use stdio
 use kinds
 use types
+use ordtypes
 use bounds
 use random
 use sorting
@@ -106,8 +107,8 @@ subroutine remap_atoms( &
 
    ! Backup atoms before reordering
 
-   mol0%newatoms = mol0%atoms
-   mol1%newatoms = mol1%atoms
+   mol0%backatoms = mol0%atoms
+   mol1%backatoms = mol1%atoms
 
    ! Reorder data arrays
 
@@ -116,7 +117,7 @@ subroutine remap_atoms( &
 
    ! Abort if molecules are not isomers
 
-   if (any(mol0%get_znums(mol0%atomequivpart) /= mol1%get_znums(mol1%atomequivpart))) then
+   if (any(mol0%get_atomnums(eqvord) /= mol1%get_atomnums(eqvord))) then
       write (stderr, '(a)') 'Error: The molecules are not isomers'
       error = 1
       return
@@ -124,7 +125,7 @@ subroutine remap_atoms( &
 
    ! Abort if there are conflicting atomic types
 
-   if (any(mol0%get_atomtypeidcs() /= mol1%get_atomtypeidcs())) then
+   if (any(mol0%get_atomtypeidcs(eqvord) /= mol1%get_atomtypeidcs(eqvord))) then
       write (stderr, '(a)') 'Error: There are conflicting atomic types'
       error = 1
       return
@@ -132,7 +133,7 @@ subroutine remap_atoms( &
 
    ! Abort if there are conflicting weights
 
-   if (any(abs(mol0%get_weights() - mol1%get_weights()) > 1.E-6)) then
+   if (any(abs(mol0%get_weights(eqvord) - mol1%get_weights(eqvord)) > 1.E-6)) then
       write (stderr, '(a)') 'Error: There are conflicting weights'
       error = 1
       return
@@ -218,7 +219,7 @@ subroutine align_atoms( &
 
    ! Abort if molecules are not isomers
 
-   if (any(sorted(mol0%get_znums(), mol0%natom) /= sorted(mol1%get_znums(), mol1%natom))) then
+   if (any(sorted(mol0%get_atomnums(), mol0%natom) /= sorted(mol1%get_atomnums(), mol1%natom))) then
       write (stderr, '(a)') 'Error: The molecules are not isomers'
       error = 1
       return
@@ -226,7 +227,7 @@ subroutine align_atoms( &
 
    ! Abort if atoms are not ordered
 
-   if (any(mol0%get_znums() /= mol1%get_znums())) then
+   if (any(mol0%get_atomnums() /= mol1%get_atomnums())) then
       write (stderr, '(a)') 'Error: The atoms are not in the same order'
       error = 1
       return
@@ -254,16 +255,16 @@ subroutine align_atoms( &
     travec0 = -mol0%get_center()
     travec1 = -mol1%get_center()
 !CZGC: llamado anterior
-!   travec0 = -center_coords(mol0%natom, mol0%get_weights(), mol0%get_coords())
-!   travec1 = -center_coords(mol1%natom, mol1%get_weights(), mol1%get_coords())
+!   travec0 = -center_coords(mol0%natom, mol0%get_weights(), mol0%get_atomcoords())
+!   travec1 = -center_coords(mol1%natom, mol1%get_weights(), mol1%get_atomcoords())
 
    ! Calculate optimal rotation matrix
 
    rotquat = leastrotquat( &
       mol0%natom, &
       mol0%get_weights(), &
-      translated(mol0%natom, mol0%get_coords(), travec0), &
-      translated(mol1%natom, mol1%get_coords(), travec1), &
+      translated(mol0%natom, mol0%get_atomcoords(), travec0), &
+      translated(mol1%natom, mol1%get_atomcoords(), travec1), &
       identitymap(mol0%natom) &
    )
 
@@ -279,7 +280,7 @@ function get_rmsd(mol0, mol1) result(rmsd)
    type(Molecule), intent(in) :: mol0, mol1
    real(wp) :: rmsd
 
-   rmsd = sqrt(squaredist(mol0%natom, mol0%get_weights(), mol0%get_coords(), mol1%get_coords(), identitymap(mol0%natom)) &
+   rmsd = sqrt(squaredist(mol0%natom, mol0%get_weights(), mol0%get_atomcoords(), mol1%get_atomcoords(), identitymap(mol0%natom)) &
         / sum(mol0%get_weights()))
 
 end function

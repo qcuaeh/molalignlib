@@ -1,12 +1,13 @@
 module types
 use kinds
+use bounds
+use ordtypes
 use discrete
 use rotation
 use translation
 use adjacency
 use alignment
 use strutils
-use bounds
 implicit none
 private
 
@@ -25,8 +26,8 @@ type :: MNA
 end type
 
 type :: Atom
-   integer, private :: znum
-   integer, private :: ynum
+   integer, private :: atomnum
+   integer, private :: atomtag
    integer, private :: typeidx
    integer, private :: equividx
    integer, allocatable, private :: mnaid(:)
@@ -42,7 +43,7 @@ type, public :: Molecule
    character(:), allocatable :: title
    integer :: natom
    type(Atom), allocatable :: atoms(:)
-   type(Atom), allocatable :: newatoms(:)
+   type(Atom), allocatable :: backatoms(:)
    type(Partition) :: atomtypepart
    type(Partition) :: atomequivpart
    integer :: nfrag
@@ -54,31 +55,33 @@ contains
    procedure :: get_natomequiv
    procedure :: get_nadjs
    procedure :: get_nadjequivs
-   procedure :: get_atomtypeidcs
    procedure :: set_atomtypeidcs
-   procedure :: get_atomequividcs
+   procedure, private :: get_atomtypeidcs_raword
+   procedure, private :: get_atomtypeidcs_eqvord
    procedure :: set_atomequividcs
-   procedure :: get_atomtypelenlist
+   procedure :: get_atomequividcs
    procedure :: set_atomtypepart
+   procedure :: get_atomtypelenlist
    procedure :: get_atomequivlenlist
    procedure :: set_atomequivpart
-   procedure :: get_adjequivlenlists
    procedure :: set_adjequivlenlists
-   procedure :: get_coords
-   procedure :: set_coords
-   procedure :: get_labels
-   procedure :: get_adjmat
-   procedure :: get_adjlists
+   procedure :: get_adjequivlenlists
+   procedure :: set_atomcoords
+   procedure :: get_atomcoords
+   procedure :: get_atomlabels
    procedure :: set_adjlists
+   procedure :: get_adjlists
+   procedure :: get_adjmat
    procedure :: get_fragroot
-   procedure :: get_atomtypeblks
-   procedure, private :: get_znums_sorted
-   procedure, private :: get_znums_unsorted
-   procedure :: set_znums
-   procedure :: set_ynums
-   procedure :: get_ynums
-   procedure :: get_weights
+   procedure :: get_atomtypeblocks
+   procedure :: set_atomnums
+   procedure :: get_atomnums_raword
+   procedure :: get_atomnums_eqvord
+   procedure :: set_atomtags
+   procedure :: get_atomtags
    procedure :: set_weights
+   procedure, private :: get_weights_raword
+   procedure, private :: get_weights_eqvord
    procedure :: get_center
    procedure :: mirror_coords
    procedure, private :: matrix_rotate_coords
@@ -89,8 +92,10 @@ contains
    procedure :: bonded
    procedure :: remove_bond
    procedure :: add_bond
-   generic :: get_znums => get_znums_sorted, get_znums_unsorted
    generic :: rotate_coords => matrix_rotate_coords, quater_rotate_coords
+   generic :: get_atomnums => get_atomnums_raword, get_atomnums_eqvord
+   generic :: get_atomtypeidcs => get_atomtypeidcs_raword, get_atomtypeidcs_eqvord
+   generic :: get_weights => get_weights_raword, get_weights_eqvord
 end type
 
 contains
@@ -120,9 +125,9 @@ subroutine mirror_coords(self)
    class(Molecule), intent(inout) :: self
    real(wp) :: coords(3, self%natom)
 
-   coords = self%get_coords()
+   coords = self%get_atomcoords()
    coords(1, :) = -coords(1, :)
-   call self%set_coords(coords)
+   call self%set_atomcoords(coords)
 
 end subroutine mirror_coords
 
@@ -130,7 +135,7 @@ subroutine matrix_rotate_coords(self, rotmat)
    class(Molecule), intent(inout) :: self
    real(wp), intent(in) :: rotmat(3, 3)
 
-   call self%set_coords(matrix_rotated(self%natom, self%get_coords(), rotmat))
+   call self%set_atomcoords(matrix_rotated(self%natom, self%get_atomcoords(), rotmat))
 
 end subroutine matrix_rotate_coords
 
@@ -138,7 +143,7 @@ subroutine quater_rotate_coords(self, rotquat)
    class(Molecule), intent(inout) :: self
    real(wp), intent(in) :: rotquat(4)
 
-   call self%set_coords(quater_rotated(self%natom, self%get_coords(), rotquat))
+   call self%set_atomcoords(quater_rotated(self%natom, self%get_atomcoords(), rotquat))
 
 end subroutine quater_rotate_coords
 
@@ -146,7 +151,7 @@ subroutine translate_coords(self, travec)
    class(Molecule), intent(inout) :: self
    real(wp), intent(in) :: travec(3)
 
-   call self%set_coords(translated(self%natom, self%get_coords(), travec))
+   call self%set_atomcoords(translated(self%natom, self%get_atomcoords(), travec))
 
 end subroutine translate_coords
 
@@ -166,46 +171,46 @@ subroutine permutate_atoms(self, order)
 
 end subroutine permutate_atoms
 
-function get_znums_unsorted(self) result(znums)
+function get_atomnums_raword(self) result(atomnums)
    class(Molecule), intent(in) :: self
-   integer, allocatable :: znums(:)
+   integer, allocatable :: atomnums(:)
 
-   znums = self%atoms(:)%znum
+   atomnums = self%atoms(:)%atomnum
 
-end function get_znums_unsorted
+end function get_atomnums_raword
 
-function get_znums_sorted(self, atompart) result(znums)
+function get_atomnums_eqvord(self, ordtype) result(atomnums)
    class(Molecule), intent(in) :: self
-   class(Partition), intent(in) :: atompart
-   integer, allocatable :: znums(:)
+   type(eqvordtype), intent(in) :: ordtype
+   integer, allocatable :: atomnums(:)
 
-   znums = self%newatoms(atompart%fororder(:))%znum
+   atomnums = self%backatoms(self%atomequivpart%fororder(:))%atomnum
 
-end function get_znums_sorted
+end function get_atomnums_eqvord
 
-subroutine set_znums(self, znums)
+subroutine set_atomnums(self, atomnums)
    class(Molecule), intent(inout) :: self
-   integer, intent(in) :: znums(:)
+   integer, intent(in) :: atomnums(:)
 
-   self%atoms(:)%znum = znums(:)
+   self%atoms(:)%atomnum = atomnums(:)
 
-end subroutine set_znums
+end subroutine set_atomnums
 
-function get_ynums(self) result(ynums)
+function get_atomtags(self) result(atomtags)
    class(Molecule), intent(in) :: self
-   integer, allocatable :: ynums(:)
+   integer, allocatable :: atomtags(:)
 
-   ynums = self%atoms(:)%ynum
+   atomtags = self%atoms(:)%atomtag
 
-end function get_ynums
+end function get_atomtags
 
-subroutine set_ynums(self, ynums)
+subroutine set_atomtags(self, atomtags)
    class(Molecule), intent(inout) :: self
-   integer, intent(in) :: ynums(:)
+   integer, intent(in) :: atomtags(:)
 
-   self%atoms(:)%ynum = ynums(:)
+   self%atoms(:)%atomtag = atomtags(:)
 
-end subroutine set_ynums
+end subroutine set_atomtags
 
 subroutine set_atomequividcs(self, atomequividcs)
    class(Molecule), intent(inout) :: self
@@ -246,7 +251,7 @@ function get_center(self) result(cntrcoords)
 
 end function get_center
 
-function get_atomtypeblks(self) result(blocks)
+function get_atomtypeblocks(self) result(blocks)
    class(Molecule), intent(in) :: self
    type(Block), allocatable :: blocks(:)
 
@@ -259,15 +264,24 @@ function get_atomtypeblks(self) result(blocks)
       blocks(i)%atomidcs = self%atomequivpart%backorder(self%atomtypepart%blocks(i)%atomidcs(:))
    end do
 
-end function get_atomtypeblks
+end function get_atomtypeblocks
 
-function get_atomtypeidcs(self) result(atomtypeidcs)
+function get_atomtypeidcs_raword(self) result(atomtypeidcs)
    class(Molecule), intent(in) :: self
    integer :: atomtypeidcs(self%natom)
 
    atomtypeidcs(:) = self%atoms(:)%typeidx
 
-end function get_atomtypeidcs
+end function get_atomtypeidcs_raword
+
+function get_atomtypeidcs_eqvord(self, ordtype) result(atomtypeidcs)
+   class(Molecule), intent(in) :: self
+   type(eqvordtype), intent(in) :: ordtype
+   integer :: atomtypeidcs(self%natom)
+
+   atomtypeidcs(:) = self%backatoms(self%atomequivpart%fororder(:))%typeidx
+
+end function get_atomtypeidcs_eqvord
 
 function get_atomequividcs(self) result(atomequividcs)
    class(Molecule), intent(in) :: self
@@ -277,13 +291,22 @@ function get_atomequividcs(self) result(atomequividcs)
 
 end function get_atomequividcs
 
-function get_weights(self) result(weights)
+function get_weights_raword(self) result(weights)
    class(Molecule), intent(in) :: self
    real(wp) :: weights(self%natom)
 
    weights(:) = self%atoms(:)%weight
 
-end function get_weights
+end function get_weights_raword
+
+function get_weights_eqvord(self, ordtype) result(weights)
+   class(Molecule), intent(in) :: self
+   type(eqvordtype), intent(in) :: ordtype
+   real(wp) :: weights(self%natom)
+
+   weights(:) = self%atoms(self%atomequivpart%fororder(:))%weight
+
+end function get_weights_eqvord
 
 subroutine set_weights(self, weights)
    class(Molecule), intent(inout) :: self
@@ -293,7 +316,7 @@ subroutine set_weights(self, weights)
 
 end subroutine set_weights
 
-function get_coords(self) result(coords)
+function get_atomcoords(self) result(coords)
    class(Molecule), intent(in) :: self
    real(wp) :: coords(3, self%natom)
    integer :: i
@@ -303,9 +326,9 @@ function get_coords(self) result(coords)
       coords(:, i) = self%atoms(i)%coords(:)
    end do
 
-end function get_coords
+end function get_atomcoords
 
-subroutine set_coords(self, coords)
+subroutine set_atomcoords(self, coords)
    class(Molecule), intent(inout) :: self
    real(wp), intent(in) :: coords(3, self%natom)
    integer :: i
@@ -314,18 +337,18 @@ subroutine set_coords(self, coords)
       self%atoms(i)%coords = coords(:, i)
    end do
 
-end subroutine set_coords
+end subroutine set_atomcoords
 
-function get_labels(self) result(labels)
+function get_atomlabels(self) result(labels)
    class(Molecule), intent(in) :: self
    character(wl) :: labels(self%natom)
    integer :: i
 
    do i = 1, self%natom
-      labels(i) = elsym(self%atoms(i)%znum) // intstr(self%atoms(i)%ynum)
+      labels(i) = elsym(self%atoms(i)%atomnum) // intstr(self%atoms(i)%atomtag)
    end do
 
-end function get_labels
+end function get_atomlabels
 
 function get_adjmat(self) result(adjmat)
    class(Molecule), intent(in) :: self
@@ -448,12 +471,12 @@ subroutine print_atom(self, ind, outLvl)
    case (1)
       if (size(self%adjlist) == 0) then
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a)'
-         write (stderr, frmt) ind, ": ", self%znum, self%ynum, self%typeidx, &
+         write (stderr, frmt) ind, ": ", self%atomnum, self%atomtag, self%typeidx, &
                      self%weight, " {", self%coords(:), " }"
       else
          write (num, '(i0)') size(self%adjlist)
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a,'//num//'i3,a)'
-         write (stderr, frmt) ind, ": ", self%znum, self%ynum, self%typeidx, &
+         write (stderr, frmt) ind, ": ", self%atomnum, self%atomtag, self%typeidx, &
                self%weight, " {", self%coords(:), " } [", &
                self%adjlist(:size(self%adjlist)), " ]"
       end if
@@ -463,12 +486,12 @@ subroutine print_atom(self, ind, outLvl)
    case default
       if (size(self%adjlist) == 0) then
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a)'
-         write (stderr, frmt) ind, ": ", self%znum, self%ynum, self%typeidx, &
+         write (stderr, frmt) ind, ": ", self%atomnum, self%atomtag, self%typeidx, &
                      self%weight, " {", self%coords(:), " }"
       else
          write (num, '(i0)') size(self%adjlist)
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a,'//num//'i3,a)'
-         write (stderr, frmt) ind, ": ", self%znum, self%ynum, self%typeidx, &
+         write (stderr, frmt) ind, ": ", self%atomnum, self%atomtag, self%typeidx, &
                self%weight, " {", self%coords(:), " } [", &
                self%adjlist(:size(self%adjlist)), " ]"
       end if
@@ -485,7 +508,7 @@ subroutine print_molecule(self)
    write (stderr, '(a,i0,a)') "Contents of molecule structure:   (", &
                                          self%natom, " atoms)"
    write (stderr, '(2a)') 'Title: ', self%title
-   write (stderr, '(a,a4,a5,a12,a7,2a14)') "ind:", "lbl", "znum", "typeidx", &
+   write (stderr, '(a,a4,a5,a12,a7,2a14)') "ind:", "lbl", "atomnum", "typeidx", &
                                           "weight", "{ coords }", "[ adjlist ]"
 
    do i = 1, self%natom

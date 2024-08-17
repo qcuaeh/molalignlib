@@ -107,8 +107,8 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 
    natom = mol0%natom
    weights = mol0%get_weights()
-   coords0 = mol0%get_coords()
-   coords1 = mol1%get_coords()
+   coords0 = mol0%get_atomcoords()
+   coords1 = mol1%get_atomcoords()
    adjmat0 = mol0%get_adjmat()
    adjmat1 = mol1%get_adjmat()
 
@@ -344,29 +344,29 @@ subroutine find_reactive_sites(mol0, mol1, mapping)
 
    integer :: natom
    integer :: h, i, j, k, m, n
-   integer, dimension(:), allocatable :: znums0, znums1
+   integer, dimension(:), allocatable :: atomnums0, atomnums1
    real(wp), dimension(:, :), allocatable :: coords0, coords1
    logical, dimension(:, :), allocatable :: adjmat0, adjmat1
    integer, dimension(:), allocatable :: atomtypeidcs0, atomtypeidcs1
    integer, dimension(:), allocatable :: atomtypelenlist0, atomtypelenlist1
-   type(Block), dimension(:), allocatable :: atomtypeblks0, atomtypeblks1
+   type(Block), dimension(:), allocatable :: atomtypeblocks0, atomtypeblocks1
    real(wp) :: rotquat(4)
 
    ! Align coordinates
 
-   rotquat = leastrotquat(mol0%natom, mol0%get_weights(), mol0%get_coords(), mol1%get_coords(), mapping)
+   rotquat = leastrotquat(mol0%natom, mol0%get_weights(), mol0%get_atomcoords(), mol1%get_atomcoords(), mapping)
    call mol1%rotate_coords(rotquat)
 
    ! Initialization
 
-   coords0 = mol0%get_coords()
-   coords1 = mol1%get_coords()
+   coords0 = mol0%get_atomcoords()
+   coords1 = mol1%get_atomcoords()
    adjmat0 = mol0%get_adjmat()
    adjmat1 = mol1%get_adjmat()
-   atomtypeblks0 = mol0%get_atomtypeblks()
-   atomtypeblks1 = mol1%get_atomtypeblks()
    atomtypeidcs0 = mol0%get_atomtypeidcs()
    atomtypeidcs1 = mol1%get_atomtypeidcs()
+   atomtypeblocks0 = mol0%get_atomtypeblocks()
+   atomtypeblocks1 = mol1%get_atomtypeblocks()
    atomtypelenlist0 = mol0%get_atomtypelenlist()
    atomtypelenlist1 = mol1%get_atomtypelenlist()
 
@@ -379,19 +379,19 @@ subroutine find_reactive_sites(mol0, mol1, mapping)
          if (adjmat0(i, j) .neqv. adjmat1(mapping(i), mapping(j))) then
             call remove_reactive_bond(i, j, mol0, mol1, mapping)
             do k = 1, atomtypelenlist0(m)
-               if (sum((coords0(:, i) - coords1(:, mapping(atomtypeblks1(m)%atomidcs(k))))**2) < 2.0) then
-                  call remove_reactive_bond(atomtypeblks1(m)%atomidcs(k), j, mol0, mol1, mapping)
+               if (sum((coords0(:, i) - coords1(:, mapping(atomtypeblocks1(m)%atomidcs(k))))**2) < 2.0) then
+                  call remove_reactive_bond(atomtypeblocks1(m)%atomidcs(k), j, mol0, mol1, mapping)
                end if
-               if (sum((coords0(:, atomtypeblks0(m)%atomidcs(k)) - coords1(:, mapping(i)))**2) < 2.0) then
-                  call remove_reactive_bond(atomtypeblks0(m)%atomidcs(k), j, mol0, mol1, mapping)
+               if (sum((coords0(:, atomtypeblocks0(m)%atomidcs(k)) - coords1(:, mapping(i)))**2) < 2.0) then
+                  call remove_reactive_bond(atomtypeblocks0(m)%atomidcs(k), j, mol0, mol1, mapping)
                end if
             end do
             do k = 1, atomtypelenlist1(n)
-               if (sum((coords0(:, j) - coords1(:, mapping(atomtypeblks1(n)%atomidcs(k))))**2) < 2.0) then
-                  call remove_reactive_bond(i, atomtypeblks1(n)%atomidcs(k), mol0, mol1, mapping)
+               if (sum((coords0(:, j) - coords1(:, mapping(atomtypeblocks1(n)%atomidcs(k))))**2) < 2.0) then
+                  call remove_reactive_bond(i, atomtypeblocks1(n)%atomidcs(k), mol0, mol1, mapping)
                end if
-               if (sum((coords0(:, atomtypeblks0(n)%atomidcs(k)) - coords1(:, mapping(j)))**2) < 2.0) then
-                  call remove_reactive_bond(i, atomtypeblks0(n)%atomidcs(k), mol0, mol1, mapping)
+               if (sum((coords0(:, atomtypeblocks0(n)%atomidcs(k)) - coords1(:, mapping(j)))**2) < 2.0) then
+                  call remove_reactive_bond(i, atomtypeblocks0(n)%atomidcs(k), mol0, mol1, mapping)
                end if
             end do
          end if
@@ -407,7 +407,7 @@ subroutine remove_reactive_bond(i, j, mol0, mol1, mapping)
    type(Molecule), intent(inout) :: mol0, mol1
 
    integer :: k
-   integer, allocatable, dimension(:) :: znums0, znums1
+   integer, allocatable, dimension(:) :: atomnums0, atomnums1
    integer :: nadjs0(mol0%natom), adjlists0(maxcoord, mol0%natom)
    integer :: nadjs1(mol1%natom), adjlists1(maxcoord, mol1%natom)
 
@@ -415,8 +415,8 @@ subroutine remove_reactive_bond(i, j, mol0, mol1, mapping)
    nadjs1 = mol1%get_nadjs()
    adjlists0 = mol0%get_adjlists()
    adjlists1 = mol1%get_adjlists()
-   znums0 = mol0%get_znums()
-   znums1 = mol1%get_znums()
+   atomnums0 = mol0%get_atomnums()
+   atomnums1 = mol1%get_atomnums()
 
    if (mol0%bonded(i, j)) then
       call mol0%remove_bond(i, j)
@@ -426,17 +426,17 @@ subroutine remove_reactive_bond(i, j, mol0, mol1, mapping)
       call mol1%remove_bond(mapping(i), mapping(j))
    end if
 
-   if (znums0(i) == 1) then
+   if (atomnums0(i) == 1) then
       do k = 1, nadjs0(i)
-         if (any([7, 8] == znums0(adjlists0(k, i)))) then
+         if (any([7, 8] == atomnums0(adjlists0(k, i)))) then
             call mol0%remove_bond(i, adjlists0(k, i))
          end if
       end do
    end if
 
-   if (znums1(i) == 1) then
+   if (atomnums1(i) == 1) then
       do k = 1, nadjs1(i)
-         if (any([7, 8] == znums1(adjlists1(k, i)))) then
+         if (any([7, 8] == atomnums1(adjlists1(k, i)))) then
             if (mol1%bonded(mapping(i), mapping(adjlists1(k, i)))) then
                call mol1%remove_bond(mapping(i), mapping(adjlists1(k, i)))
             end if
@@ -444,17 +444,17 @@ subroutine remove_reactive_bond(i, j, mol0, mol1, mapping)
       end do
    end if
 
-   if (znums0(j) == 1) then
+   if (atomnums0(j) == 1) then
       do k = 1, nadjs0(j)
-         if (any([7, 8] == znums0(adjlists0(k, j)))) then
+         if (any([7, 8] == atomnums0(adjlists0(k, j)))) then
             call mol0%remove_bond(j, adjlists0(k, j))
          end if
       end do
    end if
 
-   if (znums1(j) == 1) then
+   if (atomnums1(j) == 1) then
       do k = 1, nadjs1(j)
-         if (any([7, 8] == znums1(adjlists1(k, j)))) then
+         if (any([7, 8] == atomnums1(adjlists1(k, j)))) then
             if (mol1%bonded(mapping(j), mapping(adjlists1(k, j)))) then
                call mol1%remove_bond(mapping(j), mapping(adjlists1(k, j)))
             end if

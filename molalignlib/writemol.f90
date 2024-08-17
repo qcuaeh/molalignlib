@@ -24,10 +24,10 @@ implicit none
 
 contains
 
-subroutine writexyz(unit, title, natom, znums, coords)
+subroutine writexyz(unit, title, natom, atomnums, coords)
    character(*), intent(in) :: title
    integer, intent(in) :: unit, natom
-   integer, dimension(:), intent(in) :: znums
+   integer, dimension(:), intent(in) :: atomnums
    real(wp), dimension(:, :), intent(in) :: coords
    integer :: i
 
@@ -35,15 +35,15 @@ subroutine writexyz(unit, title, natom, znums, coords)
    write (unit, '(a)') title
 
    do i = 1, natom
-      write (unit, '(a,3(2x,f12.6))') elsym(znums(i)), coords(:, i)
+      write (unit, '(a,3(2x,f12.6))') elsym(atomnums(i)), coords(:, i)
    end do
 
 end subroutine
 
-subroutine writemol2(unit, title, natom, znums, coords, nbond, bonds)
+subroutine writemol2(unit, title, natom, atomnums, coords, nbond, bonds)
    character(*), intent(in) :: title
    integer, intent(in) :: unit, natom
-   integer, dimension(:), intent(in) :: znums
+   integer, dimension(:), intent(in) :: atomnums
    real(wp), dimension(:, :), intent(in) :: coords
    integer, intent(in) :: nbond
    integer, intent(in) :: bonds(:, :)
@@ -62,7 +62,7 @@ subroutine writemol2(unit, title, natom, znums, coords, nbond, bonds)
 
    do i = 1, natom
       write (unit, '(i4,1x,a2,3(1x,f12.6),1x,a8,1x,i2,1x,a4,1x,f7.3)') &
-         i, elsym(znums(i)), coords(:, i), elsym(znums(i)), 1, 'MOL1', 0.
+         i, elsym(atomnums(i)), coords(:, i), elsym(atomnums(i)), 1, 'MOL1', 0.
    end do
 
    write (unit, '(a)') '@<TRIPOS>BOND'

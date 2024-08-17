@@ -33,7 +33,7 @@ subroutine readxyz(unit, mol)
    type(Molecule), intent(out) :: mol
    character(ll) :: buffer
    character(wl) :: label
-   integer, allocatable :: znums(:), ynums(:)
+   integer, allocatable :: atomnums(:), atomtags(:)
    real(wp), allocatable :: weights(:)
    real(wp), allocatable :: coords(:, :)
 
@@ -41,8 +41,8 @@ subroutine readxyz(unit, mol)
 
    read (unit, *, end=99) mol%natom
 
-   allocate(znums(mol%natom))
-   allocate(ynums(mol%natom))
+   allocate(atomnums(mol%natom))
+   allocate(atomtags(mol%natom))
    allocate(weights(mol%natom))
    allocate(coords(3, mol%natom))
    allocate(mol%atoms(mol%natom))
@@ -52,14 +52,14 @@ subroutine readxyz(unit, mol)
 
    do i = 1, mol%natom
       read (unit, *, end=99) label, coords(:, i)
-      call readlabel(label, znums(i), ynums(i))
-      weights(i) = weight_func(znums(i))
+      call readlabel(label, atomnums(i), atomtags(i))
+      weights(i) = weight_func(atomnums(i))
    end do
 
-   call mol%set_znums(znums)
-   call mol%set_ynums(ynums)
+   call mol%set_atomnums(atomnums)
+   call mol%set_atomtags(atomtags)
    call mol%set_weights(weights)
-   call mol%set_coords(coords)
+   call mol%set_atomcoords(coords)
 
    return
 
@@ -76,7 +76,7 @@ subroutine readmol2(unit, mol)
    integer :: i, id
    integer :: atom1, atom2, bondorder, nbond
    character(wl) :: label
-   integer, allocatable :: znums(:), ynums(:)
+   integer, allocatable :: atomnums(:), atomtags(:)
    real(wp), allocatable :: weights(:)
    real(wp), allocatable :: coords(:, :)
    integer, allocatable :: nadjs(:), adjlists(:, :)
@@ -90,8 +90,8 @@ subroutine readmol2(unit, mol)
    mol%title = trim(buffer)
    read (unit, *, end=99) mol%natom, nbond
 
-   allocate(znums(mol%natom))
-   allocate(ynums(mol%natom))
+   allocate(atomnums(mol%natom))
+   allocate(atomtags(mol%natom))
    allocate(weights(mol%natom))
    allocate(coords(3, mol%natom))
    allocate(nadjs(mol%natom))
@@ -105,8 +105,8 @@ subroutine readmol2(unit, mol)
 
    do i = 1, mol%natom
       read (unit, *, end=99) id, label, coords(:, i)
-      call readlabel(label, znums(i), ynums(i))
-      weights(i) = weight_func(znums(i))
+      call readlabel(label, atomnums(i), atomtags(i))
+      weights(i) = weight_func(atomnums(i))
    end do
 
    do
@@ -132,10 +132,10 @@ subroutine readmol2(unit, mol)
       adjlists(nadjs(atom2), atom2) = atom1
    end do
 
-   call mol%set_znums(znums)
-   call mol%set_ynums(ynums)
+   call mol%set_atomnums(atomnums)
+   call mol%set_atomtags(atomtags)
    call mol%set_weights(weights)
-   call mol%set_coords(coords)
+   call mol%set_atomcoords(coords)
    call mol%set_adjlists(nadjs, adjlists)
 
    return
@@ -152,7 +152,7 @@ subroutine set_bonds(mol)
    integer :: i, j
    integer :: nadjs(mol%natom)
    integer :: adjlists(maxcoord, mol%natom)
-   integer, allocatable :: znums(:)
+   integer, allocatable :: atomnums(:)
    real(wp) :: atomdist
    real(wp), allocatable :: adjrads(:)
    real(wp), allocatable :: coords(:, :)
@@ -166,11 +166,11 @@ subroutine set_bonds(mol)
       return
    end if
 
-   znums = mol%get_znums()
-   coords = mol%get_coords()
+   atomnums = mol%get_atomnums()
+   coords = mol%get_atomcoords()
 
    ! Set adjacency radii
-   adjrads = covrad(znums) + 0.25*(vdwrad(znums) - covrad(znums))
+   adjrads = covrad(atomnums) + 0.25*(vdwrad(atomnums) - covrad(atomnums))
 
    ! Register adjacency matrix i,j if atoms i and j are closer
    ! than the sum of their adjacency radius
