@@ -18,7 +18,6 @@ module molalignlib
 use stdio
 use kinds
 use types
-use ordtypes
 use bounds
 use random
 use sorting

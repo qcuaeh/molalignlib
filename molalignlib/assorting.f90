@@ -36,8 +36,8 @@ subroutine assort_atoms(mol)
    integer :: natomtype
    integer :: atomtypeidcs(mol%natom)
    logical :: remaining(mol%natom)
-   integer, dimension(mol%natom) :: atomtypelenlist, blkatomnums, blkynums
-   integer, dimension(mol%natom) :: order, idorder
+   integer, dimension(mol%natom) :: atomtypelenlist, blkatomnums, blkatomtags
+   integer, dimension(mol%natom) :: foreorder, backorder
 
    integer, allocatable :: atomnums(:), atomtags(:)
    real(wp), allocatable :: weights(:)
@@ -60,7 +60,7 @@ subroutine assort_atoms(mol)
          atomtypeidcs(i) = natomtype
          atomtypelenlist(natomtype) = 1
          blkatomnums(natomtype) = atomnums(i)
-         blkynums(natomtype) = atomtags(i)
+         blkatomtags(natomtype) = atomtags(i)
          remaining(i) = .false.
 
          do j = 1, mol%natom
@@ -85,19 +85,19 @@ subroutine assort_atoms(mol)
 
    end do
 
-   ! Order parts by type number
+   ! Order parts by atom tag
 
-   order(:natomtype) = sorted_order(blkynums, natomtype)
-   idorder(:natomtype) = inverse_mapping(order(:natomtype))
-   atomtypelenlist(:natomtype) = atomtypelenlist(order(:natomtype))
-   atomtypeidcs = idorder(atomtypeidcs)
+   foreorder(:natomtype) = sorted_order(blkatomtags, natomtype)
+   backorder(:natomtype) = inverse_mapping(foreorder(:natomtype))
+   atomtypelenlist(:natomtype) = atomtypelenlist(foreorder(:natomtype))
+   atomtypeidcs = backorder(atomtypeidcs)
 
    ! Order parts by atomic number
 
-   order(:natomtype) = sorted_order(blkatomnums, natomtype)
-   idorder(:natomtype) = inverse_mapping(order(:natomtype))
-   atomtypelenlist(:natomtype) = atomtypelenlist(order(:natomtype))
-   atomtypeidcs = idorder(atomtypeidcs)
+   foreorder(:natomtype) = sorted_order(blkatomnums, natomtype)
+   backorder(:natomtype) = inverse_mapping(foreorder(:natomtype))
+   atomtypelenlist(:natomtype) = atomtypelenlist(foreorder(:natomtype))
+   atomtypeidcs = backorder(atomtypeidcs)
 
    call mol%set_atomtypeidcs(atomtypeidcs) 
    call mol%set_atomtypepart(natomtype, atomtypelenlist)
@@ -110,19 +110,18 @@ subroutine set_equiv_atoms(mol)
 
    integer i, nin, natomequiv
    integer, dimension(mol%natom) :: atomequividcs, atomequivlenlist
-   integer, dimension(mol%natom) :: intype, uptype, basetype
-   integer, dimension(mol%natom) :: order, idorder
+   integer, dimension(mol%natom) :: intype, atomtypemap
+   integer, dimension(mol%natom) :: foreorder, backorder
 
    ! Determine MNA types iteratively
 
    nin = mol%get_natomtype()
    intype = mol%get_atomtypeidcs()
-   basetype = [(i, i=1, mol%natom)]
+   atomtypemap = [(i, i=1, nin)]
 
    do
 
-      call getmnatypes(mol, nin, intype, natomequiv, atomequividcs, atomequivlenlist, uptype)
-      basetype(:natomequiv) = basetype(uptype(:natomequiv))
+      call getmnatypes(mol, nin, intype, natomequiv, atomequividcs, atomequivlenlist, atomtypemap)
 
       if (all(atomequividcs == intype)) exit
 
@@ -131,10 +130,10 @@ subroutine set_equiv_atoms(mol)
 
    end do
 
-   order(:natomequiv) = sorted_order(basetype, natomequiv)
-   idorder(:natomequiv) = inverse_mapping(order(:natomequiv))
-   atomequivlenlist(:natomequiv) = atomequivlenlist(order(:natomequiv))
-   atomequividcs = idorder(atomequividcs)
+   foreorder(:natomequiv) = sorted_order(atomtypemap, natomequiv)
+   backorder(:natomequiv) = inverse_mapping(foreorder(:natomequiv))
+   atomequivlenlist(:natomequiv) = atomequivlenlist(foreorder(:natomequiv))
+   atomequividcs = backorder(atomequividcs)
 
 !    do i = 1, mol%natom
 !        print *, i, elsym(atomnum(i)), atomequividcs(i)
@@ -155,7 +154,7 @@ subroutine groupbytype(nelem, elements, types, ngroup, groupsize, groupid)
     integer i, j
     integer, dimension(maxcoord) :: grouptype
     logical, dimension(maxcoord) :: remaining
-    integer, dimension(maxcoord) :: order, idorder
+    integer, dimension(maxcoord) :: foreorder, backorder
 
 ! Initialization
 
@@ -184,14 +183,14 @@ subroutine groupbytype(nelem, elements, types, ngroup, groupsize, groupid)
 
 ! Order groups by category type 
 
-    order(:ngroup) = sorted_order(grouptype, ngroup)
-    idorder(:ngroup) = inverse_mapping(order(:ngroup))
-    grouptype(:ngroup) = grouptype(order(:ngroup))
-    groupsize(:ngroup) = groupsize(order(:ngroup))
-    groupid(:nelem) = idorder(groupid(:nelem))
+    foreorder(:ngroup) = sorted_order(grouptype, ngroup)
+    backorder(:ngroup) = inverse_mapping(foreorder(:ngroup))
+    grouptype(:ngroup) = grouptype(foreorder(:ngroup))
+    groupsize(:ngroup) = groupsize(foreorder(:ngroup))
+    groupid(:nelem) = backorder(groupid(:nelem))
 
 !    print *, groupid(:ngroup)
-!    print *, typess(order)
+!    print *, types(foreorder)
 
 end subroutine
 
@@ -220,15 +219,17 @@ subroutine assort_neighbors(mol)
 
 end subroutine
 
-subroutine getmnatypes(mol, nin, intype, nout, outype, outsize, uptype)
+subroutine getmnatypes(mol, nin, intype, nout, outype, outsize, atomtypemap)
    type(Molecule), intent(inout) :: mol
    integer, intent(in) :: nin
    integer, dimension(:), intent(in) :: intype
    integer, intent(out) :: nout
-   integer, dimension(:), intent(out) :: outype, outsize, uptype
+   integer, dimension(:), intent(out) :: outype, outsize, atomtypemap
 
    integer :: i, j
-   integer :: nadjs(mol%natom), adjlists(maxcoord, mol%natom)
+   integer :: nadjs(mol%natom)
+   integer :: adjlists(maxcoord, mol%natom)
+   integer :: parentype(mol%natom)
    logical :: untyped(mol%natom)
 
    nadjs = mol%get_nadjs()
@@ -242,7 +243,7 @@ subroutine getmnatypes(mol, nin, intype, nout, outype, outsize, uptype)
          nout = nout + 1
          outype(i) = nout
          outsize(nout) = 1
-         uptype(nout) = intype(i)
+         parentype(nout) = intype(i)
          do j = i + 1, mol%natom
 !               print '(a, x, i0, x, i0)', trim(elsym(intype0(i))), i, j
             if (untyped(j)) then
@@ -258,6 +259,8 @@ subroutine getmnatypes(mol, nin, intype, nout, outype, outsize, uptype)
          end do
       end if
    end do
+
+   atomtypemap(:nout) = atomtypemap(parentype(:nout))
 
 end subroutine
 

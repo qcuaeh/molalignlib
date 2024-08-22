@@ -1,7 +1,6 @@
 module types
 use kinds
 use bounds
-use ordtypes
 use discrete
 use rotation
 use translation
@@ -11,18 +10,23 @@ use strutils
 implicit none
 private
 
+type :: eqvordtype
+end type
+
+type(eqvordtype), public :: eqvord
+
+type :: MNA
+   integer, allocatable :: lengths(:)
+end type
+
 type, public :: Part
    integer, allocatable :: atomidcs(:)
 end type
 
-type, public :: Partition
-   integer, allocatable :: fororder(:)
+type :: Partition
+   integer, allocatable :: foreorder(:)
    integer, allocatable :: backorder(:)
    type(Part), allocatable :: parts(:)
-end type
-
-type :: MNA
-   integer, allocatable :: lengths(:)
 end type
 
 type :: Atom
@@ -190,7 +194,7 @@ function get_atomnums_eqvord(self, ordtype) result(atomnums)
    ! Local variables
    integer, allocatable :: atomnums(:)
 
-   atomnums = self%backatoms(self%atomequivpart%fororder(:))%atomnum
+   atomnums = self%backatoms(self%atomequivpart%foreorder(:))%atomnum
 
 end function get_atomnums_eqvord
 
@@ -223,12 +227,12 @@ subroutine set_atomequividcs(self, atomequividcs)
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: atomequividcs(self%natom)
 
-   allocate(self%atomequivpart%fororder(self%natom))
+   allocate(self%atomequivpart%foreorder(self%natom))
    allocate(self%atomequivpart%backorder(self%natom))
 
    self%atoms(:)%equividx = atomequividcs(:)
-   self%atomequivpart%fororder = sorted_order(atomequividcs, self%natom)
-   self%atomequivpart%backorder = inverse_mapping(self%atomequivpart%fororder)
+   self%atomequivpart%foreorder = sorted_order(atomequividcs, self%natom)
+   self%atomequivpart%backorder = inverse_mapping(self%atomequivpart%foreorder)
 
 end subroutine set_atomequividcs
 
@@ -288,7 +292,7 @@ function get_atomtypeidcs_eqvord(self, ordtype) result(atomtypeidcs)
    ! Local variables
    integer, allocatable :: atomtypeidcs(:)
 
-   atomtypeidcs = self%backatoms(self%atomequivpart%fororder(:))%typeidx
+   atomtypeidcs = self%backatoms(self%atomequivpart%foreorder(:))%typeidx
 
 end function get_atomtypeidcs_eqvord
 
@@ -316,7 +320,7 @@ function get_weights_eqvord(self, ordtype) result(weights)
    ! Local variables
    real(wp), allocatable :: weights(:)
 
-   weights = self%atoms(self%atomequivpart%fororder(:))%weight
+   weights = self%atoms(self%atomequivpart%foreorder(:))%weight
 
 end function get_weights_eqvord
 
