@@ -349,7 +349,7 @@ subroutine find_reactive_sites(mol0, mol1, mapping)
    logical, dimension(:, :), allocatable :: adjmat0, adjmat1
    integer, dimension(:), allocatable :: atomtypeidcs0, atomtypeidcs1
    integer, dimension(:), allocatable :: atomtypelenlist0, atomtypelenlist1
-   type(Block), dimension(:), allocatable :: atomtypeblocks0, atomtypeblocks1
+   type(Part), dimension(:), allocatable :: atomtypeblocks0, atomtypeblocks1
    real(wp) :: rotquat(4)
 
    ! Align coordinates

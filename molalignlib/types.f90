@@ -11,14 +11,14 @@ use strutils
 implicit none
 private
 
-type, public :: Block
+type, public :: Part
    integer, allocatable :: atomidcs(:)
 end type
 
 type, public :: Partition
    integer, allocatable :: fororder(:)
    integer, allocatable :: backorder(:)
-   type(Block), allocatable :: blocks(:)
+   type(Part), allocatable :: parts(:)
 end type
 
 type :: MNA
@@ -110,14 +110,14 @@ end function get_natom
 integer function get_natomtype(self) result(natomtype)
    class(Molecule), intent(in) :: self
 
-   natomtype = size(self%atomtypepart%blocks)
+   natomtype = size(self%atomtypepart%parts)
 
 end function get_natomtype
 
 integer function get_natomequiv(self) result(natomequiv)
    class(Molecule), intent(in) :: self
 
-   natomequiv = size(self%atomequivpart%blocks)
+   natomequiv = size(self%atomequivpart%parts)
 
 end function get_natomequiv
 
@@ -259,16 +259,16 @@ function get_center(self) result(cntrcoords)
 
 end function get_center
 
-function get_atomtypeblocks(self) result(blocks)
+function get_atomtypeblocks(self) result(parts)
    class(Molecule), intent(in) :: self
    ! Local variables
    integer :: i
-   type(Block), allocatable :: blocks(:)
+   type(Part), allocatable :: parts(:)
 
-   allocate(blocks(size(self%atomtypepart%blocks)))
+   allocate(parts(size(self%atomtypepart%parts)))
 
-   do i = 1, size(self%atomtypepart%blocks)
-      blocks(i)%atomidcs = self%atomequivpart%backorder(self%atomtypepart%blocks(i)%atomidcs(:))
+   do i = 1, size(self%atomtypepart%parts)
+      parts(i)%atomidcs = self%atomequivpart%backorder(self%atomtypepart%parts(i)%atomidcs(:))
    end do
 
 end function get_atomtypeblocks
@@ -690,10 +690,10 @@ function get_atomtypelenlist(self) result(atomtypelenlist)
    integer :: i
    integer, allocatable :: atomtypelenlist(:)
 
-   allocate(atomtypelenlist(size(self%atomtypepart%blocks)))
+   allocate(atomtypelenlist(size(self%atomtypepart%parts)))
 
-   do i = 1, size(self%atomtypepart%blocks)
-      atomtypelenlist(i) = size(self%atomtypepart%blocks(i)%atomidcs)
+   do i = 1, size(self%atomtypepart%parts)
+      atomtypelenlist(i) = size(self%atomtypepart%parts(i)%atomidcs)
    end do
 
 end function get_atomtypelenlist
@@ -707,17 +707,17 @@ subroutine set_atomtypepart(self, natomtype, atomtypelenlist)
    integer, allocatable :: k(:)
 
    allocate(k(natomtype))
-   allocate(self%atomtypepart%blocks(natomtype))
+   allocate(self%atomtypepart%parts(natomtype))
 
    do i = 1, natomtype
-      allocate(self%atomtypepart%blocks(i)%atomidcs(atomtypelenlist(i)))
+      allocate(self%atomtypepart%parts(i)%atomidcs(atomtypelenlist(i)))
    end do
 
    k(:) = 0
 
    do i = 1, self%natom
       k(self%atoms(i)%typeidx) = k(self%atoms(i)%typeidx) + 1
-      self%atomtypepart%blocks(self%atoms(i)%typeidx)%atomidcs(k(self%atoms(i)%typeidx)) = i
+      self%atomtypepart%parts(self%atoms(i)%typeidx)%atomidcs(k(self%atoms(i)%typeidx)) = i
    end do
 
 end subroutine set_atomtypepart
@@ -728,10 +728,10 @@ function get_atomequivlenlist(self) result(atomequivlenlist)
    integer :: i
    integer, allocatable :: atomequivlenlist(:)
 
-   allocate(atomequivlenlist(size(self%atomequivpart%blocks)))
+   allocate(atomequivlenlist(size(self%atomequivpart%parts)))
 
-   do i = 1, size(self%atomequivpart%blocks)
-      atomequivlenlist(i) = size(self%atomequivpart%blocks(i)%atomidcs)
+   do i = 1, size(self%atomequivpart%parts)
+      atomequivlenlist(i) = size(self%atomequivpart%parts(i)%atomidcs)
    end do
 
 end function get_atomequivlenlist
@@ -745,17 +745,17 @@ subroutine set_atomequivpart(self, natomequiv, atomequivlenlist)
    integer, allocatable :: k(:)
 
    allocate(k(natomequiv))
-   allocate(self%atomequivpart%blocks(natomequiv))
+   allocate(self%atomequivpart%parts(natomequiv))
 
    do i = 1, natomequiv
-      allocate(self%atomequivpart%blocks(i)%atomidcs(atomequivlenlist(i)))
+      allocate(self%atomequivpart%parts(i)%atomidcs(atomequivlenlist(i)))
    end do
 
    k(:) = 0
 
    do i = 1, self%natom
       k(self%atoms(i)%equividx) = k(self%atoms(i)%equividx) + 1
-      self%atomequivpart%blocks(self%atoms(i)%equividx)%atomidcs(k(self%atoms(i)%equividx)) = i
+      self%atomequivpart%parts(self%atoms(i)%equividx)%atomidcs(k(self%atoms(i)%equividx)) = i
    end do
 
 end subroutine set_atomequivpart

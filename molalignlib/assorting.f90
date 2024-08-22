@@ -85,14 +85,14 @@ subroutine assort_atoms(mol)
 
    end do
 
-   ! Order blocks by type number
+   ! Order parts by type number
 
    order(:natomtype) = sorted_order(blkynums, natomtype)
    idorder(:natomtype) = inverse_mapping(order(:natomtype))
    atomtypelenlist(:natomtype) = atomtypelenlist(order(:natomtype))
    atomtypeidcs = idorder(atomtypeidcs)
 
-   ! Order blocks by atomic number
+   ! Order parts by atomic number
 
    order(:natomtype) = sorted_order(blkatomnums, natomtype)
    idorder(:natomtype) = inverse_mapping(order(:natomtype))
