@@ -135,10 +135,6 @@ subroutine set_equiv_atoms(mol)
    atomequivlenlist(:natomequiv) = atomequivlenlist(foreorder(:natomequiv))
    atomequividcs = backorder(atomequividcs)
 
-!    do i = 1, mol%natom
-!        print *, i, elsym(atomnum(i)), atomequividcs(i)
-!    end do
-
    call mol%set_atomequividcs(atomequividcs)
    call mol%set_atomequivpart(natomequiv, atomequivlenlist)
 

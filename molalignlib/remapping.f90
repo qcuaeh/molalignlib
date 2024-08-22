@@ -131,93 +131,23 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
    adjequivlenlists1 = mol1%get_adjequivlenlists()
 
    ! Detect fragments and root atoms
-
-!CZGC: new call
-!   call findmolfrags(mol0, nadjs0, adjlists0, nfrag0, fragroot0)
-!   call findmolfrags(mol1, nadjs1, adjlists1, nfrag1, fragroot1)
-!CZGC: optionally
-!   call findmolfrags(mol0, nfrag0, fragroot0)
-!   call findmolfrags(mol1, nfrag1, fragroot1)
-!CZGC: optionally 2 (nota: sólo pasan todos los tests si se llama findmolfrags
-!                          aquí y no al inicio en fileio.f90)
+!CZGC: nota: sólo pasan todos los tests si se llama findmolfrags
+!                          aquí y no al inicio en fileio.f90
    call findmolfrags(mol0)
    call findmolfrags(mol1)
+
    nfrag0 = mol0%nfrag
    fragroot0 = mol0%get_fragroot()
    nfrag1 = mol1%nfrag
    fragroot1 = mol1%get_fragroot()
-!CZGC: old call
-!   call findmolfrags(natom, nadjs0, adjlists0, natomtype, atomtypelenlist, natomequiv0, atomequivlenlist0, nfrag0, fragroot0)
-!   call findmolfrags(natom, nadjs1, adjlists1, natomtype, atomtypelenlist, natomequiv1, atomequivlenlist1, nfrag1, fragroot1)
 
    ! Calculate MNA equivalence matrix
 
-!CZGC: new call
    call calcequivmat(mol0, mol1, nadjmna0, adjmnalen0, adjmnalist0, nadjmna1, adjmnalen1, adjmnalist1, equivmat)
-!CZGC: old call
-!   call calcequivmat(natom, natomtype, atomtypelenlist, nadjs0, adjlists0, nadjmna0, adjmnalen0, adjmnalist0, &
-!      nadjs1, adjlists1, nadjmna1, adjmnalen1, adjmnalist1, equivmat)
-
-   ! Print equivalence matrix
-
-!   offset = 0
-!   do h = 1, natomtype
-!      print *, h
-!      do i = offset + 1, offset + atomtypelenlist(h)
-!         print '(100(1x, i3))', equivmat(offset+1:offset+atomtypelenlist(h), i)
-!      end do
-!      offset = offset + atomtypelenlist(h)
-!      print *
-!   end do
 
    ! Calculate bias matrix
 
-
-!CZGC: new call
-!   call setcrossbias(mol0, mol1, equivmat, biasmat)
-!CZGC: old call
    call setcrossbias(natom, natomtype, atomtypelenlist, coords0, coords1, equivmat, biasmat)
-
-   ! Print biases
-
-!   offset = 0
-!   do h = 1, blockcount0
-!      do i = offset+1, offset+atomtypelenlist(h)
-!         write (stdout, '(i0,":")', advance='no') i
-!         do j = offset+1, offset+atomtypelenlist(h)
-!            if (biasmat(i, j) == 0) then
-!               write (stdout, '(1x,i0)', advance='no') j
-!            end if
-!         end do
-!         print *
-!      end do
-!      offset = offset + atomtypelenlist(h)
-!   end do
-
-   ! Calculate assignment frequencies
-
-!   votes(:, :) = 0
-!   do n = 1, 100
-!      do i = 1, natom
-!         randcoords0(:, i) = randarray(3)
-!         randcoords1(:, i) = randarray(3)
-!      end do
-!      call mapatoms(natom, randcoords0, randcoords1, natomtype, atomtypelenlist, biasmat, mapping)
-!      print *, adjacencydiff(natom, adjmat0, adjmat1, mapping)
-!      do i = 1, natom
-!         votes(mapping(i), i) = votes(mapping(i), i) + 1
-!      end do
-!   end do
-!   print *
-!   offset = 0
-!   do h = 1, natomtype
-!      print *, h
-!      do i = offset + 1, offset + atomtypelenlist(h)
-!         print '(100(1x, i3))', votes(offset+1:offset+atomtypelenlist(h), i)
-!      end do
-!      offset = offset + atomtypelenlist(h)
-!      print *
-!   end do
 
    ! Initialize loop variables
 
