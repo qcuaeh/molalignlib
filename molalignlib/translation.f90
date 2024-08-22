@@ -26,22 +26,22 @@ public center_coords
 
 contains
 
-function center_coords(natom, weights, coords) result(cntrcoords)
+function center_coords(natom, weights, coords) result(centercoords)
 ! Purpose: Get the centroid coordinates
    integer, intent(in) :: natom
    real(wp), intent(in) :: weights(natom), coords(3, natom)
-   real(wp) :: cntrcoords(3)
+   real(wp) :: centercoords(3)
    integer :: i
 
 ! Calculate the coordinates of the center of mass
 
-   cntrcoords(:) = 0
+   centercoords(:) = 0
 
    do i = 1, natom
-      cntrcoords(:) = cntrcoords(:) + weights(i)*coords(:, i)
+      centercoords(:) = centercoords(:) + weights(i)*coords(:, i)
    end do
 
-   cntrcoords(:) = cntrcoords(:)/sum(weights)
+   centercoords(:) = centercoords(:)/sum(weights)
 
 end function
 

@@ -240,22 +240,22 @@ subroutine set_atomtypeidcs(self, atomtypeidcs)
 
 end subroutine set_atomtypeidcs
 
-function get_center(self) result(cntrcoords)
+function get_center(self) result(centercoords)
 ! Purpose: Get the centroid coordinates
    class(Molecule), intent(in) :: self
    ! Local variables
    integer :: i
-   real(wp) :: cntrcoords(3)
+   real(wp) :: centercoords(3)
 
 ! Calculate the coordinates of the center of mass
 
-   cntrcoords(:) = 0
+   centercoords(:) = 0
 
    do i = 1, self%natom
-      cntrcoords(:) = cntrcoords(:) + self%atoms(i)%weight*self%atoms(i)%coords(:)
+      centercoords(:) = centercoords(:) + self%atoms(i)%weight*self%atoms(i)%coords(:)
    end do
 
-   cntrcoords(:) = cntrcoords(:)/sum(self%get_weights())
+   centercoords(:) = centercoords(:)/sum(self%get_weights())
 
 end function get_center
 
