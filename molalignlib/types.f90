@@ -123,6 +123,7 @@ end function get_natomequiv
 
 subroutine mirror_coords(self)
    class(Molecule), intent(inout) :: self
+   ! Local variables
    real(wp) :: coords(3, self%natom)
 
    coords = self%get_atomcoords()
@@ -133,6 +134,7 @@ end subroutine mirror_coords
 
 subroutine matrix_rotate_coords(self, rotmat)
    class(Molecule), intent(inout) :: self
+   ! Local variables
    real(wp), intent(in) :: rotmat(3, 3)
 
    call self%set_atomcoords(matrix_rotated(self%natom, self%get_atomcoords(), rotmat))
@@ -141,6 +143,7 @@ end subroutine matrix_rotate_coords
 
 subroutine quater_rotate_coords(self, rotquat)
    class(Molecule), intent(inout) :: self
+   ! Local variables
    real(wp), intent(in) :: rotquat(4)
 
    call self%set_atomcoords(quater_rotated(self%natom, self%get_atomcoords(), rotquat))
@@ -149,6 +152,7 @@ end subroutine quater_rotate_coords
 
 subroutine translate_coords(self, travec)
    class(Molecule), intent(inout) :: self
+   ! Local variables
    real(wp), intent(in) :: travec(3)
 
    call self%set_atomcoords(translated(self%natom, self%get_atomcoords(), travec))
@@ -158,6 +162,7 @@ end subroutine translate_coords
 subroutine permutate_atoms(self, order)
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: order(:)
+   ! Local variables
    integer :: i, k
    integer :: invorder(self%natom)
 
@@ -182,6 +187,7 @@ end function get_atomnums_raword
 function get_atomnums_eqvord(self, ordtype) result(atomnums)
    class(Molecule), intent(in) :: self
    type(eqvordtype), intent(in) :: ordtype
+   ! Local variables
    integer, allocatable :: atomnums(:)
 
    atomnums = self%backatoms(self%atomequivpart%fororder(:))%atomnum
@@ -198,6 +204,7 @@ end subroutine set_atomnums
 
 function get_atomtags(self) result(atomtags)
    class(Molecule), intent(in) :: self
+   ! Local variables
    integer, allocatable :: atomtags(:)
 
    atomtags = self%atoms(:)%atomtag
@@ -236,8 +243,9 @@ end subroutine set_atomtypeidcs
 function get_center(self) result(cntrcoords)
 ! Purpose: Get the centroid coordinates
    class(Molecule), intent(in) :: self
-   real(wp) :: cntrcoords(3)
+   ! Local variables
    integer :: i
+   real(wp) :: cntrcoords(3)
 
 ! Calculate the coordinates of the center of mass
 
@@ -253,10 +261,9 @@ end function get_center
 
 function get_atomtypeblocks(self) result(blocks)
    class(Molecule), intent(in) :: self
-   type(Block), allocatable :: blocks(:)
-
+   ! Local variables
    integer :: i
-   integer :: k(size(self%atomtypepart%blocks))
+   type(Block), allocatable :: blocks(:)
 
    allocate(blocks(size(self%atomtypepart%blocks)))
 
@@ -268,43 +275,48 @@ end function get_atomtypeblocks
 
 function get_atomtypeidcs_raword(self) result(atomtypeidcs)
    class(Molecule), intent(in) :: self
-   integer :: atomtypeidcs(self%natom)
+   ! Local variables
+   integer, allocatable :: atomtypeidcs(:)
 
-   atomtypeidcs(:) = self%atoms(:)%typeidx
+   atomtypeidcs = self%atoms(:)%typeidx
 
 end function get_atomtypeidcs_raword
 
 function get_atomtypeidcs_eqvord(self, ordtype) result(atomtypeidcs)
    class(Molecule), intent(in) :: self
    type(eqvordtype), intent(in) :: ordtype
-   integer :: atomtypeidcs(self%natom)
+   ! Local variables
+   integer, allocatable :: atomtypeidcs(:)
 
-   atomtypeidcs(:) = self%backatoms(self%atomequivpart%fororder(:))%typeidx
+   atomtypeidcs = self%backatoms(self%atomequivpart%fororder(:))%typeidx
 
 end function get_atomtypeidcs_eqvord
 
 function get_atomequividcs(self) result(atomequividcs)
    class(Molecule), intent(in) :: self
-   integer :: atomequividcs(self%natom)
+   ! Local variables
+   integer, allocatable :: atomequividcs(:)
 
-   atomequividcs(:) = self%atoms(:)%equividx
+   atomequividcs = self%atoms(:)%equividx
 
 end function get_atomequividcs
 
 function get_weights_raword(self) result(weights)
    class(Molecule), intent(in) :: self
-   real(wp) :: weights(self%natom)
+   ! Local variables
+   real(wp), allocatable :: weights(:)
 
-   weights(:) = self%atoms(:)%weight
+   weights = self%atoms(:)%weight
 
 end function get_weights_raword
 
 function get_weights_eqvord(self, ordtype) result(weights)
    class(Molecule), intent(in) :: self
    type(eqvordtype), intent(in) :: ordtype
-   real(wp) :: weights(self%natom)
+   ! Local variables
+   real(wp), allocatable :: weights(:)
 
-   weights(:) = self%atoms(self%atomequivpart%fororder(:))%weight
+   weights = self%atoms(self%atomequivpart%fororder(:))%weight
 
 end function get_weights_eqvord
 
@@ -318,8 +330,9 @@ end subroutine set_weights
 
 function get_atomcoords(self) result(coords)
    class(Molecule), intent(in) :: self
-   real(wp) :: coords(3, self%natom)
+   ! Local variables
    integer :: i
+   real(wp) :: coords(3, self%natom)
 
 !   coords(:, :) = self%atoms(:)%coords(:)
    do i = 1, self%natom
@@ -331,6 +344,7 @@ end function get_atomcoords
 subroutine set_atomcoords(self, coords)
    class(Molecule), intent(inout) :: self
    real(wp), intent(in) :: coords(3, self%natom)
+   ! Local variables
    integer :: i
 
    do i = 1, self%natom
@@ -341,8 +355,11 @@ end subroutine set_atomcoords
 
 function get_atomlabels(self) result(labels)
    class(Molecule), intent(in) :: self
-   character(wl) :: labels(self%natom)
+   ! Local variables
    integer :: i
+   character(wl), allocatable :: labels(:)
+
+   allocate(labels(self%natom))
 
    do i = 1, self%natom
       labels(i) = elsym(self%atoms(i)%atomnum) // intstr(self%atoms(i)%atomtag)
@@ -352,9 +369,12 @@ end function get_atomlabels
 
 function get_adjmat(self) result(adjmat)
    class(Molecule), intent(in) :: self
-   type(Atom) :: iatom
-   logical :: adjmat(self%natom, self%natom)
+   ! Local variables
    integer :: i, k
+   type(Atom) :: iatom
+   logical, allocatable :: adjmat(:, :)
+
+   allocate(adjmat(self%natom, self%natom))
 
    adjmat(:, :) = .false.
 
@@ -369,8 +389,9 @@ end function get_adjmat
 
 function get_nadjs(self) result(nadjs)
    class(Molecule), intent(in) :: self
-   integer, allocatable :: nadjs(:)
+   ! Local variables
    integer :: i
+   integer, allocatable :: nadjs(:)
 
    allocate(nadjs(size(self%atoms)))
    do i = 1, size(self%atoms)
@@ -383,6 +404,7 @@ subroutine set_adjlists(self, nadjs, adjlists)
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: nadjs(:)
    integer, intent(in) :: adjlists(:, :)
+   ! Local variables
    integer :: i
 
    do i = 1, self%natom
@@ -393,8 +415,9 @@ end subroutine set_adjlists
 
 function get_adjlists(self) result(adjlists)
    class(Molecule), intent(in) :: self
-   integer, allocatable :: adjlists(:, :)
+   ! Local variables
    integer :: i
+   integer, allocatable :: adjlists(:, :)
 
    allocate(adjlists(maxcoord, self%natom))
 
@@ -408,6 +431,7 @@ subroutine set_adjequivlenlists(self, nadjequivs, adjequivlenlists)
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: nadjequivs(:)
    integer, intent(in) :: adjequivlenlists(:, :)
+   ! Local variables
    integer :: i
 
    do i = 1, size(self%atoms)
@@ -421,8 +445,9 @@ end subroutine set_adjequivlenlists
 
 function get_adjequivlenlists(self) result(adjequivlenlists)
    class(Molecule), intent(inout) :: self
-   integer, allocatable :: adjequivlenlists(:, :)
+   ! Local variables
    integer :: i
+   integer, allocatable :: adjequivlenlists(:, :)
 
    allocate(adjequivlenlists(maxcoord, size(self%atoms)))
 
@@ -434,8 +459,9 @@ end function get_adjequivlenlists
 
 function get_nadjequivs(self) result(nadjequivs)
    class(Molecule), intent(inout) :: self
-   integer, allocatable :: nadjequivs(:)
+   ! Local variables
    integer :: i
+   integer, allocatable :: nadjequivs(:)
 
    allocate(nadjequivs(size(self%atoms)))
 
@@ -447,7 +473,10 @@ end function get_nadjequivs
 
 function get_fragroot(self) result(fragroots)
    class(Molecule), intent(in) :: self
-   integer :: fragroots(self%natom)
+   ! Local variables
+   integer, allocatable :: fragroots(:)
+
+   allocate(fragroots(self%natom))
 
    fragroots = self%fragroots
 
@@ -457,6 +486,7 @@ subroutine print_atom(self, ind, outLvl)
    class(Atom), intent(in) :: self
    integer, intent(in) :: ind
    integer, intent(in), optional :: outLvl
+   ! Local variables
    character(255) :: frmt
    character(2) :: num
    integer :: outLevel
@@ -501,6 +531,7 @@ end subroutine print_atom
 
 subroutine print_molecule(self)
    class(Molecule), intent(in) :: self
+   ! Local variables
    integer :: i
 
 ! *** code to manage unitlbl pending ***
@@ -520,9 +551,10 @@ end subroutine print_molecule
 function bonded(self, idx1, idx2) result(isbond)
    class(Molecule), intent(in) :: self
    integer, intent(in) :: idx1, idx2
-   integer, dimension(maxcoord) :: adjlist1, adjlist2
+   ! Local variables
    integer :: i
    logical :: isbond, found1, found2
+   integer, dimension(maxcoord) :: adjlist1, adjlist2
 
 ! copy arrays of adjlist
    adjlist1 = self%atoms(idx1)%adjlist
@@ -561,8 +593,9 @@ end function bonded
 subroutine remove_bond(self, idx1, idx2)
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: idx1, idx2
-   integer, dimension(maxcoord) :: adjlist1, adjlist2
+   ! Local variables
    integer :: i, pos1, pos2, nadj1, nadj2
+   integer, dimension(maxcoord) :: adjlist1, adjlist2
 
 ! copy adjlist arrays
    nadj1 = size(self%atoms(idx1)%adjlist)
@@ -610,8 +643,9 @@ end subroutine remove_bond
 subroutine add_bond(self, idx1, idx2)
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: idx1, idx2
-   integer, dimension(maxcoord) :: adjlist1, adjlist2
+   ! Local variables
    integer :: pos1, pos2, nadj1, nadj2
+   integer, dimension(maxcoord) :: adjlist1, adjlist2
 
 ! copy array of adjlist
    nadj1 = size(self%atoms(idx1)%adjlist)
@@ -652,8 +686,9 @@ end subroutine add_bond
 
 function get_atomtypelenlist(self) result(atomtypelenlist)
    class(Molecule), intent(in) :: self
-   integer, allocatable :: atomtypelenlist(:)
+   ! Local variables
    integer :: i
+   integer, allocatable :: atomtypelenlist(:)
 
    allocate(atomtypelenlist(size(self%atomtypepart%blocks)))
 
@@ -667,7 +702,7 @@ subroutine set_atomtypepart(self, natomtype, atomtypelenlist)
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: natomtype
    integer, intent(in) :: atomtypelenlist(:)
-
+   ! Local variables
    integer :: i
    integer, allocatable :: k(:)
 
@@ -689,8 +724,9 @@ end subroutine set_atomtypepart
 
 function get_atomequivlenlist(self) result(atomequivlenlist)
    class(Molecule), intent(in) :: self
-   integer, allocatable :: atomequivlenlist(:)
+   ! Local variables
    integer :: i
+   integer, allocatable :: atomequivlenlist(:)
 
    allocate(atomequivlenlist(size(self%atomequivpart%blocks)))
 
@@ -704,7 +740,7 @@ subroutine set_atomequivpart(self, natomequiv, atomequivlenlist)
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: natomequiv
    integer, intent(in) :: atomequivlenlist(:)
-
+   ! Local variables
    integer :: i
    integer, allocatable :: k(:)
 
