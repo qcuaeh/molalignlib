@@ -31,8 +31,8 @@ subroutine findmolfrags (mol)
 
    integer :: i, h, n, f, firstn, prevn, offset
    integer, dimension(mol%natom) :: order
-   integer, dimension(mol%natom) :: blkidx
-   integer, dimension(mol%natom) :: eqvidx
+   integer, dimension(mol%natom) :: atomtypeidcs
+   integer, dimension(mol%natom) :: atomequividcs
    integer, dimension(mol%natom) :: fragid
    integer, dimension(mol%natom) :: fragsize
    integer, dimension(mol%natom,mol%natom) :: fragind, fragblock, fragequiv, fragcoord
@@ -53,25 +53,18 @@ subroutine findmolfrags (mol)
 
    ! set atoms block indices
 
-   offset = 0
-   do h = 1, natomtype
-      blkidx(offset+1:offset+atomtypelenlist(h)) = h
-      offset = offset + atomtypelenlist(h)
-   end do
+   atomtypeidcs = mol%get_atomtypeidcs()
 
    ! set atoms equivalence indices
 
-   offset = 0
-   do h = 1, natomequiv
-      eqvidx(offset+1:offset+atomequivlenlist(h)) = h
-      offset = offset + atomequivlenlist(h)
-   end do
+   atomequividcs = mol%get_atomequividcs()
 
    ! initialization
 
    nfrag = 0
    fragroots(:) = 1
 
+!   order = mol%atomequivpart%foreorder
    order = [ (n, n = 1, natom) ]
    track(:) = .false.
    fragid(:) = 0
@@ -111,6 +104,7 @@ subroutine findmolfrags (mol)
 
    ! sorts sequentially by atomtypelenlist, atomequivlenlist, and nadjs for each fragment
    order = [ (n, n = 1, natom) ]
+!   order = mol%atomequivpart%foreorder
    do f = 1, nfrag
       firstn = fragsize(f)
       call groupminsort (fragblock(:firstn,f), order(:firstn), firstn)
@@ -167,8 +161,8 @@ contains
       fragsize(nfrag) = fragsize(nfrag) + 1
       fragid(n) = nfrag
       fragind(fragsize(nfrag),nfrag) = n
-      fragblock(fragsize(nfrag),nfrag) = atomtypelenlist(blkidx(n))
-      fragequiv(fragsize(nfrag),nfrag) = atomequivlenlist(eqvidx(n))
+      fragblock(fragsize(nfrag),nfrag) = atomtypelenlist(atomtypeidcs(n))
+      fragequiv(fragsize(nfrag),nfrag) = atomequivlenlist(atomequividcs(n))
       fragcoord(fragsize(nfrag),nfrag) = nadjs(n)
       
       do i = 1, nadjs(n)
