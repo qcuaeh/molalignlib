@@ -40,30 +40,15 @@ public find_reactive_sites
 
 contains
 
-subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
-!subroutine optimize_mapping( &
-!   mol0, &
-!   mol1, &
-!   natomtype, &
-!   atomtypelenlist, &
-!   natomequiv0, &
-!   atomequivlenlist0, &
-!   natomequiv1, &
-!   atomequivlenlist1, &
-!   maplist, &
-!   countlist, &
-!   nrec)
+subroutine optimize_mapping(mol0, mol1, mol0_, mol1_, maplist, countlist, nrec)
 
    type(Molecule), intent(inout) :: mol0, mol1
+   type(Molecule), intent(inout) :: mol0_, mol1_
    integer :: natomtype
    integer, dimension(mol0%natom) :: atomtypelenlist
    integer :: natomequiv0, natomequiv1
    integer, dimension(mol0%natom) :: atomequivlenlist0
    integer, dimension(mol1%natom) :: atomequivlenlist1
-!   integer, intent(in) :: natomtype
-!   integer, dimension(:), intent(in) :: atomtypelenlist
-!   integer, intent(in) :: natomequiv0, natomequiv1
-!   integer, dimension(:), intent(in) :: atomequivlenlist0, atomequivlenlist1
    integer, intent(out) :: maplist(:, :)
    integer, intent(out) :: countlist(:)
    integer, intent(out) :: nrec
@@ -98,37 +83,30 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
    real(wp) :: biasmat(mol0%natom, mol1%natom)
    real(wp) :: workcoords1(3, mol1%natom)
 
-   integer i
-!   integer h, i, n, offset
-!   real(wp), dimension(3, natom) :: randcoords0, randcoords1
-!   integer :: votes(natom, natom)
+   natom = mol0_%natom
+   weights = mol0_%get_sorted_weights()
+   coords0 = mol0_%get_sorted_atomcoords()
+   coords1 = mol1_%get_sorted_atomcoords()
+   adjmat0 = mol0_%get_sorted_adjmat()
+   adjmat1 = mol1_%get_sorted_adjmat()
 
-!  Temporary variable copies
+   natomtype = mol0_%get_natomtype()
+   atomtypelenlist = mol0_%get_atomtypelenlist()
 
-   natom = mol0%natom
-   weights = mol0%get_weights()
-   coords0 = mol0%get_atomcoords()
-   coords1 = mol1%get_atomcoords()
-   adjmat0 = mol0%get_adjmat()
-   adjmat1 = mol1%get_adjmat()
+   nadjs0 = mol0_%get_sorted_nadjs()
+   nadjs1 = mol1_%get_sorted_nadjs()
+   adjlists0 = mol0_%get_sorted_adjlists()
+   adjlists1 = mol1_%get_sorted_adjlists()
 
-   natomtype = mol0%get_natomtype()
-   atomtypelenlist = mol0%get_atomtypelenlist()
+   natomequiv0 = mol0_%get_natomequiv()
+   natomequiv1 = mol1_%get_natomequiv()
+   atomequivlenlist0 = mol0_%get_atomequivlenlist()
+   atomequivlenlist1 = mol1_%get_atomequivlenlist()
 
-   nadjs0 = mol0%get_nadjs()
-   nadjs1 = mol1%get_nadjs()
-   adjlists0 = mol0%get_adjlists()
-   adjlists1 = mol1%get_adjlists()
-
-   natomequiv0 = mol0%get_natomequiv()
-   natomequiv1 = mol1%get_natomequiv()
-   atomequivlenlist0 = mol0%get_atomequivlenlist()
-   atomequivlenlist1 = mol1%get_atomequivlenlist()
-
-   nadjequivs0 = mol0%get_nadjequivs()
-   nadjequivs1 = mol1%get_nadjequivs()
-   adjequivlenlists0 = mol0%get_adjequivlenlists()
-   adjequivlenlists1 = mol1%get_adjequivlenlists()
+   nadjequivs0 = mol0_%get_sorted_nadjequivs()
+   nadjequivs1 = mol1_%get_sorted_nadjequivs()
+   adjequivlenlists0 = mol0_%get_sorted_adjequivlenlists()
+   adjequivlenlists1 = mol1_%get_sorted_adjequivlenlists()
 
    ! Detect fragments and root atoms
 !CZGC: nota: sólo pasan todos los tests si se llama findmolfrags
