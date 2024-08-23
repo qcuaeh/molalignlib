@@ -77,7 +77,9 @@ contains
    procedure :: get_adjmat
    procedure :: get_sorted_adjmat
    procedure :: get_fragroot
+   procedure :: get_sorted_fragroot
    procedure :: get_atomtypeblocks
+   procedure :: get_sorted_atomtypeblocks
    procedure :: set_atomnums
    procedure :: get_atomnums
    procedure :: get_sorted_atomnums
@@ -268,10 +270,24 @@ function get_atomtypeblocks(self) result(parts)
    allocate(parts(size(self%atomtypepart%parts)))
 
    do i = 1, size(self%atomtypepart%parts)
-      parts(i)%atomidcs = self%atomequivpart%backorder(self%atomtypepart%parts(i)%atomidcs(:))
+      parts(i)%atomidcs = self%atomtypepart%parts(i)%atomidcs(:)
    end do
 
 end function get_atomtypeblocks
+
+function get_sorted_atomtypeblocks(self) result(parts)
+   class(Molecule), intent(in) :: self
+   ! Local variables
+   integer :: i
+   type(Part), allocatable :: parts(:)
+
+   allocate(parts(size(self%atomtypepart%parts)))
+
+   do i = 1, size(self%atomtypepart%parts)
+      parts(i)%atomidcs = self%atomequivpart%backorder(self%atomtypepart%parts(i)%atomidcs(:))
+   end do
+
+end function get_sorted_atomtypeblocks
 
 function get_atomtypeidcs(self) result(atomtypeidcs)
    class(Molecule), intent(in) :: self
@@ -566,11 +582,22 @@ function get_fragroot(self) result(fragroots)
    ! Local variables
    integer, allocatable :: fragroots(:)
 
-   allocate(fragroots(self%natom))
+!   allocate(fragroots(self%natom))
 
    fragroots = self%fragroots
 
 end function get_fragroot
+
+function get_sorted_fragroot(self) result(fragroots)
+   class(Molecule), intent(in) :: self
+   ! Local variables
+   integer, allocatable :: fragroots(:)
+
+!   allocate(fragroots(self%natom))
+
+   fragroots = self%atomequivpart%backorder(self%fragroots)
+
+end function get_sorted_fragroot
 
 subroutine print_atom(self, ind, outLvl)
    class(Atom), intent(in) :: self

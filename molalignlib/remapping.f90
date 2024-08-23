@@ -113,11 +113,17 @@ subroutine optimize_mapping(mol0, mol1, mol0_, mol1_, maplist, countlist, nrec)
 !                          aquí y no al inicio en fileio.f90
    call findmolfrags(mol0)
    call findmolfrags(mol1)
-
    nfrag0 = mol0%nfrag
    fragroot0 = mol0%get_fragroot()
    nfrag1 = mol1%nfrag
    fragroot1 = mol1%get_fragroot()
+
+!   call findmolfrags(mol0_)
+!   call findmolfrags(mol1_)
+!   nfrag0 = mol0_%nfrag
+!   fragroot0 = mol0_%get_sorted_fragroot()
+!   nfrag1 = mol1_%nfrag
+!   fragroot1 = mol1_%get_sorted_fragroot()
 
    ! Calculate MNA equivalence matrix
 
@@ -267,14 +273,14 @@ subroutine find_reactive_sites(mol0, mol1, mapping)
 
    ! Initialization
 
-   coords0 = mol0%get_atomcoords()
-   coords1 = mol1%get_atomcoords()
-   adjmat0 = mol0%get_adjmat()
-   adjmat1 = mol1%get_adjmat()
-   atomtypeidcs0 = mol0%get_atomtypeidcs()
-   atomtypeidcs1 = mol1%get_atomtypeidcs()
-   atomtypeblocks0 = mol0%get_atomtypeblocks()
-   atomtypeblocks1 = mol1%get_atomtypeblocks()
+   coords0 = mol0%get_sorted_atomcoords()
+   coords1 = mol1%get_sorted_atomcoords()
+   adjmat0 = mol0%get_sorted_adjmat()
+   adjmat1 = mol1%get_sorted_adjmat()
+   atomtypeidcs0 = mol0%get_sorted_atomtypeidcs()
+   atomtypeidcs1 = mol1%get_sorted_atomtypeidcs()
+   atomtypeblocks0 = mol0%get_sorted_atomtypeblocks()
+   atomtypeblocks1 = mol1%get_sorted_atomtypeblocks()
    atomtypelenlist0 = mol0%get_atomtypelenlist()
    atomtypelenlist1 = mol1%get_atomtypelenlist()
 

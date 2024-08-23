@@ -168,10 +168,10 @@ subroutine remap_atoms( &
    ! Debond reactive sites and reoptimize assignment
 
 !   if (reac_flag) then
-!      call find_reactive_sites(mol0, mol1, maplist(:, 1))
-!      call assort_neighbors(mol0)
-!      call assort_neighbors(mol1)
-!      call optimize_mapping(mol0, mol1, maplist, countlist, nrec)
+!      call find_reactive_sites(mol0_, mol1_, maplist(:, 1))
+!      call assort_neighbors(mol0_)
+!      call assort_neighbors(mol1_)
+!      call optimize_mapping(mol0, mol1, mol0_, mol1_, maplist, countlist, nrec)
 !   end if
 
 !   ! Print coordinates with internal order

@@ -41,13 +41,15 @@ subroutine findmolfrags (mol)
    character(3) :: numat
 
 !CZGC: temporal variable
-   natom = mol%natom
+   natom = mol%get_natom()
    natomtype = mol%get_natomtype()
    atomtypelenlist = mol%get_atomtypelenlist()
    natomequiv = mol%get_natomequiv()
    atomequivlenlist = mol%get_atomequivlenlist()
    nadjs = mol%get_nadjs()
    adjlists = mol%get_adjlists()
+!   nadjs = mol%get_sorted_nadjs()
+!   adjlists = mol%get_sorted_adjlists()
 
    ! set atoms block indices
 
