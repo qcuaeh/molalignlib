@@ -108,18 +108,6 @@ subroutine optimize_mapping(mol0, mol1, mol0_, mol1_, maplist, countlist, nrec)
    adjequivlenlists0 = mol0_%get_sorted_adjequivlenlists()
    adjequivlenlists1 = mol1_%get_sorted_adjequivlenlists()
 
-   ! Detect fragments and root atoms
-!CZGC: nota: sólo pasan todos los tests si se llama findmolfrags
-!                          aquí y no al inicio en fileio.f90
-!   call findmolfrags(mol0)
-!   call findmolfrags(mol1)
-!   nfrag0 = mol0%nfrag
-!   fragroot0 = mol0%get_fragroot()
-!   nfrag1 = mol1%nfrag
-!   fragroot1 = mol1%get_fragroot()
-
-   call findmolfrags(mol0_)
-   call findmolfrags(mol1_)
    nfrag0 = mol0_%nfrag
    fragroot0 = mol0_%get_sorted_fragroot()
    nfrag1 = mol1_%nfrag

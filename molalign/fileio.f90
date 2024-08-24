@@ -93,6 +93,7 @@ subroutine readfile(unit, fmtin, mol)
    call assort_atoms(mol)
    call set_equiv_atoms(mol)
    call assort_neighbors(mol)
+   call findmolfrags(mol)
 
 end subroutine
 

@@ -42,21 +42,13 @@ subroutine findmolfrags (mol)
 
 !CZGC: temporal variable
    natom = mol%get_natom()
+   nadjs = mol%get_nadjs()
+   adjlists = mol%get_adjlists()
    natomtype = mol%get_natomtype()
    atomtypelenlist = mol%get_atomtypelenlist()
    natomequiv = mol%get_natomequiv()
    atomequivlenlist = mol%get_atomequivlenlist()
-   nadjs = mol%get_nadjs()
-   adjlists = mol%get_adjlists()
-!   nadjs = mol%get_sorted_nadjs()
-!   adjlists = mol%get_sorted_adjlists()
-
-   ! set atoms block indices
-
    atomtypeidcs = mol%get_atomtypeidcs()
-
-   ! set atoms equivalence indices
-
    atomequividcs = mol%get_atomequividcs()
 
    ! initialization
