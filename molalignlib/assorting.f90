@@ -48,7 +48,7 @@ subroutine assort_atoms(mol)
    remaining = .true.
    atomnums = mol%get_atomnums()
    atomtags = mol%get_atomtags()
-   weights = mol%get_weights()
+   weights = mol%get_atomweights()
 
    ! Create block list
 

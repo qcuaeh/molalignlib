@@ -119,8 +119,8 @@ subroutine remap_atoms( &
 
    ! Calculate centroids
 
-   travec0 = -mol0%get_center()
-   travec1 = -mol1%get_center()
+   travec0 = -centroid_coords(mol0)
+   travec1 = -centroid_coords(mol1)
 
    ! Center coordinates at the centroids
 
@@ -223,14 +223,14 @@ subroutine align_atoms( &
 
    ! Calculate centroids
 
-    travec0 = -mol0%get_center()
-    travec1 = -mol1%get_center()
+   travec0 = -centroid_coords(mol0)
+   travec1 = -centroid_coords(mol1)
 
    ! Calculate optimal rotation matrix
 
    rotquat = leastrotquat( &
       mol0%natom, &
-      mol0%get_weights(), &
+      mol0%get_atomweights(), &
       translated(mol0%natom, mol0%get_atomcoords(), travec0), &
       translated(mol1%natom, mol1%get_atomcoords(), travec1), &
       identitymap(mol0%natom) &
@@ -248,8 +248,8 @@ function get_rmsd(mol0, mol1) result(rmsd)
    type(Molecule), intent(in) :: mol0, mol1
    real(wp) :: rmsd
 
-   rmsd = sqrt(squaredist(mol0%natom, mol0%get_weights(), mol0%get_atomcoords(), mol1%get_atomcoords(), identitymap(mol0%natom)) &
-        / sum(mol0%get_weights()))
+   rmsd = sqrt(squaredist(mol0%natom, mol0%get_atomweights(), mol0%get_atomcoords(), &
+         mol1%get_atomcoords(), identitymap(mol0%natom)) / sum(mol0%get_atomweights()))
 
 end function
 
@@ -260,5 +260,29 @@ function get_adjd(mol0, mol1) result(adjd)
    adjd = adjacencydiff(mol0%natom, mol0%get_adjmat(), mol1%get_adjmat(), identitymap(mol0%natom))
 
 end function
+
+function centroid_coords(mol) result(coords)
+! Purpose: Get the centroid coordinates
+   type(Molecule), intent(in) :: mol
+   ! Local variables
+   integer :: i
+   real(wp) :: coords(3)
+   real(wp), allocatable :: atomcoords(:, :)
+   real(wp), allocatable :: atomweights(:)
+
+   atomcoords = mol%get_atomcoords()
+   atomweights = mol%get_atomweights()
+
+! Calculate the coordinates of the center of mass
+
+   coords(:) = 0
+
+   do i = 1, size(mol%atoms)
+      coords(:) = coords(:) + atomweights(i)*atomcoords(:, i)
+   end do
+
+   coords(:) = coords(:)/sum(atomweights)
+
+end function centroid_coords
 
 end module

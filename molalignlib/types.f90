@@ -84,9 +84,8 @@ contains
    procedure :: set_atomtags
    procedure :: get_atomtags
    procedure :: set_weights
-   procedure :: get_weights
+   procedure :: get_atomweights
    procedure :: get_sorted_weights
-   procedure :: get_center
    procedure :: mirror_coords
    procedure, private :: matrix_rotate_coords
    procedure, private :: quater_rotate_coords
@@ -317,25 +316,6 @@ function get_atomtypelenlist(self) result(atomtypelenlist)
 
 end function get_atomtypelenlist
 
-function get_center(self) result(centercoords)
-! Purpose: Get the centroid coordinates
-   class(Molecule), intent(in) :: self
-   ! Local variables
-   integer :: i
-   real(wp) :: centercoords(3)
-
-! Calculate the coordinates of the center of mass
-
-   centercoords(:) = 0
-
-   do i = 1, self%natom
-      centercoords(:) = centercoords(:) + self%atoms(i)%weight*self%atoms(i)%coords(:)
-   end do
-
-   centercoords(:) = centercoords(:)/sum(self%get_weights())
-
-end function get_center
-
 function get_atomtypeblocks(self) result(parts)
    class(Molecule), intent(in) :: self
    ! Local variables
@@ -399,14 +379,14 @@ subroutine set_weights(self, weights)
 
 end subroutine set_weights
 
-function get_weights(self) result(weights)
+function get_atomweights(self) result(weights)
    class(Molecule), intent(in) :: self
    ! Local variables
    real(wp), allocatable :: weights(:)
 
    weights = self%atoms(:)%weight
 
-end function get_weights
+end function get_atomweights
 
 function get_sorted_weights(self) result(weights)
    class(Molecule), intent(in) :: self

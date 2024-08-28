@@ -255,7 +255,7 @@ subroutine find_reactive_sites(mol0, mol1, mapping)
 
    ! Align coordinates
 
-   rotquat = leastrotquat(mol0%natom, mol0%get_weights(), mol0%get_atomcoords(), mol1%get_atomcoords(), mapping)
+   rotquat = leastrotquat(mol0%natom, mol0%get_atomweights(), mol0%get_atomcoords(), mol1%get_atomcoords(), mapping)
    call mol1%rotate_coords(rotquat)
 
    ! Initialization
