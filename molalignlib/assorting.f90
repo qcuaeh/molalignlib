@@ -36,7 +36,7 @@ subroutine assort_atoms(mol)
    integer :: natomtype
    integer :: atomtypeidcs(mol%natom)
    logical :: remaining(mol%natom)
-   integer, dimension(mol%natom) :: atomtypelenlist, blkatomnums, blkatomtags
+   integer, dimension(mol%natom) :: blkatomnums, blkatomtags
    integer, dimension(mol%natom) :: foreorder, backorder
 
    integer, allocatable :: atomnums(:), atomtags(:)
@@ -58,7 +58,6 @@ subroutine assort_atoms(mol)
 
          natomtype = natomtype + 1
          atomtypeidcs(i) = natomtype
-         atomtypelenlist(natomtype) = 1
          blkatomnums(natomtype) = atomnums(i)
          blkatomtags(natomtype) = atomtags(i)
          remaining(i) = .false.
@@ -71,7 +70,6 @@ subroutine assort_atoms(mol)
                      atomnums(j) = atomnums(i)
                      weights(j) = weights(i)
                      remaining(j) = .false.
-                     atomtypelenlist(natomtype) = atomtypelenlist(natomtype) + 1
 !                  else
 !                     ! Abort if there are inconsistent weights
 !                     write (stderr, '(a)') 'Error: There are incosistent weights'
@@ -89,18 +87,15 @@ subroutine assort_atoms(mol)
 
    foreorder(:natomtype) = sorted_order(blkatomtags, natomtype)
    backorder(:natomtype) = inverse_mapping(foreorder(:natomtype))
-   atomtypelenlist(:natomtype) = atomtypelenlist(foreorder(:natomtype))
    atomtypeidcs = backorder(atomtypeidcs)
 
    ! Order parts by atomic number
 
    foreorder(:natomtype) = sorted_order(blkatomnums, natomtype)
    backorder(:natomtype) = inverse_mapping(foreorder(:natomtype))
-   atomtypelenlist(:natomtype) = atomtypelenlist(foreorder(:natomtype))
    atomtypeidcs = backorder(atomtypeidcs)
 
-   call mol%set_atomtypeidcs(atomtypeidcs) 
-   call mol%set_atomtypepart(natomtype, atomtypelenlist)
+   call mol%set_atomtypeidcs(natomtype, atomtypeidcs) 
 
 end subroutine
 
@@ -109,7 +104,7 @@ subroutine set_equiv_atoms(mol)
    type(Molecule), intent(inout) :: mol
 
    integer i, nin, natomequiv
-   integer, dimension(mol%natom) :: atomequividcs, atomequivlenlist
+   integer, dimension(mol%natom) :: atomequividcs
    integer, dimension(mol%natom) :: intype, atomtypemap
    integer, dimension(mol%natom) :: foreorder, backorder
 
@@ -121,7 +116,7 @@ subroutine set_equiv_atoms(mol)
 
    do
 
-      call getmnatypes(mol, nin, intype, natomequiv, atomequividcs, atomequivlenlist, atomtypemap)
+      call getmnatypes(mol, nin, intype, natomequiv, atomequividcs, atomtypemap)
 
       if (all(atomequividcs == intype)) exit
 
@@ -132,11 +127,9 @@ subroutine set_equiv_atoms(mol)
 
    foreorder(:natomequiv) = sorted_order(atomtypemap, natomequiv)
    backorder(:natomequiv) = inverse_mapping(foreorder(:natomequiv))
-   atomequivlenlist(:natomequiv) = atomequivlenlist(foreorder(:natomequiv))
    atomequividcs = backorder(atomequividcs)
 
-   call mol%set_atomequividcs(atomequividcs)
-   call mol%set_atomequivpart(natomequiv, atomequivlenlist)
+   call mol%set_atomequividcs(natomequiv, atomequividcs)
 
 end subroutine
 
@@ -215,12 +208,12 @@ subroutine assort_neighbors(mol)
 
 end subroutine
 
-subroutine getmnatypes(mol, nin, intype, nout, outype, outsize, atomtypemap)
+subroutine getmnatypes(mol, nin, intype, nout, outype, atomtypemap)
    type(Molecule), intent(inout) :: mol
    integer, intent(in) :: nin
    integer, dimension(:), intent(in) :: intype
    integer, intent(out) :: nout
-   integer, dimension(:), intent(out) :: outype, outsize, atomtypemap
+   integer, dimension(:), intent(out) :: outype, atomtypemap
 
    integer :: i, j
    integer :: nadjs(mol%natom)
@@ -238,7 +231,6 @@ subroutine getmnatypes(mol, nin, intype, nout, outype, outsize, atomtypemap)
       if (untyped(i)) then
          nout = nout + 1
          outype(i) = nout
-         outsize(nout) = 1
          parentype(nout) = intype(i)
          do j = i + 1, mol%natom
 !               print '(a, x, i0, x, i0)', trim(elsym(intype0(i))), i, j
@@ -247,7 +239,6 @@ subroutine getmnatypes(mol, nin, intype, nout, outype, outsize, atomtypemap)
                   if (same_adjacency(nin, intype, nadjs(i), adjlists(:, i), intype, &
                         nadjs(j), adjlists(:, j))) then
                      outype(j) = nout
-                     outsize(nout) = outsize(nout) + 1
                      untyped(j) = .false.
                   end if
                end if

@@ -60,10 +60,8 @@ contains
    procedure :: get_sorted_atomtypeidcs
    procedure :: set_atomequividcs
    procedure :: get_atomequividcs
-   procedure :: set_atomtypepart
    procedure :: get_atomtypelenlist
    procedure :: get_atomequivlenlist
-   procedure :: set_atomequivpart
    procedure :: set_adjequivlenlists
    procedure :: get_adjequivlenlists
    procedure :: get_sorted_adjequivlenlists
@@ -221,10 +219,17 @@ function get_atomtags(self) result(atomtags)
 
 end function get_atomtags
 
-subroutine set_atomequividcs(self, atomequividcs)
+subroutine set_atomequividcs(self, natomequiv, atomequividcs)
    class(Molecule), intent(inout) :: self
+   integer, intent(in) :: natomequiv
    integer, intent(in) :: atomequividcs(self%natom)
+   ! Local variables
+   integer :: i
+   integer, allocatable :: n(:), k(:)
 
+   allocate(n(natomequiv))
+   allocate(k(natomequiv))
+   allocate(self%atomequivpart%parts(natomequiv))
    allocate(self%atomequivpart%foreorder(self%natom))
    allocate(self%atomequivpart%backorder(self%natom))
 
@@ -232,15 +237,85 @@ subroutine set_atomequividcs(self, atomequividcs)
    self%atomequivpart%foreorder = sorted_order(atomequividcs, self%natom)
    self%atomequivpart%backorder = inverse_mapping(self%atomequivpart%foreorder)
 
+   n(:) = 0
+
+   do i = 1, size(self%atoms)
+      n(atomequividcs(i)) = n(atomequividcs(i)) + 1
+   end do
+
+   do i = 1, natomequiv
+      allocate(self%atomequivpart%parts(i)%atomidcs(n(i)))
+   end do
+
+   k(:) = 0
+
+   do i = 1, size(self%atoms)
+      k(self%atoms(i)%equividx) = k(self%atoms(i)%equividx) + 1
+      self%atomequivpart%parts(self%atoms(i)%equividx)%atomidcs(k(self%atoms(i)%equividx)) = i
+   end do
+
 end subroutine set_atomequividcs
 
-subroutine set_atomtypeidcs(self, atomtypeidcs)
+function get_atomequivlenlist(self) result(atomequivlenlist)
+   class(Molecule), intent(in) :: self
+   ! Local variables
+   integer :: i
+   integer, allocatable :: atomequivlenlist(:)
+
+   allocate(atomequivlenlist(size(self%atomequivpart%parts)))
+
+   do i = 1, size(self%atomequivpart%parts)
+      atomequivlenlist(i) = size(self%atomequivpart%parts(i)%atomidcs)
+   end do
+
+end function get_atomequivlenlist
+
+subroutine set_atomtypeidcs(self, natomtype, atomtypeidcs)
    class(Molecule), intent(inout) :: self
+   integer, intent(in) :: natomtype
    integer, intent(in) :: atomtypeidcs(:)
+   ! Local variables
+   integer :: i
+   integer, allocatable :: n(:), k(:)
+
+   allocate(n(natomtype))
+   allocate(k(natomtype))
+   allocate(self%atomtypepart%parts(natomtype))
 
    self%atoms(:)%typeidx = atomtypeidcs(:)
 
+   n(:) = 0
+
+   do i = 1, size(self%atoms)
+      n(atomtypeidcs(i)) = n(atomtypeidcs(i)) + 1
+   end do
+
+   do i = 1, natomtype
+      allocate(self%atomtypepart%parts(i)%atomidcs(n(i)))
+   end do
+
+   k(:) = 0
+
+   do i = 1, self%natom
+      k(self%atoms(i)%typeidx) = k(self%atoms(i)%typeidx) + 1
+      self%atomtypepart%parts(self%atoms(i)%typeidx)%atomidcs(k(self%atoms(i)%typeidx)) = i
+   end do
+
 end subroutine set_atomtypeidcs
+
+function get_atomtypelenlist(self) result(atomtypelenlist)
+   class(Molecule), intent(in) :: self
+   ! Local variables
+   integer :: i
+   integer, allocatable :: atomtypelenlist(:)
+
+   allocate(atomtypelenlist(size(self%atomtypepart%parts)))
+
+   do i = 1, size(self%atomtypepart%parts)
+      atomtypelenlist(i) = size(self%atomtypepart%parts(i)%atomidcs)
+   end do
+
+end function get_atomtypelenlist
 
 function get_center(self) result(centercoords)
 ! Purpose: Get the centroid coordinates
@@ -800,81 +875,5 @@ subroutine add_bond(self, idx1, idx2)
    end if
 
 end subroutine add_bond
-
-function get_atomtypelenlist(self) result(atomtypelenlist)
-   class(Molecule), intent(in) :: self
-   ! Local variables
-   integer :: i
-   integer, allocatable :: atomtypelenlist(:)
-
-   allocate(atomtypelenlist(size(self%atomtypepart%parts)))
-
-   do i = 1, size(self%atomtypepart%parts)
-      atomtypelenlist(i) = size(self%atomtypepart%parts(i)%atomidcs)
-   end do
-
-end function get_atomtypelenlist
-
-subroutine set_atomtypepart(self, natomtype, atomtypelenlist)
-   class(Molecule), intent(inout) :: self
-   integer, intent(in) :: natomtype
-   integer, intent(in) :: atomtypelenlist(:)
-   ! Local variables
-   integer :: i
-   integer, allocatable :: k(:)
-
-   allocate(k(natomtype))
-   allocate(self%atomtypepart%parts(natomtype))
-
-   do i = 1, natomtype
-      allocate(self%atomtypepart%parts(i)%atomidcs(atomtypelenlist(i)))
-   end do
-
-   k(:) = 0
-
-   do i = 1, self%natom
-      k(self%atoms(i)%typeidx) = k(self%atoms(i)%typeidx) + 1
-      self%atomtypepart%parts(self%atoms(i)%typeidx)%atomidcs(k(self%atoms(i)%typeidx)) = i
-   end do
-
-end subroutine set_atomtypepart
-
-function get_atomequivlenlist(self) result(atomequivlenlist)
-   class(Molecule), intent(in) :: self
-   ! Local variables
-   integer :: i
-   integer, allocatable :: atomequivlenlist(:)
-
-   allocate(atomequivlenlist(size(self%atomequivpart%parts)))
-
-   do i = 1, size(self%atomequivpart%parts)
-      atomequivlenlist(i) = size(self%atomequivpart%parts(i)%atomidcs)
-   end do
-
-end function get_atomequivlenlist
-
-subroutine set_atomequivpart(self, natomequiv, atomequivlenlist)
-   class(Molecule), intent(inout) :: self
-   integer, intent(in) :: natomequiv
-   integer, intent(in) :: atomequivlenlist(:)
-   ! Local variables
-   integer :: i
-   integer, allocatable :: k(:)
-
-   allocate(k(natomequiv))
-   allocate(self%atomequivpart%parts(natomequiv))
-
-   do i = 1, natomequiv
-      allocate(self%atomequivpart%parts(i)%atomidcs(atomequivlenlist(i)))
-   end do
-
-   k(:) = 0
-
-   do i = 1, self%natom
-      k(self%atoms(i)%equividx) = k(self%atoms(i)%equividx) + 1
-      self%atomequivpart%parts(self%atoms(i)%equividx)%atomidcs(k(self%atoms(i)%equividx)) = i
-   end do
-
-end subroutine set_atomequivpart
 
 end module
