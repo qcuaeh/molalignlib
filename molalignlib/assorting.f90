@@ -273,14 +273,14 @@ subroutine calcequivmat(mol0, mol1, nadjmna0, adjmnalen0, adjmnalist0, &
    natom = mol0%get_natom()
    natomtype = mol0%get_natomtype()
    atomtypelenlist = mol0%get_atomtypelenlist()
-   nadjs0 = mol0%get_nadjs()
-   nadjs1 = mol1%get_nadjs()
-   adjlists0 = mol0%get_adjlists()
-   adjlists1 = mol1%get_adjlists()
+   nadjs0 = mol0%get_sorted_nadjs()
+   nadjs1 = mol1%get_sorted_nadjs()
+   adjlists0 = mol0%get_sorted_adjlists()
+   adjlists1 = mol1%get_sorted_adjlists()
 
    nin = natomtype
-   intype0 = mol0%get_atomtypeidcs()
-   intype1 = mol1%get_atomtypeidcs()
+   intype0 = mol0%get_sorted_atomtypeidcs()
+   intype1 = mol1%get_sorted_atomtypeidcs()
    level = 1
 
    do

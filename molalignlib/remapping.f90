@@ -40,10 +40,9 @@ public find_reactive_sites
 
 contains
 
-subroutine optimize_mapping(mol0, mol1, mol0_, mol1_, maplist, countlist, nrec)
+subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 
    type(Molecule), intent(inout) :: mol0, mol1
-   type(Molecule), intent(inout) :: mol0_, mol1_
    integer :: natomtype
    integer, dimension(mol0%natom) :: atomtypelenlist
    integer :: natomequiv0, natomequiv1
@@ -83,35 +82,35 @@ subroutine optimize_mapping(mol0, mol1, mol0_, mol1_, maplist, countlist, nrec)
    real(wp) :: biasmat(mol0%natom, mol1%natom)
    real(wp) :: workcoords1(3, mol1%natom)
 
-   natom = mol0_%natom
-   weights = mol0_%get_sorted_weights()
-   coords0 = mol0_%get_sorted_atomcoords()
-   coords1 = mol1_%get_sorted_atomcoords()
-   adjmat0 = mol0_%get_sorted_adjmat()
-   adjmat1 = mol1_%get_sorted_adjmat()
+   natom = mol0%natom
+   weights = mol0%get_sorted_weights()
+   coords0 = mol0%get_sorted_atomcoords()
+   coords1 = mol1%get_sorted_atomcoords()
+   adjmat0 = mol0%get_sorted_adjmat()
+   adjmat1 = mol1%get_sorted_adjmat()
 
-   natomtype = mol0_%get_natomtype()
-   atomtypelenlist = mol0_%get_atomtypelenlist()
+   natomtype = mol0%get_natomtype()
+   atomtypelenlist = mol0%get_atomtypelenlist()
 
-   nadjs0 = mol0_%get_sorted_nadjs()
-   nadjs1 = mol1_%get_sorted_nadjs()
-   adjlists0 = mol0_%get_sorted_adjlists()
-   adjlists1 = mol1_%get_sorted_adjlists()
+   nadjs0 = mol0%get_sorted_nadjs()
+   nadjs1 = mol1%get_sorted_nadjs()
+   adjlists0 = mol0%get_sorted_adjlists()
+   adjlists1 = mol1%get_sorted_adjlists()
 
-   natomequiv0 = mol0_%get_natomequiv()
-   natomequiv1 = mol1_%get_natomequiv()
-   atomequivlenlist0 = mol0_%get_atomequivlenlist()
-   atomequivlenlist1 = mol1_%get_atomequivlenlist()
+   natomequiv0 = mol0%get_natomequiv()
+   natomequiv1 = mol1%get_natomequiv()
+   atomequivlenlist0 = mol0%get_atomequivlenlist()
+   atomequivlenlist1 = mol1%get_atomequivlenlist()
 
-   nadjequivs0 = mol0_%get_sorted_nadjequivs()
-   nadjequivs1 = mol1_%get_sorted_nadjequivs()
-   adjequivlenlists0 = mol0_%get_sorted_adjequivlenlists()
-   adjequivlenlists1 = mol1_%get_sorted_adjequivlenlists()
+   nadjequivs0 = mol0%get_sorted_nadjequivs()
+   nadjequivs1 = mol1%get_sorted_nadjequivs()
+   adjequivlenlists0 = mol0%get_sorted_adjequivlenlists()
+   adjequivlenlists1 = mol1%get_sorted_adjequivlenlists()
 
-   nfrag0 = mol0_%nfrag
-   fragroot0 = mol0_%get_sorted_fragroot()
-   nfrag1 = mol1_%nfrag
-   fragroot1 = mol1_%get_sorted_fragroot()
+   nfrag0 = mol0%nfrag
+   fragroot0 = mol0%get_sorted_fragroot()
+   nfrag1 = mol1%nfrag
+   fragroot1 = mol1%get_sorted_fragroot()
 
    ! Calculate MNA equivalence matrix
 

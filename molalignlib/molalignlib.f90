@@ -51,13 +51,11 @@ subroutine remap_atoms( &
    integer, intent(out) :: nrec, error
 
    integer :: i
-   type(Molecule) :: mol0_, mol1_
    real(wp) :: travec0(3), travec1(3)
    integer, dimension(mol0%natom) :: mapping
-   integer :: nbond0, bonds0(2, maxcoord*mol0%natom)
-   integer :: nbond1, bonds1(2, maxcoord*mol1%natom)
-   integer, dimension(:), allocatable :: atomorder0, atomorder1
-   integer, dimension(:), allocatable :: backorder0, backorder1
+
+!   integer :: nbond0, bonds0(2, maxcoord*mol0%natom)
+!   integer :: nbond1, bonds1(2, maxcoord*mol1%natom)
 
    ! Set error code to 0 by default
 
@@ -89,34 +87,9 @@ subroutine remap_atoms( &
       return
    end if
 
-   ! Allocate arrays
-
-   allocate(atomorder0(mol0%natom), atomorder1(mol1%natom))
-   allocate(backorder0(mol0%natom), backorder1(mol1%natom))
-
-   ! Get atom order
-
-   atomorder0 = sorted_order(mol0%get_atomequividcs(), mol0%natom)
-   atomorder1 = sorted_order(mol1%get_atomequividcs(), mol1%natom)
-
-   ! Get inverse atom order
-
-   backorder0 = inverse_mapping(atomorder0)
-   backorder1 = inverse_mapping(atomorder1)
-
-   ! Backup molecules before reordering
-
-   mol0_ = mol0
-   mol1_ = mol1
-
-   ! Reorder data arrays
-
-   call mol0%permutate_atoms(atomorder0)
-   call mol1%permutate_atoms(atomorder1)
-
    ! Abort if molecules are not isomers
 
-   if (any(mol0_%get_sorted_atomnums() /= mol1_%get_sorted_atomnums())) then
+   if (any(mol0%get_sorted_atomnums() /= mol1%get_sorted_atomnums())) then
       write (stderr, '(a)') 'Error: The molecules are not isomers'
       error = 1
       return
@@ -124,7 +97,7 @@ subroutine remap_atoms( &
 
    ! Abort if there are conflicting atomic types
 
-   if (any(mol0_%get_sorted_atomtypeidcs() /= mol1_%get_sorted_atomtypeidcs())) then
+   if (any(mol0%get_sorted_atomtypeidcs() /= mol1%get_sorted_atomtypeidcs())) then
       write (stderr, '(a)') 'Error: There are conflicting atomic types'
       error = 1
       return
@@ -132,7 +105,7 @@ subroutine remap_atoms( &
 
    ! Abort if there are conflicting weights
 
-   if (any(abs(mol0_%get_sorted_weights() - mol1_%get_sorted_weights()) > 1.E-6)) then
+   if (any(abs(mol0%get_sorted_weights() - mol1%get_sorted_weights()) > 1.E-6)) then
       write (stderr, '(a)') 'Error: There are conflicting weights'
       error = 1
       return
@@ -142,7 +115,6 @@ subroutine remap_atoms( &
 
    if (mirror_flag) then
       call mol1%mirror_coords()
-      call mol1_%mirror_coords()
    end if
 
    ! Calculate centroids
@@ -154,8 +126,6 @@ subroutine remap_atoms( &
 
    call mol0%translate_coords(travec0)
    call mol1%translate_coords(travec1)
-   call mol0_%translate_coords(travec0)
-   call mol1_%translate_coords(travec1)
 
    ! Initialize random number generator
 
@@ -163,15 +133,15 @@ subroutine remap_atoms( &
 
    ! Optimize assignment to minimize the AdjD and RMSD
 
-    call optimize_mapping(mol0, mol1, mol0_, mol1_, maplist, countlist, nrec)
+    call optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 
    ! Debond reactive sites and reoptimize assignment
 
 !   if (reac_flag) then
-!      call find_reactive_sites(mol0_, mol1_, maplist(:, 1))
-!      call assort_neighbors(mol0_)
-!      call assort_neighbors(mol1_)
-!      call optimize_mapping(mol0, mol1, mol0_, mol1_, maplist, countlist, nrec)
+!      call find_reactive_sites(mol0, mol1, maplist(:, 1))
+!      call assort_neighbors(mol0)
+!      call assort_neighbors(mol1)
+!      call optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 !   end if
 
 !   ! Print coordinates with internal order
@@ -189,7 +159,7 @@ subroutine remap_atoms( &
    ! Reorder back to original atom ordering
 
    do i = 1, nrec
-      maplist(:, i) = atomorder1(maplist(backorder0, i))
+      maplist(:, i) = mol1%atomequivpart%foreorder(maplist(mol0%atomequivpart%backorder, i))
    end do
 
 end subroutine
