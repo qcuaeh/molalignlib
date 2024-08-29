@@ -123,7 +123,9 @@ end function get_natomequiv
 subroutine mirror_coords(self)
    class(Molecule), intent(inout) :: self
    ! Local variables
-   real(wp) :: coords(3, self%natom)
+   real(wp), allocatable :: coords(:, :)
+
+   allocate(coords(3, self%natom))
 
    coords = self%get_atomcoords()
    coords(1, :) = -coords(1, :)
@@ -163,7 +165,9 @@ subroutine permutate_atoms(self, order)
    integer, intent(in) :: order(:)
    ! Local variables
    integer :: i, k
-   integer :: invorder(self%natom)
+   integer, allocatable :: invorder(:)
+
+   allocate(invorder(self%natom))
 
    invorder = inverse_mapping(order)
    self%atoms = self%atoms(order(:))
@@ -412,7 +416,9 @@ function get_atomcoords(self) result(coords)
    class(Molecule), intent(in) :: self
    ! Local variables
    integer :: i
-   real(wp) :: coords(3, self%natom)
+   real(wp), allocatable :: coords(:, :)
+
+   allocate(coords(3, self%natom))
 
    do i = 1, self%natom
       coords(:, i) = self%atoms(i)%coords(:)
@@ -424,7 +430,9 @@ function get_sorted_atomcoords(self) result(coords)
    class(Molecule), intent(in) :: self
    ! Local variables
    integer :: i
-   real(wp) :: coords(3, self%natom)
+   real(wp), allocatable :: coords(:, :)
+
+   allocate(coords(3, self%natom))
 
    do i = 1, self%natom
       coords(:, i) = self%atoms(self%atomequivpart%foreorder(i))%coords(:)
@@ -622,8 +630,6 @@ function get_fragroot(self) result(fragroots)
    ! Local variables
    integer, allocatable :: fragroots(:)
 
-!   allocate(fragroots(self%natom))
-
    fragroots = self%fragroots
 
 end function get_fragroot
@@ -632,8 +638,6 @@ function get_sorted_fragroot(self) result(fragroots)
    class(Molecule), intent(in) :: self
    ! Local variables
    integer, allocatable :: fragroots(:)
-
-!   allocate(fragroots(self%natom))
 
    fragroots = self%atomequivpart%backorder(self%fragroots)
 
@@ -711,7 +715,9 @@ function bonded(self, idx1, idx2) result(isbond)
    ! Local variables
    integer :: i
    logical :: isbond, found1, found2
-   integer, dimension(maxcoord) :: adjlist1, adjlist2
+   integer, allocatable :: adjlist1(:), adjlist2(:)
+
+   allocate(adjlist1(maxcoord), adjlist2(maxcoord))
 
 ! copy arrays of adjlist
    adjlist1 = self%atoms(idx1)%adjlist
@@ -752,7 +758,9 @@ subroutine remove_bond(self, idx1, idx2)
    integer, intent(in) :: idx1, idx2
    ! Local variables
    integer :: i, pos1, pos2, nadj1, nadj2
-   integer, dimension(maxcoord) :: adjlist1, adjlist2
+   integer, allocatable :: adjlist1(:), adjlist2(:)
+
+   allocate(adjlist1(maxcoord), adjlist2(maxcoord))
 
 ! copy adjlist arrays
    nadj1 = size(self%atoms(idx1)%adjlist)
@@ -802,7 +810,9 @@ subroutine add_bond(self, idx1, idx2)
    integer, intent(in) :: idx1, idx2
    ! Local variables
    integer :: pos1, pos2, nadj1, nadj2
-   integer, dimension(maxcoord) :: adjlist1, adjlist2
+   integer, allocatable :: adjlist1(:), adjlist2(:)
+
+   allocate(adjlist1(maxcoord), adjlist2(maxcoord))
 
 ! copy array of adjlist
    nadj1 = size(self%atoms(idx1)%adjlist)
