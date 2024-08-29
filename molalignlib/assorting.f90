@@ -36,19 +36,19 @@ subroutine assort_atoms(mol)
    integer :: natomtype
    integer :: atomtypeidcs(mol%natom)
    logical :: remaining(mol%natom)
-   integer, dimension(mol%natom) :: blkatomnums, blkatomtags
    integer, dimension(mol%natom) :: foreorder, backorder
+   integer, dimension(mol%natom) :: blockelnums, blocklabels
 
-   integer, allocatable :: atomnums(:), atomtags(:)
-   real(wp), allocatable :: weights(:)
+   integer, allocatable :: atomelnums(:), atomlabels(:)
+!   real(wp), allocatable :: weights(:)
 
    ! Initialization
 
    natomtype = 0
    remaining = .true.
-   atomnums = mol%get_atomnums()
-   atomtags = mol%get_atomtags()
-   weights = mol%get_atomweights()
+   atomelnums = mol%get_atomelnums()
+   atomlabels = mol%get_atomlabels()
+!   weights = mol%get_atomweights()
 
    ! Create block list
 
@@ -58,18 +58,18 @@ subroutine assort_atoms(mol)
 
          natomtype = natomtype + 1
          atomtypeidcs(i) = natomtype
-         blkatomnums(natomtype) = atomnums(i)
-         blkatomtags(natomtype) = atomtags(i)
+         blockelnums(natomtype) = atomelnums(i)
+         blocklabels(natomtype) = atomlabels(i)
          remaining(i) = .false.
 
          do j = 1, mol%natom
             if (remaining(j)) then
-               if (atomnums(i) == atomnums(j) .and. atomtags(i) == atomtags(j)) then
+               if (atomelnums(i) == atomelnums(j) .and. atomlabels(i) == atomlabels(j)) then
 !                  if (weights(i) == weights(j)) then
-                     atomtypeidcs(j) = natomtype
-                     atomnums(j) = atomnums(i)
-                     weights(j) = weights(i)
                      remaining(j) = .false.
+                     atomtypeidcs(j) = natomtype
+                     atomelnums(j) = atomelnums(i)
+!                     weights(j) = weights(i)
 !                  else
 !                     ! Abort if there are inconsistent weights
 !                     write (stderr, '(a)') 'Error: There are incosistent weights'
@@ -85,13 +85,13 @@ subroutine assort_atoms(mol)
 
    ! Order parts by atom tag
 
-   foreorder(:natomtype) = sorted_order(blkatomtags, natomtype)
+   foreorder(:natomtype) = sorted_order(blocklabels, natomtype)
    backorder(:natomtype) = inverse_mapping(foreorder(:natomtype))
    atomtypeidcs = backorder(atomtypeidcs)
 
    ! Order parts by atomic number
 
-   foreorder(:natomtype) = sorted_order(blkatomnums, natomtype)
+   foreorder(:natomtype) = sorted_order(blockelnums, natomtype)
    backorder(:natomtype) = inverse_mapping(foreorder(:natomtype))
    atomtypeidcs = backorder(atomtypeidcs)
 

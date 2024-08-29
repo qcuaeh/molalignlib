@@ -191,7 +191,7 @@ subroutine align_atoms( &
 
    ! Abort if molecules are not isomers
 
-   if (any(sorted(mol0%get_atomnums(), mol0%natom) /= sorted(mol1%get_atomnums(), mol1%natom))) then
+   if (any(sorted(mol0%get_atomelnums(), mol0%natom) /= sorted(mol1%get_atomelnums(), mol1%natom))) then
       write (stderr, '(a)') 'Error: The molecules are not isomers'
       error = 1
       return
@@ -199,7 +199,7 @@ subroutine align_atoms( &
 
    ! Abort if atoms are not ordered
 
-   if (any(mol0%get_atomnums() /= mol1%get_atomnums())) then
+   if (any(mol0%get_atomelnums() /= mol1%get_atomelnums())) then
       write (stderr, '(a)') 'Error: The atoms are not in the same order'
       error = 1
       return

@@ -99,7 +99,7 @@ end subroutine
 
 subroutine writefile(unit, fmtout, mol)
 !   integer, intent(in) :: unit, natom
-!   integer, dimension(:), intent(in) :: atomnums
+!   integer, dimension(:), intent(in) :: atomelnums
 !   real(wp), dimension(:, :), intent(in) :: coords
 !   logical, dimension(:, :), intent(in) :: adjmat
 !   character(*), intent(in) :: title, fmtout
@@ -115,9 +115,9 @@ subroutine writefile(unit, fmtout, mol)
 
    select case (fmtout)
    case ('xyz')
-      call writexyz(unit, mol%title, mol%natom, mol%get_atomnums(), mol%get_atomcoords())
+      call writexyz(unit, mol%title, mol%natom, mol%get_atomelnums(), mol%get_atomcoords())
    case ('mol2')
-      call writemol2(unit, mol%title, mol%natom, mol%get_atomnums(), mol%get_atomcoords(), nbond, bonds)
+      call writemol2(unit, mol%title, mol%natom, mol%get_atomelnums(), mol%get_atomcoords(), nbond, bonds)
    case default
       write (stderr, '(a,1x,a)') 'Invalid format:', fmtout
       stop

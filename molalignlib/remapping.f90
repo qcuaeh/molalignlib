@@ -316,8 +316,8 @@ subroutine remove_reactive_bond(i, j, mol0, mol1, mapping)
    nadjs1 = mol1%get_nadjs()
    adjlists0 = mol0%get_adjlists()
    adjlists1 = mol1%get_adjlists()
-   atomnums0 = mol0%get_atomnums()
-   atomnums1 = mol1%get_atomnums()
+   atomnums0 = mol0%get_atomelnums()
+   atomnums1 = mol1%get_atomelnums()
 
    if (mol0%bonded(i, j)) then
       call mol0%remove_bond(i, j)

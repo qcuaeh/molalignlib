@@ -25,8 +25,8 @@ type :: Partition
 end type
 
 type :: Atom
-   integer, private :: atomnum
-   integer, private :: atomtag
+   integer, private :: elnum
+   integer, private :: label
    integer, private :: typeidx
    integer, private :: equividx
    integer, allocatable, private :: mnaid(:)
@@ -68,7 +68,6 @@ contains
    procedure :: set_atomcoords
    procedure :: get_atomcoords
    procedure :: get_sorted_atomcoords
-   procedure :: get_atomlabels
    procedure :: set_adjlists
    procedure :: get_adjlists
    procedure :: get_sorted_adjlists
@@ -78,11 +77,11 @@ contains
    procedure :: get_sorted_fragroot
    procedure :: get_atomtypeblocks
    procedure :: get_sorted_atomtypeblocks
-   procedure :: set_atomnums
-   procedure :: get_atomnums
+   procedure :: set_atomelnums
+   procedure :: get_atomelnums
    procedure :: get_sorted_atomnums
-   procedure :: set_atomtags
-   procedure :: get_atomtags
+   procedure :: set_atomlabels
+   procedure :: get_atomlabels
    procedure :: set_weights
    procedure :: get_atomweights
    procedure :: get_sorted_weights
@@ -176,47 +175,47 @@ subroutine permutate_atoms(self, order)
 
 end subroutine permutate_atoms
 
-subroutine set_atomnums(self, atomnums)
+subroutine set_atomelnums(self, atomelnums)
    class(Molecule), intent(inout) :: self
-   integer, intent(in) :: atomnums(:)
+   integer, intent(in) :: atomelnums(:)
 
-   self%atoms(:)%atomnum = atomnums(:)
+   self%atoms(:)%elnum = atomelnums(:)
 
-end subroutine set_atomnums
+end subroutine set_atomelnums
 
-function get_atomnums(self) result(atomnums)
+function get_atomelnums(self) result(atomelnums)
    class(Molecule), intent(in) :: self
-   integer, allocatable :: atomnums(:)
+   integer, allocatable :: atomelnums(:)
 
-   atomnums = self%atoms(:)%atomnum
+   atomelnums = self%atoms(:)%elnum
 
-end function get_atomnums
+end function get_atomelnums
 
-function get_sorted_atomnums(self) result(atomnums)
+function get_sorted_atomnums(self) result(atomelnums)
    class(Molecule), intent(in) :: self
    ! Local variables
-   integer, allocatable :: atomnums(:)
+   integer, allocatable :: atomelnums(:)
 
-   atomnums = self%atoms(self%atomequivpart%foreorder(:))%atomnum
+   atomelnums = self%atoms(self%atomequivpart%foreorder(:))%elnum
 
 end function get_sorted_atomnums
 
-subroutine set_atomtags(self, atomtags)
+subroutine set_atomlabels(self, atomlabels)
    class(Molecule), intent(inout) :: self
-   integer, intent(in) :: atomtags(:)
+   integer, intent(in) :: atomlabels(:)
 
-   self%atoms(:)%atomtag = atomtags(:)
+   self%atoms(:)%label = atomlabels(:)
 
-end subroutine set_atomtags
+end subroutine set_atomlabels
 
-function get_atomtags(self) result(atomtags)
+function get_atomlabels(self) result(atomlabels)
    class(Molecule), intent(in) :: self
    ! Local variables
-   integer, allocatable :: atomtags(:)
+   integer, allocatable :: atomlabels(:)
 
-   atomtags = self%atoms(:)%atomtag
+   atomlabels = self%atoms(:)%label
 
-end function get_atomtags
+end function get_atomlabels
 
 subroutine set_atomequividcs(self, natomequiv, atomequividcs)
    class(Molecule), intent(inout) :: self
@@ -432,20 +431,6 @@ function get_sorted_atomcoords(self) result(coords)
    end do
 
 end function get_sorted_atomcoords
-
-function get_atomlabels(self) result(labels)
-   class(Molecule), intent(in) :: self
-   ! Local variables
-   integer :: i
-   character(wl), allocatable :: labels(:)
-
-   allocate(labels(self%natom))
-
-   do i = 1, self%natom
-      labels(i) = elsym(self%atoms(i)%atomnum) // intstr(self%atoms(i)%atomtag)
-   end do
-
-end function get_atomlabels
 
 function get_adjmat(self) result(adjmat)
    class(Molecule), intent(in) :: self
@@ -673,12 +658,12 @@ subroutine print_atom(self, ind, outLvl)
    case (1)
       if (size(self%adjlist) == 0) then
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a)'
-         write (stderr, frmt) ind, ": ", self%atomnum, self%atomtag, self%typeidx, &
+         write (stderr, frmt) ind, ": ", self%elnum, self%label, self%typeidx, &
                      self%weight, " {", self%coords(:), " }"
       else
          write (num, '(i0)') size(self%adjlist)
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a,'//num//'i3,a)'
-         write (stderr, frmt) ind, ": ", self%atomnum, self%atomtag, self%typeidx, &
+         write (stderr, frmt) ind, ": ", self%elnum, self%label, self%typeidx, &
                self%weight, " {", self%coords(:), " } [", &
                self%adjlist(:size(self%adjlist)), " ]"
       end if
@@ -688,12 +673,12 @@ subroutine print_atom(self, ind, outLvl)
    case default
       if (size(self%adjlist) == 0) then
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a)'
-         write (stderr, frmt) ind, ": ", self%atomnum, self%atomtag, self%typeidx, &
+         write (stderr, frmt) ind, ": ", self%elnum, self%label, self%typeidx, &
                      self%weight, " {", self%coords(:), " }"
       else
          write (num, '(i0)') size(self%adjlist)
          frmt = '(i3,2a,2i3,f7.2,a,3f8.3,a,'//num//'i3,a)'
-         write (stderr, frmt) ind, ": ", self%atomnum, self%atomtag, self%typeidx, &
+         write (stderr, frmt) ind, ": ", self%elnum, self%label, self%typeidx, &
                self%weight, " {", self%coords(:), " } [", &
                self%adjlist(:size(self%adjlist)), " ]"
       end if
@@ -711,7 +696,7 @@ subroutine print_molecule(self)
    write (stderr, '(a,i0,a)') "Contents of molecule structure:   (", &
                                          self%natom, " atoms)"
    write (stderr, '(2a)') 'Title: ', self%title
-   write (stderr, '(a,a4,a5,a12,a7,2a14)') "ind:", "lbl", "atomnum", "typeidx", &
+   write (stderr, '(a,a4,a5,a12,a7,2a14)') "ind:", "lbl", "elnum", "typeidx", &
                                           "weight", "{ coords }", "[ adjlist ]"
 
    do i = 1, self%natom
