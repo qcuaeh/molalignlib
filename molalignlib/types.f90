@@ -146,7 +146,7 @@ subroutine mirror_coords(self)
    coords(1, :) = -coords(1, :)
    call self%set_atomcoords(coords)
 
-end subroutine mirror_coords
+end subroutine
 
 subroutine matrix_rotate_coords(self, rotmat)
    class(Molecule), intent(inout) :: self
@@ -155,7 +155,7 @@ subroutine matrix_rotate_coords(self, rotmat)
 
    call self%set_atomcoords(matrix_rotated(self%natom, self%get_atomcoords(), rotmat))
 
-end subroutine matrix_rotate_coords
+end subroutine
 
 subroutine quater_rotate_coords(self, rotquat)
    class(Molecule), intent(inout) :: self
@@ -164,7 +164,7 @@ subroutine quater_rotate_coords(self, rotquat)
 
    call self%set_atomcoords(quater_rotated(self%natom, self%get_atomcoords(), rotquat))
 
-end subroutine quater_rotate_coords
+end subroutine
 
 subroutine translate_coords(self, travec)
    class(Molecule), intent(inout) :: self
@@ -173,7 +173,7 @@ subroutine translate_coords(self, travec)
 
    call self%set_atomcoords(translated(self%natom, self%get_atomcoords(), travec))
 
-end subroutine translate_coords
+end subroutine
 
 subroutine permutate_atoms(self, order)
    class(Molecule), intent(inout) :: self
@@ -192,7 +192,7 @@ subroutine permutate_atoms(self, order)
       end do
    end do
 
-end subroutine permutate_atoms
+end subroutine
 
 subroutine set_atomelnums(self, atomelnums)
    class(Molecule), intent(inout) :: self
@@ -200,7 +200,7 @@ subroutine set_atomelnums(self, atomelnums)
 
    self%atoms(:)%elnum = atomelnums(:)
 
-end subroutine set_atomelnums
+end subroutine
 
 function get_inner_atomelnums(self) result(atomelnums)
    class(Molecule), intent(in) :: self
@@ -214,9 +214,18 @@ function get_sorted_atomelnums(self, selfpart) result(atomelnums)
    class(Molecule), intent(in) :: self
    type(Partition), intent(in) :: selfpart
    ! Local variables
+   integer :: i, offset
    integer, allocatable :: atomelnums(:)
 
-   atomelnums = self%atoms(selfpart%foreorder(:))%elnum
+!   atomelnums = self%atoms(selfpart%foreorder(:))%elnum
+
+   allocate(atomelnums(size(self%atoms)))
+
+   offset = 0
+   do i = 1, size(selfpart%parts)
+      atomelnums(offset+1:offset+size(selfpart%parts(i)%atomidcs)) = self%atoms(selfpart%parts(i)%atomidcs(:))%elnum
+      offset = offset + size(selfpart%parts(i)%atomidcs)
+   end do
 
 end function
 
@@ -226,7 +235,7 @@ subroutine set_atomlabels(self, atomlabels)
 
    self%atoms(:)%label = atomlabels(:)
 
-end subroutine set_atomlabels
+end subroutine
 
 function get_inner_atomlabels(self) result(atomlabels)
    class(Molecule), intent(in) :: self
@@ -274,7 +283,6 @@ subroutine set_partition(self, natomequiv, atomequividcs)
    self%backorder = inverse_mapping(self%foreorder)
 
    n(:) = 0
-
    do i = 1, size(atomequividcs)
       n(atomequividcs(i)) = n(atomequividcs(i)) + 1
    end do
@@ -283,7 +291,9 @@ subroutine set_partition(self, natomequiv, atomequividcs)
       allocate(self%parts(i)%atomidcs(n(i)))
    end do
 
+   n(:) = 0
    do i = 1, size(atomequividcs)
+      n(atomequividcs(i)) = n(atomequividcs(i)) + 1
       self%parts(atomequividcs(i))%atomidcs(n(atomequividcs(i))) = i
    end do
 
@@ -311,16 +321,14 @@ subroutine set_atomtypeidcs(self, natomtype, atomtypeidcs)
    integer, intent(in) :: atomtypeidcs(:)
    ! Local variables
    integer :: i
-   integer, allocatable :: n(:), k(:)
+   integer, allocatable :: n(:)
 
    allocate(n(natomtype))
-   allocate(k(natomtype))
    allocate(self%atomtypepart%parts(natomtype))
 
    self%atoms(:)%typeidx = atomtypeidcs(:)
 
    n(:) = 0
-
    do i = 1, size(self%atoms)
       n(atomtypeidcs(i)) = n(atomtypeidcs(i)) + 1
    end do
@@ -329,14 +337,13 @@ subroutine set_atomtypeidcs(self, natomtype, atomtypeidcs)
       allocate(self%atomtypepart%parts(i)%atomidcs(n(i)))
    end do
 
-   k(:) = 0
-
+   n(:) = 0
    do i = 1, self%natom
-      k(self%atoms(i)%typeidx) = k(self%atoms(i)%typeidx) + 1
-      self%atomtypepart%parts(self%atoms(i)%typeidx)%atomidcs(k(self%atoms(i)%typeidx)) = i
+      n(self%atoms(i)%typeidx) = n(self%atoms(i)%typeidx) + 1
+      self%atomtypepart%parts(self%atoms(i)%typeidx)%atomidcs(n(self%atoms(i)%typeidx)) = i
    end do
 
-end subroutine set_atomtypeidcs
+end subroutine
 
 function get_atomtypelenlist(self) result(atomtypelenlist)
    class(Molecule), intent(in) :: self
@@ -415,7 +422,7 @@ subroutine set_weights(self, weights)
 
    self%atoms(:)%weight = weights(:)
 
-end subroutine set_weights
+end subroutine
 
 function get_inner_atomweights(self) result(weights)
    class(Molecule), intent(in) :: self
@@ -446,7 +453,7 @@ subroutine set_atomcoords(self, coords)
       self%atoms(i)%coords = coords(:, i)
    end do
 
-end subroutine set_atomcoords
+end subroutine
 
 function get_inner_atomcoords(self) result(coords)
    class(Molecule), intent(in) :: self
@@ -556,7 +563,7 @@ subroutine set_adjlists(self, nadjs, adjlists)
       self%atoms(i)%adjlist = adjlists(:nadjs(i), i)
    end do
 
-end subroutine set_adjlists
+end subroutine
 
 function get_inner_adjlists(self) result(adjlists)
    class(Molecule), intent(in) :: self
@@ -603,7 +610,7 @@ subroutine set_adjequivlenlists(self, nadjequivs, adjequivlenlists)
       self%atoms(i)%adjequivlenlist = adjequivlenlists(:nadjequivs(i), i)
    end do
 
-end subroutine set_adjequivlenlists
+end subroutine
 
 function get_inner_adjequivlenlists(self) result(adjequivlenlists)
    class(Molecule), intent(inout) :: self
@@ -731,7 +738,7 @@ subroutine print_atom(self, ind, outLvl)
       end if
    end select
 
-end subroutine print_atom
+end subroutine
 
 subroutine print_molecule(self)
    class(Molecule), intent(in) :: self
@@ -750,7 +757,7 @@ subroutine print_molecule(self)
       call self%atoms(i)%print(i)
    end do
 
-end subroutine print_molecule
+end subroutine
 
 function bonded(self, idx1, idx2) result(isbond)
    class(Molecule), intent(in) :: self
@@ -846,7 +853,7 @@ subroutine remove_bond(self, idx1, idx2)
       write (stderr, '(a,i0,2x,i0)') 'Error: atoms not bonded: ', idx1, idx2
    end if
 
-end subroutine remove_bond
+end subroutine
 
 subroutine add_bond(self, idx1, idx2)
    class(Molecule), intent(inout) :: self
@@ -892,6 +899,6 @@ subroutine add_bond(self, idx1, idx2)
       write (stderr, '(a,i0,2x,i0)') "Error: atoms already bonded: ", idx1, idx2
    end if
 
-end subroutine add_bond
+end subroutine
 
 end module
