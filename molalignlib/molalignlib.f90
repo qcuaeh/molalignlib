@@ -53,6 +53,7 @@ subroutine remap_atoms( &
    integer :: i
    real(wp) :: travec0(3), travec1(3)
    integer, dimension(mol0%natom) :: mapping
+   integer, allocatable :: indices1(:), indexmap0(:)
    type(Partition) :: part0, part1
 
 !   integer :: nbond0, bonds0(2, maxcoord*mol0%natom)
@@ -164,8 +165,11 @@ subroutine remap_atoms( &
 
    ! Reorder back to original atom ordering
 
+   indices1 = part1%get_indices()
+   indexmap0 = inverse_mapping(part0%get_indices())
+
    do i = 1, nrec
-      maplist(:, i) = part1%foreorder(maplist(part0%backorder, i))
+      maplist(:, i) = indices1(maplist(indexmap0(:), i))
    end do
 
 end subroutine
