@@ -40,9 +40,10 @@ public find_reactive_sites
 
 contains
 
-subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
+subroutine optimize_mapping(mol0, mol1, part0, part1, maplist, countlist, nrec)
 
    type(Molecule), intent(inout) :: mol0, mol1
+   type(Partition), intent(in) :: part0, part1
    integer :: natomtype
    integer, dimension(mol0%natom) :: atomtypelenlist
    integer :: natomequiv0, natomequiv1
@@ -83,38 +84,38 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
    real(wp) :: workcoords1(3, mol1%natom)
 
    natom = mol0%natom
-   weights = mol0%get_sorted_weights()
-   coords0 = mol0%get_sorted_atomcoords()
-   coords1 = mol1%get_sorted_atomcoords()
-   adjmat0 = mol0%get_sorted_adjmat()
-   adjmat1 = mol1%get_sorted_adjmat()
+   weights = mol0%get_atomweights(part0)
+   coords0 = mol0%get_atomcoords(part0)
+   coords1 = mol1%get_atomcoords(part1)
+   adjmat0 = mol0%get_adjmat(part0)
+   adjmat1 = mol1%get_adjmat(part1)
 
    natomtype = mol0%get_natomtype()
    atomtypelenlist = mol0%get_atomtypelenlist()
 
-   nadjs0 = mol0%get_sorted_nadjs()
-   nadjs1 = mol1%get_sorted_nadjs()
-   adjlists0 = mol0%get_sorted_adjlists()
-   adjlists1 = mol1%get_sorted_adjlists()
+   nadjs0 = mol0%get_nadjs(part0)
+   nadjs1 = mol1%get_nadjs(part1)
+   adjlists0 = mol0%get_adjlists(part0)
+   adjlists1 = mol1%get_adjlists(part1)
 
    natomequiv0 = mol0%get_natomequiv()
    natomequiv1 = mol1%get_natomequiv()
    atomequivlenlist0 = mol0%get_atomequivlenlist()
    atomequivlenlist1 = mol1%get_atomequivlenlist()
 
-   nadjequivs0 = mol0%get_sorted_nadjequivs()
-   nadjequivs1 = mol1%get_sorted_nadjequivs()
-   adjequivlenlists0 = mol0%get_sorted_adjequivlenlists()
-   adjequivlenlists1 = mol1%get_sorted_adjequivlenlists()
+   nadjequivs0 = mol0%get_nadjequivs(part0)
+   nadjequivs1 = mol1%get_nadjequivs(part1)
+   adjequivlenlists0 = mol0%get_adjequivlenlists(part0)
+   adjequivlenlists1 = mol1%get_adjequivlenlists(part1)
 
    nfrag0 = mol0%nfrag
-   fragroot0 = mol0%get_sorted_fragroot()
+   fragroot0 = mol0%get_fragroot(part0)
    nfrag1 = mol1%nfrag
-   fragroot1 = mol1%get_sorted_fragroot()
+   fragroot1 = mol1%get_fragroot(part1)
 
    ! Calculate MNA equivalence matrix
 
-   call calcequivmat(mol0, mol1, nadjmna0, adjmnalen0, adjmnalist0, nadjmna1, adjmnalen1, adjmnalist1, equivmat)
+   call calcequivmat(mol0, mol1, part0, part1, nadjmna0, adjmnalen0, adjmnalist0, nadjmna1, adjmnalen1, adjmnalist1, equivmat)
 
    ! Calculate bias matrix
 
@@ -238,9 +239,10 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 
 end subroutine
 
-subroutine find_reactive_sites(mol0, mol1, mapping)
+subroutine find_reactive_sites(mol0, mol1, part0, part1, mapping)
 
    type(Molecule), intent(inout) :: mol0, mol1
+   type(Partition), intent(in) :: part0, part1
    integer, dimension(:), intent(in) :: mapping
 
    integer :: natom
@@ -260,14 +262,14 @@ subroutine find_reactive_sites(mol0, mol1, mapping)
 
    ! Initialization
 
-   coords0 = mol0%get_sorted_atomcoords()
-   coords1 = mol1%get_sorted_atomcoords()
-   adjmat0 = mol0%get_sorted_adjmat()
-   adjmat1 = mol1%get_sorted_adjmat()
-   atomtypeidcs0 = mol0%get_sorted_atomtypeidcs()
-   atomtypeidcs1 = mol1%get_sorted_atomtypeidcs()
-   atomtypeblocks0 = mol0%get_sorted_atomtypeblocks()
-   atomtypeblocks1 = mol1%get_sorted_atomtypeblocks()
+   coords0 = mol0%get_atomcoords(part0)
+   coords1 = mol1%get_atomcoords(part1)
+   adjmat0 = mol0%get_adjmat(part0)
+   adjmat1 = mol1%get_adjmat(part1)
+   atomtypeidcs0 = mol0%get_atomtypeidcs(part0)
+   atomtypeidcs1 = mol1%get_atomtypeidcs(part1)
+   atomtypeblocks0 = mol0%get_atomtypeblocks(part0)
+   atomtypeblocks1 = mol1%get_atomtypeblocks(part1)
    atomtypelenlist0 = mol0%get_atomtypelenlist()
    atomtypelenlist1 = mol1%get_atomtypelenlist()
 

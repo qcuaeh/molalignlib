@@ -53,6 +53,7 @@ subroutine remap_atoms( &
    integer :: i
    real(wp) :: travec0(3), travec1(3)
    integer, dimension(mol0%natom) :: mapping
+   type(Partition) :: part0, part1
 
 !   integer :: nbond0, bonds0(2, maxcoord*mol0%natom)
 !   integer :: nbond1, bonds1(2, maxcoord*mol1%natom)
@@ -79,6 +80,11 @@ subroutine remap_atoms( &
       setcrossbias => setcrossbias_none
    end if
 
+   ! Set MNA equivalence partitions
+
+   call part0%set_partition(mol0%get_natomequiv(), mol0%get_atomequividcs())
+   call part1%set_partition(mol1%get_natomequiv(), mol1%get_atomequividcs())
+
    ! Abort if molecules have different number of atoms
 
    if (mol0%natom /= mol1%natom) then
@@ -89,7 +95,7 @@ subroutine remap_atoms( &
 
    ! Abort if molecules are not isomers
 
-   if (any(mol0%get_sorted_atomnums() /= mol1%get_sorted_atomnums())) then
+   if (any(mol0%get_atomelnums(part0) /= mol1%get_atomelnums(part1))) then
       write (stderr, '(a)') 'Error: The molecules are not isomers'
       error = 1
       return
@@ -97,7 +103,7 @@ subroutine remap_atoms( &
 
    ! Abort if there are conflicting atomic types
 
-   if (any(mol0%get_sorted_atomtypeidcs() /= mol1%get_sorted_atomtypeidcs())) then
+   if (any(mol0%get_atomtypeidcs(part0) /= mol1%get_atomtypeidcs(part1))) then
       write (stderr, '(a)') 'Error: There are conflicting atomic types'
       error = 1
       return
@@ -105,7 +111,7 @@ subroutine remap_atoms( &
 
    ! Abort if there are conflicting weights
 
-   if (any(abs(mol0%get_sorted_weights() - mol1%get_sorted_weights()) > 1.E-6)) then
+   if (any(abs(mol0%get_atomweights(part0) - mol1%get_atomweights(part1)) > 1.E-6)) then
       write (stderr, '(a)') 'Error: There are conflicting weights'
       error = 1
       return
@@ -133,15 +139,15 @@ subroutine remap_atoms( &
 
    ! Optimize assignment to minimize the AdjD and RMSD
 
-    call optimize_mapping(mol0, mol1, maplist, countlist, nrec)
+    call optimize_mapping(mol0, mol1, part0, part1, maplist, countlist, nrec)
 
    ! Debond reactive sites and reoptimize assignment
 
 !   if (reac_flag) then
-!      call find_reactive_sites(mol0, mol1, maplist(:, 1))
+!      call find_reactive_sites(mol0, mol1, part0, part1, maplist(:, 1))
 !      call assort_neighbors(mol0)
 !      call assort_neighbors(mol1)
-!      call optimize_mapping(mol0, mol1, maplist, countlist, nrec)
+!      call optimize_mapping(mol0, mol1, part0, part1, maplist, countlist, nrec)
 !   end if
 
 !   ! Print coordinates with internal order
@@ -159,7 +165,7 @@ subroutine remap_atoms( &
    ! Reorder back to original atom ordering
 
    do i = 1, nrec
-      maplist(:, i) = mol1%atomequivpart%foreorder(maplist(mol0%atomequivpart%backorder, i))
+      maplist(:, i) = part1%foreorder(maplist(part0%backorder, i))
    end do
 
 end subroutine
@@ -283,6 +289,6 @@ function centroid_coords(mol) result(coords)
 
    coords(:) = coords(:)/sum(atomweights)
 
-end function centroid_coords
+end function
 
 end module
