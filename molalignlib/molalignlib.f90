@@ -54,7 +54,7 @@ subroutine remap_atoms( &
    real(wp) :: travec0(3), travec1(3)
    integer, dimension(mol0%natom) :: mapping
    integer, allocatable :: indices1(:), indexmap0(:)
-   type(Partition) :: part0, part1
+   type(Partition) :: equiv0, equiv1
 
 !   integer :: nbond0, bonds0(2, maxcoord*mol0%natom)
 !   integer :: nbond1, bonds1(2, maxcoord*mol1%natom)
@@ -83,8 +83,8 @@ subroutine remap_atoms( &
 
    ! Set MNA equivalence partitions
 
-   call part0%set_partition(mol0%get_natomequiv(), mol0%get_atomequividcs())
-   call part1%set_partition(mol1%get_natomequiv(), mol1%get_atomequividcs())
+   call equiv0%set_partition(mol0%get_natomequiv(), mol0%get_atomequividcs())
+   call equiv1%set_partition(mol1%get_natomequiv(), mol1%get_atomequividcs())
 
    ! Abort if molecules have different number of atoms
 
@@ -96,7 +96,7 @@ subroutine remap_atoms( &
 
    ! Abort if molecules are not isomers
 
-   if (any(mol0%get_atomelnums(part0) /= mol1%get_atomelnums(part1))) then
+   if (any(mol0%get_atomelnums(equiv0) /= mol1%get_atomelnums(equiv1))) then
       write (stderr, '(a)') 'Error: The molecules are not isomers'
       error = 1
       return
@@ -104,7 +104,7 @@ subroutine remap_atoms( &
 
    ! Abort if there are conflicting atomic types
 
-   if (any(mol0%get_atomtypeidcs(part0) /= mol1%get_atomtypeidcs(part1))) then
+   if (any(mol0%get_atomtypeidcs(equiv0) /= mol1%get_atomtypeidcs(equiv1))) then
       write (stderr, '(a)') 'Error: There are conflicting atomic types'
       error = 1
       return
@@ -112,7 +112,7 @@ subroutine remap_atoms( &
 
    ! Abort if there are conflicting weights
 
-   if (any(abs(mol0%get_atomweights(part0) - mol1%get_atomweights(part1)) > 1.E-6)) then
+   if (any(abs(mol0%get_atomweights(equiv0) - mol1%get_atomweights(equiv1)) > 1.E-6)) then
       write (stderr, '(a)') 'Error: There are conflicting weights'
       error = 1
       return
@@ -140,15 +140,15 @@ subroutine remap_atoms( &
 
    ! Optimize assignment to minimize the AdjD and RMSD
 
-    call optimize_mapping(mol0, mol1, part0, part1, maplist, countlist, nrec)
+    call optimize_mapping(mol0, mol1, equiv0, equiv1, maplist, countlist, nrec)
 
    ! Debond reactive sites and reoptimize assignment
 
 !   if (reac_flag) then
-!      call find_reactive_sites(mol0, mol1, part0, part1, maplist(:, 1))
+!      call find_reactive_sites(mol0, mol1, equiv0, equiv1, maplist(:, 1))
 !      call assort_neighbors(mol0)
 !      call assort_neighbors(mol1)
-!      call optimize_mapping(mol0, mol1, part0, part1, maplist, countlist, nrec)
+!      call optimize_mapping(mol0, mol1, equiv0, equiv1, maplist, countlist, nrec)
 !   end if
 
 !   ! Print coordinates with internal order
@@ -165,8 +165,8 @@ subroutine remap_atoms( &
 
    ! Reorder back to original atom ordering
 
-   indices1 = part1%get_indices()
-   indexmap0 = inverse_mapping(part0%get_indices())
+   indices1 = equiv1%get_indices()
+   indexmap0 = inverse_mapping(equiv0%get_indices())
 
    do i = 1, nrec
       maplist(:, i) = indices1(maplist(indexmap0(:), i))

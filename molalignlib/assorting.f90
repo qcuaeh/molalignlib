@@ -249,11 +249,11 @@ subroutine getmnatypes(mol, nin, intype, nout, outype, atomtypemap)
 
 end subroutine
 
-subroutine calcequivmat(mol0, mol1, part0, part1, nadjmna0, adjmnalen0, adjmnalist0, &
+subroutine calcequivmat(mol0, mol1, equiv0, equiv1, nadjmna0, adjmnalen0, adjmnalist0, &
    nadjmna1, adjmnalen1, adjmnalist1, equivmat)
 ! Purpose: Calculate the maximum common MNA level for all atom cross assignments
    type(Molecule), intent(in) :: mol0, mol1
-   type(Partition), intent(in) :: part0, part1
+   type(Partition), intent(in) :: equiv0, equiv1
 
    integer, dimension(:, :), intent(out) :: nadjmna0, nadjmna1
    integer, dimension(:, :, :), intent(out) :: adjmnalen0, adjmnalen1
@@ -272,14 +272,14 @@ subroutine calcequivmat(mol0, mol1, part0, part1, nadjmna0, adjmnalen0, adjmnali
    natom = mol0%get_natom()
    natomtype = mol0%get_natomtype()
    atomtypelenlist = mol0%get_atomtypelenlist()
-   nadjs0 = mol0%get_nadjs(part0)
-   nadjs1 = mol1%get_nadjs(part1)
-   adjlists0 = mol0%get_adjlists(part0)
-   adjlists1 = mol1%get_adjlists(part1)
+   nadjs0 = mol0%get_nadjs(equiv0)
+   nadjs1 = mol1%get_nadjs(equiv1)
+   adjlists0 = mol0%get_adjlists(equiv0)
+   adjlists1 = mol1%get_adjlists(equiv1)
 
    nin = natomtype
-   intype0 = mol0%get_atomtypeidcs(part0)
-   intype1 = mol1%get_atomtypeidcs(part1)
+   intype0 = mol0%get_atomtypeidcs(equiv0)
+   intype1 = mol1%get_atomtypeidcs(equiv1)
    level = 1
 
    do
