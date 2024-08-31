@@ -45,6 +45,7 @@ type, public :: Molecule
    type(Partition) :: atomtypepartition
    type(Partition) :: atomequivpartition
 contains
+   procedure :: print => print_molecule
    procedure :: set_atomelnums
    procedure :: set_atomlabels
    procedure :: set_atomcoords
@@ -65,49 +66,44 @@ contains
    procedure :: bonded
    procedure :: remove_bond
    procedure :: add_bond
+   procedure :: get_fragparts
    procedure :: get_fragroots
-   procedure :: print => print_molecule
-   procedure, private :: get_inner_nadjs
+   procedure :: get_atomtypeparts
+   procedure, private :: get_default_nadjs
+   procedure, private :: get_default_adjlists
+   procedure, private :: get_default_adjmat
+   procedure, private :: get_default_atomcoords
+   procedure, private :: get_default_atomelnums
+   procedure, private :: get_default_atomequividcs
+   procedure, private :: get_default_atomlabels
+   procedure, private :: get_default_atomtypeidcs
+   procedure, private :: get_default_atomweights
+   procedure, private :: get_default_nadjequivs
+   procedure, private :: get_default_adjequivlenlists
    procedure, private :: get_sorted_nadjs
-   procedure, private :: get_inner_nadjequivs
-   procedure, private :: get_sorted_nadjequivs
-   procedure, private :: get_inner_atomtypeidcs
-   procedure, private :: get_sorted_atomtypeidcs
-   procedure, private :: get_inner_atomequividcs
-   procedure, private :: get_sorted_atomequividcs
-   procedure, private :: get_inner_adjequivlenlists
-   procedure, private :: get_sorted_adjequivlenlists
-   procedure, private :: get_inner_atomcoords
-   procedure, private :: get_sorted_atomcoords
-   procedure, private :: get_inner_adjlists
    procedure, private :: get_sorted_adjlists
-   procedure, private :: get_inner_adjmat
    procedure, private :: get_sorted_adjmat
-   procedure, private :: get_inner_fragparts
-   procedure, private :: get_sorted_fragparts
-   procedure, private :: get_inner_atomelnums
+   procedure, private :: get_sorted_atomcoords
    procedure, private :: get_sorted_atomelnums
-   procedure, private :: get_inner_atomlabels
+   procedure, private :: get_sorted_atomequividcs
    procedure, private :: get_sorted_atomlabels
-   procedure, private :: get_inner_atomweights
+   procedure, private :: get_sorted_atomtypeidcs
    procedure, private :: get_sorted_atomweights
-   procedure, private :: get_inner_atomtypeparts
-   procedure, private :: get_sorted_atomtypeparts
+   procedure, private :: get_sorted_nadjequivs
+   procedure, private :: get_sorted_adjequivlenlists
    procedure, private :: matrix_rotate_coords
    procedure, private :: quater_rotate_coords
-   generic :: get_nadjs => get_inner_nadjs, get_sorted_nadjs
-   generic :: get_nadjequivs => get_inner_nadjequivs, get_sorted_nadjequivs
-   generic :: get_atomtypeidcs => get_inner_atomtypeidcs, get_sorted_atomtypeidcs
-   generic :: get_atomequividcs => get_inner_atomequividcs, get_sorted_atomequividcs
-   generic :: get_adjequivlenlists => get_inner_adjequivlenlists, get_sorted_adjequivlenlists
-   generic :: get_atomcoords => get_inner_atomcoords, get_sorted_atomcoords
-   generic :: get_adjlists => get_inner_adjlists, get_sorted_adjlists
-   generic :: get_adjmat => get_inner_adjmat, get_sorted_adjmat
-   generic :: get_fragparts => get_inner_fragparts, get_sorted_fragparts
-   generic :: get_atomtypeparts => get_inner_atomtypeparts, get_sorted_atomtypeparts
-   generic :: get_atomelnums => get_inner_atomelnums, get_sorted_atomelnums
-   generic :: get_atomlabels => get_inner_atomlabels, get_sorted_atomlabels
-   generic :: get_atomweights => get_inner_atomweights, get_sorted_atomweights
+   generic :: get_nadjs => get_default_nadjs, get_sorted_nadjs
+   generic :: get_nadjequivs => get_default_nadjequivs, get_sorted_nadjequivs
+   generic :: get_atomtypeidcs => get_default_atomtypeidcs, get_sorted_atomtypeidcs
+   generic :: get_atomequividcs => get_default_atomequividcs, get_sorted_atomequividcs
+   generic :: get_adjequivlenlists => get_default_adjequivlenlists, get_sorted_adjequivlenlists
+   generic :: get_atomcoords => get_default_atomcoords, get_sorted_atomcoords
+   generic :: get_adjlists => get_default_adjlists, get_sorted_adjlists
+   generic :: get_adjmat => get_default_adjmat, get_sorted_adjmat
+   generic :: get_atomelnums => get_default_atomelnums, get_sorted_atomelnums
+   generic :: get_atomlabels => get_default_atomlabels, get_sorted_atomlabels
+   generic :: get_atomweights => get_default_atomweights, get_sorted_atomweights
    generic :: rotate_coords => matrix_rotate_coords, quater_rotate_coords
 end type
 
@@ -201,7 +197,7 @@ subroutine set_atomelnums(self, atomelnums)
 
 end subroutine
 
-function get_inner_atomelnums(self) result(atomelnums)
+function get_default_atomelnums(self) result(atomelnums)
    class(Molecule), intent(in) :: self
    integer, allocatable :: atomelnums(:)
 
@@ -227,7 +223,7 @@ subroutine set_atomlabels(self, atomlabels)
 
 end subroutine
 
-function get_inner_atomlabels(self) result(atomlabels)
+function get_default_atomlabels(self) result(atomlabels)
    class(Molecule), intent(in) :: self
    ! Local variables
    integer, allocatable :: atomlabels(:)
@@ -336,21 +332,7 @@ function get_atomtypelenlist(self) result(atomtypelenlist)
 
 end function
 
-function get_inner_atomtypeparts(self) result(parts)
-   class(Molecule), intent(in) :: self
-   ! Local variables
-   integer :: i
-   type(Part), allocatable :: parts(:)
-
-   allocate(parts(size(self%atomtypepartition%parts)))
-
-   do i = 1, size(self%atomtypepartition%parts)
-      parts(i)%atomidcs = self%atomtypepartition%parts(i)%atomidcs(:)
-   end do
-
-end function
-
-function get_sorted_atomtypeparts(self, atomorder) result(parts)
+function get_atomtypeparts(self, atomorder) result(parts)
    class(Molecule), intent(in) :: self
    integer, intent(in) :: atomorder(:)
    ! Local variables
@@ -367,21 +349,7 @@ function get_sorted_atomtypeparts(self, atomorder) result(parts)
 
 end function
 
-function get_inner_fragparts(self) result(parts)
-   class(Molecule), intent(in) :: self
-   ! Local variables
-   integer :: i
-   type(Part), allocatable :: parts(:)
-
-   allocate(parts(size(self%molfragpartition%parts)))
-
-   do i = 1, size(self%molfragpartition%parts)
-      parts(i)%atomidcs = self%molfragpartition%parts(i)%atomidcs(:)
-   end do
-
-end function
-
-function get_sorted_fragparts(self, atomorder) result(parts)
+function get_fragparts(self, atomorder) result(parts)
    class(Molecule), intent(in) :: self
    integer, intent(in) :: atomorder(:)
    ! Local variables
@@ -421,7 +389,7 @@ function get_fragroots(self, atomorder) result(fragroots)
 
 end function
 
-function get_inner_atomtypeidcs(self) result(atomtypeidcs)
+function get_default_atomtypeidcs(self) result(atomtypeidcs)
    class(Molecule), intent(in) :: self
    ! Local variables
    integer, allocatable :: atomtypeidcs(:)
@@ -440,7 +408,7 @@ function get_sorted_atomtypeidcs(self, atomorder) result(atomtypeidcs)
 
 end function
 
-function get_inner_atomequividcs(self) result(atomequividcs)
+function get_default_atomequividcs(self) result(atomequividcs)
    class(Molecule), intent(in) :: self
    ! Local variables
    integer, allocatable :: atomequividcs(:)
@@ -467,7 +435,7 @@ subroutine set_weights(self, weights)
 
 end subroutine
 
-function get_inner_atomweights(self) result(weights)
+function get_default_atomweights(self) result(weights)
    class(Molecule), intent(in) :: self
    ! Local variables
    real(wp), allocatable :: weights(:)
@@ -498,7 +466,7 @@ subroutine set_atomcoords(self, coords)
 
 end subroutine
 
-function get_inner_atomcoords(self) result(coords)
+function get_default_atomcoords(self) result(coords)
    class(Molecule), intent(in) :: self
    ! Local variables
    integer :: i
@@ -527,7 +495,7 @@ function get_sorted_atomcoords(self, atomorder) result(coords)
 
 end function
 
-function get_inner_adjmat(self) result(adjmat)
+function get_default_adjmat(self) result(adjmat)
    class(Molecule), intent(in) :: self
    ! Local variables
    integer :: i, k
@@ -569,7 +537,7 @@ function get_sorted_adjmat(self, atomorder) result(adjmat)
 
 end function
 
-function get_inner_nadjs(self) result(nadjs)
+function get_default_nadjs(self) result(nadjs)
    class(Molecule), intent(in) :: self
    ! Local variables
    integer :: i
@@ -610,7 +578,7 @@ subroutine set_adjlists(self, nadjs, adjlists)
 
 end subroutine
 
-function get_inner_adjlists(self) result(adjlists)
+function get_default_adjlists(self) result(adjlists)
    class(Molecule), intent(in) :: self
    ! Local variables
    integer :: i
@@ -659,7 +627,7 @@ subroutine set_adjequivlenlists(self, nadjequivs, adjequivlenlists)
 
 end subroutine
 
-function get_inner_adjequivlenlists(self) result(adjequivlenlists)
+function get_default_adjequivlenlists(self) result(adjequivlenlists)
    class(Molecule), intent(inout) :: self
    ! Local variables
    integer :: i
@@ -690,7 +658,7 @@ function get_sorted_adjequivlenlists(self, atomorder) result(adjequivlenlists)
 
 end function
 
-function get_inner_nadjequivs(self) result(nadjequivs)
+function get_default_nadjequivs(self) result(nadjequivs)
    class(Molecule), intent(inout) :: self
    ! Local variables
    integer :: i
