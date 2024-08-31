@@ -22,8 +22,10 @@ type, public :: Partition
    type(Part), allocatable :: parts(:)
 contains
    procedure :: set_partition
-   procedure :: get_indexlist
-   procedure :: get_indexmap
+   procedure :: get_atomidcs
+   procedure :: get_atomidxmap
+   procedure :: get_lenlist
+   procedure :: get_partidcs
 end type
 
 type :: Atom
@@ -117,7 +119,7 @@ contains
 integer function get_natom(self) result(natom)
    class(Molecule), intent(in) :: self
 
-   natom = self%natom
+   natom = size(self%atoms)
 
 end function
 
@@ -216,7 +218,7 @@ function get_sorted_atomelnums(self, atompart) result(atomelnums)
    ! Local variables
    integer, allocatable :: atomelnums(:)
 
-   atomelnums = self%atoms(atompart%get_indexlist())%elnum
+   atomelnums = self%atoms(atompart%get_atomidcs())%elnum
 
 end function
 
@@ -243,7 +245,7 @@ function get_sorted_atomlabels(self, atompart) result(atomlabels)
    ! Local variables
    integer, allocatable :: atomlabels(:)
 
-   atomlabels = self%atoms(atompart%get_indexlist())%label
+   atomlabels = self%atoms(atompart%get_atomidcs())%label
 
 end function
 
@@ -285,34 +287,66 @@ subroutine set_partition(self, natomequiv, atomequividcs)
 
 end subroutine
 
-function get_indexlist(self) result(indexlist)
+function get_atomidcs(self) result(indexlist)
    class(Partition), intent(in) :: self
    ! Local variables
-   integer :: i, nidx
+   integer :: i, n
    integer, allocatable :: indexlist(:)
 
-   nidx = 0
+   n = 0
    do i = 1, size(self%parts)
-      nidx = nidx + size(self%parts(i)%atomidcs)
+      n = n + size(self%parts(i)%atomidcs)
    end do
 
-   allocate(indexlist(nidx))
+   allocate(indexlist(n))
 
-   nidx = 0
+   n = 0
    do i = 1, size(self%parts)
-      indexlist(nidx+1:nidx+size(self%parts(i)%atomidcs)) = self%parts(i)%atomidcs(:)
-      nidx = nidx + size(self%parts(i)%atomidcs)
+      indexlist(n+1:n+size(self%parts(i)%atomidcs)) = self%parts(i)%atomidcs(:)
+      n = n + size(self%parts(i)%atomidcs)
    end do
 
 end function
 
-function get_indexmap(self) result(indexmap)
+function get_atomidxmap(self) result(indexmap)
    class(Partition), intent(in) :: self
    ! Local variables
-   integer :: i, nidx
    integer, allocatable :: indexmap(:)
 
-   indexmap = inverse_mapping(self%get_indexlist())
+   indexmap = inverse_mapping(self%get_atomidcs())
+
+end function
+
+function get_lenlist(self) result(lenlist)
+   class(Partition), intent(in) :: self
+   ! Local variables
+   integer :: i
+   integer, allocatable :: lenlist(:)
+
+   allocate(lenlist(size(self%parts)))
+
+   do i = 1, size(self%parts)
+      lenlist(i) = size(self%parts(i)%atomidcs)
+   end do
+
+end function
+
+function get_partidcs(self) result(partidcs)
+   class(Partition), intent(in) :: self
+   ! Local variables
+   integer :: i, n
+   integer, allocatable :: partidcs(:)
+
+   n = 0
+   do i = 1, size(self%parts)
+      n = n + size(self%parts(i)%atomidcs)
+   end do
+
+   allocate(partidcs(n))
+
+   do i = 1, size(self%parts)
+      partidcs(self%parts(i)%atomidcs(:)) = i
+   end do
 
 end function
 
@@ -398,7 +432,7 @@ function get_sorted_atomtypeblocks(self, atompart) result(parts)
    integer, allocatable :: indexmap(:)
    type(Part), allocatable :: parts(:)
 
-   indexmap = atompart%get_indexmap()
+   indexmap = atompart%get_atomidxmap()
    allocate(parts(size(self%atomtypepart%parts)))
 
    do i = 1, size(self%atomtypepart%parts)
@@ -422,7 +456,7 @@ function get_sorted_atomtypeidcs(self, atompart) result(atomtypeidcs)
    ! Local variables
    integer, allocatable :: atomtypeidcs(:)
 
-   atomtypeidcs = self%atoms(atompart%get_indexlist())%typeidx
+   atomtypeidcs = self%atoms(atompart%get_atomidcs())%typeidx
 
 end function
 
@@ -458,7 +492,7 @@ function get_sorted_atomweights(self, atompart) result(weights)
    ! Local variables
    real(wp), allocatable :: weights(:)
 
-   weights = self%atoms(atompart%get_indexlist())%weight
+   weights = self%atoms(atompart%get_atomidcs())%weight
 
 end function
 
@@ -497,7 +531,7 @@ function get_sorted_atomcoords(self, atompart) result(coords)
    real(wp), allocatable :: coords(:, :)
 
    allocate(coords(3, self%natom))
-   indexlist = atompart%get_indexlist()
+   indexlist = atompart%get_atomidcs()
 
    do i = 1, self%natom
       coords(:, i) = self%atoms(indexlist(i))%coords(:)
@@ -534,8 +568,8 @@ function get_sorted_adjmat(self, atompart) result(adjmat)
    integer, allocatable :: indexlist(:), indexmap(:)
    logical, allocatable :: adjmat(:, :)
 
-   indexlist = atompart%get_indexlist()
-   indexmap = atompart%get_indexmap()
+   indexlist = atompart%get_atomidcs()
+   indexmap = atompart%get_atomidxmap()
    allocate(adjmat(self%natom, self%natom))
    adjmat(:, :) = .false.
 
@@ -569,7 +603,7 @@ function get_sorted_nadjs(self, atompart) result(nadjs)
    integer, allocatable :: indexlist(:)
    integer, allocatable :: nadjs(:)
 
-   indexlist = atompart%get_indexlist()
+   indexlist = atompart%get_atomidcs()
    allocate(nadjs(size(self%atoms)))
 
    do i = 1, size(self%atoms)
@@ -614,7 +648,7 @@ function get_sorted_adjlists(self, atompart) result(adjlists)
    integer, allocatable :: indexlist(:), indexmap(:)
    integer, allocatable :: adjlists(:, :)
 
-   indexlist = atompart%get_indexlist()
+   indexlist = atompart%get_atomidcs()
    indexmap = inverse_mapping(indexlist)
    allocate(adjlists(maxcoord, self%natom))
 
@@ -664,7 +698,7 @@ function get_sorted_adjequivlenlists(self, atompart) result(adjequivlenlists)
    integer, allocatable :: indexlist(:)
    integer, allocatable :: adjequivlenlists(:, :)
 
-   indexlist = atompart%get_indexlist()
+   indexlist = atompart%get_atomidcs()
    allocate(adjequivlenlists(maxcoord, size(self%atoms)))
 
    do i = 1, size(self%atoms)
@@ -697,7 +731,7 @@ function get_sorted_nadjequivs(self, atompart) result(nadjequivs)
    integer, allocatable :: indexlist(:)
    integer, allocatable :: nadjequivs(:)
 
-   indexlist = atompart%get_indexlist()
+   indexlist = atompart%get_atomidcs()
    allocate(nadjequivs(size(self%atoms)))
 
    do i = 1, size(self%atoms)
@@ -722,7 +756,7 @@ function get_sorted_fragroot(self, atompart) result(fragroots)
    ! Local variables
    integer, allocatable :: indexmap(:), fragroots(:)
 
-   indexmap = atompart%get_indexmap()
+   indexmap = atompart%get_atomidxmap()
    fragroots = indexmap(self%fragroots)
 
 end function

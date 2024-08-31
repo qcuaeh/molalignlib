@@ -103,33 +103,39 @@ subroutine set_equiv_atoms(mol)
 ! Group atoms by MNA type at infinite level
    type(Molecule), intent(inout) :: mol
 
-   integer i, nin, natomequiv
-   integer, dimension(mol%natom) :: atomequividcs
-   integer, dimension(mol%natom) :: intype, atomtypemap
-   integer, dimension(mol%natom) :: foreorder, backorder
+   integer :: i, natom, nin, nout
+   integer, allocatable, dimension(:) :: intype, outype, typemap
+   integer, allocatable, dimension(:) :: foreorder, backorder
 
-   ! Determine MNA types iteratively
+   allocate(outype(size(mol%atoms)))
+   allocate(typemap(size(mol%atoms)))
+   allocate(foreorder(size(mol%atoms)))
+   allocate(backorder(size(mol%atoms)))
+
+   ! Initialization
 
    nin = mol%get_natomtype()
    intype = mol%get_atomtypeidcs()
-   atomtypemap = [(i, i=1, nin)]
+   typemap(:nin) = [(i, i=1, nin)]
+
+   ! Determine MNA types iteratively
 
    do
 
-      call getmnatypes(mol, nin, intype, natomequiv, atomequividcs, atomtypemap)
+      call getmnatypes(mol, nin, nout, intype, outype, typemap)
 
-      if (all(atomequividcs == intype)) exit
+      if (all(outype == intype)) exit
 
-      nin = natomequiv
-      intype = atomequividcs
+      nin = nout
+      intype = outype
 
    end do
 
-   foreorder(:natomequiv) = sorted_order(atomtypemap, natomequiv)
-   backorder(:natomequiv) = inverse_mapping(foreorder(:natomequiv))
-   atomequividcs = backorder(atomequividcs)
+   foreorder(:nout) = sorted_order(typemap, nout)
+   backorder(:nout) = inverse_mapping(foreorder(:nout))
+   outype = backorder(outype)
 
-   call mol%set_atomequividcs(natomequiv, atomequividcs)
+   call mol%set_atomequividcs(nout, outype)
 
 end subroutine
 
@@ -207,12 +213,12 @@ subroutine assort_neighbors(mol)
 
 end subroutine
 
-subroutine getmnatypes(mol, nin, intype, nout, outype, atomtypemap)
-   type(Molecule), intent(inout) :: mol
+subroutine getmnatypes(mol, nin, nout, intype, outype, typemap)
+   type(Molecule), intent(in) :: mol
    integer, intent(in) :: nin
    integer, dimension(:), intent(in) :: intype
    integer, intent(out) :: nout
-   integer, dimension(:), intent(out) :: outype, atomtypemap
+   integer, dimension(:), intent(out) :: outype, typemap
 
    integer :: i, j
    integer :: nadjs(mol%natom)
@@ -245,15 +251,15 @@ subroutine getmnatypes(mol, nin, intype, nout, outype, atomtypemap)
       end if
    end do
 
-   atomtypemap(:nout) = atomtypemap(parentype(:nout))
+   typemap(:nout) = typemap(parentype(:nout))
 
 end subroutine
 
-subroutine calcequivmat(mol0, mol1, equiv0, equiv1, nadjmna0, adjmnalen0, adjmnalist0, &
+subroutine calcequivmat(mol0, mol1, atomequiv0, atomequiv1, nadjmna0, adjmnalen0, adjmnalist0, &
    nadjmna1, adjmnalen1, adjmnalist1, equivmat)
 ! Purpose: Calculate the maximum common MNA level for all atom cross assignments
    type(Molecule), intent(in) :: mol0, mol1
-   type(Partition), intent(in) :: equiv0, equiv1
+   type(Partition), intent(in) :: atomequiv0, atomequiv1
 
    integer, dimension(:, :), intent(out) :: nadjmna0, nadjmna1
    integer, dimension(:, :, :), intent(out) :: adjmnalen0, adjmnalen1
@@ -272,14 +278,14 @@ subroutine calcequivmat(mol0, mol1, equiv0, equiv1, nadjmna0, adjmnalen0, adjmna
    natom = mol0%get_natom()
    natomtype = mol0%get_natomtype()
    atomtypelenlist = mol0%get_atomtypelenlist()
-   nadjs0 = mol0%get_nadjs(equiv0)
-   nadjs1 = mol1%get_nadjs(equiv1)
-   adjlists0 = mol0%get_adjlists(equiv0)
-   adjlists1 = mol1%get_adjlists(equiv1)
+   nadjs0 = mol0%get_nadjs(atomequiv0)
+   nadjs1 = mol1%get_nadjs(atomequiv1)
+   adjlists0 = mol0%get_adjlists(atomequiv0)
+   adjlists1 = mol1%get_adjlists(atomequiv1)
 
    nin = natomtype
-   intype0 = mol0%get_atomtypeidcs(equiv0)
-   intype1 = mol1%get_atomtypeidcs(equiv1)
+   intype0 = mol0%get_atomtypeidcs(atomequiv0)
+   intype1 = mol1%get_atomtypeidcs(atomequiv1)
    level = 1
 
    do
