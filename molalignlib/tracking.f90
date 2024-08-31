@@ -10,20 +10,21 @@ implicit none
 private
 public find_molfrags
 
+integer, allocatable :: nadjs(:), adjlists(:, :)
+
 contains
 
 subroutine find_molfrags (mol)
    type(Molecule), intent(inout) :: mol
+   ! Local variables
+   integer :: n, nfrag
+   integer, allocatable :: fragidcs(:), fragsize(:)
+   logical, allocatable :: tracked(:)
 
-   integer :: i, n
-   integer :: natom, nfrag
-   integer, dimension(mol%natom) :: nadjs
-   integer, dimension(maxcoord, mol%natom) :: adjlists
-   integer, dimension(mol%natom) :: fragidcs
-   integer, dimension(mol%natom) :: fragsize
-   logical :: tracked(mol%natom)
+   allocate(fragidcs(size(mol%atoms)))
+   allocate(fragsize(size(mol%atoms)))
+   allocate(tracked(size(mol%atoms)))
 
-   natom = mol%get_natom()
    nadjs = mol%get_nadjs()
    adjlists = mol%get_adjlists()
 
@@ -36,12 +37,12 @@ subroutine find_molfrags (mol)
 
    ! detect fragments and populate frag arrays
    n = 1
-   do while (n <= natom)
+   do while (n <= size(mol%atoms))
       if (tracked(n)) then
          n = n + 1
       else
          nfrag = nfrag + 1
-         call recrun(n, tracked)
+         call recrun(tracked, n, nfrag, fragidcs, fragsize)
          n = 1
       end if
    end do
@@ -49,25 +50,25 @@ subroutine find_molfrags (mol)
    ! register nfrag and fragidcs in the mol strucutre
    call mol%set_molfrags(nfrag, fragidcs)
 
-contains
+end subroutine
 
-   ! runs recursivelly over the structure and populates arrays
-   recursive subroutine recrun (n, tracked)
-      integer, intent(in) :: n
-      logical, dimension(:), intent(inout) :: tracked
-      integer i
+recursive subroutine recrun (tracked, n, nfrag, fragidcs, fragsize)
+! runs recursivelly over the structure and populates arrays
+   logical, intent(inout) :: tracked(:)
+   integer, intent(in) :: n, nfrag
+   integer, intent(inout) :: fragidcs(:), fragsize(:)
+   ! Local variables
+   integer i
 
-      if (tracked(n)) return
+   if (tracked(n)) return
 
-      tracked(n) = .true.
-      fragidcs(n) = nfrag
-      fragsize(nfrag) = fragsize(nfrag) + 1
-      
-      do i = 1, nadjs(n)
-         call recrun(adjlists(i, n), tracked)
-      end do
-
-   end subroutine
+   tracked(n) = .true.
+   fragidcs(n) = nfrag
+   fragsize(nfrag) = fragsize(nfrag) + 1
+   
+   do i = 1, nadjs(n)
+      call recrun(tracked, adjlists(i, n), nfrag, fragidcs, fragsize)
+   end do
 
 end subroutine
 

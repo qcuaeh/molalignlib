@@ -61,8 +61,6 @@ subroutine optimize_mapping(mol0, mol1, equivorder0, equivorder1, maplist, count
    integer :: nadjs0(mol0%natom), adjlists0(maxcoord, mol0%natom)
    integer :: nadjs1(mol1%natom), adjlists1(maxcoord, mol1%natom)
    integer, dimension(mol0%natom) :: atomtypelenlist
-   integer, dimension(mol0%natom) :: atomequivlenlist0
-   integer, dimension(mol1%natom) :: atomequivlenlist1
    integer, dimension(mol0%natom, maxlevel) :: nadjmna0
    integer, dimension(mol1%natom, maxlevel) :: nadjmna1
    integer, dimension(maxcoord, mol0%natom, maxlevel) :: adjmnalen0
@@ -73,8 +71,6 @@ subroutine optimize_mapping(mol0, mol1, equivorder0, equivorder1, maplist, count
    integer, dimension(mol1%natom) :: nadjequivs1
    integer, dimension(maxcoord, mol0%natom) :: adjequivlenlists0
    integer, dimension(maxcoord, mol1%natom) :: adjequivlenlists1
-   integer, dimension(mol0%natom) :: fragroots0
-   integer, dimension(mol1%natom) :: fragroots1
    integer :: equivmat(mol0%natom, mol1%natom)
    integer, dimension(mol0%natom) :: mapping, newmapping
    real(wp) :: rmsd, totalrot
@@ -82,6 +78,9 @@ subroutine optimize_mapping(mol0, mol1, equivorder0, equivorder1, maplist, count
    real(wp), dimension(maxrec) :: recrmsd, avgsteps, avgtotalrot, avgrealrot
    real(wp) :: biasmat(mol0%natom, mol1%natom)
    real(wp) :: workcoords1(3, mol1%natom)
+
+   integer, allocatable, dimension(:) :: atomequivlenlist0, atomequivlenlist1
+   integer, allocatable, dimension(:) :: fragroots0, fragroots1
 
    natom = mol0%natom
    weights = mol0%get_atomweights(equivorder0)
@@ -108,10 +107,11 @@ subroutine optimize_mapping(mol0, mol1, equivorder0, equivorder1, maplist, count
    adjequivlenlists0 = mol0%get_adjequivlenlists(equivorder0)
    adjequivlenlists1 = mol1%get_adjequivlenlists(equivorder1)
 
-   nfrag0 = mol0%nfrag
-   nfrag1 = mol1%nfrag
-!   fragparts0 = mol0%get_fragparts(equivorder0)
-!   fragparts1 = mol1%get_fragparts(equivorder1)
+   fragroots0 = mol0%get_fragroots(equivorder0)
+   fragroots1 = mol1%get_fragroots(equivorder1)
+
+   nfrag0 = size(fragroots0)
+   nfrag1 = size(fragroots1)
 
    ! Calculate MNA equivalence matrix
 
@@ -269,8 +269,8 @@ subroutine find_reactive_sites(mol0, mol1, equivorder0, equivorder1, mapping)
    adjmat1 = mol1%get_adjmat(equivorder1)
    atomtypeidcs0 = mol0%get_atomtypeidcs(equivorder0)
    atomtypeidcs1 = mol1%get_atomtypeidcs(equivorder1)
-   atomtypeblocks0 = mol0%get_atomtypes(equivorder0)
-   atomtypeblocks1 = mol1%get_atomtypes(equivorder1)
+   atomtypeblocks0 = mol0%get_atomtypeparts(equivorder0)
+   atomtypeblocks1 = mol1%get_atomtypeparts(equivorder1)
    atomtypelenlist0 = mol0%get_atomtypelenlist()
    atomtypelenlist1 = mol1%get_atomtypelenlist()
 
