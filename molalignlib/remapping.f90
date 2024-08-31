@@ -73,8 +73,8 @@ subroutine optimize_mapping(mol0, mol1, atomequiv0, atomequiv1, maplist, countli
    integer, dimension(mol1%natom) :: nadjequivs1
    integer, dimension(maxcoord, mol0%natom) :: adjequivlenlists0
    integer, dimension(maxcoord, mol1%natom) :: adjequivlenlists1
-   integer, dimension(mol0%natom) :: fragroot0
-   integer, dimension(mol1%natom) :: fragroot1
+   integer, dimension(mol0%natom) :: fragroots0
+   integer, dimension(mol1%natom) :: fragroots1
    integer :: equivmat(mol0%natom, mol1%natom)
    integer, dimension(mol0%natom) :: mapping, newmapping
    real(wp) :: rmsd, totalrot
@@ -111,9 +111,9 @@ subroutine optimize_mapping(mol0, mol1, atomequiv0, atomequiv1, maplist, countli
    adjequivlenlists1 = mol1%get_adjequivlenlists(atomequiv1)
 
    nfrag0 = mol0%nfrag
-   fragroot0 = mol0%get_fragroot(atomequiv0)
    nfrag1 = mol1%nfrag
-   fragroot1 = mol1%get_fragroot(atomequiv1)
+!   fragparts0 = mol0%get_fragparts(atomequiv0)
+!   fragparts1 = mol1%get_fragparts(atomequiv1)
 
    ! Calculate MNA equivalence matrix
 
@@ -174,10 +174,10 @@ subroutine optimize_mapping(mol0, mol1, atomequiv0, atomequiv1, maplist, countli
       if (back_flag) then
 
          call minadjdiff(natom, weights, natomtype, atomtypelenlist, coords0, nadjs0, adjlists0, adjmat0, natomequiv0, &
-            atomequivlenlist0, workcoords1, nadjs1, adjlists1, adjmat1, natomequiv1, atomequivlenlist1, mapping, nfrag0, fragroot0)
+            atomequivlenlist0, workcoords1, nadjs1, adjlists1, adjmat1, natomequiv1, atomequivlenlist1, mapping, nfrag0, fragroots0)
 
          call eqvatomperm(natom, weights, coords0, adjmat0, adjlists0, natomequiv0, atomequivlenlist0, &
-            nadjequivs0, adjequivlenlists0, workcoords1, adjmat1, mapping, nfrag0, fragroot0)
+            nadjequivs0, adjequivlenlists0, workcoords1, adjmat1, mapping, nfrag0, fragroots0)
 
       end if
 

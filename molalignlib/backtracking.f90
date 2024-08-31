@@ -16,7 +16,7 @@ public eqvatomperm
 contains
 
 subroutine minadjdiff (natom, weights, natomtype, atomtypelenlist, coords0, nadjs0, adjlists0, adjmat0, natomequiv0, &
-   atomequivlenlist0, coords1, nadjs1, adjlists1, adjmat1, natomequiv1, atomequivlenlist1, mapping, nfrag0, fragroot0)
+   atomequivlenlist0, coords1, nadjs1, adjlists1, adjmat1, natomequiv1, atomequivlenlist1, mapping, nfrag0, fragroots0)
 ! Purpose: Find best correspondence between points of graphs
 
    integer, intent(in) :: natom, natomtype, natomequiv0, natomequiv1
@@ -28,7 +28,7 @@ subroutine minadjdiff (natom, weights, natomtype, atomtypelenlist, coords0, nadj
    logical, dimension(:, :), intent(in) :: adjmat0, adjmat1
    integer, dimension(:), intent(inout) :: mapping
    integer, intent(in) :: nfrag0
-   integer, dimension(:), intent(in) :: fragroot0
+   integer, dimension(:), intent(in) :: fragroots0
 
    logical, parameter :: printInfo = .false.
 
@@ -76,7 +76,7 @@ subroutine minadjdiff (natom, weights, natomtype, atomtypelenlist, coords0, nadj
    end if
 
    do i = 1, nfrag0
-      call recursive_backtrack (fragroot0(i), mapping, unmapping, tracked, moldiff, moldist, ntrack, track)
+      call recursive_backtrack (fragroots0(i), mapping, unmapping, tracked, moldiff, moldist, ntrack, track)
 !        print *, ntrack
    end do
 

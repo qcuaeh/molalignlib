@@ -90,10 +90,10 @@ subroutine readfile(unit, fmtin, mol)
    end select
 
    call set_bonds(mol)
+   call find_molfrags(mol)
    call assort_atoms(mol)
    call set_equiv_atoms(mol)
    call assort_neighbors(mol)
-   call findmolfrags(mol)
 
 end subroutine
 

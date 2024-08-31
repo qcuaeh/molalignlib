@@ -95,7 +95,7 @@ subroutine assort_atoms(mol)
    backorder(:natomtype) = inverse_mapping(foreorder(:natomtype))
    atomtypeidcs = backorder(atomtypeidcs)
 
-   call mol%set_atomtypeidcs(natomtype, atomtypeidcs) 
+   call mol%set_atomtypes(natomtype, atomtypeidcs) 
 
 end subroutine
 
@@ -135,7 +135,7 @@ subroutine set_equiv_atoms(mol)
    backorder(:nout) = inverse_mapping(foreorder(:nout))
    outype = backorder(outype)
 
-   call mol%set_atomequividcs(nout, outype)
+   call mol%set_atomequivs(nout, outype)
 
 end subroutine
 
@@ -325,8 +325,6 @@ subroutine calcequivmat(mol0, mol1, atomequiv0, atomequiv1, nadjmna0, adjmnalen0
       level = level + 1
 
    end do
-
-!    print *, natom, nout
 
 end subroutine
 

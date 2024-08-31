@@ -10,10 +10,6 @@ use strutils
 implicit none
 private
 
-type :: MNA
-   integer, allocatable :: lengths(:)
-end type
-
 type, public :: Part
    integer, allocatable :: atomidcs(:)
 end type
@@ -31,6 +27,7 @@ end type
 type :: Atom
    integer, private :: elnum
    integer, private :: label
+   integer, private :: fragidx
    integer, private :: typeidx
    integer, private :: equividx
    integer, allocatable, private :: mnaid(:)
@@ -49,14 +46,13 @@ type, public :: Molecule
    character(:), allocatable :: title
    type(Atom), allocatable :: atoms(:)
    type(Partition) :: atomtypepart
-   integer, allocatable :: fragroots(:)
-!   type(MNA), allocatable :: mnas(:)
 contains
    procedure :: get_natom
+   procedure :: set_molfrags
+   procedure :: set_atomtypes
+   procedure :: set_atomequivs
    procedure :: get_natomtype
    procedure :: get_natomequiv
-   procedure :: set_atomtypeidcs
-   procedure :: set_atomequividcs
    procedure :: get_atomequividcs
    procedure :: get_atomtypelenlist
    procedure :: get_atomequivlenlist
@@ -87,8 +83,8 @@ contains
    procedure, private :: get_sorted_adjlists
    procedure, private :: get_inner_adjmat
    procedure, private :: get_sorted_adjmat
-   procedure, private :: get_inner_fragroot
-   procedure, private :: get_sorted_fragroot
+!   procedure, private :: get_inner_fragroots
+!   procedure, private :: get_sorted_fragroots
    procedure, private :: get_inner_atomtypeblocks
    procedure, private :: get_sorted_atomtypeblocks
    procedure, private :: get_inner_atomelnums
@@ -106,7 +102,7 @@ contains
    generic :: get_atomcoords => get_inner_atomcoords, get_sorted_atomcoords
    generic :: get_adjlists => get_inner_adjlists, get_sorted_adjlists
    generic :: get_adjmat => get_inner_adjmat, get_sorted_adjmat
-   generic :: get_fragroot => get_inner_fragroot, get_sorted_fragroot
+!   generic :: get_fragroots => get_inner_fragroots, get_sorted_fragroots
    generic :: get_atomtypeblocks => get_inner_atomtypeblocks, get_sorted_atomtypeblocks
    generic :: get_atomelnums => get_inner_atomelnums, get_sorted_atomelnums
    generic :: get_atomlabels => get_inner_atomlabels, get_sorted_atomlabels
@@ -249,13 +245,23 @@ function get_sorted_atomlabels(self, atompart) result(atomlabels)
 
 end function
 
-subroutine set_atomequividcs(self, natomequiv, atomequividcs)
+subroutine set_atomequivs(self, natomequiv, atomequividcs)
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: natomequiv
    integer, intent(in) :: atomequividcs(:)
 
    self%natomequiv = natomequiv
    self%atoms(:)%equividx = atomequividcs(:)
+
+end subroutine
+
+subroutine set_molfrags(self, nfrag, fragidcs)
+   class(Molecule), intent(inout) :: self
+   integer, intent(in) :: nfrag
+   integer, intent(in) :: fragidcs(:)
+
+   self%nfrag = nfrag
+   self%atoms(:)%fragidx = fragidcs(:)
 
 end subroutine
 
@@ -366,7 +372,7 @@ function get_atomequivlenlist(self) result(atomequivlenlist)
 
 end function
 
-subroutine set_atomtypeidcs(self, natomtype, atomtypeidcs)
+subroutine set_atomtypes(self, natomtype, atomtypeidcs)
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: natomtype
    integer, intent(in) :: atomtypeidcs(:)
@@ -738,26 +744,6 @@ function get_sorted_nadjequivs(self, atompart) result(nadjequivs)
       atom_i = self%atoms(indexlist(i))
       nadjequivs(i) = size(atom_i%adjequivlenlist)
    end do
-
-end function
-
-function get_inner_fragroot(self) result(fragroots)
-   class(Molecule), intent(in) :: self
-   ! Local variables
-   integer, allocatable :: fragroots(:)
-
-   fragroots = self%fragroots
-
-end function
-
-function get_sorted_fragroot(self, atompart) result(fragroots)
-   class(Molecule), intent(in) :: self
-   type(Partition), intent(in) :: atompart
-   ! Local variables
-   integer, allocatable :: indexmap(:), fragroots(:)
-
-   indexmap = atompart%get_atomidxmap()
-   fragroots = indexmap(self%fragroots)
 
 end function
 
