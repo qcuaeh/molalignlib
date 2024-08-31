@@ -192,6 +192,6 @@ subroutine set_bonds(mol)
 
    call mol%set_adjlists(nadjs, adjlists)
 
-end subroutine set_bonds
+end subroutine
 
 end module

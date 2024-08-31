@@ -203,6 +203,6 @@ end if
 
 return
 
-end subroutine assndx
+end subroutine
 
 end module

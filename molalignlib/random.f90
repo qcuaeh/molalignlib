@@ -90,7 +90,7 @@ subroutine initialize_random()
       call random_seed(put=seed)
    end if
 
-end subroutine initialize_random
+end subroutine
 
 function randarray(n) result(array)
    integer, intent(in) :: n
