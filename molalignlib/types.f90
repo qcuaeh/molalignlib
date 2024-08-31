@@ -22,7 +22,8 @@ type, public :: Partition
    type(Part), allocatable :: parts(:)
 contains
    procedure :: set_partition
-   procedure :: get_indices
+   procedure :: get_indexlist
+   procedure :: get_indexmap
 end type
 
 type :: Atom
@@ -215,7 +216,7 @@ function get_sorted_atomelnums(self, atompart) result(atomelnums)
    ! Local variables
    integer, allocatable :: atomelnums(:)
 
-   atomelnums = self%atoms(atompart%get_indices())%elnum
+   atomelnums = self%atoms(atompart%get_indexlist())%elnum
 
 end function
 
@@ -242,7 +243,7 @@ function get_sorted_atomlabels(self, atompart) result(atomlabels)
    ! Local variables
    integer, allocatable :: atomlabels(:)
 
-   atomlabels = self%atoms(atompart%get_indices())%label
+   atomlabels = self%atoms(atompart%get_indexlist())%label
 
 end function
 
@@ -284,24 +285,34 @@ subroutine set_partition(self, natomequiv, atomequividcs)
 
 end subroutine
 
-function get_indices(self) result(indices)
+function get_indexlist(self) result(indexlist)
    class(Partition), intent(in) :: self
    ! Local variables
    integer :: i, nidx
-   integer, allocatable :: indices(:)
+   integer, allocatable :: indexlist(:)
 
    nidx = 0
    do i = 1, size(self%parts)
       nidx = nidx + size(self%parts(i)%atomidcs)
    end do
 
-   allocate(indices(nidx))
+   allocate(indexlist(nidx))
 
    nidx = 0
    do i = 1, size(self%parts)
-      indices(nidx+1:nidx+size(self%parts(i)%atomidcs)) = self%parts(i)%atomidcs(:)
+      indexlist(nidx+1:nidx+size(self%parts(i)%atomidcs)) = self%parts(i)%atomidcs(:)
       nidx = nidx + size(self%parts(i)%atomidcs)
    end do
+
+end function
+
+function get_indexmap(self) result(indexmap)
+   class(Partition), intent(in) :: self
+   ! Local variables
+   integer :: i, nidx
+   integer, allocatable :: indexmap(:)
+
+   indexmap = inverse_mapping(self%get_indexlist())
 
 end function
 
@@ -387,7 +398,7 @@ function get_sorted_atomtypeblocks(self, atompart) result(parts)
    integer, allocatable :: indexmap(:)
    type(Part), allocatable :: parts(:)
 
-   indexmap = inverse_mapping(atompart%get_indices())
+   indexmap = atompart%get_indexmap()
    allocate(parts(size(self%atomtypepart%parts)))
 
    do i = 1, size(self%atomtypepart%parts)
@@ -411,7 +422,7 @@ function get_sorted_atomtypeidcs(self, atompart) result(atomtypeidcs)
    ! Local variables
    integer, allocatable :: atomtypeidcs(:)
 
-   atomtypeidcs = self%atoms(atompart%get_indices())%typeidx
+   atomtypeidcs = self%atoms(atompart%get_indexlist())%typeidx
 
 end function
 
@@ -447,7 +458,7 @@ function get_sorted_atomweights(self, atompart) result(weights)
    ! Local variables
    real(wp), allocatable :: weights(:)
 
-   weights = self%atoms(atompart%get_indices())%weight
+   weights = self%atoms(atompart%get_indexlist())%weight
 
 end function
 
@@ -482,14 +493,14 @@ function get_sorted_atomcoords(self, atompart) result(coords)
    type(Partition), intent(in) :: atompart
    ! Local variables
    integer :: i
-   integer, allocatable :: indices(:)
+   integer, allocatable :: indexlist(:)
    real(wp), allocatable :: coords(:, :)
 
    allocate(coords(3, self%natom))
-   indices = atompart%get_indices()
+   indexlist = atompart%get_indexlist()
 
    do i = 1, self%natom
-      coords(:, i) = self%atoms(indices(i))%coords(:)
+      coords(:, i) = self%atoms(indexlist(i))%coords(:)
    end do
 
 end function
@@ -520,16 +531,16 @@ function get_sorted_adjmat(self, atompart) result(adjmat)
    ! Local variables
    integer :: i, k
    type(Atom) :: atom_i
-   integer, allocatable :: indices(:), indexmap(:)
+   integer, allocatable :: indexlist(:), indexmap(:)
    logical, allocatable :: adjmat(:, :)
 
-   indices = atompart%get_indices()
-   indexmap = inverse_mapping(indices)
+   indexlist = atompart%get_indexlist()
+   indexmap = atompart%get_indexmap()
    allocate(adjmat(self%natom, self%natom))
    adjmat(:, :) = .false.
 
    do i = 1, self%natom
-      atom_i = self%atoms(indices(i))
+      atom_i = self%atoms(indexlist(i))
       do k = 1, size(atom_i%adjlist)
          adjmat(i, indexmap(atom_i%adjlist(k))) = .true.
       end do
@@ -555,14 +566,14 @@ function get_sorted_nadjs(self, atompart) result(nadjs)
    type(Partition), intent(in) :: atompart
    ! Local variables
    integer :: i
-   integer, allocatable :: indices(:)
+   integer, allocatable :: indexlist(:)
    integer, allocatable :: nadjs(:)
 
-   indices = atompart%get_indices()
+   indexlist = atompart%get_indexlist()
    allocate(nadjs(size(self%atoms)))
 
    do i = 1, size(self%atoms)
-      nadjs(i) = size(self%atoms(indices(i))%adjlist)
+      nadjs(i) = size(self%atoms(indexlist(i))%adjlist)
    end do
 
 end function
@@ -600,15 +611,15 @@ function get_sorted_adjlists(self, atompart) result(adjlists)
    ! Local variables
    integer :: i
    type(Atom) :: atom_i
-   integer, allocatable :: indices(:), indexmap(:)
+   integer, allocatable :: indexlist(:), indexmap(:)
    integer, allocatable :: adjlists(:, :)
 
-   indices = atompart%get_indices()
-   indexmap = inverse_mapping(indices)
+   indexlist = atompart%get_indexlist()
+   indexmap = inverse_mapping(indexlist)
    allocate(adjlists(maxcoord, self%natom))
 
    do i = 1, self%natom
-      atom_i = self%atoms(indices(i))
+      atom_i = self%atoms(indexlist(i))
       adjlists(:size(atom_i%adjlist), i) = indexmap(atom_i%adjlist)
    end do
 
@@ -650,14 +661,14 @@ function get_sorted_adjequivlenlists(self, atompart) result(adjequivlenlists)
    ! Local variables
    integer :: i
    type(Atom) :: atom_i
-   integer, allocatable :: indices(:)
+   integer, allocatable :: indexlist(:)
    integer, allocatable :: adjequivlenlists(:, :)
 
-   indices = atompart%get_indices()
+   indexlist = atompart%get_indexlist()
    allocate(adjequivlenlists(maxcoord, size(self%atoms)))
 
    do i = 1, size(self%atoms)
-      atom_i = self%atoms(indices(i))
+      atom_i = self%atoms(indexlist(i))
       adjequivlenlists(:size(atom_i%adjequivlenlist), i) = atom_i%adjequivlenlist
    end do
 
@@ -683,14 +694,14 @@ function get_sorted_nadjequivs(self, atompart) result(nadjequivs)
    ! Local variables
    integer :: i
    type(Atom) :: atom_i
-   integer, allocatable :: indices(:)
+   integer, allocatable :: indexlist(:)
    integer, allocatable :: nadjequivs(:)
 
-   indices = atompart%get_indices()
+   indexlist = atompart%get_indexlist()
    allocate(nadjequivs(size(self%atoms)))
 
    do i = 1, size(self%atoms)
-      atom_i = self%atoms(indices(i))
+      atom_i = self%atoms(indexlist(i))
       nadjequivs(i) = size(atom_i%adjequivlenlist)
    end do
 
@@ -711,7 +722,7 @@ function get_sorted_fragroot(self, atompart) result(fragroots)
    ! Local variables
    integer, allocatable :: indexmap(:), fragroots(:)
 
-   indexmap = inverse_mapping(atompart%get_indices())
+   indexmap = atompart%get_indexmap()
    fragroots = indexmap(self%fragroots)
 
 end function
