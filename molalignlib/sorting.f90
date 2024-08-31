@@ -35,7 +35,8 @@ interface sorted
 end interface
 
 interface sorted_order
-   module procedure intsortedorder
+   module procedure int_sorted_order
+   module procedure int_part_sorted_order
    module procedure realsortedorder
    module procedure charsortedorder
 end interface
@@ -58,7 +59,14 @@ function realsorted(x, n) result(y)
    call realquicksort(y, 1, n)
 end function
 
-function intsortedorder(x, n) result(o)
+function int_sorted_order(x) result(o)
+   integer, intent(in) :: x(:)
+   integer :: i, o(size(x)), t((size(x)+1)/2)
+   o = [(i, i=1, size(x))]
+   call intmergesort(x, o, size(x), t)
+end function
+
+function int_part_sorted_order(x, n) result(o)
    integer, intent(in) :: n
    integer, intent(in) :: x(:)
    integer :: i, o(n), t((n+1)/2)

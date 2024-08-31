@@ -95,7 +95,7 @@ subroutine assort_atoms(mol)
    backorder(:natomtype) = inverse_mapping(foreorder(:natomtype))
    atomtypeidcs = backorder(atomtypeidcs)
 
-   call mol%set_atomtypes(natomtype, atomtypeidcs) 
+   call mol%set_atomtypepartition(natomtype, atomtypeidcs) 
 
 end subroutine
 
@@ -135,7 +135,7 @@ subroutine set_equiv_atoms(mol)
    backorder(:nout) = inverse_mapping(foreorder(:nout))
    outype = backorder(outype)
 
-   call mol%set_atomequivs(nout, outype)
+   call mol%set_atomequivpartition(nout, outype)
 
 end subroutine
 
@@ -255,11 +255,11 @@ subroutine getmnatypes(mol, nin, nout, intype, outype, typemap)
 
 end subroutine
 
-subroutine calcequivmat(mol0, mol1, atomequiv0, atomequiv1, nadjmna0, adjmnalen0, adjmnalist0, &
+subroutine calcequivmat(mol0, mol1, equivorder0, equivorder1, nadjmna0, adjmnalen0, adjmnalist0, &
    nadjmna1, adjmnalen1, adjmnalist1, equivmat)
 ! Purpose: Calculate the maximum common MNA level for all atom cross assignments
    type(Molecule), intent(in) :: mol0, mol1
-   type(Partition), intent(in) :: atomequiv0, atomequiv1
+   integer, intent(in), dimension(:) :: equivorder0, equivorder1
 
    integer, dimension(:, :), intent(out) :: nadjmna0, nadjmna1
    integer, dimension(:, :, :), intent(out) :: adjmnalen0, adjmnalen1
@@ -278,14 +278,14 @@ subroutine calcequivmat(mol0, mol1, atomequiv0, atomequiv1, nadjmna0, adjmnalen0
    natom = mol0%get_natom()
    natomtype = mol0%get_natomtype()
    atomtypelenlist = mol0%get_atomtypelenlist()
-   nadjs0 = mol0%get_nadjs(atomequiv0)
-   nadjs1 = mol1%get_nadjs(atomequiv1)
-   adjlists0 = mol0%get_adjlists(atomequiv0)
-   adjlists1 = mol1%get_adjlists(atomequiv1)
+   nadjs0 = mol0%get_nadjs(equivorder0)
+   nadjs1 = mol1%get_nadjs(equivorder1)
+   adjlists0 = mol0%get_adjlists(equivorder0)
+   adjlists1 = mol1%get_adjlists(equivorder1)
 
    nin = natomtype
-   intype0 = mol0%get_atomtypeidcs(atomequiv0)
-   intype1 = mol1%get_atomtypeidcs(atomequiv1)
+   intype0 = mol0%get_atomtypeidcs(equivorder0)
+   intype1 = mol1%get_atomtypeidcs(equivorder1)
    level = 1
 
    do

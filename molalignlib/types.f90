@@ -18,10 +18,7 @@ type, public :: Partition
    type(Part), allocatable :: parts(:)
 contains
    procedure :: set_partition
-   procedure :: get_atomidcs
-   procedure :: get_atomidxmap
    procedure :: get_lenlist
-   procedure :: get_partidcs
 end type
 
 type :: Atom
@@ -42,15 +39,15 @@ end type
 type, public :: Molecule
    integer :: natom
    integer :: nfrag
-   integer :: natomequiv
    character(:), allocatable :: title
    type(Atom), allocatable :: atoms(:)
-   type(Partition) :: atomtypepart
+   type(Partition) :: atomtypepartition
+   type(Partition) :: atomequivpartition
 contains
    procedure :: get_natom
    procedure :: set_molfrags
-   procedure :: set_atomtypes
-   procedure :: set_atomequivs
+   procedure :: set_atomtypepartition
+   procedure :: set_atomequivpartition
    procedure :: get_natomtype
    procedure :: get_natomequiv
    procedure :: get_atomequividcs
@@ -85,8 +82,8 @@ contains
    procedure, private :: get_sorted_adjmat
 !   procedure, private :: get_inner_fragroots
 !   procedure, private :: get_sorted_fragroots
-   procedure, private :: get_inner_atomtypeblocks
-   procedure, private :: get_sorted_atomtypeblocks
+   procedure, private :: get_inner_atomtypes
+   procedure, private :: get_sorted_atomtypes
    procedure, private :: get_inner_atomelnums
    procedure, private :: get_sorted_atomelnums
    procedure, private :: get_inner_atomlabels
@@ -103,7 +100,7 @@ contains
    generic :: get_adjlists => get_inner_adjlists, get_sorted_adjlists
    generic :: get_adjmat => get_inner_adjmat, get_sorted_adjmat
 !   generic :: get_fragroots => get_inner_fragroots, get_sorted_fragroots
-   generic :: get_atomtypeblocks => get_inner_atomtypeblocks, get_sorted_atomtypeblocks
+   generic :: get_atomtypes => get_inner_atomtypes, get_sorted_atomtypes
    generic :: get_atomelnums => get_inner_atomelnums, get_sorted_atomelnums
    generic :: get_atomlabels => get_inner_atomlabels, get_sorted_atomlabels
    generic :: get_atomweights => get_inner_atomweights, get_sorted_atomweights
@@ -122,14 +119,14 @@ end function
 integer function get_natomtype(self) result(natomtype)
    class(Molecule), intent(in) :: self
 
-   natomtype = size(self%atomtypepart%parts)
+   natomtype = size(self%atomtypepartition%parts)
 
 end function
 
 integer function get_natomequiv(self) result(natomequiv)
    class(Molecule), intent(in) :: self
 
-   natomequiv = self%natomequiv
+   natomequiv = size(self%atomequivpartition%parts)
 
 end function
 
@@ -173,20 +170,20 @@ subroutine translate_coords(self, travec)
 
 end subroutine
 
-subroutine permutate_atoms(self, order)
+subroutine permutate_atoms(self, atomorder)
    class(Molecule), intent(inout) :: self
-   integer, intent(in) :: order(:)
+   integer, intent(in) :: atomorder(:)
    ! Local variables
    integer :: i, k
-   integer, allocatable :: invorder(:)
+   integer, allocatable :: atomunorder(:)
 
-   allocate(invorder(self%natom))
+   allocate(atomunorder(self%natom))
 
-   invorder = inverse_mapping(order)
-   self%atoms = self%atoms(order(:))
+   atomunorder = inverse_mapping(atomorder)
+   self%atoms = self%atoms(atomorder(:))
    do i = 1, self%natom
       do k = 1, size(self%atoms(i)%adjlist)
-         self%atoms(i)%adjlist(k) = invorder(self%atoms(i)%adjlist(k))
+         self%atoms(i)%adjlist(k) = atomunorder(self%atoms(i)%adjlist(k))
       end do
    end do
 
@@ -208,13 +205,13 @@ function get_inner_atomelnums(self) result(atomelnums)
 
 end function
 
-function get_sorted_atomelnums(self, atompart) result(atomelnums)
+function get_sorted_atomelnums(self, atomorder) result(atomelnums)
    class(Molecule), intent(in) :: self
-   type(Partition), intent(in) :: atompart
+   integer, intent(in) :: atomorder(:)
    ! Local variables
    integer, allocatable :: atomelnums(:)
 
-   atomelnums = self%atoms(atompart%get_atomidcs())%elnum
+   atomelnums = self%atoms(atomorder)%elnum
 
 end function
 
@@ -235,23 +232,23 @@ function get_inner_atomlabels(self) result(atomlabels)
 
 end function
 
-function get_sorted_atomlabels(self, atompart) result(atomlabels)
+function get_sorted_atomlabels(self, atomorder) result(atomlabels)
    class(Molecule), intent(in) :: self
-   type(Partition), intent(in) :: atompart
+   integer, intent(in) :: atomorder(:)
    ! Local variables
    integer, allocatable :: atomlabels(:)
 
-   atomlabels = self%atoms(atompart%get_atomidcs())%label
+   atomlabels = self%atoms(atomorder)%label
 
 end function
 
-subroutine set_atomequivs(self, natomequiv, atomequividcs)
+subroutine set_atomequivpartition(self, natomequiv, atomequividcs)
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: natomequiv
    integer, intent(in) :: atomequividcs(:)
 
-   self%natomequiv = natomequiv
    self%atoms(:)%equividx = atomequividcs(:)
+   call self%atomequivpartition%set_partition(natomequiv, atomequividcs)
 
 end subroutine
 
@@ -265,63 +262,33 @@ subroutine set_molfrags(self, nfrag, fragidcs)
 
 end subroutine
 
-subroutine set_partition(self, natomequiv, atomequividcs)
+subroutine set_partition(self, npart, partidcs)
    class(Partition), intent(inout) :: self
-   integer, intent(in) :: natomequiv
-   integer, intent(in) :: atomequividcs(:)
+   integer, intent(in) :: npart
+   integer, intent(in) :: partidcs(:)
    ! Local variables
    integer :: i
    integer, allocatable :: n(:)
 
-   allocate(n(natomequiv))
-   allocate(self%parts(natomequiv))
+   allocate(n(npart))
+   allocate(self%parts(npart))
 
    n(:) = 0
-   do i = 1, size(atomequividcs)
-      n(atomequividcs(i)) = n(atomequividcs(i)) + 1
+   do i = 1, size(partidcs)
+      n(partidcs(i)) = n(partidcs(i)) + 1
    end do
 
-   do i = 1, natomequiv
+   do i = 1, npart
       allocate(self%parts(i)%atomidcs(n(i)))
    end do
 
    n(:) = 0
-   do i = 1, size(atomequividcs)
-      n(atomequividcs(i)) = n(atomequividcs(i)) + 1
-      self%parts(atomequividcs(i))%atomidcs(n(atomequividcs(i))) = i
+   do i = 1, size(partidcs)
+      n(partidcs(i)) = n(partidcs(i)) + 1
+      self%parts(partidcs(i))%atomidcs(n(partidcs(i))) = i
    end do
 
 end subroutine
-
-function get_atomidcs(self) result(indexlist)
-   class(Partition), intent(in) :: self
-   ! Local variables
-   integer :: i, n
-   integer, allocatable :: indexlist(:)
-
-   n = 0
-   do i = 1, size(self%parts)
-      n = n + size(self%parts(i)%atomidcs)
-   end do
-
-   allocate(indexlist(n))
-
-   n = 0
-   do i = 1, size(self%parts)
-      indexlist(n+1:n+size(self%parts(i)%atomidcs)) = self%parts(i)%atomidcs(:)
-      n = n + size(self%parts(i)%atomidcs)
-   end do
-
-end function
-
-function get_atomidxmap(self) result(indexmap)
-   class(Partition), intent(in) :: self
-   ! Local variables
-   integer, allocatable :: indexmap(:)
-
-   indexmap = inverse_mapping(self%get_atomidcs())
-
-end function
 
 function get_lenlist(self) result(lenlist)
    class(Partition), intent(in) :: self
@@ -337,112 +304,61 @@ function get_lenlist(self) result(lenlist)
 
 end function
 
-function get_partidcs(self) result(partidcs)
-   class(Partition), intent(in) :: self
-   ! Local variables
-   integer :: i, n
-   integer, allocatable :: partidcs(:)
-
-   n = 0
-   do i = 1, size(self%parts)
-      n = n + size(self%parts(i)%atomidcs)
-   end do
-
-   allocate(partidcs(n))
-
-   do i = 1, size(self%parts)
-      partidcs(self%parts(i)%atomidcs(:)) = i
-   end do
-
-end function
-
 function get_atomequivlenlist(self) result(atomequivlenlist)
    class(Molecule), intent(in) :: self
    ! Local variables
-   integer :: i
    integer, allocatable :: atomequivlenlist(:)
 
-   allocate(atomequivlenlist(self%natomequiv))
-
-   atomequivlenlist(:) = 0
-
-   do i = 1, size(self%atoms)
-      atomequivlenlist(self%atoms(i)%equividx) = atomequivlenlist(self%atoms(i)%equividx) + 1
-   end do
+   atomequivlenlist = self%atomequivpartition%get_lenlist()
 
 end function
 
-subroutine set_atomtypes(self, natomtype, atomtypeidcs)
+subroutine set_atomtypepartition(self, natomtype, atomtypeidcs)
    class(Molecule), intent(inout) :: self
    integer, intent(in) :: natomtype
    integer, intent(in) :: atomtypeidcs(:)
-   ! Local variables
-   integer :: i
-   integer, allocatable :: n(:)
-
-   allocate(n(natomtype))
-   allocate(self%atomtypepart%parts(natomtype))
 
    self%atoms(:)%typeidx = atomtypeidcs(:)
-
-   n(:) = 0
-   do i = 1, size(self%atoms)
-      n(atomtypeidcs(i)) = n(atomtypeidcs(i)) + 1
-   end do
-
-   do i = 1, natomtype
-      allocate(self%atomtypepart%parts(i)%atomidcs(n(i)))
-   end do
-
-   n(:) = 0
-   do i = 1, self%natom
-      n(self%atoms(i)%typeidx) = n(self%atoms(i)%typeidx) + 1
-      self%atomtypepart%parts(self%atoms(i)%typeidx)%atomidcs(n(self%atoms(i)%typeidx)) = i
-   end do
+   call self%atomtypepartition%set_partition(natomtype, atomtypeidcs)
 
 end subroutine
 
 function get_atomtypelenlist(self) result(atomtypelenlist)
    class(Molecule), intent(in) :: self
    ! Local variables
-   integer :: i
    integer, allocatable :: atomtypelenlist(:)
 
-   allocate(atomtypelenlist(size(self%atomtypepart%parts)))
-
-   do i = 1, size(self%atomtypepart%parts)
-      atomtypelenlist(i) = size(self%atomtypepart%parts(i)%atomidcs)
-   end do
+   atomtypelenlist = self%atomtypepartition%get_lenlist()
 
 end function
 
-function get_inner_atomtypeblocks(self) result(parts)
+function get_inner_atomtypes(self) result(parts)
    class(Molecule), intent(in) :: self
    ! Local variables
    integer :: i
    type(Part), allocatable :: parts(:)
 
-   allocate(parts(size(self%atomtypepart%parts)))
+   allocate(parts(size(self%atomtypepartition%parts)))
 
-   do i = 1, size(self%atomtypepart%parts)
-      parts(i)%atomidcs = self%atomtypepart%parts(i)%atomidcs(:)
+   do i = 1, size(self%atomtypepartition%parts)
+      parts(i)%atomidcs = self%atomtypepartition%parts(i)%atomidcs(:)
    end do
 
 end function
 
-function get_sorted_atomtypeblocks(self, atompart) result(parts)
+function get_sorted_atomtypes(self, atomorder) result(parts)
    class(Molecule), intent(in) :: self
-   type(Partition), intent(in) :: atompart
+   integer, intent(in) :: atomorder(:)
    ! Local variables
    integer :: i
-   integer, allocatable :: indexmap(:)
+   integer, allocatable :: atomunorder(:)
    type(Part), allocatable :: parts(:)
 
-   indexmap = atompart%get_atomidxmap()
-   allocate(parts(size(self%atomtypepart%parts)))
+   atomunorder = inverse_mapping(atomorder)
+   allocate(parts(size(self%atomtypepartition%parts)))
 
-   do i = 1, size(self%atomtypepart%parts)
-      parts(i)%atomidcs = indexmap(self%atomtypepart%parts(i)%atomidcs(:))
+   do i = 1, size(self%atomtypepartition%parts)
+      parts(i)%atomidcs = atomunorder(self%atomtypepartition%parts(i)%atomidcs(:))
    end do
 
 end function
@@ -456,13 +372,13 @@ function get_inner_atomtypeidcs(self) result(atomtypeidcs)
 
 end function
 
-function get_sorted_atomtypeidcs(self, atompart) result(atomtypeidcs)
+function get_sorted_atomtypeidcs(self, atomorder) result(atomtypeidcs)
    class(Molecule), intent(in) :: self
-   type(Partition), intent(in) :: atompart
+   integer, intent(in) :: atomorder(:)
    ! Local variables
    integer, allocatable :: atomtypeidcs(:)
 
-   atomtypeidcs = self%atoms(atompart%get_atomidcs())%typeidx
+   atomtypeidcs = self%atoms(atomorder)%typeidx
 
 end function
 
@@ -492,13 +408,13 @@ function get_inner_atomweights(self) result(weights)
 
 end function
 
-function get_sorted_atomweights(self, atompart) result(weights)
+function get_sorted_atomweights(self, atomorder) result(weights)
    class(Molecule), intent(in) :: self
-   type(Partition), intent(in) :: atompart
+   integer, intent(in) :: atomorder(:)
    ! Local variables
    real(wp), allocatable :: weights(:)
 
-   weights = self%atoms(atompart%get_atomidcs())%weight
+   weights = self%atoms(atomorder)%weight
 
 end function
 
@@ -528,19 +444,17 @@ function get_inner_atomcoords(self) result(coords)
 
 end function
 
-function get_sorted_atomcoords(self, atompart) result(coords)
+function get_sorted_atomcoords(self, atomorder) result(coords)
    class(Molecule), intent(in) :: self
-   type(Partition), intent(in) :: atompart
+   integer, intent(in) :: atomorder(:)
    ! Local variables
    integer :: i
-   integer, allocatable :: indexlist(:)
    real(wp), allocatable :: coords(:, :)
 
    allocate(coords(3, self%natom))
-   indexlist = atompart%get_atomidcs()
 
    do i = 1, self%natom
-      coords(:, i) = self%atoms(indexlist(i))%coords(:)
+      coords(:, i) = self%atoms(atomorder(i))%coords(:)
    end do
 
 end function
@@ -565,24 +479,23 @@ function get_inner_adjmat(self) result(adjmat)
 
 end function
 
-function get_sorted_adjmat(self, atompart) result(adjmat)
+function get_sorted_adjmat(self, atomorder) result(adjmat)
    class(Molecule), intent(in) :: self
-   type(Partition), intent(in) :: atompart
+   integer, intent(in) :: atomorder(:)
    ! Local variables
    integer :: i, k
    type(Atom) :: atom_i
-   integer, allocatable :: indexlist(:), indexmap(:)
+   integer, allocatable :: atomunorder(:)
    logical, allocatable :: adjmat(:, :)
 
-   indexlist = atompart%get_atomidcs()
-   indexmap = atompart%get_atomidxmap()
+   atomunorder = inverse_mapping(atomorder)
    allocate(adjmat(self%natom, self%natom))
    adjmat(:, :) = .false.
 
    do i = 1, self%natom
-      atom_i = self%atoms(indexlist(i))
+      atom_i = self%atoms(atomorder(i))
       do k = 1, size(atom_i%adjlist)
-         adjmat(i, indexmap(atom_i%adjlist(k))) = .true.
+         adjmat(i, atomunorder(atom_i%adjlist(k))) = .true.
       end do
    end do
 
@@ -601,19 +514,17 @@ function get_inner_nadjs(self) result(nadjs)
 
 end function
 
-function get_sorted_nadjs(self, atompart) result(nadjs)
+function get_sorted_nadjs(self, atomorder) result(nadjs)
    class(Molecule), intent(in) :: self
-   type(Partition), intent(in) :: atompart
+   integer, intent(in) :: atomorder(:)
    ! Local variables
    integer :: i
-   integer, allocatable :: indexlist(:)
    integer, allocatable :: nadjs(:)
 
-   indexlist = atompart%get_atomidcs()
    allocate(nadjs(size(self%atoms)))
 
    do i = 1, size(self%atoms)
-      nadjs(i) = size(self%atoms(indexlist(i))%adjlist)
+      nadjs(i) = size(self%atoms(atomorder(i))%adjlist)
    end do
 
 end function
@@ -645,22 +556,21 @@ function get_inner_adjlists(self) result(adjlists)
 
 end function
 
-function get_sorted_adjlists(self, atompart) result(adjlists)
+function get_sorted_adjlists(self, atomorder) result(adjlists)
    class(Molecule), intent(in) :: self
-   type(Partition), intent(in) :: atompart
+   integer, intent(in) :: atomorder(:)
    ! Local variables
    integer :: i
    type(Atom) :: atom_i
-   integer, allocatable :: indexlist(:), indexmap(:)
+   integer, allocatable :: atomunorder(:)
    integer, allocatable :: adjlists(:, :)
 
-   indexlist = atompart%get_atomidcs()
-   indexmap = inverse_mapping(indexlist)
+   atomunorder = inverse_mapping(atomorder)
    allocate(adjlists(maxcoord, self%natom))
 
    do i = 1, self%natom
-      atom_i = self%atoms(indexlist(i))
-      adjlists(:size(atom_i%adjlist), i) = indexmap(atom_i%adjlist)
+      atom_i = self%atoms(atomorder(i))
+      adjlists(:size(atom_i%adjlist), i) = atomunorder(atom_i%adjlist)
    end do
 
 end function
@@ -695,20 +605,18 @@ function get_inner_adjequivlenlists(self) result(adjequivlenlists)
 
 end function
 
-function get_sorted_adjequivlenlists(self, atompart) result(adjequivlenlists)
+function get_sorted_adjequivlenlists(self, atomorder) result(adjequivlenlists)
    class(Molecule), intent(inout) :: self
-   type(Partition), intent(in) :: atompart
+   integer, intent(in) :: atomorder(:)
    ! Local variables
    integer :: i
    type(Atom) :: atom_i
-   integer, allocatable :: indexlist(:)
    integer, allocatable :: adjequivlenlists(:, :)
 
-   indexlist = atompart%get_atomidcs()
    allocate(adjequivlenlists(maxcoord, size(self%atoms)))
 
    do i = 1, size(self%atoms)
-      atom_i = self%atoms(indexlist(i))
+      atom_i = self%atoms(atomorder(i))
       adjequivlenlists(:size(atom_i%adjequivlenlist), i) = atom_i%adjequivlenlist
    end do
 
@@ -728,20 +636,18 @@ function get_inner_nadjequivs(self) result(nadjequivs)
 
 end function
 
-function get_sorted_nadjequivs(self, atompart) result(nadjequivs)
+function get_sorted_nadjequivs(self, atomorder) result(nadjequivs)
    class(Molecule), intent(inout) :: self
-   type(Partition), intent(in) :: atompart
+   integer, intent(in) :: atomorder(:)
    ! Local variables
    integer :: i
    type(Atom) :: atom_i
-   integer, allocatable :: indexlist(:)
    integer, allocatable :: nadjequivs(:)
 
-   indexlist = atompart%get_atomidcs()
    allocate(nadjequivs(size(self%atoms)))
 
    do i = 1, size(self%atoms)
-      atom_i = self%atoms(indexlist(i))
+      atom_i = self%atoms(atomorder(i))
       nadjequivs(i) = size(atom_i%adjequivlenlist)
    end do
 
