@@ -30,11 +30,11 @@ public mapatoms_bonded
 public proc_mapatoms
 
 abstract interface
-   subroutine proc_mapatoms(natom, natomtype, atomtypelenlist, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
+   subroutine proc_mapatoms(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
       nadjmna1, adjmnalen1, adjmnalist1, coords1, weights, equivmat, biasmat, mapping)
       use kinds
-      integer, intent(in) :: natom, natomtype
-      integer, dimension(:), intent(in) :: atomtypelenlist
+      integer, intent(in) :: natom, neltype
+      integer, dimension(:), intent(in) :: eltypepartlens
       integer, dimension(:, :), intent(in) :: nadjmna0, nadjmna1
       integer, dimension(:, :, :), intent(in) :: adjmnalen0, adjmnalen1
       integer, dimension(:, :, :), intent(in) :: adjmnalist0, adjmnalist1
@@ -50,11 +50,11 @@ procedure(proc_mapatoms), pointer :: mapatoms
 
 contains
 
-subroutine mapatoms_free(natom, natomtype, atomtypelenlist, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
+subroutine mapatoms_free(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
    nadjmna1, adjmnalen1, adjmnalist1, coords1, weights, equivmat, biasmat, mapping)
 ! Find best correspondence between points sets with fixed orientation
-   integer, intent(in) :: natom, natomtype
-   integer, dimension(:), intent(in) :: atomtypelenlist
+   integer, intent(in) :: natom, neltype
+   integer, dimension(:), intent(in) :: eltypepartlens
    integer, dimension(:, :), intent(in) :: nadjmna0, nadjmna1
    integer, dimension(:, :, :), intent(in) :: adjmnalen0, adjmnalen1
    integer, dimension(:, :, :), intent(in) :: adjmnalist0, adjmnalist1
@@ -71,21 +71,21 @@ subroutine mapatoms_free(natom, natomtype, atomtypelenlist, nadjmna0, adjmnalen0
 
    offset = 0
 
-   do h = 1, natomtype
-      call minperm(atomtypelenlist(h), coords0(:, offset+1:offset+atomtypelenlist(h)), &
-         coords1(:, offset+1:offset+atomtypelenlist(h)), biasmat(offset+1:offset+atomtypelenlist(h), &
-         offset+1:offset+atomtypelenlist(h)), mapping(offset+1:), dummy)
-      mapping(offset+1:offset+atomtypelenlist(h)) = mapping(offset+1:offset+atomtypelenlist(h)) + offset
-      offset = offset + atomtypelenlist(h)
+   do h = 1, neltype
+      call minperm(eltypepartlens(h), coords0(:, offset+1:offset+eltypepartlens(h)), &
+         coords1(:, offset+1:offset+eltypepartlens(h)), biasmat(offset+1:offset+eltypepartlens(h), &
+         offset+1:offset+eltypepartlens(h)), mapping(offset+1:), dummy)
+      mapping(offset+1:offset+eltypepartlens(h)) = mapping(offset+1:offset+eltypepartlens(h)) + offset
+      offset = offset + eltypepartlens(h)
    end do
 
 end subroutine
 
-subroutine mapatoms_bonded(natom, natomtype, atomtypelenlist, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
+subroutine mapatoms_bonded(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
    nadjmna1, adjmnalen1, adjmnalist1, coords1, weights, equivmat, biasmat, mapping)
 ! Find best correspondence between points sets with fixed orientation
-   integer, intent(in) :: natom, natomtype
-   integer, dimension(:), intent(in) :: atomtypelenlist
+   integer, intent(in) :: natom, neltype
+   integer, dimension(:), intent(in) :: eltypepartlens
    integer, dimension(:, :), intent(in) :: nadjmna0, nadjmna1
    integer, dimension(:, :, :), intent(in) :: adjmnalen0, adjmnalen1
    integer, dimension(:, :, :), intent(in) :: adjmnalist0, adjmnalist1
@@ -103,9 +103,9 @@ subroutine mapatoms_bonded(natom, natomtype, atomtypelenlist, nadjmna0, adjmnale
    allocate(costs(natom, natom))
 
    offset = 0
-   do h = 1, natomtype
-      do i = offset + 1, offset + atomtypelenlist(h)
-         do j = offset + 1, offset + atomtypelenlist(h)
+   do h = 1, neltype
+      do i = offset + 1, offset + eltypepartlens(h)
+         do j = offset + 1, offset + eltypepartlens(h)
 !            costs(i, j) = sum((coords0(:, i) - coords1(:, j))**2)
             costs(i, j) = biasmat(j, i) + sum((coords0(:, i) - coords1(:, j))**2)
 !            costs(i, j) = biasmat(j, i) &
@@ -113,9 +113,9 @@ subroutine mapatoms_bonded(natom, natomtype, atomtypelenlist, nadjmna0, adjmnale
 !                             coords0, nadjmna1, adjmnalen1, adjmnalist1, coords1, weights)
          end do
       end do
-      call assndx(1, costs(offset+1:, offset+1:), atomtypelenlist(h), atomtypelenlist(h), mapping(offset+1:), dummy)
-      mapping(offset+1:offset+atomtypelenlist(h)) = mapping(offset+1:offset+atomtypelenlist(h)) + offset
-      offset = offset + atomtypelenlist(h)
+      call assndx(1, costs(offset+1:, offset+1:), eltypepartlens(h), eltypepartlens(h), mapping(offset+1:), dummy)
+      mapping(offset+1:offset+eltypepartlens(h)) = mapping(offset+1:offset+eltypepartlens(h)) + offset
+      offset = offset + eltypepartlens(h)
    end do
 
 end subroutine

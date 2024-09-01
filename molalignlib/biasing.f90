@@ -23,10 +23,10 @@ use sorting
 implicit none
 
 abstract interface
-   subroutine proc_setcrossbias(natom, natomtype, atomtypelenlist, coords0, coords1, equivmat, biasmat)
+   subroutine proc_setcrossbias(natom, neltype, eltypepartlens, coords0, coords1, equivmat, biasmat)
       use kinds
-      integer, intent(in) :: natom, natomtype
-      integer, dimension(:), intent(in) :: atomtypelenlist
+      integer, intent(in) :: natom, neltype
+      integer, dimension(:), intent(in) :: eltypepartlens
       real(wp), dimension(:, :), intent(in) :: coords0, coords1
       integer, dimension(:, :), intent(in) :: equivmat
       real(wp), dimension(:, :), intent(out) :: biasmat
@@ -42,11 +42,11 @@ procedure(proc_setcrossbias), pointer :: mapsetcrossbias
 
 contains
 
-subroutine setcrossbias_none(natom, natomtype, atomtypelenlist, coords0, coords1, equivmat, biasmat)
+subroutine setcrossbias_none(natom, neltype, eltypepartlens, coords0, coords1, equivmat, biasmat)
 ! Purpose: Set biases from sorted neighbors' distances equivalence
 
-   integer, intent(in) :: natom, natomtype
-   integer, dimension(:), intent(in) :: atomtypelenlist
+   integer, intent(in) :: natom, neltype
+   integer, dimension(:), intent(in) :: eltypepartlens
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
    integer, dimension(:, :), intent(in) :: equivmat
    real(wp), dimension(:, :), intent(out) :: biasmat
@@ -55,22 +55,22 @@ subroutine setcrossbias_none(natom, natomtype, atomtypelenlist, coords0, coords1
 
    offset = 0
 
-   do h = 1, natomtype
-      do i = offset + 1, offset + atomtypelenlist(h)
-         do j = offset + 1, offset + atomtypelenlist(h)
+   do h = 1, neltype
+      do i = offset + 1, offset + eltypepartlens(h)
+         do j = offset + 1, offset + eltypepartlens(h)
             biasmat(j, i) = 0
          end do
       end do
-      offset = offset + atomtypelenlist(h)
+      offset = offset + eltypepartlens(h)
    end do
 
 end subroutine
 
-subroutine setcrossbias_rd(natom, natomtype, atomtypelenlist, coords0, coords1, equivmat, biasmat)
+subroutine setcrossbias_rd(natom, neltype, eltypepartlens, coords0, coords1, equivmat, biasmat)
 ! Purpose: Set biases from sorted neighbors' distances equivalence
 
-   integer, intent(in) :: natom, natomtype
-   integer, dimension(:), intent(in) :: atomtypelenlist
+   integer, intent(in) :: natom, neltype
+   integer, dimension(:), intent(in) :: eltypepartlens
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
    integer, dimension(:, :), intent(in) :: equivmat
    real(wp), dimension(:, :), intent(out) :: biasmat
@@ -82,31 +82,31 @@ subroutine setcrossbias_rd(natom, natomtype, atomtypelenlist, coords0, coords1, 
 
    do i = 1, natom
       offset = 0
-      do h = 1, natomtype
-         do j = offset + 1, offset + atomtypelenlist(h)
+      do h = 1, neltype
+         do j = offset + 1, offset + eltypepartlens(h)
             d0(j, i) = sqrt(sum((coords0(:, j) - coords0(:, i))**2))
          end do
-         call sort(d0(:, i), offset + 1, offset + atomtypelenlist(h))
-         offset = offset + atomtypelenlist(h)
+         call sort(d0(:, i), offset + 1, offset + eltypepartlens(h))
+         offset = offset + eltypepartlens(h)
       end do
    end do
 
    do i = 1, natom
       offset = 0
-      do h = 1, natomtype
-         do j = offset + 1, offset + atomtypelenlist(h)
+      do h = 1, neltype
+         do j = offset + 1, offset + eltypepartlens(h)
             d1(j, i) = sqrt(sum((coords1(:, j) - coords1(:, i))**2))
          end do
-         call sort(d1(:, i), offset + 1, offset + atomtypelenlist(h))
-         offset = offset + atomtypelenlist(h)
+         call sort(d1(:, i), offset + 1, offset + eltypepartlens(h))
+         offset = offset + eltypepartlens(h)
       end do
    end do
 
    offset = 0
 
-   do h = 1, natomtype
-      do i = offset + 1, offset + atomtypelenlist(h)
-         do j = offset + 1, offset + atomtypelenlist(h)
+   do h = 1, neltype
+      do i = offset + 1, offset + eltypepartlens(h)
+         do j = offset + 1, offset + eltypepartlens(h)
             if (all(abs(d1(:, j) - d0(:, i)) < bias_tol)) then
                biasmat(j, i) = 0
             else
@@ -114,16 +114,16 @@ subroutine setcrossbias_rd(natom, natomtype, atomtypelenlist, coords0, coords1, 
             end if
          end do
       end do
-      offset = offset + atomtypelenlist(h)
+      offset = offset + eltypepartlens(h)
    end do
 
 end subroutine
 
-subroutine setcrossbias_mna(natom, natomtype, atomtypelenlist, coords0, coords1, equivmat, biasmat)
+subroutine setcrossbias_mna(natom, neltype, eltypepartlens, coords0, coords1, equivmat, biasmat)
 ! Purpose: Set biases from sorted distances to neighbors equivalence
 
-   integer, intent(in) :: natom, natomtype
-   integer, dimension(:), intent(in) :: atomtypelenlist
+   integer, intent(in) :: natom, neltype
+   integer, dimension(:), intent(in) :: eltypepartlens
    real(wp), dimension(:, :), intent(in) :: coords0, coords1
    integer, dimension(:, :), intent(in) :: equivmat
    real(wp), dimension(:, :), intent(out) :: biasmat
@@ -132,24 +132,24 @@ subroutine setcrossbias_mna(natom, natomtype, atomtypelenlist, coords0, coords1,
    maxequiv = 0
 
    offset = 0
-   do h = 1, natomtype
-      do i = offset + 1, offset + atomtypelenlist(h)
-         do j = offset + 1, offset + atomtypelenlist(h)
+   do h = 1, neltype
+      do i = offset + 1, offset + eltypepartlens(h)
+         do j = offset + 1, offset + eltypepartlens(h)
             maxequiv = max(maxequiv, equivmat(j, i))
          end do
       end do
-      offset = offset + atomtypelenlist(h)
+      offset = offset + eltypepartlens(h)
    end do
 
    offset = 0
-   do h = 1, natomtype
-      do i = offset + 1, offset + atomtypelenlist(h)
-         do j = offset + 1, offset + atomtypelenlist(h)
+   do h = 1, neltype
+      do i = offset + 1, offset + eltypepartlens(h)
+         do j = offset + 1, offset + eltypepartlens(h)
 !            biasmat(j, i) = bias_scale**2*bias_ratio**(equivmat(j, i))
             biasmat(j, i) = bias_scale**2*(maxequiv - equivmat(j, i))
          end do
       end do
-      offset = offset + atomtypelenlist(h)
+      offset = offset + eltypepartlens(h)
    end do
 
 end subroutine

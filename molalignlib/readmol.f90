@@ -56,10 +56,10 @@ subroutine readxyz(unit, mol)
       weights(i) = weight_func(atomelnums(i))
    end do
 
-   call mol%set_atomelnums(atomelnums)
-   call mol%set_atomlabels(atomlabels)
+   call mol%set_elnums(atomelnums)
+   call mol%set_labels(atomlabels)
    call mol%set_weights(weights)
-   call mol%set_atomcoords(atomcoords)
+   call mol%set_coords(atomcoords)
 
    return
 
@@ -132,10 +132,10 @@ subroutine readmol2(unit, mol)
       adjlists(nadjs(atom2), atom2) = atom1
    end do
 
-   call mol%set_atomelnums(atomelnums)
-   call mol%set_atomlabels(atomlabels)
+   call mol%set_elnums(atomelnums)
+   call mol%set_labels(atomlabels)
    call mol%set_weights(weights)
-   call mol%set_atomcoords(atomcoords)
+   call mol%set_coords(atomcoords)
    call mol%set_adjlists(nadjs, adjlists)
 
    return
@@ -166,8 +166,8 @@ subroutine set_bonds(mol)
       return
    end if
 
-   atomelnums = mol%get_atomelnums()
-   atomcoords = mol%get_atomcoords()
+   atomelnums = mol%get_elnums()
+   atomcoords = mol%get_coords()
 
    ! Set adjacency radii
    adjrads = covrad(atomelnums) + 0.25*(vdwrad(atomelnums) - covrad(atomelnums))

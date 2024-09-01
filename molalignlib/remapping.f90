@@ -40,17 +40,17 @@ public find_reactive_sites
 
 contains
 
-subroutine optimize_mapping(mol0, mol1, equivorder0, equivorder1, maplist, countlist, nrec)
+subroutine optimize_mapping(mol0, mol1, mnatypeorder0, mnatypeorder1, maplist, countlist, nrec)
 
    type(Molecule), intent(inout) :: mol0, mol1
-   integer, intent(in), dimension(:) :: equivorder0, equivorder1
+   integer, intent(in), dimension(:) :: mnatypeorder0, mnatypeorder1
    integer, intent(out) :: maplist(:, :)
    integer, intent(out) :: countlist(:)
    integer, intent(out) :: nrec
 
    integer :: natom
-   integer :: natomtype
-   integer :: natomequiv0, natomequiv1
+   integer :: neltype
+   integer :: nmnatype0, nmnatype1
    real(wp), dimension(:), allocatable :: weights
    real(wp), dimension(:, :), allocatable :: coords0, coords1
    logical, dimension(:, :), allocatable :: adjmat0, adjmat1
@@ -60,17 +60,17 @@ subroutine optimize_mapping(mol0, mol1, equivorder0, equivorder1, maplist, count
    integer :: adjd, recadjd(maxrec)
    integer :: nadjs0(mol0%natom), adjlists0(maxcoord, mol0%natom)
    integer :: nadjs1(mol1%natom), adjlists1(maxcoord, mol1%natom)
-   integer, dimension(mol0%natom) :: atomtypelenlist
+   integer, dimension(mol0%natom) :: eltypepartlens
    integer, dimension(mol0%natom, maxlevel) :: nadjmna0
    integer, dimension(mol1%natom, maxlevel) :: nadjmna1
    integer, dimension(maxcoord, mol0%natom, maxlevel) :: adjmnalen0
    integer, dimension(maxcoord, mol1%natom, maxlevel) :: adjmnalen1
    integer, dimension(maxcoord, mol0%natom, maxlevel) :: adjmnalist0
    integer, dimension(maxcoord, mol1%natom, maxlevel) :: adjmnalist1
-   integer, dimension(mol0%natom) :: nadjequivs0
-   integer, dimension(mol1%natom) :: nadjequivs1
-   integer, dimension(maxcoord, mol0%natom) :: adjequivlenlists0
-   integer, dimension(maxcoord, mol1%natom) :: adjequivlenlists1
+   integer, dimension(mol0%natom) :: natomneimnatypes0
+   integer, dimension(mol1%natom) :: natomneimnatypes1
+   integer, dimension(maxcoord, mol0%natom) :: atomneimnatypepartlens0
+   integer, dimension(maxcoord, mol1%natom) :: atomneimnatypepartlens1
    integer :: equivmat(mol0%natom, mol1%natom)
    integer, dimension(mol0%natom) :: mapping, newmapping
    real(wp) :: rmsd, totalrot
@@ -79,48 +79,48 @@ subroutine optimize_mapping(mol0, mol1, equivorder0, equivorder1, maplist, count
    real(wp) :: biasmat(mol0%natom, mol1%natom)
    real(wp) :: workcoords1(3, mol1%natom)
 
-   integer, allocatable, dimension(:) :: atomequivlenlist0, atomequivlenlist1
+   integer, allocatable, dimension(:) :: mnatypepartlens0, mnatypepartlens1
    integer, allocatable, dimension(:) :: fragroots0, fragroots1
 
    natom = mol0%natom
-   weights = mol0%get_atomweights(equivorder0)
-   coords0 = mol0%get_atomcoords(equivorder0)
-   coords1 = mol1%get_atomcoords(equivorder1)
-   adjmat0 = mol0%get_adjmat(equivorder0)
-   adjmat1 = mol1%get_adjmat(equivorder1)
+   weights = mol0%get_atomweights(mnatypeorder0)
+   coords0 = mol0%get_coords(mnatypeorder0)
+   coords1 = mol1%get_coords(mnatypeorder1)
+   adjmat0 = mol0%get_adjmat(mnatypeorder0)
+   adjmat1 = mol1%get_adjmat(mnatypeorder1)
 
-   natomtype = mol0%get_natomtype()
-   atomtypelenlist = mol0%get_atomtypelenlist()
+   neltype = mol0%get_neltype()
+   eltypepartlens = mol0%get_eltypepartlens()
 
-   nadjs0 = mol0%get_nadjs(equivorder0)
-   nadjs1 = mol1%get_nadjs(equivorder1)
-   adjlists0 = mol0%get_adjlists(equivorder0)
-   adjlists1 = mol1%get_adjlists(equivorder1)
+   nadjs0 = mol0%get_nadjs(mnatypeorder0)
+   nadjs1 = mol1%get_nadjs(mnatypeorder1)
+   adjlists0 = mol0%get_adjlists(mnatypeorder0)
+   adjlists1 = mol1%get_adjlists(mnatypeorder1)
 
-   natomequiv0 = mol0%get_natomequiv()
-   natomequiv1 = mol1%get_natomequiv()
-   atomequivlenlist0 = mol0%get_atomequivlenlist()
-   atomequivlenlist1 = mol1%get_atomequivlenlist()
+   nmnatype0 = mol0%get_nmnatype()
+   nmnatype1 = mol1%get_nmnatype()
+   mnatypepartlens0 = mol0%get_mnatypepartlens()
+   mnatypepartlens1 = mol1%get_mnatypepartlens()
 
-   nadjequivs0 = mol0%get_nadjequivs(equivorder0)
-   nadjequivs1 = mol1%get_nadjequivs(equivorder1)
-   adjequivlenlists0 = mol0%get_adjequivlenlists(equivorder0)
-   adjequivlenlists1 = mol1%get_adjequivlenlists(equivorder1)
+   natomneimnatypes0 = mol0%get_natomneimnatypes(mnatypeorder0)
+   natomneimnatypes1 = mol1%get_natomneimnatypes(mnatypeorder1)
+   atomneimnatypepartlens0 = mol0%get_atomneimnatypepartlens(mnatypeorder0)
+   atomneimnatypepartlens1 = mol1%get_atomneimnatypepartlens(mnatypeorder1)
 
-   fragroots0 = mol0%get_fragroots(equivorder0)
-   fragroots1 = mol1%get_fragroots(equivorder1)
+   fragroots0 = mol0%get_fragroots(mnatypeorder0)
+   fragroots1 = mol1%get_fragroots(mnatypeorder1)
 
    nfrag0 = size(fragroots0)
    nfrag1 = size(fragroots1)
 
    ! Calculate MNA equivalence matrix
 
-   call calcequivmat(mol0, mol1, equivorder0, equivorder1, nadjmna0, adjmnalen0, adjmnalist0, nadjmna1, &
+   call calcequivmat(mol0, mol1, mnatypeorder0, mnatypeorder1, nadjmna0, adjmnalen0, adjmnalist0, nadjmna1, &
          adjmnalen1, adjmnalist1, equivmat)
 
    ! Calculate bias matrix
 
-   call setcrossbias(natom, natomtype, atomtypelenlist, coords0, coords1, equivmat, biasmat)
+   call setcrossbias(natom, neltype, eltypepartlens, coords0, coords1, equivmat, biasmat)
 
    ! Initialize loop variables
 
@@ -146,7 +146,7 @@ subroutine optimize_mapping(mol0, mol1, equivorder0, equivorder1, maplist, count
 
       ! Minimize the euclidean distance
 
-      call mapatoms(natom, natomtype, atomtypelenlist, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
+      call mapatoms(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
          nadjmna1, adjmnalen1, adjmnalist1, workcoords1, weights, equivmat, biasmat, mapping)
       rotquat = leastrotquat(natom, weights, coords0, workcoords1, mapping)
       prodquat = rotquat
@@ -156,7 +156,7 @@ subroutine optimize_mapping(mol0, mol1, equivorder0, equivorder1, maplist, count
       steps = 1
 
       do while (iter_flag)
-         call mapatoms(natom, natomtype, atomtypelenlist, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
+         call mapatoms(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
             nadjmna1, adjmnalen1, adjmnalist1, workcoords1, weights, equivmat, biasmat, newmapping)
          if (all(newmapping == mapping)) exit
          rotquat = leastrotquat(natom, weights, coords0, workcoords1, newmapping)
@@ -171,11 +171,11 @@ subroutine optimize_mapping(mol0, mol1, equivorder0, equivorder1, maplist, count
 
       if (back_flag) then
 
-         call minadjdiff(natom, weights, natomtype, atomtypelenlist, coords0, nadjs0, adjlists0, adjmat0, natomequiv0, &
-            atomequivlenlist0, workcoords1, nadjs1, adjlists1, adjmat1, natomequiv1, atomequivlenlist1, mapping, nfrag0, fragroots0)
+         call minadjdiff(natom, weights, neltype, eltypepartlens, coords0, nadjs0, adjlists0, adjmat0, nmnatype0, &
+            mnatypepartlens0, workcoords1, nadjs1, adjlists1, adjmat1, nmnatype1, mnatypepartlens1, mapping, nfrag0, fragroots0)
 
-         call eqvatomperm(natom, weights, coords0, adjmat0, adjlists0, natomequiv0, atomequivlenlist0, &
-            nadjequivs0, adjequivlenlists0, workcoords1, adjmat1, mapping, nfrag0, fragroots0)
+         call eqvatomperm(natom, weights, coords0, adjmat0, adjlists0, nmnatype0, mnatypepartlens0, &
+            natomneimnatypes0, atomneimnatypepartlens0, workcoords1, adjmat1, mapping, nfrag0, fragroots0)
 
       end if
 
@@ -240,10 +240,10 @@ subroutine optimize_mapping(mol0, mol1, equivorder0, equivorder1, maplist, count
 
 end subroutine
 
-subroutine find_reactive_sites(mol0, mol1, equivorder0, equivorder1, mapping)
+subroutine find_reactive_sites(mol0, mol1, mnatypeorder0, mnatypeorder1, mapping)
 
    type(Molecule), intent(inout) :: mol0, mol1
-   integer, intent(in), dimension(:) :: equivorder0, equivorder1
+   integer, intent(in), dimension(:) :: mnatypeorder0, mnatypeorder1
    integer, dimension(:), intent(in) :: mapping
 
    integer :: natom
@@ -251,51 +251,51 @@ subroutine find_reactive_sites(mol0, mol1, equivorder0, equivorder1, mapping)
    integer, dimension(:), allocatable :: atomnums0, atomnums1
    real(wp), dimension(:, :), allocatable :: coords0, coords1
    logical, dimension(:, :), allocatable :: adjmat0, adjmat1
-   integer, dimension(:), allocatable :: atomtypeidcs0, atomtypeidcs1
-   integer, dimension(:), allocatable :: atomtypelenlist0, atomtypelenlist1
-   type(Part), dimension(:), allocatable :: atomtypeblocks0, atomtypeblocks1
+   integer, dimension(:), allocatable :: atomeltypes0, atomeltypes1
+   integer, dimension(:), allocatable :: eltypepartlens0, eltypepartlens1
+   type(Part), dimension(:), allocatable :: eltypeparts0, eltypeparts1
    real(wp) :: rotquat(4)
 
    ! Align coordinates
 
-   rotquat = leastrotquat(mol0%natom, mol0%get_atomweights(), mol0%get_atomcoords(), mol1%get_atomcoords(), mapping)
+   rotquat = leastrotquat(mol0%natom, mol0%get_atomweights(), mol0%get_coords(), mol1%get_coords(), mapping)
    call mol1%rotate_coords(rotquat)
 
    ! Initialization
 
-   coords0 = mol0%get_atomcoords(equivorder0)
-   coords1 = mol1%get_atomcoords(equivorder1)
-   adjmat0 = mol0%get_adjmat(equivorder0)
-   adjmat1 = mol1%get_adjmat(equivorder1)
-   atomtypeidcs0 = mol0%get_atomtypeidcs(equivorder0)
-   atomtypeidcs1 = mol1%get_atomtypeidcs(equivorder1)
-   atomtypeblocks0 = mol0%get_atomtypeparts(equivorder0)
-   atomtypeblocks1 = mol1%get_atomtypeparts(equivorder1)
-   atomtypelenlist0 = mol0%get_atomtypelenlist()
-   atomtypelenlist1 = mol1%get_atomtypelenlist()
+   coords0 = mol0%get_coords(mnatypeorder0)
+   coords1 = mol1%get_coords(mnatypeorder1)
+   adjmat0 = mol0%get_adjmat(mnatypeorder0)
+   adjmat1 = mol1%get_adjmat(mnatypeorder1)
+   atomeltypes0 = mol0%get_atomeltypes(mnatypeorder0)
+   atomeltypes1 = mol1%get_atomeltypes(mnatypeorder1)
+   eltypeparts0 = mol0%get_eltypeparts(mnatypeorder0)
+   eltypeparts1 = mol1%get_eltypeparts(mnatypeorder1)
+   eltypepartlens0 = mol0%get_eltypepartlens()
+   eltypepartlens1 = mol1%get_eltypepartlens()
 
    ! Remove reactive bonds
 
    do i = 1, mol0%natom
-      m = atomtypeidcs0(i)
+      m = atomeltypes0(i)
       do j = i + 1, mol0%natom
-         n = atomtypeidcs0(j)
+         n = atomeltypes0(j)
          if (adjmat0(i, j) .neqv. adjmat1(mapping(i), mapping(j))) then
             call remove_reactive_bond(i, j, mol0, mol1, mapping)
-            do k = 1, atomtypelenlist0(m)
-               if (sum((coords0(:, i) - coords1(:, mapping(atomtypeblocks1(m)%atomidcs(k))))**2) < 2.0) then
-                  call remove_reactive_bond(atomtypeblocks1(m)%atomidcs(k), j, mol0, mol1, mapping)
+            do k = 1, eltypepartlens0(m)
+               if (sum((coords0(:, i) - coords1(:, mapping(eltypeparts1(m)%atomidcs(k))))**2) < 2.0) then
+                  call remove_reactive_bond(eltypeparts1(m)%atomidcs(k), j, mol0, mol1, mapping)
                end if
-               if (sum((coords0(:, atomtypeblocks0(m)%atomidcs(k)) - coords1(:, mapping(i)))**2) < 2.0) then
-                  call remove_reactive_bond(atomtypeblocks0(m)%atomidcs(k), j, mol0, mol1, mapping)
+               if (sum((coords0(:, eltypeparts0(m)%atomidcs(k)) - coords1(:, mapping(i)))**2) < 2.0) then
+                  call remove_reactive_bond(eltypeparts0(m)%atomidcs(k), j, mol0, mol1, mapping)
                end if
             end do
-            do k = 1, atomtypelenlist1(n)
-               if (sum((coords0(:, j) - coords1(:, mapping(atomtypeblocks1(n)%atomidcs(k))))**2) < 2.0) then
-                  call remove_reactive_bond(i, atomtypeblocks1(n)%atomidcs(k), mol0, mol1, mapping)
+            do k = 1, eltypepartlens1(n)
+               if (sum((coords0(:, j) - coords1(:, mapping(eltypeparts1(n)%atomidcs(k))))**2) < 2.0) then
+                  call remove_reactive_bond(i, eltypeparts1(n)%atomidcs(k), mol0, mol1, mapping)
                end if
-               if (sum((coords0(:, atomtypeblocks0(n)%atomidcs(k)) - coords1(:, mapping(j)))**2) < 2.0) then
-                  call remove_reactive_bond(i, atomtypeblocks0(n)%atomidcs(k), mol0, mol1, mapping)
+               if (sum((coords0(:, eltypeparts0(n)%atomidcs(k)) - coords1(:, mapping(j)))**2) < 2.0) then
+                  call remove_reactive_bond(i, eltypeparts0(n)%atomidcs(k), mol0, mol1, mapping)
                end if
             end do
          end if
@@ -319,8 +319,8 @@ subroutine remove_reactive_bond(i, j, mol0, mol1, mapping)
    nadjs1 = mol1%get_nadjs()
    adjlists0 = mol0%get_adjlists()
    adjlists1 = mol1%get_adjlists()
-   atomnums0 = mol0%get_atomelnums()
-   atomnums1 = mol1%get_atomelnums()
+   atomnums0 = mol0%get_elnums()
+   atomnums1 = mol1%get_elnums()
 
    if (mol0%bonded(i, j)) then
       call mol0%remove_bond(i, j)

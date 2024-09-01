@@ -53,8 +53,8 @@ subroutine remap_atoms( &
    integer :: i
    real(wp) :: travec0(3), travec1(3)
    integer, dimension(mol0%natom) :: mapping
-   integer, allocatable, dimension(:) :: equivorder0, equivorder1
-   integer, allocatable, dimension(:) :: equivunorder0, equivunorder1
+   integer, allocatable, dimension(:) :: mnatypeorder0, mnatypeorder1
+   integer, allocatable, dimension(:) :: mnatypeunorder0, mnatypeunorder1
 
 !   integer :: nbond0, bonds0(2, maxcoord*mol0%natom)
 !   integer :: nbond1, bonds1(2, maxcoord*mol1%natom)
@@ -83,11 +83,11 @@ subroutine remap_atoms( &
 
    ! Set MNA equivalence partitions
 
-   equivorder0 = sorted_order(mol0%get_atomequividcs())
-   equivorder1 = sorted_order(mol1%get_atomequividcs())
+   mnatypeorder0 = sorted_order(mol0%get_atommnatypes())
+   mnatypeorder1 = sorted_order(mol1%get_atommnatypes())
 
-   equivunorder0 = inverse_mapping(equivorder0)
-   equivunorder1 = inverse_mapping(equivorder1)
+   mnatypeunorder0 = inverse_mapping(mnatypeorder0)
+   mnatypeunorder1 = inverse_mapping(mnatypeorder1)
 
    ! Abort if molecules have different number of atoms
 
@@ -99,7 +99,7 @@ subroutine remap_atoms( &
 
    ! Abort if molecules are not isomers
 
-   if (any(mol0%get_atomelnums(equivorder0) /= mol1%get_atomelnums(equivorder1))) then
+   if (any(mol0%get_elnums(mnatypeorder0) /= mol1%get_elnums(mnatypeorder1))) then
       write (stderr, '(a)') 'Error: The molecules are not isomers'
       error = 1
       return
@@ -107,7 +107,7 @@ subroutine remap_atoms( &
 
    ! Abort if there are conflicting atomic types
 
-   if (any(mol0%get_atomtypeidcs(equivorder0) /= mol1%get_atomtypeidcs(equivorder1))) then
+   if (any(mol0%get_atomeltypes(mnatypeorder0) /= mol1%get_atomeltypes(mnatypeorder1))) then
       write (stderr, '(a)') 'Error: There are conflicting atomic types'
       error = 1
       return
@@ -115,7 +115,7 @@ subroutine remap_atoms( &
 
    ! Abort if there are conflicting weights
 
-   if (any(abs(mol0%get_atomweights(equivorder0) - mol1%get_atomweights(equivorder1)) > 1.E-6)) then
+   if (any(abs(mol0%get_atomweights(mnatypeorder0) - mol1%get_atomweights(mnatypeorder1)) > 1.E-6)) then
       write (stderr, '(a)') 'Error: There are conflicting weights'
       error = 1
       return
@@ -143,15 +143,15 @@ subroutine remap_atoms( &
 
    ! Optimize assignment to minimize the AdjD and RMSD
 
-    call optimize_mapping(mol0, mol1, equivorder0, equivorder1, maplist, countlist, nrec)
+    call optimize_mapping(mol0, mol1, mnatypeorder0, mnatypeorder1, maplist, countlist, nrec)
 
    ! Debond reactive sites and reoptimize assignment
 
 !   if (reac_flag) then
-!      call find_reactive_sites(mol0, mol1, equivorder0, equivorder1, maplist(:, 1))
+!      call find_reactive_sites(mol0, mol1, mnatypeorder0, mnatypeorder1, maplist(:, 1))
 !      call assort_neighbors(mol0)
 !      call assort_neighbors(mol1)
-!      call optimize_mapping(mol0, mol1, equivorder0, equivorder1, maplist, countlist, nrec)
+!      call optimize_mapping(mol0, mol1, mnatypeorder0, mnatypeorder1, maplist, countlist, nrec)
 !   end if
 
 !   ! Print coordinates with internal order
@@ -169,7 +169,7 @@ subroutine remap_atoms( &
    ! Reorder back to original atom ordering
 
    do i = 1, nrec
-      maplist(:, i) = equivorder1(maplist(equivunorder0(:), i))
+      maplist(:, i) = mnatypeorder1(maplist(mnatypeunorder0(:), i))
    end do
 
 end subroutine
@@ -201,7 +201,7 @@ subroutine align_atoms( &
 
    ! Abort if molecules are not isomers
 
-   if (any(sorted(mol0%get_atomelnums(), mol0%natom) /= sorted(mol1%get_atomelnums(), mol1%natom))) then
+   if (any(sorted(mol0%get_elnums(), mol0%natom) /= sorted(mol1%get_elnums(), mol1%natom))) then
       write (stderr, '(a)') 'Error: The molecules are not isomers'
       error = 1
       return
@@ -209,7 +209,7 @@ subroutine align_atoms( &
 
    ! Abort if atoms are not ordered
 
-   if (any(mol0%get_atomelnums() /= mol1%get_atomelnums())) then
+   if (any(mol0%get_elnums() /= mol1%get_elnums())) then
       write (stderr, '(a)') 'Error: The atoms are not in the same order'
       error = 1
       return
@@ -217,7 +217,7 @@ subroutine align_atoms( &
 
    ! Abort if there are conflicting atomic types
 
-   if (any(sorted(mol0%get_atomtypeidcs(), mol0%natom) /= sorted(mol1%get_atomtypeidcs(), mol1%natom))) then
+   if (any(sorted(mol0%get_atomeltypes(), mol0%natom) /= sorted(mol1%get_atomeltypes(), mol1%natom))) then
       write (stderr, '(a)') 'Error: There are conflicting atomic types'
       error = 1
       return
@@ -225,7 +225,7 @@ subroutine align_atoms( &
 
    ! Abort if atomic types are not ordered
 
-   if (any(mol0%get_atomtypeidcs() /= mol1%get_atomtypeidcs())) then
+   if (any(mol0%get_atomeltypes() /= mol1%get_atomeltypes())) then
       write (stderr, '(a)') 'Error: Atomic types are not in the same order'
       error = 1
       return
@@ -241,8 +241,8 @@ subroutine align_atoms( &
    rotquat = leastrotquat( &
       mol0%natom, &
       mol0%get_atomweights(), &
-      translated(mol0%natom, mol0%get_atomcoords(), travec0), &
-      translated(mol1%natom, mol1%get_atomcoords(), travec1), &
+      translated(mol0%natom, mol0%get_coords(), travec0), &
+      translated(mol1%natom, mol1%get_coords(), travec1), &
       identitymap(mol0%natom) &
    )
 
@@ -258,8 +258,8 @@ function get_rmsd(mol0, mol1) result(rmsd)
    type(Molecule), intent(in) :: mol0, mol1
    real(wp) :: rmsd
 
-   rmsd = sqrt(squaredist(mol0%natom, mol0%get_atomweights(), mol0%get_atomcoords(), &
-         mol1%get_atomcoords(), identitymap(mol0%natom)) / sum(mol0%get_atomweights()))
+   rmsd = sqrt(squaredist(mol0%natom, mol0%get_atomweights(), mol0%get_coords(), &
+         mol1%get_coords(), identitymap(mol0%natom)) / sum(mol0%get_atomweights()))
 
 end function
 
@@ -280,7 +280,7 @@ function centroid_coords(mol) result(coords)
    real(wp), allocatable :: atomcoords(:, :)
    real(wp), allocatable :: atomweights(:)
 
-   atomcoords = mol%get_atomcoords()
+   atomcoords = mol%get_coords()
    atomweights = mol%get_atomweights()
 
 ! Calculate the coordinates of the center of mass
