@@ -36,7 +36,7 @@ implicit none
 
 private
 public optimize_mapping
-public find_reactive_sites
+public remove_reactive_bonds
 
 contains
 
@@ -252,61 +252,60 @@ subroutine optimize_mapping(mol0, mol1, mnaord0, mnaord1, maplist, countlist, nr
 
 end subroutine
 
-subroutine find_reactive_sites(mol0, mol1, mapping)
+subroutine remove_reactive_bonds(mol0, mol1, mapping)
 
    type(cMol), intent(inout) :: mol0, mol1
    integer, dimension(:), intent(in) :: mapping
 
    integer :: natom
-   integer :: h, i, j, k, m, n
-   integer, dimension(:), allocatable :: atomnums0, atomnums1
-   real(wp), dimension(:, :), allocatable :: coords0, coords1
-   logical, dimension(:, :), allocatable :: adjmat0, adjmat1
-   integer, dimension(:), allocatable :: atomeltypes0, atomeltypes1
-   integer, dimension(:), allocatable :: eltypepartlens0, eltypepartlens1
-   type(cPart), dimension(:), allocatable :: eltypeparts0, eltypeparts1
-   real(wp) :: rotquat(4)
+   integer :: i, j, k
+   type(cAtom), allocatable, dimension(:) :: atoms0, atoms1
+   logical, allocatable, dimension(:, :) :: adjmat0, adjmat1
+   integer, allocatable, dimension(:) :: atomeltypes0, atomeltypes1
+   type(cPart), allocatable, dimension(:) :: eltypeparts0, eltypeparts1
+   integer, allocatable, dimension(:) :: eltypepartidcs0j, eltypepartidcs1j
+   real(wp) :: atomdist, rotquat(4)
 
    ! Align coordinates
 
    rotquat = leastrotquat(mol0%natom, mol0%get_atomweights(), mol0%get_coords(), mol1%get_coords(), mapping)
    call mol1%rotate_coords(rotquat)
 
+!   write (stderr, *) sqrt(squaredist(mol0%natom, mol0%get_atomweights(), mol0%get_coords(), mol1%get_coords(), mapping) &
+!         /sum(mol0%get_atomweights()))
+
    ! Initialization
 
-   coords0 = mol0%get_coords()
-   coords1 = mol1%get_coords()
+   atoms0 = mol0%get_atoms()
+   atoms1 = mol1%get_atoms()
    adjmat0 = mol0%get_adjmat()
    adjmat1 = mol1%get_adjmat()
    atomeltypes0 = mol0%get_atomeltypes()
    atomeltypes1 = mol1%get_atomeltypes()
    eltypeparts0 = mol0%get_eltypeparts()
    eltypeparts1 = mol1%get_eltypeparts()
-   eltypepartlens0 = mol0%get_eltypepartlens()
-   eltypepartlens1 = mol1%get_eltypepartlens()
 
    ! Remove reactive bonds
 
    do i = 1, mol0%natom
-      m = atomeltypes0(i)
-      do j = i + 1, mol0%natom
-         n = atomeltypes0(j)
+      do j = 1, mol0%natom
          if (adjmat0(i, j) .neqv. adjmat1(mapping(i), mapping(j))) then
+            eltypepartidcs0j = eltypeparts0(atomeltypes0(j))%atomidcs
+            eltypepartidcs1j = eltypeparts1(atomeltypes1(j))%atomidcs
+!            write (stderr, '(i3,2x,i3)') i, j
             call remove_reactive_bond(i, j, mol0, mol1, mapping)
-            do k = 1, eltypepartlens0(m)
-               if (sum((coords0(:, i) - coords1(:, mapping(eltypeparts1(m)%atomidcs(k))))**2) < 2.0) then
-                  call remove_reactive_bond(eltypeparts1(m)%atomidcs(k), j, mol0, mol1, mapping)
-               end if
-               if (sum((coords0(:, eltypeparts0(m)%atomidcs(k)) - coords1(:, mapping(i)))**2) < 2.0) then
-                  call remove_reactive_bond(eltypeparts0(m)%atomidcs(k), j, mol0, mol1, mapping)
+            do k = 1, size(eltypepartidcs1j)
+               atomdist = sum((atoms0(j)%coords - atoms1(mapping(eltypepartidcs1j(k)))%coords)**2)
+!               write (stderr, '(a3,2x,i3,2x,i3,2x,f8.4)') '<<<', i, eltypepartidcs1j(k), atomdist
+               if (atomdist < 2.0) then
+                  call remove_reactive_bond(i, eltypepartidcs1j(k), mol0, mol1, mapping)
                end if
             end do
-            do k = 1, eltypepartlens1(n)
-               if (sum((coords0(:, j) - coords1(:, mapping(eltypeparts1(n)%atomidcs(k))))**2) < 2.0) then
-                  call remove_reactive_bond(i, eltypeparts1(n)%atomidcs(k), mol0, mol1, mapping)
-               end if
-               if (sum((coords0(:, eltypeparts0(n)%atomidcs(k)) - coords1(:, mapping(j)))**2) < 2.0) then
-                  call remove_reactive_bond(i, eltypeparts0(n)%atomidcs(k), mol0, mol1, mapping)
+            do k = 1, size(eltypepartidcs0j)
+               atomdist = sum((atoms0(eltypepartidcs0j(k))%coords - atoms1(mapping(j))%coords)**2)
+!               write (stderr, '(a3,2x,i3,2x,i3,2x,f8.4)') '>>>', i, eltypepartidcs0j(k), atomdist
+               if (atomdist < 2.0) then
+                  call remove_reactive_bond(i, eltypepartidcs0j(k), mol0, mol1, mapping)
                end if
             end do
          end if
@@ -323,23 +322,18 @@ subroutine remove_reactive_bond(i, j, mol0, mol1, mapping)
 
    integer :: k
    integer, allocatable, dimension(:) :: atomnums0, atomnums1
-   integer :: nadjs0(mol0%natom), adjlists0(maxcoord, mol0%natom)
-   integer :: nadjs1(mol1%natom), adjlists1(maxcoord, mol1%natom)
+   integer, allocatable, dimension(:) :: nadjs0, nadjs1
+   integer, allocatable, dimension(:, :) :: adjlists0, adjlists1
 
+   atomnums0 = mol0%get_elnums()
+   atomnums1 = mol1%get_elnums()
    nadjs0 = mol0%get_nadjs()
    nadjs1 = mol1%get_nadjs()
    adjlists0 = mol0%get_adjlists()
    adjlists1 = mol1%get_adjlists()
-   atomnums0 = mol0%get_elnums()
-   atomnums1 = mol1%get_elnums()
 
-   if (mol0%bonded(i, j)) then
-      call mol0%remove_bond(i, j)
-   end if
-
-   if (mol1%bonded(mapping(i), mapping(j))) then
-      call mol1%remove_bond(mapping(i), mapping(j))
-   end if
+   call mol0%remove_bond(i, j)
+   call mol1%remove_bond(mapping(i), mapping(j))
 
    if (atomnums0(i) == 1) then
       do k = 1, nadjs0(i)
@@ -352,9 +346,7 @@ subroutine remove_reactive_bond(i, j, mol0, mol1, mapping)
    if (atomnums1(i) == 1) then
       do k = 1, nadjs1(i)
          if (any([7, 8] == atomnums1(adjlists1(k, i)))) then
-            if (mol1%bonded(mapping(i), mapping(adjlists1(k, i)))) then
-               call mol1%remove_bond(mapping(i), mapping(adjlists1(k, i)))
-            end if
+            call mol1%remove_bond(mapping(i), mapping(adjlists1(k, i)))
          end if
       end do
    end if
@@ -370,9 +362,7 @@ subroutine remove_reactive_bond(i, j, mol0, mol1, mapping)
    if (atomnums1(j) == 1) then
       do k = 1, nadjs1(j)
          if (any([7, 8] == atomnums1(adjlists1(k, j)))) then
-            if (mol1%bonded(mapping(j), mapping(adjlists1(k, j)))) then
-               call mol1%remove_bond(mapping(j), mapping(adjlists1(k, j)))
-            end if
+            call mol1%remove_bond(mapping(j), mapping(adjlists1(k, j)))
          end if
       end do
    end if

@@ -145,8 +145,9 @@ subroutine remap_atoms( &
    ! Remove bonds from reactive sites and reoptimize assignment
 
    if (reac_flag) then
-      call find_reactive_sites(mol0, mol1, maplist(:, 1))
+      call remove_reactive_bonds(mol0, mol1, maplist(:, 1))
 !      call mol0%print_bonds()
+!      call mol1%print_bonds()
       call find_molfrags(mol0)
       call find_molfrags(mol1)
       call assort_neighbors(mol0)

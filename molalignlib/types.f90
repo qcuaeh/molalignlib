@@ -27,16 +27,16 @@ type :: cBond
    integer :: atomidx2
 end type
 
-type :: cAtom
-   integer, private :: elnum
-   integer, private :: label
-   integer, private :: eltype
-   integer, private :: mnatype
-   integer, private :: fragidx
-   integer, allocatable, private :: mnaid(:)
-   real(wp), private :: weight
-   real(wp), private :: coords(3)
-   integer, allocatable, private :: adjlist(:)
+type, public :: cAtom
+   integer :: elnum
+   integer :: label
+   integer :: eltype
+   integer :: mnatype
+   integer :: fragidx
+   integer, allocatable :: mnaid(:)
+   real(wp) :: weight
+   real(wp) :: coords(3)
+   integer, allocatable :: adjlist(:)
    integer, allocatable :: atomneimnatypepartlens(:)
 end type
 
@@ -74,6 +74,7 @@ contains
    procedure :: remove_bond
    procedure :: get_fragparts
    procedure :: get_fragroots
+   procedure, private :: get_default_atoms
    procedure, private :: get_default_nadjs
    procedure, private :: get_default_adjlists
    procedure, private :: get_default_adjmat
@@ -86,6 +87,7 @@ contains
    procedure, private :: get_default_atomneimnatypepartlens
    procedure, private :: get_default_atommnatypes
    procedure, private :: get_default_eltypeparts
+   procedure, private :: get_sorted_atoms
    procedure, private :: get_sorted_nadjs
    procedure, private :: get_sorted_adjlists
    procedure, private :: get_sorted_adjmat
@@ -100,6 +102,7 @@ contains
    procedure, private :: get_sorted_eltypeparts
    procedure, private :: matrix_rotate_coords
    procedure, private :: quater_rotate_coords
+   generic :: get_atoms => get_default_atoms, get_sorted_atoms
    generic :: get_nadjs => get_default_nadjs, get_sorted_nadjs
    generic :: get_adjlists => get_default_adjlists, get_sorted_adjlists
    generic :: get_adjmat => get_default_adjmat, get_sorted_adjmat
@@ -210,6 +213,25 @@ function get_default_elnums(self) result(atomelnums)
    integer, allocatable :: atomelnums(:)
 
    atomelnums = self%atoms(:)%elnum
+
+end function
+
+function get_default_atoms(self) result(atoms)
+   class(cMol), intent(in) :: self
+   ! Local variables
+   type(cAtom), allocatable :: atoms(:)
+
+   atoms = self%atoms
+
+end function
+
+function get_sorted_atoms(self, atomorder) result(atoms)
+   class(cMol), intent(in) :: self
+   integer, intent(in) :: atomorder(:)
+   ! Local variables
+   type(cAtom), allocatable :: atoms(:)
+
+   atoms = self%atoms(atomorder)
 
 end function
 
@@ -715,12 +737,17 @@ function get_bonds(self) result(bonds)
    class(cMol), intent(in) :: self
    ! Local variables
    integer :: i, j, nbond
+   logical, allocatable :: adjmat(:, :)
    type(cBond), allocatable :: bonds(:)
+
+   adjmat = self%get_adjmat()
 
    nbond = 0
    do i = 1, size(self%atoms)
-      do j = 1, size(self%atoms(i)%adjlist)
-         nbond = nbond + 1
+      do j = i + 1, size(self%atoms)
+         if (adjmat(i, j)) then
+            nbond = nbond + 1
+         end if
       end do
    end do
 
@@ -728,10 +755,12 @@ function get_bonds(self) result(bonds)
 
    nbond = 0
    do i = 1, size(self%atoms)
-      do j = 1, size(self%atoms(i)%adjlist)
-         nbond = nbond + 1
-         bonds(nbond)%atomidx1 = i
-         bonds(nbond)%atomidx2 = self%atoms(i)%adjlist(j)
+      do j = i + 1, size(self%atoms)
+         if (adjmat(i, j)) then
+            nbond = nbond + 1
+            bonds(nbond)%atomidx1 = i
+            bonds(nbond)%atomidx2 = j
+         end if
       end do
    end do
 
@@ -767,10 +796,10 @@ subroutine print_bonds(self)
    bonds = self%get_bonds()
 
    write (stderr, '(a,1x,i0)') 'Bonds:', size(bonds)
-   write (stderr, '(a5,a5,a5)') "ind:", "idx1", "idx2"
+   write (stderr, '(a)') "idx1 idx2"
 
    do i = 1, size(bonds)
-      write (stderr, '(i3,":",2x,i3,2x,i3)') i, bonds(i)%atomidx1, bonds(i)%atomidx2 
+      write (stderr, '(i3,2x,i3)') bonds(i)%atomidx1, bonds(i)%atomidx2 
    end do
 
 end subroutine
@@ -865,8 +894,8 @@ subroutine remove_bond(self, idx1, idx2)
 ! update neighbor arrays for atoms idx1 and idx2
       self%atoms(idx1)%adjlist = adjlist1(:nadj1)
       self%atoms(idx2)%adjlist = adjlist2(:nadj2)
-   else
-      write (stderr, '(a,i0,2x,i0)') 'Error: atoms not bonded: ', idx1, idx2
+!   else
+!      write (stderr, '(a,i0,2x,i0)') 'Error: atoms not bonded: ', idx1, idx2
    end if
 
 end subroutine
