@@ -6,6 +6,7 @@ use stdio
 use types
 use bounds
 use sorting
+
 implicit none
 private
 public find_molfrags
@@ -15,7 +16,7 @@ integer, allocatable :: nadjs(:), adjlists(:, :)
 contains
 
 subroutine find_molfrags (mol)
-   type(Molecule), intent(inout) :: mol
+   type(cMol), intent(inout) :: mol
    ! Local variables
    integer :: n, nfrag
    integer, allocatable :: fragidcs(:), fragsize(:)

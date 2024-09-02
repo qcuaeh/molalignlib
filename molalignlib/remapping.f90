@@ -40,14 +40,14 @@ public find_reactive_sites
 
 contains
 
-subroutine optimize_mapping(mol0, mol1, mnatypeorder0, mnatypeorder1, maplist, countlist, nrec)
-
-   type(Molecule), intent(inout) :: mol0, mol1
-   integer, intent(in), dimension(:) :: mnatypeorder0, mnatypeorder1
+subroutine optimize_mapping(mol0, mol1, mnaord0, mnaord1, maplist, countlist, nrec)
+   type(cMol), intent(in) :: mol0, mol1
+   integer, intent(in), dimension(:) :: mnaord0, mnaord1
    integer, intent(out) :: maplist(:, :)
    integer, intent(out) :: countlist(:)
    integer, intent(out) :: nrec
 
+   integer :: i
    integer :: natom
    integer :: neltype
    integer :: nmnatype0, nmnatype1
@@ -79,43 +79,44 @@ subroutine optimize_mapping(mol0, mol1, mnatypeorder0, mnatypeorder1, maplist, c
    real(wp) :: biasmat(mol0%natom, mol1%natom)
    real(wp) :: workcoords1(3, mol1%natom)
 
-   integer, allocatable, dimension(:) :: mnatypepartlens0, mnatypepartlens1
    integer, allocatable, dimension(:) :: fragroots0, fragroots1
+   integer, allocatable, dimension(:) :: mnatypepartlens0, mnatypepartlens1
+   integer, allocatable, dimension(:) :: unord0, unord1
 
    natom = mol0%natom
-   weights = mol0%get_atomweights(mnatypeorder0)
-   coords0 = mol0%get_coords(mnatypeorder0)
-   coords1 = mol1%get_coords(mnatypeorder1)
-   adjmat0 = mol0%get_adjmat(mnatypeorder0)
-   adjmat1 = mol1%get_adjmat(mnatypeorder1)
+   weights = mol0%get_atomweights(mnaord0)
+   coords0 = mol0%get_coords(mnaord0)
+   coords1 = mol1%get_coords(mnaord1)
+   adjmat0 = mol0%get_adjmat(mnaord0)
+   adjmat1 = mol1%get_adjmat(mnaord1)
 
    neltype = mol0%get_neltype()
    eltypepartlens = mol0%get_eltypepartlens()
 
-   nadjs0 = mol0%get_nadjs(mnatypeorder0)
-   nadjs1 = mol1%get_nadjs(mnatypeorder1)
-   adjlists0 = mol0%get_adjlists(mnatypeorder0)
-   adjlists1 = mol1%get_adjlists(mnatypeorder1)
+   nadjs0 = mol0%get_nadjs(mnaord0)
+   nadjs1 = mol1%get_nadjs(mnaord1)
+   adjlists0 = mol0%get_adjlists(mnaord0)
+   adjlists1 = mol1%get_adjlists(mnaord1)
 
    nmnatype0 = mol0%get_nmnatype()
    nmnatype1 = mol1%get_nmnatype()
    mnatypepartlens0 = mol0%get_mnatypepartlens()
    mnatypepartlens1 = mol1%get_mnatypepartlens()
 
-   natomneimnatypes0 = mol0%get_natomneimnatypes(mnatypeorder0)
-   natomneimnatypes1 = mol1%get_natomneimnatypes(mnatypeorder1)
-   atomneimnatypepartlens0 = mol0%get_atomneimnatypepartlens(mnatypeorder0)
-   atomneimnatypepartlens1 = mol1%get_atomneimnatypepartlens(mnatypeorder1)
+   natomneimnatypes0 = mol0%get_natomneimnatypes(mnaord0)
+   natomneimnatypes1 = mol1%get_natomneimnatypes(mnaord1)
+   atomneimnatypepartlens0 = mol0%get_atomneimnatypepartlens(mnaord0)
+   atomneimnatypepartlens1 = mol1%get_atomneimnatypepartlens(mnaord1)
 
-   fragroots0 = mol0%get_fragroots(mnatypeorder0)
-   fragroots1 = mol1%get_fragroots(mnatypeorder1)
+   fragroots0 = mol0%get_fragroots(mnaord0)
+   fragroots1 = mol1%get_fragroots(mnaord1)
 
    nfrag0 = size(fragroots0)
    nfrag1 = size(fragroots1)
 
    ! Calculate MNA equivalence matrix
 
-   call calcequivmat(mol0, mol1, mnatypeorder0, mnatypeorder1, nadjmna0, adjmnalen0, adjmnalist0, nadjmna1, &
+   call calcequivmat(mol0, mol1, mnaord0, mnaord1, nadjmna0, adjmnalen0, adjmnalist0, nadjmna1, &
          adjmnalen1, adjmnalist1, equivmat)
 
    ! Calculate bias matrix
@@ -233,6 +234,17 @@ subroutine optimize_mapping(mol0, mol1, mnatypeorder0, mnatypeorder1, maplist, c
 
    end do
 
+   ! Reorder back to default atom ordering
+
+   unord0 = inverse_mapping(mnaord0)
+   unord1 = inverse_mapping(mnaord1)
+
+   do i = 1, nrec
+      maplist(:, i) = mnaord1(maplist(unord0(:), i))
+   end do
+
+   ! Print stats if requested
+
    if (stats_flag) then
       call print_stats(nrec, countlist, avgsteps, avgtotalrot, avgrealrot, recadjd, recrmsd)
       call print_final_stats(overflow, maxrec, nrec, ntrial, nstep)
@@ -240,10 +252,9 @@ subroutine optimize_mapping(mol0, mol1, mnatypeorder0, mnatypeorder1, maplist, c
 
 end subroutine
 
-subroutine find_reactive_sites(mol0, mol1, mnatypeorder0, mnatypeorder1, mapping)
+subroutine find_reactive_sites(mol0, mol1, mapping)
 
-   type(Molecule), intent(inout) :: mol0, mol1
-   integer, intent(in), dimension(:) :: mnatypeorder0, mnatypeorder1
+   type(cMol), intent(inout) :: mol0, mol1
    integer, dimension(:), intent(in) :: mapping
 
    integer :: natom
@@ -253,7 +264,7 @@ subroutine find_reactive_sites(mol0, mol1, mnatypeorder0, mnatypeorder1, mapping
    logical, dimension(:, :), allocatable :: adjmat0, adjmat1
    integer, dimension(:), allocatable :: atomeltypes0, atomeltypes1
    integer, dimension(:), allocatable :: eltypepartlens0, eltypepartlens1
-   type(Part), dimension(:), allocatable :: eltypeparts0, eltypeparts1
+   type(cPart), dimension(:), allocatable :: eltypeparts0, eltypeparts1
    real(wp) :: rotquat(4)
 
    ! Align coordinates
@@ -263,14 +274,14 @@ subroutine find_reactive_sites(mol0, mol1, mnatypeorder0, mnatypeorder1, mapping
 
    ! Initialization
 
-   coords0 = mol0%get_coords(mnatypeorder0)
-   coords1 = mol1%get_coords(mnatypeorder1)
-   adjmat0 = mol0%get_adjmat(mnatypeorder0)
-   adjmat1 = mol1%get_adjmat(mnatypeorder1)
-   atomeltypes0 = mol0%get_atomeltypes(mnatypeorder0)
-   atomeltypes1 = mol1%get_atomeltypes(mnatypeorder1)
-   eltypeparts0 = mol0%get_eltypeparts(mnatypeorder0)
-   eltypeparts1 = mol1%get_eltypeparts(mnatypeorder1)
+   coords0 = mol0%get_coords()
+   coords1 = mol1%get_coords()
+   adjmat0 = mol0%get_adjmat()
+   adjmat1 = mol1%get_adjmat()
+   atomeltypes0 = mol0%get_atomeltypes()
+   atomeltypes1 = mol1%get_atomeltypes()
+   eltypeparts0 = mol0%get_eltypeparts()
+   eltypeparts1 = mol1%get_eltypeparts()
    eltypepartlens0 = mol0%get_eltypepartlens()
    eltypepartlens1 = mol1%get_eltypepartlens()
 
@@ -308,7 +319,7 @@ subroutine remove_reactive_bond(i, j, mol0, mol1, mapping)
 ! Purpose: Remove reactive bonds
    integer, intent(in) :: i, j
    integer, dimension(:), intent(in) :: mapping
-   type(Molecule), intent(inout) :: mol0, mol1
+   type(cMol), intent(inout) :: mol0, mol1
 
    integer :: k
    integer, allocatable, dimension(:) :: atomnums0, atomnums1

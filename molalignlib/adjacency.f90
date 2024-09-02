@@ -57,26 +57,6 @@ subroutine adjmat2bonds(natom, adjmat, nbond, bonds)
 
 end subroutine
 
-subroutine adjlist2bonds(natom, nadjs, adjlists, nbond, bonds)
-   integer, intent(in) :: natom
-   integer, dimension(:), intent(in) :: nadjs
-   integer, dimension(:, :), intent(in) :: adjlists
-   integer, intent(out) :: nbond
-   integer, dimension(:, :), intent(out) :: bonds
-   integer :: i, j
-
-   nbond = 0
-
-   do i = 1, natom
-      do j =1, nadjs(i)
-         nbond = nbond + 1
-         bonds(1, nbond) = i
-         bonds(2, nbond) = adjlists(j, i)
-      end do
-   end do
-
-end subroutine
-
 function adjacencydiff(natom, adjmat0, adjmat1, mapping) result(diff)
 ! Purpose: Check if two graphs are equal.
 ! Return the number of differences between graphs.

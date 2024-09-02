@@ -31,6 +31,7 @@ use remapping
 use assignment
 use writemol
 use biasing
+use tracking
 
 implicit none
 
@@ -45,7 +46,7 @@ subroutine remap_atoms( &
    nrec, &
    error)
 
-   type(Molecule), intent(inout) :: mol0, mol1
+   type(cMol), intent(inout) :: mol0, mol1
    integer, dimension(:, :), intent(inout) :: maplist
    integer, dimension(:), intent(inout) :: countlist
    integer, intent(out) :: nrec, error
@@ -53,8 +54,7 @@ subroutine remap_atoms( &
    integer :: i
    real(wp) :: travec0(3), travec1(3)
    integer, dimension(mol0%natom) :: mapping
-   integer, allocatable, dimension(:) :: mnatypeorder0, mnatypeorder1
-   integer, allocatable, dimension(:) :: mnatypeunorder0, mnatypeunorder1
+   integer, allocatable, dimension(:) :: mnaord0, mnaord1
 
 !   integer :: nbond0, bonds0(2, maxcoord*mol0%natom)
 !   integer :: nbond1, bonds1(2, maxcoord*mol1%natom)
@@ -83,11 +83,8 @@ subroutine remap_atoms( &
 
    ! Set MNA equivalence partitions
 
-   mnatypeorder0 = sorted_order(mol0%get_atommnatypes())
-   mnatypeorder1 = sorted_order(mol1%get_atommnatypes())
-
-   mnatypeunorder0 = inverse_mapping(mnatypeorder0)
-   mnatypeunorder1 = inverse_mapping(mnatypeorder1)
+   mnaord0 = sorted_order(mol0%get_atommnatypes())
+   mnaord1 = sorted_order(mol1%get_atommnatypes())
 
    ! Abort if molecules have different number of atoms
 
@@ -99,7 +96,7 @@ subroutine remap_atoms( &
 
    ! Abort if molecules are not isomers
 
-   if (any(mol0%get_elnums(mnatypeorder0) /= mol1%get_elnums(mnatypeorder1))) then
+   if (any(mol0%get_elnums(mnaord0) /= mol1%get_elnums(mnaord1))) then
       write (stderr, '(a)') 'Error: The molecules are not isomers'
       error = 1
       return
@@ -107,7 +104,7 @@ subroutine remap_atoms( &
 
    ! Abort if there are conflicting atomic types
 
-   if (any(mol0%get_atomeltypes(mnatypeorder0) /= mol1%get_atomeltypes(mnatypeorder1))) then
+   if (any(mol0%get_atomeltypes(mnaord0) /= mol1%get_atomeltypes(mnaord1))) then
       write (stderr, '(a)') 'Error: There are conflicting atomic types'
       error = 1
       return
@@ -115,7 +112,7 @@ subroutine remap_atoms( &
 
    ! Abort if there are conflicting weights
 
-   if (any(abs(mol0%get_atomweights(mnatypeorder0) - mol1%get_atomweights(mnatypeorder1)) > 1.E-6)) then
+   if (any(abs(mol0%get_atomweights(mnaord0) - mol1%get_atomweights(mnaord1)) > 1.E-6)) then
       write (stderr, '(a)') 'Error: There are conflicting weights'
       error = 1
       return
@@ -143,16 +140,19 @@ subroutine remap_atoms( &
 
    ! Optimize assignment to minimize the AdjD and RMSD
 
-    call optimize_mapping(mol0, mol1, mnatypeorder0, mnatypeorder1, maplist, countlist, nrec)
+   call optimize_mapping(mol0, mol1, mnaord0, mnaord1, maplist, countlist, nrec)
 
-   ! Debond reactive sites and reoptimize assignment
+   ! Remove bonds from reactive sites and reoptimize assignment
 
-!   if (reac_flag) then
-!      call find_reactive_sites(mol0, mol1, mnatypeorder0, mnatypeorder1, maplist(:, 1))
-!      call assort_neighbors(mol0)
-!      call assort_neighbors(mol1)
-!      call optimize_mapping(mol0, mol1, mnatypeorder0, mnatypeorder1, maplist, countlist, nrec)
-!   end if
+   if (reac_flag) then
+      call find_reactive_sites(mol0, mol1, maplist(:, 1))
+!      call mol0%print_bonds()
+      call find_molfrags(mol0)
+      call find_molfrags(mol1)
+      call assort_neighbors(mol0)
+      call assort_neighbors(mol1)
+      call optimize_mapping(mol0, mol1, mnaord0, mnaord1, maplist, countlist, nrec)
+   end if
 
 !   ! Print coordinates with internal order
 
@@ -166,12 +166,6 @@ subroutine remap_atoms( &
 !   call writemol2(99, 'coords1', natom1, workznums1, workcoords1, nbond1, bonds1)
 !!   call writemol2(99, 'coords1', natom1, workznums1(mapping), workcoords1(:, mapping), nbond1, bonds1)
 
-   ! Reorder back to original atom ordering
-
-   do i = 1, nrec
-      maplist(:, i) = mnatypeorder1(maplist(mnatypeunorder0(:), i))
-   end do
-
 end subroutine
 
 subroutine align_atoms( &
@@ -182,7 +176,7 @@ subroutine align_atoms( &
    rotmat, &
    error)
 
-   type(Molecule), intent(inout) :: mol0, mol1
+   type(cMol), intent(inout) :: mol0, mol1
    real(wp), intent(out) :: travec(3), rotmat(3, 3)
    real(wp) :: travec0(3), travec1(3), rotquat(4)
    integer, intent(out) :: error
@@ -255,7 +249,7 @@ subroutine align_atoms( &
 end subroutine
 
 function get_rmsd(mol0, mol1) result(rmsd)
-   type(Molecule), intent(in) :: mol0, mol1
+   type(cMol), intent(in) :: mol0, mol1
    real(wp) :: rmsd
 
    rmsd = sqrt(squaredist(mol0%natom, mol0%get_atomweights(), mol0%get_coords(), &
@@ -264,7 +258,7 @@ function get_rmsd(mol0, mol1) result(rmsd)
 end function
 
 function get_adjd(mol0, mol1) result(adjd)
-   type(Molecule), intent(in) :: mol0, mol1
+   type(cMol), intent(in) :: mol0, mol1
    integer :: adjd
 
    adjd = adjacencydiff(mol0%natom, mol0%get_adjmat(), mol1%get_adjmat(), identitymap(mol0%natom))
@@ -273,7 +267,7 @@ end function
 
 function centroid_coords(mol) result(coords)
 ! Purpose: Get the centroid coordinates
-   type(Molecule), intent(in) :: mol
+   type(cMol), intent(in) :: mol
    ! Local variables
    integer :: i
    real(wp) :: coords(3)

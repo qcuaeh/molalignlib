@@ -46,7 +46,7 @@ character(ll) :: posargs(2)
 logical :: fmtin_flag, fmtout_flag
 logical :: remap_flag, pipe_flag, nrec_flag
 real(wp) :: travec(3), rotmat(3, 3)
-type(Molecule) :: mol0, mol1, auxmol0, auxmol1
+type(cMol) :: mol0, mol1, auxmol0, auxmol1
 integer :: adjd, minadjd
 real(wp) :: rmsd, minrmsd
 
@@ -187,10 +187,6 @@ if (fmtout_flag) then
    fmtout = optfmtout
 end if
 
-if (.not. nrec_flag) then
-   call writefile(write_unit, fmtout, mol0)
-end if
-
 if (remap_flag) then
 
    auxmol0 = mol0
@@ -211,6 +207,10 @@ if (remap_flag) then
    auxmol1 = mol1
    minrmsd = huge(rmsd)
    minadjd = huge(adjd)
+
+   if (.not. nrec_flag) then
+      call writefile(write_unit, fmtout, mol0)
+   end if
 
    do i = 1, nrec
 

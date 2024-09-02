@@ -30,7 +30,7 @@ contains
 
 subroutine assort_atoms(mol)
 ! Purpose: Group atoms by atomic numbers and types
-   type(Molecule), intent(inout) :: mol
+   type(cMol), intent(inout) :: mol
 
    integer :: i, j
    integer :: neltype
@@ -101,7 +101,7 @@ end subroutine
 
 subroutine set_equiv_atoms(mol)
 ! Group atoms by MNA type at infinite level
-   type(Molecule), intent(inout) :: mol
+   type(cMol), intent(inout) :: mol
 
    integer :: i, natom, nin, nout
    integer, allocatable, dimension(:) :: intype, outype, typemap
@@ -191,7 +191,7 @@ end subroutine
 
 subroutine assort_neighbors(mol)
 ! Purpose: Categorize atoms by eqtypes
-   type(Molecule), intent(inout) :: mol
+   type(cMol), intent(inout) :: mol
 
    integer :: i, h
    integer :: nadjs(mol%natom), adjlists(maxcoord, mol%natom)
@@ -214,7 +214,7 @@ subroutine assort_neighbors(mol)
 end subroutine
 
 subroutine getmnatypes(mol, nin, nout, intype, outype, typemap)
-   type(Molecule), intent(in) :: mol
+   type(cMol), intent(in) :: mol
    integer, intent(in) :: nin
    integer, dimension(:), intent(in) :: intype
    integer, intent(out) :: nout
@@ -255,11 +255,11 @@ subroutine getmnatypes(mol, nin, nout, intype, outype, typemap)
 
 end subroutine
 
-subroutine calcequivmat(mol0, mol1, mnatypeorder0, mnatypeorder1, nadjmna0, adjmnalen0, adjmnalist0, &
+subroutine calcequivmat(mol0, mol1, mnaord0, mnaord1, nadjmna0, adjmnalen0, adjmnalist0, &
    nadjmna1, adjmnalen1, adjmnalist1, equivmat)
 ! Purpose: Calculate the maximum common MNA level for all atom cross assignments
-   type(Molecule), intent(in) :: mol0, mol1
-   integer, intent(in), dimension(:) :: mnatypeorder0, mnatypeorder1
+   type(cMol), intent(in) :: mol0, mol1
+   integer, intent(in), dimension(:) :: mnaord0, mnaord1
 
    integer, dimension(:, :), intent(out) :: nadjmna0, nadjmna1
    integer, dimension(:, :, :), intent(out) :: adjmnalen0, adjmnalen1
@@ -278,14 +278,14 @@ subroutine calcequivmat(mol0, mol1, mnatypeorder0, mnatypeorder1, nadjmna0, adjm
    natom = mol0%get_natom()
    neltype = mol0%get_neltype()
    eltypepartlens = mol0%get_eltypepartlens()
-   nadjs0 = mol0%get_nadjs(mnatypeorder0)
-   nadjs1 = mol1%get_nadjs(mnatypeorder1)
-   adjlists0 = mol0%get_adjlists(mnatypeorder0)
-   adjlists1 = mol1%get_adjlists(mnatypeorder1)
+   nadjs0 = mol0%get_nadjs(mnaord0)
+   nadjs1 = mol1%get_nadjs(mnaord1)
+   adjlists0 = mol0%get_adjlists(mnaord0)
+   adjlists1 = mol1%get_adjlists(mnaord1)
 
    nin = neltype
-   intype0 = mol0%get_atomeltypes(mnatypeorder0)
-   intype1 = mol1%get_atomeltypes(mnatypeorder1)
+   intype0 = mol0%get_atomeltypes(mnaord0)
+   intype1 = mol1%get_atomeltypes(mnaord1)
    level = 1
 
    do

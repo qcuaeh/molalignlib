@@ -30,7 +30,7 @@ contains
 
 subroutine readxyz(unit, mol)
    integer, intent(in) :: unit
-   type(Molecule), intent(out) :: mol
+   type(cMol), intent(out) :: mol
    character(ll) :: buffer
    character(wl) :: element
    integer, allocatable :: atomelnums(:), atomlabels(:)
@@ -71,7 +71,7 @@ end subroutine
 
 subroutine readmol2(unit, mol)
    integer, intent(in) :: unit
-   type(Molecule), intent(out) :: mol
+   type(cMol), intent(out) :: mol
    character(ll) :: buffer
    integer :: i, id
    integer :: atom1, atom2, bondorder, nbond
@@ -147,7 +147,7 @@ subroutine readmol2(unit, mol)
 end subroutine
 
 subroutine set_bonds(mol)
-   type(Molecule), intent(inout) :: mol
+   type(cMol), intent(inout) :: mol
 
    integer :: i, j
    integer :: nadjs(mol%natom)
