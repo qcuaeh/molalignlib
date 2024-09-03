@@ -51,9 +51,9 @@ type, public :: cMol
 contains
    procedure :: print_atoms
    procedure :: print_bonds
-   procedure :: set_elnums
-   procedure :: set_labels
-   procedure :: set_coords
+   procedure :: set_atomelnums
+   procedure :: set_atomlabels
+   procedure :: set_atomcoords
    procedure :: set_weights
    procedure :: set_adjlists
    procedure :: set_eltypes
@@ -65,57 +65,62 @@ contains
    procedure :: get_nmnatype
    procedure :: get_eltypepartlens
    procedure :: get_mnatypepartlens
-   procedure :: mirror_coords
-   procedure :: translate_coords
+   procedure :: mirror_atomcoords
+   procedure :: translate_atomcoords
    procedure :: permutate_atoms
    procedure :: get_bonds
    procedure :: bonded
    procedure :: add_bond
    procedure :: remove_bond
-   procedure :: get_fragparts
-   procedure :: get_fragroots
+   procedure :: get_molfragroots
    procedure, private :: get_default_atoms
    procedure, private :: get_default_nadjs
    procedure, private :: get_default_adjlists
    procedure, private :: get_default_adjmat
-   procedure, private :: get_default_coords
-   procedure, private :: get_default_elnums
-   procedure, private :: get_default_labels
+   procedure, private :: get_default_atomcoords
+   procedure, private :: get_default_atomelnums
+   procedure, private :: get_default_atomlabels
    procedure, private :: get_default_atomeltypes
    procedure, private :: get_default_atomweights
    procedure, private :: get_default_natomneimnatypes
    procedure, private :: get_default_atomneimnatypepartlens
    procedure, private :: get_default_atommnatypes
    procedure, private :: get_default_eltypeparts
+   procedure, private :: get_default_mnatypeparts
+   procedure, private :: get_default_molfragparts
    procedure, private :: get_sorted_atoms
    procedure, private :: get_sorted_nadjs
    procedure, private :: get_sorted_adjlists
    procedure, private :: get_sorted_adjmat
-   procedure, private :: get_sorted_coords
-   procedure, private :: get_sorted_elnums
-   procedure, private :: get_sorted_labels
+   procedure, private :: get_sorted_atomcoords
+   procedure, private :: get_sorted_atomelnums
+   procedure, private :: get_sorted_atomlabels
    procedure, private :: get_sorted_atomeltypes
    procedure, private :: get_sorted_atomweights
    procedure, private :: get_sorted_natomneimnatypes
    procedure, private :: get_sorted_atomneimnatypepartlens
    procedure, private :: get_sorted_atommnatypes
    procedure, private :: get_sorted_eltypeparts
-   procedure, private :: matrix_rotate_coords
-   procedure, private :: quater_rotate_coords
+   procedure, private :: get_sorted_mnatypeparts
+   procedure, private :: get_sorted_molfragparts
+   procedure, private :: matrix_rotate_atomcoords
+   procedure, private :: quater_rotate_atomcoords
    generic :: get_atoms => get_default_atoms, get_sorted_atoms
    generic :: get_nadjs => get_default_nadjs, get_sorted_nadjs
    generic :: get_adjlists => get_default_adjlists, get_sorted_adjlists
    generic :: get_adjmat => get_default_adjmat, get_sorted_adjmat
-   generic :: get_coords => get_default_coords, get_sorted_coords
-   generic :: get_elnums => get_default_elnums, get_sorted_elnums
-   generic :: get_labels => get_default_labels, get_sorted_labels
+   generic :: get_atomcoords => get_default_atomcoords, get_sorted_atomcoords
+   generic :: get_atomelnums => get_default_atomelnums, get_sorted_atomelnums
+   generic :: get_atomlabels => get_default_atomlabels, get_sorted_atomlabels
    generic :: get_atomeltypes => get_default_atomeltypes, get_sorted_atomeltypes
    generic :: get_atommnatypes => get_default_atommnatypes, get_sorted_atommnatypes
    generic :: get_atomneimnatypepartlens => get_default_atomneimnatypepartlens, get_sorted_atomneimnatypepartlens
    generic :: get_atomweights => get_default_atomweights, get_sorted_atomweights
    generic :: get_eltypeparts => get_default_eltypeparts, get_sorted_eltypeparts
+   generic :: get_mnatypeparts => get_default_mnatypeparts, get_sorted_mnatypeparts
    generic :: get_natomneimnatypes => get_default_natomneimnatypes, get_sorted_natomneimnatypes
-   generic :: rotate_coords => matrix_rotate_coords, quater_rotate_coords
+   generic :: get_molfragparts => get_default_molfragparts, get_sorted_molfragparts
+   generic :: rotate_atomcoords => matrix_rotate_atomcoords, quater_rotate_atomcoords
 end type
 
 contains
@@ -141,43 +146,43 @@ integer function get_nmnatype(self) result(nmnatype)
 
 end function
 
-subroutine mirror_coords(self)
+subroutine mirror_atomcoords(self)
    class(cMol), intent(inout) :: self
    ! Local variables
    real(wp), allocatable :: coords(:, :)
 
    allocate(coords(3, self%natom))
 
-   coords = self%get_coords()
+   coords = self%get_atomcoords()
    coords(1, :) = -coords(1, :)
-   call self%set_coords(coords)
+   call self%set_atomcoords(coords)
 
 end subroutine
 
-subroutine matrix_rotate_coords(self, rotmat)
+subroutine matrix_rotate_atomcoords(self, rotmat)
    class(cMol), intent(inout) :: self
    ! Local variables
    real(wp), intent(in) :: rotmat(3, 3)
 
-   call self%set_coords(matrix_rotated(self%natom, self%get_coords(), rotmat))
+   call self%set_atomcoords(matrix_rotated(self%natom, self%get_atomcoords(), rotmat))
 
 end subroutine
 
-subroutine quater_rotate_coords(self, rotquat)
+subroutine quater_rotate_atomcoords(self, rotquat)
    class(cMol), intent(inout) :: self
    ! Local variables
    real(wp), intent(in) :: rotquat(4)
 
-   call self%set_coords(quater_rotated(self%natom, self%get_coords(), rotquat))
+   call self%set_atomcoords(quater_rotated(self%natom, self%get_atomcoords(), rotquat))
 
 end subroutine
 
-subroutine translate_coords(self, travec)
+subroutine translate_atomcoords(self, travec)
    class(cMol), intent(inout) :: self
    ! Local variables
    real(wp), intent(in) :: travec(3)
 
-   call self%set_coords(translated(self%natom, self%get_coords(), travec))
+   call self%set_atomcoords(translated(self%natom, self%get_atomcoords(), travec))
 
 end subroutine
 
@@ -200,7 +205,7 @@ subroutine permutate_atoms(self, atomorder)
 
 end subroutine
 
-subroutine set_elnums(self, atomelnums)
+subroutine set_atomelnums(self, atomelnums)
    class(cMol), intent(inout) :: self
    integer, intent(in) :: atomelnums(:)
 
@@ -208,7 +213,7 @@ subroutine set_elnums(self, atomelnums)
 
 end subroutine
 
-function get_default_elnums(self) result(atomelnums)
+function get_default_atomelnums(self) result(atomelnums)
    class(cMol), intent(in) :: self
    integer, allocatable :: atomelnums(:)
 
@@ -235,7 +240,7 @@ function get_sorted_atoms(self, atomorder) result(atoms)
 
 end function
 
-function get_sorted_elnums(self, atomorder) result(atomelnums)
+function get_sorted_atomelnums(self, atomorder) result(atomelnums)
    class(cMol), intent(in) :: self
    integer, intent(in) :: atomorder(:)
    ! Local variables
@@ -245,7 +250,7 @@ function get_sorted_elnums(self, atomorder) result(atomelnums)
 
 end function
 
-subroutine set_labels(self, atomlabels)
+subroutine set_atomlabels(self, atomlabels)
    class(cMol), intent(inout) :: self
    integer, intent(in) :: atomlabels(:)
 
@@ -253,7 +258,7 @@ subroutine set_labels(self, atomlabels)
 
 end subroutine
 
-function get_default_labels(self) result(atomlabels)
+function get_default_atomlabels(self) result(atomlabels)
    class(cMol), intent(in) :: self
    ! Local variables
    integer, allocatable :: atomlabels(:)
@@ -262,7 +267,7 @@ function get_default_labels(self) result(atomlabels)
 
 end function
 
-function get_sorted_labels(self, atomorder) result(atomlabels)
+function get_sorted_atomlabels(self, atomorder) result(atomlabels)
    class(cMol), intent(in) :: self
    integer, intent(in) :: atomorder(:)
    ! Local variables
@@ -344,6 +349,37 @@ function partition_get_lenlist(self) result(lenlist)
 
 end function
 
+function get_default_mnatypeparts(self) result(parts)
+   class(cMol), intent(in) :: self
+   ! Local variables
+   integer :: i
+   type(cPart), allocatable :: parts(:)
+
+   allocate(parts(size(self%mnatypepartition%parts)))
+
+   do i = 1, size(self%mnatypepartition%parts)
+      parts(i)%atomidcs = self%mnatypepartition%parts(i)%atomidcs(:)
+   end do
+
+end function
+
+function get_sorted_mnatypeparts(self, atomorder) result(parts)
+   class(cMol), intent(in) :: self
+   integer, intent(in) :: atomorder(:)
+   ! Local variables
+   integer :: i
+   integer, allocatable :: atomunorder(:)
+   type(cPart), allocatable :: parts(:)
+
+   atomunorder = inverse_mapping(atomorder)
+   allocate(parts(size(self%mnatypepartition%parts)))
+
+   do i = 1, size(self%mnatypepartition%parts)
+      parts(i)%atomidcs = atomunorder(self%mnatypepartition%parts(i)%atomidcs(:))
+   end do
+
+end function
+
 function get_mnatypepartlens(self) result(mnatypepartlens)
    class(cMol), intent(in) :: self
    ! Local variables
@@ -393,7 +429,21 @@ function get_eltypepartlens(self) result(eltypepartlens)
 
 end function
 
-function get_fragparts(self, atomorder) result(parts)
+function get_default_molfragparts(self) result(parts)
+   class(cMol), intent(in) :: self
+   ! Local variables
+   integer :: i
+   type(cPart), allocatable :: parts(:)
+
+   allocate(parts(size(self%molfragpartition%parts)))
+
+   do i = 1, size(self%molfragpartition%parts)
+      parts(i)%atomidcs = self%molfragpartition%parts(i)%atomidcs(:)
+   end do
+
+end function
+
+function get_sorted_molfragparts(self, atomorder) result(parts)
    class(cMol), intent(in) :: self
    integer, intent(in) :: atomorder(:)
    ! Local variables
@@ -410,7 +460,7 @@ function get_fragparts(self, atomorder) result(parts)
 
 end function
 
-function get_fragroots(self, atomorder) result(fragroots)
+function get_molfragroots(self, atomorder) result(fragroots)
    class(cMol), intent(in) :: self
    integer, intent(in) :: atomorder(:)
    ! Local variables
@@ -421,7 +471,7 @@ function get_fragroots(self, atomorder) result(fragroots)
    integer, allocatable :: mnatypepartlens(:)
    type(cPart), allocatable :: fragparts(:)
 
-   fragparts = self%get_fragparts(atomorder)
+   fragparts = self%get_molfragparts(atomorder)
    atommnatypes = self%get_atommnatypes(atomorder)
    mnatypepartlens = self%get_mnatypepartlens()
    allocate(fragroots(size(fragparts)))
@@ -498,7 +548,7 @@ function get_sorted_atomweights(self, atomorder) result(weights)
 
 end function
 
-subroutine set_coords(self, coords)
+subroutine set_atomcoords(self, coords)
    class(cMol), intent(inout) :: self
    real(wp), intent(in) :: coords(3, self%natom)
    ! Local variables
@@ -510,7 +560,7 @@ subroutine set_coords(self, coords)
 
 end subroutine
 
-function get_default_coords(self) result(coords)
+function get_default_atomcoords(self) result(coords)
    class(cMol), intent(in) :: self
    ! Local variables
    integer :: i
@@ -524,7 +574,7 @@ function get_default_coords(self) result(coords)
 
 end function
 
-function get_sorted_coords(self, atomorder) result(coords)
+function get_sorted_atomcoords(self, atomorder) result(coords)
    class(cMol), intent(in) :: self
    integer, intent(in) :: atomorder(:)
    ! Local variables

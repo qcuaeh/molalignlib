@@ -46,8 +46,8 @@ subroutine assort_atoms(mol)
 
    neltype = 0
    remaining = .true.
-   atomelnums = mol%get_elnums()
-   atomlabels = mol%get_labels()
+   atomelnums = mol%get_atomelnums()
+   atomlabels = mol%get_atomlabels()
 !   weights = mol%get_atomweights()
 
    ! Create block list

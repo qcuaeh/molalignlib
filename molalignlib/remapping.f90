@@ -85,8 +85,8 @@ subroutine optimize_mapping(mol0, mol1, mnaord0, mnaord1, maplist, countlist, nr
 
    natom = mol0%natom
    weights = mol0%get_atomweights(mnaord0)
-   coords0 = mol0%get_coords(mnaord0)
-   coords1 = mol1%get_coords(mnaord1)
+   coords0 = mol0%get_atomcoords(mnaord0)
+   coords1 = mol1%get_atomcoords(mnaord1)
    adjmat0 = mol0%get_adjmat(mnaord0)
    adjmat1 = mol1%get_adjmat(mnaord1)
 
@@ -108,8 +108,8 @@ subroutine optimize_mapping(mol0, mol1, mnaord0, mnaord1, maplist, countlist, nr
    atomneimnatypepartlens0 = mol0%get_atomneimnatypepartlens(mnaord0)
    atomneimnatypepartlens1 = mol1%get_atomneimnatypepartlens(mnaord1)
 
-   fragroots0 = mol0%get_fragroots(mnaord0)
-   fragroots1 = mol1%get_fragroots(mnaord1)
+   fragroots0 = mol0%get_molfragroots(mnaord0)
+   fragroots1 = mol1%get_molfragroots(mnaord1)
 
    nfrag0 = size(fragroots0)
    nfrag1 = size(fragroots1)
@@ -258,20 +258,21 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
    integer, dimension(:), intent(in) :: mapping
 
    integer :: natom
-   integer :: i, j, k
+   integer :: i, j, k, l, j_, k_, l_
    type(cAtom), allocatable, dimension(:) :: atoms0, atoms1
    logical, allocatable, dimension(:, :) :: adjmat0, adjmat1
-   integer, allocatable, dimension(:) :: atomeltypes0, atomeltypes1
-   type(cPart), allocatable, dimension(:) :: eltypeparts0, eltypeparts1
-   integer, allocatable, dimension(:) :: eltypepartidcs0j, eltypepartidcs1j
-   real(wp) :: atomdist, rotquat(4)
+   type(cPart), allocatable, dimension(:) :: molfragparts0, molfragparts1
+   type(cPart), allocatable, dimension(:) :: mnatypeparts0, mnatypeparts1
+   integer, allocatable, dimension(:) :: mnatypepartidcs0, mnatypepartidcs1
+   integer, allocatable, dimension(:) :: unmapping
+   real(wp) :: rotquat(4)
 
    ! Align coordinates
 
-   rotquat = leastrotquat(mol0%natom, mol0%get_atomweights(), mol0%get_coords(), mol1%get_coords(), mapping)
-   call mol1%rotate_coords(rotquat)
+   rotquat = leastrotquat(mol0%natom, mol0%get_atomweights(), mol0%get_atomcoords(), mol1%get_atomcoords(), mapping)
+   call mol1%rotate_atomcoords(rotquat)
 
-!   write (stderr, *) sqrt(squaredist(mol0%natom, mol0%get_atomweights(), mol0%get_coords(), mol1%get_coords(), mapping) &
+!   write (stderr, *) sqrt(squaredist(mol0%natom, mol0%get_atomweights(), mol0%get_atomcoords(), mol1%get_atomcoords(), mapping) &
 !         /sum(mol0%get_atomweights()))
 
    ! Initialization
@@ -280,92 +281,67 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
    atoms1 = mol1%get_atoms()
    adjmat0 = mol0%get_adjmat()
    adjmat1 = mol1%get_adjmat()
-   atomeltypes0 = mol0%get_atomeltypes()
-   atomeltypes1 = mol1%get_atomeltypes()
-   eltypeparts0 = mol0%get_eltypeparts()
-   eltypeparts1 = mol1%get_eltypeparts()
+   mnatypeparts0 = mol0%get_mnatypeparts()
+   mnatypeparts1 = mol1%get_mnatypeparts()
+   molfragparts0 = mol0%get_molfragparts()
+   molfragparts1 = mol1%get_molfragparts()
+   unmapping = inverse_mapping(mapping)
 
-   ! Remove reactive bonds
+   ! Remove mismatched bonds
 
-   do i = 1, mol0%natom
-      do j = 1, mol0%natom
-         if (adjmat0(i, j) .neqv. adjmat1(mapping(i), mapping(j))) then
-            eltypepartidcs0j = eltypeparts0(atomeltypes0(j))%atomidcs
-            eltypepartidcs1j = eltypeparts1(atomeltypes1(j))%atomidcs
-!            write (stderr, '(i3,2x,i3)') i, j
-            call remove_reactive_bond(i, j, mol0, mol1, mapping)
-            do k = 1, size(eltypepartidcs1j)
-               atomdist = sum((atoms0(j)%coords - atoms1(mapping(eltypepartidcs1j(k)))%coords)**2)
-!               write (stderr, '(a3,2x,i3,2x,i3,2x,f8.4)') '<<<', i, eltypepartidcs1j(k), atomdist
-               if (atomdist < 2.0) then
-                  call remove_reactive_bond(i, eltypepartidcs1j(k), mol0, mol1, mapping)
-               end if
-            end do
-            do k = 1, size(eltypepartidcs0j)
-               atomdist = sum((atoms0(eltypepartidcs0j(k))%coords - atoms1(mapping(j))%coords)**2)
-!               write (stderr, '(a3,2x,i3,2x,i3,2x,f8.4)') '>>>', i, eltypepartidcs0j(k), atomdist
-               if (atomdist < 2.0) then
-                  call remove_reactive_bond(i, eltypepartidcs0j(k), mol0, mol1, mapping)
-               end if
+   do i = 1, size(atoms0)
+      do j_ = 1, size(atoms0(i)%adjlist)
+         j = atoms0(i)%adjlist(j_)
+         if (.not. adjmat1(mapping(i), mapping(j))) then
+            mnatypepartidcs0 = mnatypeparts0(atoms0(j)%mnatype)%atomidcs
+            do k_ = 1, size(mnatypepartidcs0)
+               k = mnatypepartidcs0(k_)
+               call mol0%remove_bond(i, k)
+               call mol1%remove_bond(mapping(i), mapping(k))
             end do
          end if
       end do
    end do
 
-end subroutine
-
-subroutine remove_reactive_bond(i, j, mol0, mol1, mapping)
-! Purpose: Remove reactive bonds
-   integer, intent(in) :: i, j
-   integer, dimension(:), intent(in) :: mapping
-   type(cMol), intent(inout) :: mol0, mol1
-
-   integer :: k
-   integer, allocatable, dimension(:) :: atomnums0, atomnums1
-   integer, allocatable, dimension(:) :: nadjs0, nadjs1
-   integer, allocatable, dimension(:, :) :: adjlists0, adjlists1
-
-   atomnums0 = mol0%get_elnums()
-   atomnums1 = mol1%get_elnums()
-   nadjs0 = mol0%get_nadjs()
-   nadjs1 = mol1%get_nadjs()
-   adjlists0 = mol0%get_adjlists()
-   adjlists1 = mol1%get_adjlists()
-
-   call mol0%remove_bond(i, j)
-   call mol1%remove_bond(mapping(i), mapping(j))
-
-   if (atomnums0(i) == 1) then
-      do k = 1, nadjs0(i)
-         if (any([7, 8] == atomnums0(adjlists0(k, i)))) then
-            call mol0%remove_bond(i, adjlists0(k, i))
+   do i = 1, size(atoms1)
+      do j_ = 1, size(atoms1(i)%adjlist)
+         j = atoms1(i)%adjlist(j_)
+         if (.not. adjmat0(unmapping(i), unmapping(j))) then
+            mnatypepartidcs1 = mnatypeparts1(atoms1(j)%mnatype)%atomidcs
+            do k_ = 1, size(mnatypepartidcs1)
+               k = mnatypepartidcs1(k_)
+               call mol1%remove_bond(i, k)
+               call mol0%remove_bond(unmapping(i), unmapping(k))
+            end do
          end if
       end do
-   end if
+   end do
 
-   if (atomnums1(i) == 1) then
-      do k = 1, nadjs1(i)
-         if (any([7, 8] == atomnums1(adjlists1(k, i)))) then
-            call mol1%remove_bond(mapping(i), mapping(adjlists1(k, i)))
-         end if
-      end do
-   end if
+   ! Remove water bonds
 
-   if (atomnums0(j) == 1) then
-      do k = 1, nadjs0(j)
-         if (any([7, 8] == atomnums0(adjlists0(k, j)))) then
-            call mol0%remove_bond(j, adjlists0(k, j))
-         end if
-      end do
-   end if
+   do i = 1, size(molfragparts0)
+      if (all(sorted(atoms0(molfragparts0(i)%atomidcs)%elnum) == [1, 1, 8])) then
+         do j_ = 1, size(molfragparts0(i)%atomidcs)
+            j = molfragparts0(i)%atomidcs(j_)
+            do k_ = 1, size(atoms0(j)%adjlist)
+               k = atoms0(j)%adjlist(k_)
+               call mol0%remove_bond(j, k)
+            end do
+         end do
+      end if
+   end do
 
-   if (atomnums1(j) == 1) then
-      do k = 1, nadjs1(j)
-         if (any([7, 8] == atomnums1(adjlists1(k, j)))) then
-            call mol1%remove_bond(mapping(j), mapping(adjlists1(k, j)))
-         end if
-      end do
-   end if
+   do i = 1, size(molfragparts1)
+      if (all(sorted(atoms1(molfragparts1(i)%atomidcs)%elnum) == [1, 1, 8])) then
+         do j_ = 1, size(molfragparts1(i)%atomidcs)
+            j = molfragparts1(i)%atomidcs(j_)
+            do k_ = 1, size(atoms1(j)%adjlist)
+               k = atoms1(j)%adjlist(k_)
+               call mol1%remove_bond(j, k)
+            end do
+         end do
+      end if
+   end do
 
 end subroutine
 

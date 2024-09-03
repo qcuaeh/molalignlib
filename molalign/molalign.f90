@@ -189,14 +189,11 @@ end if
 
 if (remap_flag) then
 
-   auxmol0 = mol0
-   auxmol1 = mol1
-
    ! Remap atoms to minimize the MSD
 
    call remap_atoms( &
-      auxmol0, &
-      auxmol1, &
+      mol0, &
+      mol1, &
       maplist, &
       countlist, &
       nrec, &
@@ -204,7 +201,6 @@ if (remap_flag) then
 
    if (error /= 0) stop
 
-   auxmol1 = mol1
    minrmsd = huge(rmsd)
    minadjd = huge(adjd)
 
@@ -214,27 +210,27 @@ if (remap_flag) then
 
    do i = 1, nrec
 
-      mol1 = auxmol1
-      call mol1%permutate_atoms(maplist(:, i))
+      auxmol1 = mol1
+      call auxmol1%permutate_atoms(maplist(:, i))
 
       call align_atoms( &
          mol0, &
-         mol1, &
+         auxmol1, &
          travec, &
          rotmat, &
          error)
 
-      call mol1%rotate_coords(rotmat)
-      call mol1%translate_coords(travec)
+      call auxmol1%rotate_atomcoords(rotmat)
+      call auxmol1%translate_atomcoords(travec)
 
-      adjd = get_adjd(mol0, mol1)
+      adjd = get_adjd(mol0, auxmol1)
       minadjd = min(minadjd, adjd)
 
-      rmsd = get_rmsd(mol0, mol1)
+      rmsd = get_rmsd(mol0, auxmol1)
       minrmsd = min(minrmsd, rmsd)
 
-      mol1%title = 'Map='//intstr(i)//' RMSD='//realstr(rmsd, 4)
-      call writefile(write_unit, fmtout, mol1)
+      auxmol1%title = 'Map='//intstr(i)//' RMSD='//realstr(rmsd, 4)
+      call writefile(write_unit, fmtout, auxmol1)
 
    end do
 
@@ -259,8 +255,8 @@ else
 
    if (error /= 0) stop
 
-   call mol1%rotate_coords(rotmat)
-   call mol1%translate_coords(travec)
+   call mol1%rotate_atomcoords(rotmat)
+   call mol1%translate_atomcoords(travec)
 
    adjd = get_adjd(mol0, mol1)
    rmsd = get_rmsd(mol0, mol1)

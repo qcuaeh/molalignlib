@@ -30,20 +30,28 @@ interface sort
 end interface
 
 interface sorted
-   module procedure intsorted
-   module procedure realsorted
+   module procedure int_sorted
+   module procedure int_sorted_partial
+   module procedure real_sorted_partial
 end interface
 
 interface sorted_order
    module procedure int_sorted_order
-   module procedure int_part_sorted_order
-   module procedure realsortedorder
-   module procedure charsortedorder
+   module procedure int_sorted_order_partial
+   module procedure real_sorted_order_partial
+   module procedure char_sorted_order_partial
 end interface
 
 contains
 
-function intsorted(x, n) result(y)
+function int_sorted(x) result(y)
+   integer, intent(in) :: x(:)
+   integer, allocatable :: y(:)
+   y = x(:)
+   call intquicksort(y, 1, size(y))
+end function
+
+function int_sorted_partial(x, n) result(y)
    integer, intent(in) :: n
    integer, intent(in) :: x(:)
    integer :: y(n)
@@ -51,11 +59,11 @@ function intsorted(x, n) result(y)
    call intquicksort(y, 1, n)
 end function
 
-function realsorted(x, n) result(y)
+function real_sorted_partial(x, n) result(y)
    integer, intent(in) :: n
    real(wp), intent(in) :: x(:)
-   real(wp) :: y(n)
-   y(1:n) = x(1:n)
+   real(wp), allocatable :: y(:)
+   y = x(1:n)
    call realquicksort(y, 1, n)
 end function
 
@@ -66,7 +74,7 @@ function int_sorted_order(x) result(o)
    call intmergesort(x, o, size(x), t)
 end function
 
-function int_part_sorted_order(x, n) result(o)
+function int_sorted_order_partial(x, n) result(o)
    integer, intent(in) :: n
    integer, intent(in) :: x(:)
    integer :: i, o(n), t((n+1)/2)
@@ -74,7 +82,7 @@ function int_part_sorted_order(x, n) result(o)
    call intmergesort(x, o, n, t)
 end function
 
-function realsortedorder(x, n) result(o)
+function real_sorted_order_partial(x, n) result(o)
    integer, intent(in) :: n
    real(wp), intent(in) :: x(:)
    integer :: i, o(n), t((n+1)/2)
@@ -82,7 +90,7 @@ function realsortedorder(x, n) result(o)
    call realmergesort(x, o, n, t)
 end function
 
-function charsortedorder(x, n) result(o)
+function char_sorted_order_partial(x, n) result(o)
    integer, intent(in) :: n
    character(*), intent(in) :: x(:)
    integer :: i, o(n), t((n+1)/2)

@@ -52,9 +52,10 @@ subroutine remap_atoms( &
    integer, intent(out) :: nrec, error
 
    integer :: i
-   real(wp) :: travec0(3), travec1(3)
    integer, dimension(mol0%natom) :: mapping
    integer, allocatable, dimension(:) :: mnaord0, mnaord1
+   real(wp) :: travec0(3), travec1(3)
+   real(wp), allocatable, dimension(:, :) :: backcoords0, backcoords1
 
 !   integer :: nbond0, bonds0(2, maxcoord*mol0%natom)
 !   integer :: nbond1, bonds1(2, maxcoord*mol1%natom)
@@ -96,7 +97,7 @@ subroutine remap_atoms( &
 
    ! Abort if molecules are not isomers
 
-   if (any(mol0%get_elnums(mnaord0) /= mol1%get_elnums(mnaord1))) then
+   if (any(mol0%get_atomelnums(mnaord0) /= mol1%get_atomelnums(mnaord1))) then
       write (stderr, '(a)') 'Error: The molecules are not isomers'
       error = 1
       return
@@ -118,21 +119,26 @@ subroutine remap_atoms( &
       return
    end if
 
+   ! Backup coordinates
+
+   backcoords0 = mol0%get_atomcoords()
+   backcoords1 = mol1%get_atomcoords()
+
    ! Mirror coordinates
 
    if (mirror_flag) then
-      call mol1%mirror_coords()
+      call mol1%mirror_atomcoords()
    end if
 
    ! Calculate centroids
 
-   travec0 = -centroid_coords(mol0)
-   travec1 = -centroid_coords(mol1)
+   travec0 = -centroid_atomcoords(mol0)
+   travec1 = -centroid_atomcoords(mol1)
 
    ! Center coordinates at the centroids
 
-   call mol0%translate_coords(travec0)
-   call mol1%translate_coords(travec1)
+   call mol0%translate_atomcoords(travec0)
+   call mol1%translate_atomcoords(travec1)
 
    ! Initialize random number generator
 
@@ -145,15 +151,20 @@ subroutine remap_atoms( &
    ! Remove bonds from reactive sites and reoptimize assignment
 
    if (reac_flag) then
-      call remove_reactive_bonds(mol0, mol1, maplist(:, 1))
 !      call mol0%print_bonds()
 !      call mol1%print_bonds()
+      call remove_reactive_bonds(mol0, mol1, maplist(:, 1))
       call find_molfrags(mol0)
       call find_molfrags(mol1)
       call assort_neighbors(mol0)
       call assort_neighbors(mol1)
       call optimize_mapping(mol0, mol1, mnaord0, mnaord1, maplist, countlist, nrec)
    end if
+
+   ! Restore coordinates
+
+   call mol0%set_atomcoords(backcoords0)
+   call mol1%set_atomcoords(backcoords1)
 
 !   ! Print coordinates with internal order
 
@@ -196,7 +207,7 @@ subroutine align_atoms( &
 
    ! Abort if molecules are not isomers
 
-   if (any(sorted(mol0%get_elnums(), mol0%natom) /= sorted(mol1%get_elnums(), mol1%natom))) then
+   if (any(sorted(mol0%get_atomelnums(), mol0%natom) /= sorted(mol1%get_atomelnums(), mol1%natom))) then
       write (stderr, '(a)') 'Error: The molecules are not isomers'
       error = 1
       return
@@ -204,7 +215,7 @@ subroutine align_atoms( &
 
    ! Abort if atoms are not ordered
 
-   if (any(mol0%get_elnums() /= mol1%get_elnums())) then
+   if (any(mol0%get_atomelnums() /= mol1%get_atomelnums())) then
       write (stderr, '(a)') 'Error: The atoms are not in the same order'
       error = 1
       return
@@ -228,16 +239,16 @@ subroutine align_atoms( &
 
    ! Calculate centroids
 
-   travec0 = -centroid_coords(mol0)
-   travec1 = -centroid_coords(mol1)
+   travec0 = -centroid_atomcoords(mol0)
+   travec1 = -centroid_atomcoords(mol1)
 
    ! Calculate optimal rotation matrix
 
    rotquat = leastrotquat( &
       mol0%natom, &
       mol0%get_atomweights(), &
-      translated(mol0%natom, mol0%get_coords(), travec0), &
-      translated(mol1%natom, mol1%get_coords(), travec1), &
+      translated(mol0%natom, mol0%get_atomcoords(), travec0), &
+      translated(mol1%natom, mol1%get_atomcoords(), travec1), &
       identitymap(mol0%natom) &
    )
 
@@ -253,8 +264,8 @@ function get_rmsd(mol0, mol1) result(rmsd)
    type(cMol), intent(in) :: mol0, mol1
    real(wp) :: rmsd
 
-   rmsd = sqrt(squaredist(mol0%natom, mol0%get_atomweights(), mol0%get_coords(), &
-         mol1%get_coords(), identitymap(mol0%natom)) / sum(mol0%get_atomweights()))
+   rmsd = sqrt(squaredist(mol0%natom, mol0%get_atomweights(), mol0%get_atomcoords(), &
+         mol1%get_atomcoords(), identitymap(mol0%natom)) / sum(mol0%get_atomweights()))
 
 end function
 
@@ -266,7 +277,7 @@ function get_adjd(mol0, mol1) result(adjd)
 
 end function
 
-function centroid_coords(mol) result(coords)
+function centroid_atomcoords(mol) result(coords)
 ! Purpose: Get the centroid coordinates
    type(cMol), intent(in) :: mol
    ! Local variables
@@ -275,7 +286,7 @@ function centroid_coords(mol) result(coords)
    real(wp), allocatable :: atomcoords(:, :)
    real(wp), allocatable :: atomweights(:)
 
-   atomcoords = mol%get_coords()
+   atomcoords = mol%get_atomcoords()
    atomweights = mol%get_atomweights()
 
 ! Calculate the coordinates of the center of mass
