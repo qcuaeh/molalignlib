@@ -104,10 +104,10 @@ subroutine set_equiv_atoms(mol)
    type(cMol), intent(inout) :: mol
 
    integer :: i, natom, nin, nout
-   integer, allocatable, dimension(:) :: intype, outype, typemap
+   integer, allocatable, dimension(:) :: intypes, outtypes, typemap
    integer, allocatable, dimension(:) :: foreorder, backorder
 
-   allocate(outype(size(mol%atoms)))
+   allocate(outtypes(size(mol%atoms)))
    allocate(typemap(size(mol%atoms)))
    allocate(foreorder(size(mol%atoms)))
    allocate(backorder(size(mol%atoms)))
@@ -115,36 +115,36 @@ subroutine set_equiv_atoms(mol)
    ! Initialization
 
    nin = mol%get_neltype()
-   intype = mol%get_atomeltypes()
+   intypes = mol%get_atomeltypes()
    typemap(:nin) = [(i, i=1, nin)]
 
    ! Determine MNA types iteratively
 
    do
 
-      call getmnatypes(mol, nin, nout, intype, outype, typemap)
+      call getmnatypes(mol, nin, nout, intypes, outtypes, typemap)
 
-      if (all(outype == intype)) exit
+      if (all(outtypes == intypes)) exit
 
       nin = nout
-      intype = outype
+      intypes = outtypes
 
    end do
 
    foreorder(:nout) = sorted_order(typemap, nout)
    backorder(:nout) = inverse_mapping(foreorder(:nout))
-   outype = backorder(outype)
+   outtypes = backorder(outtypes)
 
-   call mol%set_mnatypes(nout, outype)
+   call mol%set_mnatypes(nout, outtypes)
 
 end subroutine
 
-subroutine groupbytype(nelem, elements, types, ngroup, groupsize, groupid)
+subroutine groupbytype(nitem, items, itemtypes, ngroup, grouplens, groupidcs)
 ! Purpose: Categorize atoms by types
-    integer, intent(in) :: nelem
+    integer, intent(in) :: nitem
     integer, intent(out) :: ngroup
-    integer, dimension(:), intent(in) :: types, elements
-    integer, dimension(:), intent(out) :: groupid, groupsize
+    integer, dimension(:), intent(in) :: itemtypes, items
+    integer, dimension(:), intent(out) :: groupidcs, grouplens
 
     integer i, j
     integer, dimension(maxcoord) :: grouptype
@@ -158,17 +158,17 @@ subroutine groupbytype(nelem, elements, types, ngroup, groupsize, groupid)
 
 ! Create group lists
 
-    do i = 1, nelem
+    do i = 1, nitem
         if (remaining(i)) then
             ngroup = ngroup + 1
-            groupsize(ngroup) = 1
-            grouptype(ngroup) = types(elements(i))
-            groupid(i) = ngroup
-            do j = i + 1, nelem
+            grouplens(ngroup) = 1
+            grouptype(ngroup) = itemtypes(items(i))
+            groupidcs(i) = ngroup
+            do j = i + 1, nitem
                 if (remaining(i)) then
-                    if (types(elements(j)) == types(elements(i))) then
-                        groupid(j) = ngroup
-                        groupsize(ngroup) = groupsize(ngroup) + 1
+                    if (itemtypes(items(j)) == itemtypes(items(i))) then
+                        groupidcs(j) = ngroup
+                        grouplens(ngroup) = grouplens(ngroup) + 1
                         remaining(j) = .false.
                     end if
                 end if
@@ -181,11 +181,11 @@ subroutine groupbytype(nelem, elements, types, ngroup, groupsize, groupid)
     foreorder(:ngroup) = sorted_order(grouptype, ngroup)
     backorder(:ngroup) = inverse_mapping(foreorder(:ngroup))
     grouptype(:ngroup) = grouptype(foreorder(:ngroup))
-    groupsize(:ngroup) = groupsize(foreorder(:ngroup))
-    groupid(:nelem) = backorder(groupid(:nelem))
+    grouplens(:ngroup) = grouplens(foreorder(:ngroup))
+    groupidcs(:nitem) = backorder(groupidcs(:nitem))
 
-!    print *, groupid(:ngroup)
-!    print *, types(foreorder)
+!    print *, groupidcs(:ngroup)
+!    print *, itemtypes(foreorder)
 
 end subroutine
 
@@ -213,12 +213,12 @@ subroutine assort_neighbors(mol)
 
 end subroutine
 
-subroutine getmnatypes(mol, nin, nout, intype, outype, typemap)
+subroutine getmnatypes(mol, nin, nout, intypes, outtypes, typemap)
    type(cMol), intent(in) :: mol
    integer, intent(in) :: nin
-   integer, dimension(:), intent(in) :: intype
+   integer, dimension(:), intent(in) :: intypes
    integer, intent(out) :: nout
-   integer, dimension(:), intent(out) :: outype, typemap
+   integer, dimension(:), intent(out) :: outtypes, typemap
 
    integer :: i, j
    integer :: nadjs(mol%natom)
@@ -235,14 +235,14 @@ subroutine getmnatypes(mol, nin, nout, intype, outype, typemap)
    do i = 1, mol%natom
       if (untyped(i)) then
          nout = nout + 1
-         outype(i) = nout
-         parentype(nout) = intype(i)
+         outtypes(i) = nout
+         parentype(nout) = intypes(i)
          do j = i + 1, mol%natom
-!               print '(a, x, i0, x, i0)', trim(elsym(intype0(i))), i, j
+!               print '(a, x, i0, x, i0)', trim(elsym(intypes0(i))), i, j
             if (untyped(j)) then
-               if (intype(j) == intype(i)) then
-                  if (same_adjacency(nin, intype, nadjs(i), adjlists(:, i), intype, nadjs(j), adjlists(:, j))) then
-                     outype(j) = nout
+               if (intypes(j) == intypes(i)) then
+                  if (same_adjacency(nin, intypes, nadjs(i), adjlists(:, i), intypes, nadjs(j), adjlists(:, j))) then
+                     outtypes(j) = nout
                      untyped(j) = .false.
                   end if
                end if
@@ -272,7 +272,7 @@ subroutine calcequivmat(mol0, mol1, mnaord0, mnaord1, nadjmna0, adjmnalen0, adjm
    integer, dimension(:, :), allocatable :: adjlists0, adjlists1
 
    integer :: h, i, j, offset, level, nin, nout
-   integer, dimension(mol0%natom) :: intype0, intype1, outype0, outype1
+   integer, dimension(mol0%natom) :: intypes0, intypes1, outtypes0, outtypes1
    integer, dimension(maxcoord) :: indices, atomorder
 
    natom = mol0%get_natom()
@@ -284,8 +284,8 @@ subroutine calcequivmat(mol0, mol1, mnaord0, mnaord1, nadjmna0, adjmnalen0, adjm
    adjlists1 = mol1%get_adjlists(mnaord1)
 
    nin = neltype
-   intype0 = mol0%get_atomeltypes(mnaord0)
-   intype1 = mol1%get_atomeltypes(mnaord1)
+   intypes0 = mol0%get_atomeltypes(mnaord0)
+   intypes1 = mol1%get_atomeltypes(mnaord1)
    level = 1
 
    do
@@ -294,7 +294,7 @@ subroutine calcequivmat(mol0, mol1, mnaord0, mnaord1, nadjmna0, adjmnalen0, adjm
       do h = 1, neltype
          do i = offset + 1, offset + eltypepartlens(h)
             do j = offset + 1, offset + eltypepartlens(h)
-               if (intype0(i) == intype1(j)) then
+               if (intypes0(i) == intypes1(j)) then
                   equivmat(j, i) = level
                end if
             end do
@@ -303,38 +303,38 @@ subroutine calcequivmat(mol0, mol1, mnaord0, mnaord1, nadjmna0, adjmnalen0, adjm
       end do
 
       do i = 1, natom
-         call groupbytype(nadjs0(i), adjlists0(:, i), intype0, nadjmna0(i, level), adjmnalen0(:, i, level), indices)
+         call groupbytype(nadjs0(i), adjlists0(:, i), intypes0, nadjmna0(i, level), adjmnalen0(:, i, level), indices)
          atomorder(:nadjs0(i)) = sorted_order(indices, nadjs0(i))
          adjmnalist0(:nadjs0(i), i, level) = adjlists0(atomorder(:nadjs0(i)), i)
       end do
 
       do i = 1, natom
-         call groupbytype(nadjs1(i), adjlists1(:, i), intype1, nadjmna1(i, level), adjmnalen1(:, i, level), indices)
+         call groupbytype(nadjs1(i), adjlists1(:, i), intypes1, nadjmna1(i, level), adjmnalen1(:, i, level), indices)
          atomorder(:nadjs1(i)) = sorted_order(indices, nadjs1(i))
          adjmnalist1(:nadjs1(i), i, level) = adjlists1(atomorder(:nadjs1(i)), i)
       end do
 
-      call getmnacrosstypes(mol0%natom, nin, intype0, nadjs0, adjlists0, intype1, nadjs1, adjlists1, &
-         nout, outype0, outype1)
+      call getmnacrosstypes(mol0%natom, nin, intypes0, nadjs0, adjlists0, intypes1, nadjs1, adjlists1, &
+         nout, outtypes0, outtypes1)
 
-      if (all(outype0 == intype0) .and. all((outype1 == intype1))) exit
+      if (all(outtypes0 == intypes0) .and. all((outtypes1 == intypes1))) exit
 
       nin = nout
-      intype0 = outype0
-      intype1 = outype1
+      intypes0 = outtypes0
+      intypes1 = outtypes1
       level = level + 1
 
    end do
 
 end subroutine
 
-subroutine getmnacrosstypes(natom, nin, intype0, nadjs0, adjlists0, intype1, nadjs1, adjlists1, &
-      nout, outype0, outype1)
+subroutine getmnacrosstypes(natom, nin, intypes0, nadjs0, adjlists0, intypes1, nadjs1, adjlists1, &
+      nout, outtypes0, outtypes1)
    integer, intent(in) :: natom, nin
-   integer, dimension(:), intent(in) :: intype0, intype1, nadjs0, nadjs1
+   integer, dimension(:), intent(in) :: intypes0, intypes1, nadjs0, nadjs1
    integer, dimension(:, :), intent(in) :: adjlists0, adjlists1
    integer, intent(out) :: nout
-   integer, dimension(:), intent(out) :: outype0, outype1
+   integer, dimension(:), intent(out) :: outtypes0, outtypes1
 
    integer i, j
    integer archetype(natom)
@@ -346,13 +346,13 @@ subroutine getmnacrosstypes(natom, nin, intype0, nadjs0, adjlists0, intype1, nad
    do i = 1, natom
       if (untyped(i)) then
          nout = nout + 1
-         outype0(i) = nout
+         outtypes0(i) = nout
          archetype(nout) = i
          do j = i + 1, natom
             if (untyped(j)) then
-               if (intype0(j) == intype0(i)) then
-                  if (same_adjacency(nin, intype0, nadjs0(i), adjlists0(:, i), intype0, nadjs0(j), adjlists0(:, j))) then
-                     outype0(j) = nout
+               if (intypes0(j) == intypes0(i)) then
+                  if (same_adjacency(nin, intypes0, nadjs0(i), adjlists0(:, i), intypes0, nadjs0(j), adjlists0(:, j))) then
+                     outtypes0(j) = nout
                      untyped(j) = .false.
                   end if
                end if
@@ -366,10 +366,10 @@ subroutine getmnacrosstypes(natom, nin, intype0, nadjs0, adjlists0, intype1, nad
    do i = 1, nout
       do j = 1, natom
          if (untyped(j)) then
-            if (intype1(j) == intype0(archetype(i))) then
-               if (same_adjacency(nin, intype0, nadjs0(archetype(i)), adjlists0(:, archetype(i)), intype1, nadjs1(j), &
+            if (intypes1(j) == intypes0(archetype(i))) then
+               if (same_adjacency(nin, intypes0, nadjs0(archetype(i)), adjlists0(:, archetype(i)), intypes1, nadjs1(j), &
                             adjlists1(:, j))) then
-                  outype1(j) = i
+                  outtypes1(j) = i
                   untyped(j) = .false.
                end if
             end if
@@ -380,12 +380,12 @@ subroutine getmnacrosstypes(natom, nin, intype0, nadjs0, adjlists0, intype1, nad
    do i = 1, natom
       if (untyped(i)) then
          nout = nout + 1
-         outype1(i) = nout
+         outtypes1(i) = nout
          do j = i + 1, natom
             if (untyped(j)) then
-               if (intype1(j) == intype1(i)) then
-                  if (same_adjacency(nin, intype1, nadjs1(i), adjlists1(:, i), intype1, nadjs1(j), adjlists1(:, j))) then
-                     outype1(j) = nout
+               if (intypes1(j) == intypes1(i)) then
+                  if (same_adjacency(nin, intypes1, nadjs1(i), adjlists1(:, i), intypes1, nadjs1(j), adjlists1(:, j))) then
+                     outtypes1(j) = nout
                      untyped(j) = .false.
                   end if
                end if
