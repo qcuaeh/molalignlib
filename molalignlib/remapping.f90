@@ -108,8 +108,8 @@ subroutine optimize_mapping(mol0, mol1, mnaord0, mnaord1, maplist, countlist, nr
    atomneimnatypepartlens0 = mol0%get_atomneimnatypepartlens(mnaord0)
    atomneimnatypepartlens1 = mol1%get_atomneimnatypepartlens(mnaord1)
 
-   fragroots0 = mol0%get_molfragroots(mnaord0)
-   fragroots1 = mol1%get_molfragroots(mnaord1)
+   fragroots0 = mol0%get_fragroots(mnaord0)
+   fragroots1 = mol1%get_fragroots(mnaord1)
 
    nfrag0 = size(fragroots0)
    nfrag1 = size(fragroots1)

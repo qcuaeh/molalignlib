@@ -72,7 +72,7 @@ contains
    procedure :: bonded
    procedure :: add_bond
    procedure :: remove_bond
-   procedure :: get_molfragroots
+   procedure :: get_fragroots
    procedure, private :: get_default_atoms
    procedure, private :: get_default_nadjs
    procedure, private :: get_default_adjlists
@@ -460,24 +460,29 @@ function get_sorted_molfragparts(self, atomorder) result(parts)
 
 end function
 
-function get_molfragroots(self, atomorder) result(fragroots)
+function get_fragroots(self, atomorder) result(fragroots)
    class(cMol), intent(in) :: self
    integer, intent(in) :: atomorder(:)
    ! Local variables
    integer :: i
-   integer, allocatable :: order(:)
+   integer, allocatable, dimension(:) :: order, order1, order2
    integer, allocatable :: fragroots(:)
    integer, allocatable :: atommnatypes(:)
+   integer, allocatable :: eltypepartlens(:)
    integer, allocatable :: mnatypepartlens(:)
    type(cPart), allocatable :: fragparts(:)
+   type(cAtom), allocatable :: atoms(:)
 
+   atoms = self%get_atoms(atomorder)
    fragparts = self%get_molfragparts(atomorder)
-   atommnatypes = self%get_atommnatypes(atomorder)
+   eltypepartlens = self%get_eltypepartlens()
    mnatypepartlens = self%get_mnatypepartlens()
    allocate(fragroots(size(fragparts)))
 
    do i = 1, size(fragparts)
-      order = sorted_order(mnatypepartlens(atommnatypes(fragparts(i)%atomidcs)))
+      order1 = sorted_order(mnatypepartlens(atoms(fragparts(i)%atomidcs)%mnatype))
+      order2 = sorted_order(eltypepartlens(atoms(fragparts(i)%atomidcs(order1))%eltype))
+      order = order1(order2)
       fragroots(i) = fragparts(i)%atomidcs(order(1))
    end do
 
