@@ -20,111 +20,64 @@ implicit none
 
 contains
 
-function identitymap(n) result(idenperm)
-! Purpose: Get an identity permutation
+! Get an identity permutation
+function identitymap(n)
    integer, intent(in) :: n
-   integer :: idenperm(n)
+   ! Local variables
    integer :: i
+   integer :: identitymap(n)
 
    do i = 1, n
-      idenperm(i) = i
+      identitymap(i) = i
    end do
 
 end function
 
-function inverse_mapping(perm) result(invperm)
-! Purpose: Get the inverse permutation
-   integer, intent(in) :: perm(:)
-   integer :: invperm(size(perm))
+! Get the inverse mapping of mapping
+function inverse_mapping(mapping)
+   integer, intent(in) :: mapping(:)
+   ! Local variables
    integer :: i
+   integer, allocatable :: inverse_mapping(:)
 
-   do i = 1, size(perm)
-      invperm(perm(i)) = i
+   allocate(inverse_mapping(size(mapping)))
+
+   do i = 1, size(mapping)
+      inverse_mapping(mapping(i)) = i
    end do
 
 end function
 
-logical function is_permutation(arr, n) result(flag)
-! Purpose: Check if array is a valid permutation
-   integer, intent(in) :: n
-   integer, dimension(n), intent(in) :: arr
-   integer :: i, j
+function intersection(list1, list2, hash_size)
+   integer, intent(in) :: hash_size
+   integer, intent(in) :: list1(:), list2(:)
+   ! Local variables
+   integer :: i, ni
+   integer, allocatable :: intersection(:)
+   integer, allocatable :: intersection_buffer(:)
+   logical, allocatable :: hash_table(:)
 
-   flag = .true.
-   do i = 1, n
-      do j = 1, n
-         if (arr(j) == i) exit
-      end do
-      if (j == n + 1) then
-         flag = .false.
-         exit
+   allocate(hash_table(hash_size))
+   allocate(intersection_buffer(min(size(list1), size(list2))))
+
+   hash_table = .false.  ! Inicializar todos los elementos a falso
+
+   ! Añadir elementos de list1 al conjunto
+   do i = 1, size(list1)
+      hash_table(list1(i)) = .true.
+   end do
+
+   ! Verificar elementos de list2 y construir la intersección
+   ni = 0
+   do i = 1, size(list2)
+      if (hash_table(list2(i))) then
+         ni = ni + 1
+         intersection_buffer(ni) = list2(i)
       end if
    end do
+
+   intersection = intersection_buffer(:ni)
 
 end function
-
-subroutine union(n1, list1, n2, list2, n3, list3)
-! Purpose: Find the union of two sorted lists without repeated elements
-   integer, intent(in) :: n1, n2, list1(:), list2(:)
-   integer, intent(out) :: n3, list3(:)
-   integer :: i1, i2
-
-   i1 = 1
-   i2 = 1
-   n3 = 0
-
-   do while (i1 <= n1 .and. i2 <= n2)
-      n3 = n3 + 1
-      if (list1(i1) < list2(i2)) then
-         list3(n3) = list1(i1)
-         i1 = i1 + 1
-      else if (list1(i1) > list2(i2)) then
-         list3(n3) = list2(i2)
-         i2 = i2 + 1
-      else
-         list3(n3) = list2(i2)
-         i1 = i1 + 1
-         i2 = i2 + 1
-      end if
-   end do
-
-   do while (i1 <= n1)
-      n3 = n3 + 1
-      list3(n3) = list1(i1)
-      i1 = i1 + 1
-   end do
-
-   do while (i2 <= n2)
-      n3 = n3 + 1
-      list3(n3) = list2(i2)
-      i2 = i2 + 1
-   end do
-
-end subroutine
-
-subroutine intersection(n1, list1, n2, list2, n3, list3)
-! Purpose: Find the intersection of two sorted lists without repeated elements
-   integer, intent(in) :: n1, n2, list1(:), list2(:)
-   integer, intent(out) :: n3, list3(:)
-   integer :: i1, i2
-
-   i1 = 1
-   i2 = 1
-   n3 = 0
-
-   do while (i1 <= n1 .and. i2 <= n2)
-      if (list1(i1) < list2(i2)) then
-         i1 = i1 + 1
-      else if (list1(i1) > list2(i2)) then
-         i2 = i2 + 1
-      else
-         n3 = n3 + 1
-         list3(n3) = list2(i2)
-         i1 = i1 + 1
-         i2 = i2 + 1
-      end if
-   end do
-
-end subroutine
 
 end module
