@@ -147,15 +147,15 @@ subroutine readmol2(unit, mol)
 end subroutine
 
 subroutine set_bonds(mol)
+   ! Arguments
    type(cMol), intent(inout) :: mol
-
+   ! Local variables
    integer :: i, j
    integer :: nadjs(mol%natom)
    integer :: adjlists(maxcoord, mol%natom)
-   integer, allocatable :: atomelnums(:)
    real(wp) :: atomdist
    real(wp), allocatable :: adjrads(:)
-   real(wp), allocatable :: atomcoords(:, :)
+   type(cAtom), allocatable :: atoms(:)
 
    ! Bond initialization
    nadjs(:) = 0
@@ -166,17 +166,16 @@ subroutine set_bonds(mol)
       return
    end if
 
-   atomelnums = mol%get_atomelnums()
-   atomcoords = mol%get_atomcoords()
+   atoms = mol%get_atoms()
 
    ! Set adjacency radii
-   adjrads = covrad(atomelnums) + 0.25*(vdwrad(atomelnums) - covrad(atomelnums))
+   adjrads = covrad(atoms%elnum) + 0.25*(vdwrad(atoms%elnum) - covrad(atoms%elnum))
 
    ! Register adjacency matrix i,j if atoms i and j are closer
    ! than the sum of their adjacency radius
    do i = 1, mol%natom
       do j = i + 1, mol%natom
-         atomdist = sqrt(sum((atomcoords(:, i) - atomcoords(:, j))**2))
+         atomdist = sqrt(sum((atoms(i)%coords - atoms(j)%coords)**2))
          if (atomdist < adjrads(i) + adjrads(j)) then
             nadjs(i) = nadjs(i) + 1
             nadjs(j) = nadjs(j) + 1

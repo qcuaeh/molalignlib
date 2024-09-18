@@ -35,7 +35,7 @@ use molalignlib
 implicit none
 
 integer :: i
-integer :: nrec, error
+integer :: nrec
 integer :: read_unit0, read_unit1, write_unit
 integer, allocatable, dimension(:) :: countlist
 integer, allocatable, dimension(:, :) :: maplist
@@ -194,12 +194,9 @@ if (remap_flag) then
    call remap_atoms( &
       mol0, &
       mol1, &
-      maplist, &
-      countlist, &
       nrec, &
-      error)
-
-   if (error /= 0) stop
+      maplist, &
+      countlist)
 
    minrmsd = huge(rmsd)
    minadjd = huge(adjd)
@@ -210,16 +207,15 @@ if (remap_flag) then
 
    do i = 1, nrec
 
+      call align_remapped_atoms( &
+         mol0, &
+         mol1, &
+         maplist(:, i), &
+         travec, &
+         rotmat)
+
       auxmol1 = mol1
       call auxmol1%permutate_atoms(maplist(:, i))
-
-      call align_atoms( &
-         mol0, &
-         auxmol1, &
-         travec, &
-         rotmat, &
-         error)
-
       call auxmol1%rotate_atomcoords(rotmat)
       call auxmol1%translate_atomcoords(travec)
 
@@ -250,10 +246,7 @@ else
       mol0, &
       mol1, &
       travec, &
-      rotmat, &
-      error)
-
-   if (error /= 0) stop
+      rotmat)
 
    call mol1%rotate_atomcoords(rotmat)
    call mol1%translate_atomcoords(travec)

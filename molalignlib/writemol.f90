@@ -16,6 +16,7 @@
 
 module writemol
 use stdio
+use types
 use bounds
 use strutils
 use chemdata
@@ -24,51 +25,61 @@ implicit none
 
 contains
 
-subroutine writexyz(unit, title, natom, atomelnums, coords)
-   character(*), intent(in) :: title
-   integer, intent(in) :: unit, natom
-   integer, dimension(:), intent(in) :: atomelnums
-   real(wp), dimension(:, :), intent(in) :: coords
+subroutine writexyz(unit, mol)
+   ! Arguments
+   integer, intent(in) :: unit
+   type(cMol) :: mol
+   ! Local varibles
    integer :: i
+   character(:), allocatable :: title
+   type(cAtom), allocatable :: atoms(:)
 
-   write (unit, '(i0)') natom
+   title = mol%get_title()
+   atoms = mol%get_atoms()
+
+   write (unit, '(i0)') size(atoms)
    write (unit, '(a)') title
 
-   do i = 1, natom
-      write (unit, '(a,3(2x,f12.6))') elsym(atomelnums(i)), coords(:, i)
+   do i = 1, size(atoms)
+      write (unit, '(a,3(2x,f12.6))') elsym(atoms(i)%elnum), atoms(i)%coords
    end do
 
 end subroutine
 
-subroutine writemol2(unit, title, natom, atomelnums, coords, nbond, bonds)
-   character(*), intent(in) :: title
-   integer, intent(in) :: unit, natom
-   integer, dimension(:), intent(in) :: atomelnums
-   real(wp), dimension(:, :), intent(in) :: coords
-   integer, intent(in) :: nbond
-   integer, intent(in) :: bonds(:, :)
+subroutine writemol2(unit, mol)
+   ! Arguments
+   integer, intent(in) :: unit
+   type(cMol) :: mol
+   ! Local varibles
    integer :: i
-   
+   character(:), allocatable :: title
+   type(cAtom), allocatable :: atoms(:)
+   type(cBond), allocatable :: bonds(:)
+
+   title = mol%get_title()
+   atoms = mol%get_atoms()
+   bonds = mol%get_bonds()
+
    write (unit, '(a)') '@<TRIPOS>MOLECULE'
    if (title /= '') then
       write (unit, '(a)') title
    else
       write (unit, '(a)') 'Untitled'
    end if
-   write (unit, '(5(i4,1x))') natom, nbond, 0, 0, 0
+   write (unit, '(5(i4,1x))') size(atoms), size(bonds), 0, 0, 0
    write (unit, '(a)') 'SMALL'
    write (unit, '(a)') 'NO_CHARGES'
    write (unit, '(a)') '@<TRIPOS>ATOM'
 
-   do i = 1, natom
+   do i = 1, size(atoms)
       write (unit, '(i4,1x,a2,3(1x,f12.6),1x,a8,1x,i2,1x,a4,1x,f7.3)') &
-         i, elsym(atomelnums(i)), coords(:, i), elsym(atomelnums(i)), 1, 'MOL1', 0.
+         i, elsym(atoms(i)%elnum), atoms(i)%coords, elsym(atoms(i)%elnum), 1, 'MOL1', 0.
    end do
 
    write (unit, '(a)') '@<TRIPOS>BOND'
 
-   do i = 1, nbond
-      write (unit, '(i4,1x,2(1x,i4),1x,a2)') i, bonds(1, i), bonds(2, i), '1'
+   do i = 1, size(bonds)
+      write (unit, '(i4,1x,2(1x,i4),1x,a2)') i, bonds(i)%atomidx1, bonds(i)%atomidx2, '1'
    end do
 
 end subroutine

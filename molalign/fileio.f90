@@ -115,9 +115,9 @@ subroutine writefile(unit, fmtout, mol)
 
    select case (fmtout)
    case ('xyz')
-      call writexyz(unit, mol%title, mol%natom, mol%get_atomelnums(), mol%get_atomcoords())
+      call writexyz(unit, mol)
    case ('mol2')
-      call writemol2(unit, mol%title, mol%natom, mol%get_atomelnums(), mol%get_atomcoords(), nbond, bonds)
+      call writemol2(unit, mol)
    case default
       write (stderr, '(a,1x,a)') 'Invalid format:', fmtout
       stop

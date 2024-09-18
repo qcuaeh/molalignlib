@@ -19,10 +19,10 @@ type, public :: cPartition
    type(cPart), allocatable :: parts(:)
 contains
    procedure :: init => partition_init
-   procedure :: get_lenlist => partition_get_lenlist
+   procedure :: get_lenlist => partition_lenlist
 end type
 
-type :: cBond
+type, public :: cBond
    integer :: atomidx1
    integer :: atomidx2
 end type
@@ -60,7 +60,7 @@ contains
    procedure :: set_mnatypes
    procedure :: set_molfrags
    procedure :: set_atomneimnatypepartlens
-   procedure :: get_natom
+   procedure :: get_title
    procedure :: get_neltype
    procedure :: get_nmnatype
    procedure :: get_eltypepartlens
@@ -73,12 +73,12 @@ contains
    procedure :: add_bond
    procedure :: remove_bond
    procedure :: get_fragroots
-   procedure, private :: get_default_atoms
+   procedure :: get_atoms
+   procedure :: get_sorted_atoms
    procedure, private :: get_default_nadjs
    procedure, private :: get_default_adjlists
    procedure, private :: get_default_adjmat
    procedure, private :: get_default_atomcoords
-   procedure, private :: get_default_atomelnums
    procedure, private :: get_default_atomlabels
    procedure, private :: get_default_atomeltypes
    procedure, private :: get_default_atomweights
@@ -88,12 +88,10 @@ contains
    procedure, private :: get_default_eltypeparts
    procedure, private :: get_default_mnatypeparts
    procedure, private :: get_default_molfragparts
-   procedure, private :: get_sorted_atoms
    procedure, private :: get_sorted_nadjs
    procedure, private :: get_sorted_adjlists
    procedure, private :: get_sorted_adjmat
    procedure, private :: get_sorted_atomcoords
-   procedure, private :: get_sorted_atomelnums
    procedure, private :: get_sorted_atomlabels
    procedure, private :: get_sorted_atomeltypes
    procedure, private :: get_sorted_atomweights
@@ -105,12 +103,10 @@ contains
    procedure, private :: get_sorted_molfragparts
    procedure, private :: matrix_rotate_atomcoords
    procedure, private :: quater_rotate_atomcoords
-   generic :: get_atoms => get_default_atoms, get_sorted_atoms
    generic :: get_nadjs => get_default_nadjs, get_sorted_nadjs
    generic :: get_adjlists => get_default_adjlists, get_sorted_adjlists
    generic :: get_adjmat => get_default_adjmat, get_sorted_adjmat
    generic :: get_atomcoords => get_default_atomcoords, get_sorted_atomcoords
-   generic :: get_atomelnums => get_default_atomelnums, get_sorted_atomelnums
    generic :: get_atomlabels => get_default_atomlabels, get_sorted_atomlabels
    generic :: get_atomeltypes => get_default_atomeltypes, get_sorted_atomeltypes
    generic :: get_atommnatypes => get_default_atommnatypes, get_sorted_atommnatypes
@@ -125,10 +121,11 @@ end type
 
 contains
 
-integer function get_natom(self) result(natom)
+function get_title(self) result(title)
    class(cMol), intent(in) :: self
+   character(:), allocatable :: title
 
-   natom = size(self%atoms)
+   title = self%title
 
 end function
 
@@ -213,15 +210,7 @@ subroutine set_atomelnums(self, atomelnums)
 
 end subroutine
 
-function get_default_atomelnums(self) result(atomelnums)
-   class(cMol), intent(in) :: self
-   integer, allocatable :: atomelnums(:)
-
-   atomelnums = self%atoms(:)%elnum
-
-end function
-
-function get_default_atoms(self) result(atoms)
+function get_atoms(self) result(atoms)
    class(cMol), intent(in) :: self
    ! Local variables
    type(cAtom), allocatable :: atoms(:)
@@ -230,23 +219,21 @@ function get_default_atoms(self) result(atoms)
 
 end function
 
-function get_sorted_atoms(self, atom_order) result(atoms)
+function get_sorted_atoms(self) result(atoms)
    class(cMol), intent(in) :: self
-   integer, intent(in) :: atom_order(:)
    ! Local variables
+   integer :: p, offset, partsize
+   integer, allocatable :: atom_order(:)
    type(cAtom), allocatable :: atoms(:)
 
-   atoms = self%atoms(atom_order)
+   allocate(atoms(size(self%atoms)))
 
-end function
-
-function get_sorted_atomelnums(self, atom_order) result(atomelnums)
-   class(cMol), intent(in) :: self
-   integer, intent(in) :: atom_order(:)
-   ! Local variables
-   integer, allocatable :: atomelnums(:)
-
-   atomelnums = self%atoms(atom_order)%elnum
+   offset = 0
+   do p = 1, size(self%mnatypepartition%parts)
+      partsize = size(self%mnatypepartition%parts(p)%atomidcs)
+      atoms(offset+1:offset+partsize) = self%atoms(self%mnatypepartition%parts(p)%atomidcs)
+      offset = offset + partsize
+   end do
 
 end function
 
@@ -335,7 +322,7 @@ subroutine partition_init(self, npart, partidcs)
 
 end subroutine
 
-function partition_get_lenlist(self) result(lenlist)
+function partition_lenlist(self) result(lenlist)
    class(cPartition), intent(in) :: self
    ! Local variables
    integer :: i
@@ -473,7 +460,7 @@ function get_fragroots(self, atom_order) result(fragroots)
    type(cPart), allocatable :: fragparts(:)
    type(cAtom), allocatable :: atoms(:)
 
-   atoms = self%get_atoms(atom_order)
+   atoms = self%get_sorted_atoms()
    fragparts = self%get_molfragparts(atom_order)
    eltypepartlens = self%get_eltypepartlens()
    mnatypepartlens = self%get_mnatypepartlens()
@@ -794,30 +781,23 @@ function get_bonds(self) result(bonds)
    integer :: i, j, nbond
    logical, allocatable :: adjmat(:, :)
    type(cBond), allocatable :: bonds(:)
+   type(cBond), allocatable :: bonds_buffer(:)
 
    adjmat = self%get_adjmat()
+   allocate(bonds_buffer(size(self%atoms)*maxcoord))
 
    nbond = 0
    do i = 1, size(self%atoms)
       do j = i + 1, size(self%atoms)
          if (adjmat(i, j)) then
             nbond = nbond + 1
+            bonds_buffer(nbond)%atomidx1 = i
+            bonds_buffer(nbond)%atomidx2 = j
          end if
       end do
    end do
 
-   allocate(bonds(nbond))
-
-   nbond = 0
-   do i = 1, size(self%atoms)
-      do j = i + 1, size(self%atoms)
-         if (adjmat(i, j)) then
-            nbond = nbond + 1
-            bonds(nbond)%atomidx1 = i
-            bonds(nbond)%atomidx2 = j
-         end if
-      end do
-   end do
+   bonds = bonds_buffer(:nbond)
 
 end function
 

@@ -41,28 +41,24 @@ contains
 subroutine remap_atoms( &
    mol0, &
    mol1, &
-   maplist, &
-   countlist, &
    nrec, &
-   error)
+   maplist, &
+   countlist)
 
    type(cMol), intent(inout) :: mol0, mol1
+   integer, intent(out) :: nrec
    integer, dimension(:, :), intent(inout) :: maplist
    integer, dimension(:), intent(inout) :: countlist
-   integer, intent(out) :: nrec, error
 
    integer :: i
-   integer, dimension(mol0%natom) :: mapping
    integer, allocatable, dimension(:) :: mnaord0, mnaord1
    real(wp) :: travec0(3), travec1(3)
-   real(wp), allocatable, dimension(:, :) :: backcoords0, backcoords1
+   real(wp), allocatable, dimension(:, :) :: atomcoords0, atomcoords1
+   type(cAtom), allocatable, dimension(:) :: atoms0, atoms1
 
+!   integer, dimension(mol0%natom) :: mapping
 !   integer :: nbond0, bonds0(2, maxcoord*mol0%natom)
 !   integer :: nbond1, bonds1(2, maxcoord*mol1%natom)
-
-   ! Set error code to 0 by default
-
-   error = 0
 
    !  Select assignment algorithm
 
@@ -87,42 +83,43 @@ subroutine remap_atoms( &
    mnaord0 = sorted_order(mol0%get_atommnatypes())
    mnaord1 = sorted_order(mol1%get_atommnatypes())
 
+   ! Get sorted atoms lists
+
+   atoms0 = mol0%get_sorted_atoms()
+   atoms1 = mol1%get_sorted_atoms()
+
    ! Abort if molecules have different number of atoms
 
-   if (mol0%natom /= mol1%natom) then
-      write (stderr, '(a)') 'Error: The molecules are not isomers'
-      error = 1
-      return
+   if (size(atoms0) /= size(atoms1)) then
+      write (stderr, '(a)') 'Error: These molecules are not isomers'
+      stop
    end if
 
    ! Abort if molecules are not isomers
 
-   if (any(mol0%get_atomelnums(mnaord0) /= mol1%get_atomelnums(mnaord1))) then
-      write (stderr, '(a)') 'Error: The molecules are not isomers'
-      error = 1
-      return
+   if (any(atoms0%elnum /= atoms1%elnum)) then
+      write (stderr, '(a)') 'Error: These molecules are not isomers'
+      stop
    end if
 
    ! Abort if there are conflicting atomic types
 
-   if (any(mol0%get_atomeltypes(mnaord0) /= mol1%get_atomeltypes(mnaord1))) then
+   if (any(atoms0%eltype /= atoms1%eltype)) then
       write (stderr, '(a)') 'Error: There are conflicting atomic types'
-      error = 1
-      return
+      stop
    end if
 
    ! Abort if there are conflicting weights
 
-   if (any(abs(mol0%get_atomweights(mnaord0) - mol1%get_atomweights(mnaord1)) > 1.E-6)) then
+   if (any(abs(atoms0%weight - atoms1%weight) > 1.E-6)) then
       write (stderr, '(a)') 'Error: There are conflicting weights'
-      error = 1
-      return
+      stop
    end if
 
    ! Backup coordinates
 
-   backcoords0 = mol0%get_atomcoords()
-   backcoords1 = mol1%get_atomcoords()
+   atomcoords0 = mol0%get_atomcoords()
+   atomcoords1 = mol1%get_atomcoords()
 
    ! Mirror coordinates
 
@@ -132,8 +129,8 @@ subroutine remap_atoms( &
 
    ! Calculate centroids
 
-   travec0 = -centroid_atomcoords(mol0)
-   travec1 = -centroid_atomcoords(mol1)
+   travec0 = -centroid_coords(mol0)
+   travec1 = -centroid_coords(mol1)
 
    ! Center coordinates at the centroids
 
@@ -163,12 +160,11 @@ subroutine remap_atoms( &
 
    ! Restore coordinates
 
-   call mol0%set_atomcoords(backcoords0)
-   call mol1%set_atomcoords(backcoords1)
+   call mol0%set_atomcoords(atomcoords0)
+   call mol1%set_atomcoords(atomcoords1)
 
 !   ! Print coordinates with internal order
 
-!   mapping = maplist(:, 1)
 !   call rotate(natom1, workcoords1, leastrotquat(natom0, workweights0, workcoords0, workcoords1, mapping))
 !   open(unit=99, file='aligned_debug.mol2', action='write', status='replace')
 !   call adjmat2bonds(natom0, workadjmat0, nbond0, bonds0)
@@ -180,67 +176,110 @@ subroutine remap_atoms( &
 
 end subroutine
 
+! Align atoms
+subroutine align_remapped_atoms( &
+   mol0, &
+   mol1, &
+   mapping, &
+   travec, &
+   rotmat)
+
+   type(cMol), intent(inout) :: mol0, mol1
+   integer :: mapping(:)
+   real(wp), intent(out) :: travec(3), rotmat(3, 3)
+   ! Local variables
+   real(wp) :: travec0(3), travec1(3), rotquat(4)
+   real(wp), allocatable :: atomweights(:)
+   real(wp), allocatable, dimension(:, :) :: atomcoords0, atomcoords1
+
+   atomweights = mol0%get_atomweights()
+   atomcoords0 = mol0%get_atomcoords()
+   atomcoords1 = mol1%get_atomcoords()
+
+   ! Calculate centroids
+
+   travec0 = -centroid_coords(mol0)
+   travec1 = -centroid_coords(mol1)
+
+   ! Calculate optimal rotation matrix
+
+   rotquat = leastrotquat( &
+      mol0%natom, &
+      atomweights, &
+      translated(mol0%natom, atomcoords0, travec0), &
+      translated(mol1%natom, atomcoords1, travec1), &
+      mapping &
+   )
+
+   rotmat = quat2rotmat(rotquat)
+
+   ! Calculate optimal translation vector
+
+   travec = matmul(rotmat, travec1) - travec0
+
+end subroutine
+
 subroutine align_atoms( &
 ! Purpose: Align atoms0 and atoms1
    mol0, &
    mol1, &
    travec, &
-   rotmat, &
-   error)
+   rotmat)
 
    type(cMol), intent(inout) :: mol0, mol1
    real(wp), intent(out) :: travec(3), rotmat(3, 3)
    real(wp) :: travec0(3), travec1(3), rotquat(4)
-   integer, intent(out) :: error
+   type(cAtom), allocatable, dimension(:) :: atoms0, atoms1
 
-   ! Set error code to 0 by default
+   ! Get sorted atoms lists
 
-   error = 0
+   atoms0 = mol0%get_sorted_atoms()
+   atoms1 = mol1%get_sorted_atoms()
 
    ! Abort if molecules have different number of atoms
 
-   if (mol0%natom /= mol1%natom) then
-      write (stderr, '(a)') 'Error: The molecules are not isomers'
-      error = 1
-      return
+   if (size(atoms0) /= size(atoms1)) then
+      write (stderr, '(a)') 'Error: These molecules are not isomers'
+      stop
    end if
 
    ! Abort if molecules are not isomers
 
-   if (any(sorted(mol0%get_atomelnums(), mol0%natom) /= sorted(mol1%get_atomelnums(), mol1%natom))) then
-      write (stderr, '(a)') 'Error: The molecules are not isomers'
-      error = 1
-      return
-   end if
-
-   ! Abort if atoms are not ordered
-
-   if (any(mol0%get_atomelnums() /= mol1%get_atomelnums())) then
-      write (stderr, '(a)') 'Error: The atoms are not in the same order'
-      error = 1
-      return
+   if (any(atoms0%elnum /= atoms1%elnum)) then
+      write (stderr, '(a)') '*Error: These molecules are not isomers'
+      stop
    end if
 
    ! Abort if there are conflicting atomic types
 
-   if (any(sorted(mol0%get_atomeltypes(), mol0%natom) /= sorted(mol1%get_atomeltypes(), mol1%natom))) then
+   if (any(atoms0%eltype /= atoms1%eltype)) then
       write (stderr, '(a)') 'Error: There are conflicting atomic types'
-      error = 1
-      return
+      stop
+   end if
+
+   ! Get unsorted atoms lists
+
+   atoms0 = mol0%get_atoms()
+   atoms1 = mol1%get_atoms()
+
+   ! Abort if atoms are not ordered
+
+   if (any(atoms0%elnum /= atoms1%elnum)) then
+      write (stderr, '(a)') 'Error: The atoms are not in the same order'
+      stop
    end if
 
    ! Abort if atomic types are not ordered
 
-   if (any(mol0%get_atomeltypes() /= mol1%get_atomeltypes())) then
+   if (any(atoms0%eltype /= atoms1%eltype)) then
       write (stderr, '(a)') 'Error: Atomic types are not in the same order'
-      error = 1
-      return
+      stop
    end if
 
    ! Calculate centroids
 
-   travec0 = -centroid_atomcoords(mol0)
-   travec1 = -centroid_atomcoords(mol1)
+   travec0 = -centroid_coords(mol0)
+   travec1 = -centroid_coords(mol1)
 
    ! Calculate optimal rotation matrix
 
@@ -277,7 +316,7 @@ function get_adjd(mol0, mol1) result(adjd)
 
 end function
 
-function centroid_atomcoords(mol) result(coords)
+function centroid_coords(mol) result(coords)
 ! Purpose: Get the centroid coordinates
    type(cMol), intent(in) :: mol
    ! Local variables

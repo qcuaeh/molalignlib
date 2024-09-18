@@ -39,15 +39,14 @@ subroutine assort_atoms(mol)
    integer, dimension(mol%natom) :: foreorder, backorder
    integer, dimension(mol%natom) :: blockelnums, blocklabels
 
-   integer, allocatable :: atomelnums(:), atomlabels(:)
+   type(cAtom), allocatable :: atoms(:)
 !   real(wp), allocatable :: weights(:)
 
    ! Initialization
 
    neltype = 0
    remaining = .true.
-   atomelnums = mol%get_atomelnums()
-   atomlabels = mol%get_atomlabels()
+   atoms = mol%get_atoms()
 !   weights = mol%get_atomweights()
 
    ! Create block list
@@ -58,17 +57,16 @@ subroutine assort_atoms(mol)
 
          neltype = neltype + 1
          atomeltypes(i) = neltype
-         blockelnums(neltype) = atomelnums(i)
-         blocklabels(neltype) = atomlabels(i)
+         blockelnums(neltype) = atoms(i)%elnum
+         blocklabels(neltype) = atoms(i)%label
          remaining(i) = .false.
 
          do j = 1, mol%natom
             if (remaining(j)) then
-               if (atomelnums(i) == atomelnums(j) .and. atomlabels(i) == atomlabels(j)) then
+               if (atoms(i)%elnum == atoms(j)%elnum .and. atoms(i)%label == atoms(j)%label) then
 !                  if (weights(i) == weights(j)) then
                      remaining(j) = .false.
                      atomeltypes(j) = neltype
-                     atomelnums(j) = atomelnums(i)
 !                     weights(j) = weights(i)
 !                  else
 !                     ! Abort if there are inconsistent weights
@@ -275,7 +273,7 @@ subroutine calcequivmat(mol0, mol1, mnaord0, mnaord1, nadjmna0, adjmnalen0, adjm
    integer, dimension(mol0%natom) :: intypes0, intypes1, outtypes0, outtypes1
    integer, dimension(maxcoord) :: indices, atomorder
 
-   natom = mol0%get_natom()
+   natom = mol0%natom
    neltype = mol0%get_neltype()
    eltypepartlens = mol0%get_eltypepartlens()
    nadjs0 = mol0%get_nadjs(mnaord0)
