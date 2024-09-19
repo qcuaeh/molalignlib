@@ -297,7 +297,7 @@ subroutine partition_init(self, npart, partidcs)
    offset = 0
    do p = 1, size(self%parts)
       do i = 1, size(self%parts(p)%atomidcs)
-         self%atom_mapping(self%parts(p)%atomidcs(i)) = offset+i
+         self%atom_mapping(self%parts(p)%atomidcs(i)) = offset + i
       end do
       offset = offset + size(self%parts(p)%atomidcs)
    end do

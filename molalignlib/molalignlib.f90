@@ -20,6 +20,7 @@ use kinds
 use types
 use bounds
 use random
+use linear
 use sorting
 use discrete
 use rotation
@@ -211,11 +212,12 @@ subroutine align_remapped_atoms( &
       mapping &
    )
 
+   ! Calculate optimal rotation matrix
    rotmat = quat2rotmat(rotquat)
 
    ! Calculate optimal translation vector
-
    travec = matmul(rotmat, travec1) - travec0
+!   travec = travec1 - matmul(inv3(rotmat), travec0)
 
 end subroutine
 
@@ -288,7 +290,7 @@ subroutine align_atoms( &
       mol0%get_atomweights(), &
       translated(mol0%natom, mol0%get_atomcoords(), travec0), &
       translated(mol1%natom, mol1%get_atomcoords(), travec1), &
-      identitymap(mol0%natom) &
+      identity_mapping(mol0%natom) &
    )
 
    rotmat = quat2rotmat(rotquat)
@@ -296,23 +298,26 @@ subroutine align_atoms( &
    ! Calculate optimal translation vector
 
    travec = matmul(rotmat, travec1) - travec0
+!   travec = travec1 - matmul(inv3(rotmat), travec0)
 
 end subroutine
 
-function get_rmsd(mol0, mol1) result(rmsd)
+function get_rmsd(mol0, mol1, mapping) result(rmsd)
    type(cMol), intent(in) :: mol0, mol1
+   integer :: mapping(:)
    real(wp) :: rmsd
 
    rmsd = sqrt(squaredist(mol0%natom, mol0%get_atomweights(), mol0%get_atomcoords(), &
-         mol1%get_atomcoords(), identitymap(mol0%natom)) / sum(mol0%get_atomweights()))
+         mol1%get_atomcoords(), mapping) / sum(mol0%get_atomweights()))
 
 end function
 
-function get_adjd(mol0, mol1) result(adjd)
+function get_adjd(mol0, mol1, mapping) result(adjd)
    type(cMol), intent(in) :: mol0, mol1
+   integer :: mapping(:)
    integer :: adjd
 
-   adjd = adjacencydiff(mol0%natom, mol0%get_adjmat(), mol1%get_adjmat(), identitymap(mol0%natom))
+   adjd = adjacencydiff(mol0%natom, mol0%get_adjmat(), mol1%get_adjmat(), mapping)
 
 end function
 

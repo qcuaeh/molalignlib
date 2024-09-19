@@ -37,8 +37,9 @@ implicit none
 integer :: i
 integer :: nrec
 integer :: read_unit0, read_unit1, write_unit
-integer, allocatable, dimension(:) :: countlist
-integer, allocatable, dimension(:, :) :: maplist
+integer, allocatable :: countlist(:)
+integer, allocatable :: maplist(:, :)
+integer, allocatable :: mapping(:)
 character(:), allocatable :: arg
 character(:), allocatable :: pathin1, pathin2, pathout
 character(:), allocatable :: fmtin0, fmtin1, fmtout, optfmtin, optfmtout
@@ -219,10 +220,13 @@ if (remap_flag) then
       call auxmol1%rotate_atomcoords(rotmat)
       call auxmol1%translate_atomcoords(travec)
 
-      adjd = get_adjd(mol0, auxmol1)
+!      mapping = maplist(:, i)
+      mapping = identity_mapping(size(mol0%atoms))
+
+      adjd = get_adjd(mol0, auxmol1, mapping)
       minadjd = min(minadjd, adjd)
 
-      rmsd = get_rmsd(mol0, auxmol1)
+      rmsd = get_rmsd(mol0, auxmol1, mapping)
       minrmsd = min(minrmsd, rmsd)
 
       auxmol1%title = 'Map='//intstr(i)//' RMSD='//realstr(rmsd, 4)
@@ -251,8 +255,10 @@ else
    call mol1%rotate_atomcoords(rotmat)
    call mol1%translate_atomcoords(travec)
 
-   adjd = get_adjd(mol0, mol1)
-   rmsd = get_rmsd(mol0, mol1)
+   mapping = identity_mapping(size(mol0%atoms))
+
+   adjd = get_adjd(mol0, mol1, mapping)
+   rmsd = get_rmsd(mol0, mol1, mapping)
 
    if (bond_flag) then
       write (stderr, '(a,",",a)') intstr(adjd), realstr(rmsd, 4)

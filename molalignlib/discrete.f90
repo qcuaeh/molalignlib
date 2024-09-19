@@ -21,14 +21,14 @@ implicit none
 contains
 
 ! Get an identity permutation
-function identitymap(n)
+function identity_mapping(n) result(mapping)
    integer, intent(in) :: n
    ! Local variables
    integer :: i
-   integer :: identitymap(n)
+   integer :: mapping(n)
 
    do i = 1, n
-      identitymap(i) = i
+      mapping(i) = i
    end do
 
 end function

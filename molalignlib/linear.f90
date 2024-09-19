@@ -1,4 +1,5 @@
 module linear
+use stdio
 use kinds
 
 implicit none
@@ -8,6 +9,7 @@ external dsyev
 
 private
 public det3
+public inv3
 public syeval4
 public syevec4
 !public matmul
@@ -33,6 +35,30 @@ real(wp) function det3(a) result(det)
        + a(1,2)*a(2,3)*a(3,1)  &
        + a(1,3)*a(2,1)*a(3,2)  &
        - a(1,3)*a(2,2)*a(3,1)
+
+end function
+
+function inv3(a) result(inv)
+   real(wp), intent(in) :: a(3,3)
+   real(wp) :: inv(3,3)
+   real(wp) :: det
+
+   det = det3(a)
+
+   if (abs(det) < 1.0e-6) then
+      write (stderr, '(a)') 'Error: Matrix is not invertible'
+      stop
+   end if
+
+   inv(1,1) = (a(2,2) * a(3,3) - a(2,3) * a(3,2)) / det
+   inv(1,2) = (a(1,3) * a(3,2) - a(1,2) * a(3,3)) / det
+   inv(1,3) = (a(1,2) * a(2,3) - a(1,3) * a(2,2)) / det
+   inv(2,1) = (a(2,3) * a(3,1) - a(2,1) * a(3,3)) / det
+   inv(2,2) = (a(1,1) * a(3,3) - a(1,3) * a(3,1)) / det
+   inv(2,3) = (a(1,3) * a(2,1) - a(1,1) * a(2,3)) / det
+   inv(3,1) = (a(2,1) * a(3,2) - a(2,2) * a(3,1)) / det
+   inv(3,2) = (a(1,2) * a(3,1) - a(1,1) * a(3,2)) / det
+   inv(3,3) = (a(1,1) * a(2,2) - a(1,2) * a(2,1)) / det
 
 end function
 

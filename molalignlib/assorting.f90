@@ -335,7 +335,7 @@ subroutine getmnacrosstypes(natom, nin, intypes0, nadjs0, adjlists0, intypes1, n
    integer, dimension(:), intent(out) :: outtypes0, outtypes1
 
    integer i, j
-   integer archetype(natom)
+   integer archatom(natom)
    logical untyped(natom)
 
    nout = 0
@@ -345,7 +345,7 @@ subroutine getmnacrosstypes(natom, nin, intypes0, nadjs0, adjlists0, intypes1, n
       if (untyped(i)) then
          nout = nout + 1
          outtypes0(i) = nout
-         archetype(nout) = i
+         archatom(nout) = i
          do j = i + 1, natom
             if (untyped(j)) then
                if (intypes0(j) == intypes0(i)) then
@@ -364,8 +364,8 @@ subroutine getmnacrosstypes(natom, nin, intypes0, nadjs0, adjlists0, intypes1, n
    do i = 1, nout
       do j = 1, natom
          if (untyped(j)) then
-            if (intypes1(j) == intypes0(archetype(i))) then
-               if (same_adjacency(nin, intypes0, nadjs0(archetype(i)), adjlists0(:, archetype(i)), intypes1, nadjs1(j), &
+            if (intypes1(j) == intypes0(archatom(i))) then
+               if (same_adjacency(nin, intypes0, nadjs0(archatom(i)), adjlists0(:, archatom(i)), intypes1, nadjs1(j), &
                             adjlists1(:, j))) then
                   outtypes1(j) = i
                   untyped(j) = .false.
@@ -394,9 +394,9 @@ subroutine getmnacrosstypes(natom, nin, intypes0, nadjs0, adjlists0, intypes1, n
 
 end subroutine
 
-function same_adjacency(neltype, atomtype0, nadjs0, adjlists0, atomtype1, nadjs1, adjlists1) result(sameadj)
-   integer, intent(in) :: neltype, nadjs0, nadjs1
-   integer, dimension(:), intent(in) :: adjlists0, adjlists1
+function same_adjacency(neltype, atomtype0, nadj0, adjlist0, atomtype1, nadj1, adjlist1) result(sameadj)
+   integer, intent(in) :: neltype, nadj0, nadj1
+   integer, dimension(:), intent(in) :: adjlist0, adjlist1
    integer, dimension(:) :: atomtype0, atomtype1
    logical :: sameadj
 
@@ -407,7 +407,7 @@ function same_adjacency(neltype, atomtype0, nadjs0, adjlists0, atomtype1, nadjs1
 
    sameadj = .true.
 
-   if (nadjs0 /= nadjs1) then
+   if (nadj0 /= nadj1) then
       sameadj = .false.
       return
    end if
@@ -417,14 +417,14 @@ function same_adjacency(neltype, atomtype0, nadjs0, adjlists0, atomtype1, nadjs1
    n0(:) = 0
    n1(:) = 0
 
-   do i0 = 1, nadjs0
-      n0(atomtype0(adjlists0(i0))) = n0(atomtype0(adjlists0(i0))) + 1
-!       typelist0(n0(atomtype0(adjlists0(i0))), atomtype0(adjlists0(i0))) = i0
+   do i0 = 1, nadj0
+      n0(atomtype0(adjlist0(i0))) = n0(atomtype0(adjlist0(i0))) + 1
+!       typelist0(n0(atomtype0(adjlist0(i0))), atomtype0(adjlist0(i0))) = i0
    end do
 
-   do i1 = 1, nadjs1
-      n1(atomtype1(adjlists1(i1))) = n1(atomtype1(adjlists1(i1))) + 1
-!       typelist1(n1(atomtype1(adjlists1(i1))), atomtype1(adjlists1(i1))) = i1
+   do i1 = 1, nadj1
+      n1(atomtype1(adjlist1(i1))) = n1(atomtype1(adjlist1(i1))) + 1
+!       typelist1(n1(atomtype1(adjlist1(i1))), atomtype1(adjlist1(i1))) = i1
    end do
 
    if (any(n0 /= n1)) then
@@ -432,7 +432,7 @@ function same_adjacency(neltype, atomtype0, nadjs0, adjlists0, atomtype1, nadjs1
       return
    end if
 
-!   print *, typelist0(:nadjs0), '/', typelist1(:nadjs1)
+!   print *, typelist0(:nadj0), '/', typelist1(:nadj1)
 
 end function
 
