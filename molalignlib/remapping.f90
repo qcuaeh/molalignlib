@@ -41,7 +41,7 @@ public remove_reactive_bonds
 contains
 
 subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
-   type(cMol), intent(in) :: mol0, mol1
+   type(t_mol), intent(in) :: mol0, mol1
    integer, intent(out) :: maplist(:, :)
    integer, intent(out) :: countlist(:)
    integer, intent(out) :: nrec
@@ -249,7 +249,7 @@ end subroutine
 
 subroutine remove_reactive_bonds(mol0, mol1, mapping)
 
-   type(cMol), intent(inout) :: mol0, mol1
+   type(t_mol), intent(inout) :: mol0, mol1
    integer, dimension(:), intent(in) :: mapping
 
    integer :: i, j, k, l, j_, k_, l_
@@ -257,9 +257,9 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
    integer, allocatable, dimension(:) :: atomelnums0, atomelnums1
    integer, allocatable, dimension(:) :: atommnatypes0, atommnatypes1
    logical, allocatable, dimension(:, :) :: adjmat0, adjmat1
-   type(cPart), allocatable, dimension(:) :: adjlists0, adjlists1
-   type(cPart), allocatable, dimension(:) :: molfragparts0, molfragparts1
-   type(cPart), allocatable, dimension(:) :: mnatypeparts0, mnatypeparts1
+   type(t_atomlist), allocatable, dimension(:) :: adjlists0, adjlists1
+   type(t_atomlist), allocatable, dimension(:) :: molfragparts0, molfragparts1
+   type(t_atomlist), allocatable, dimension(:) :: mnatypeparts0, mnatypeparts1
    integer, allocatable, dimension(:) :: mnatypepartidcs0, mnatypepartidcs1
    integer, allocatable, dimension(:) :: unmapping
    real(wp) :: rotquat(4)

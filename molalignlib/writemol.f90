@@ -28,7 +28,7 @@ contains
 subroutine writexyz(unit, mol)
    ! Arguments
    integer, intent(in) :: unit
-   type(cMol) :: mol
+   type(t_mol) :: mol
    ! Local varibles
    integer :: i, natom
    character(:), allocatable :: title
@@ -52,11 +52,11 @@ end subroutine
 subroutine writemol2(unit, mol)
    ! Arguments
    integer, intent(in) :: unit
-   type(cMol) :: mol
+   type(t_mol) :: mol
    ! Local varibles
    integer :: i, natom
    character(:), allocatable :: title
-   type(cBond), allocatable :: bonds(:)
+   type(t_bond), allocatable :: bonds(:)
    integer, allocatable :: atomelnums(:)
    real(wp), allocatable :: atomcoords(:, :)
 

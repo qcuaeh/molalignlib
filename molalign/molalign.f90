@@ -47,7 +47,7 @@ character(ll) :: posargs(2)
 logical :: fmtin_flag, fmtout_flag
 logical :: remap_flag, pipe_flag, nrec_flag
 real(wp) :: travec(3), rotmat(3, 3)
-type(cMol) :: mol0, mol1, auxmol0, auxmol1
+type(t_mol) :: mol0, mol1, auxmol0, auxmol1
 integer :: adjd, minadjd
 real(wp) :: rmsd, minrmsd
 

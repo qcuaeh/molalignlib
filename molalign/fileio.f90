@@ -77,7 +77,7 @@ end subroutine
 subroutine readfile(unit, fmtin, mol)
    integer, intent(in) :: unit
    character(*), intent(in) :: fmtin
-   type(cMol), intent(out) :: mol
+   type(t_mol), intent(out) :: mol
 
    select case (fmtin)
    case ('xyz')
@@ -105,7 +105,7 @@ subroutine writefile(unit, fmtout, mol)
 !   character(*), intent(in) :: title, fmtout
    integer, intent(in) :: unit
    character(*), intent(in) :: fmtout
-   type(cMol), intent(in) :: mol
+   type(t_mol), intent(in) :: mol
 
    integer :: i, j
    integer :: nbond

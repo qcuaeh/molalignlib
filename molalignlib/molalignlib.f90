@@ -46,7 +46,7 @@ subroutine remap_atoms( &
    maplist, &
    countlist)
 
-   type(cMol), intent(inout) :: mol0, mol1
+   type(t_mol), intent(inout) :: mol0, mol1
    integer, intent(out) :: nrec
    integer, dimension(:, :), intent(inout) :: maplist
    integer, dimension(:), intent(inout) :: countlist
@@ -166,7 +166,7 @@ subroutine align_remapped_atoms( &
    travec, &
    rotmat)
 
-   type(cMol), intent(inout) :: mol0, mol1
+   type(t_mol), intent(inout) :: mol0, mol1
    integer :: mapping(:)
    real(wp), intent(out) :: travec(3), rotmat(3, 3)
    ! Local variables
@@ -209,7 +209,7 @@ subroutine align_atoms( &
    travec, &
    rotmat)
 
-   type(cMol), intent(inout) :: mol0, mol1
+   type(t_mol), intent(inout) :: mol0, mol1
    real(wp), intent(out) :: travec(3), rotmat(3, 3)
    real(wp) :: travec0(3), travec1(3), rotquat(4)
 
@@ -273,7 +273,7 @@ subroutine align_atoms( &
 end subroutine
 
 function get_rmsd(mol0, mol1, mapping) result(rmsd)
-   type(cMol), intent(in) :: mol0, mol1
+   type(t_mol), intent(in) :: mol0, mol1
    integer :: mapping(:)
    real(wp) :: rmsd
 
@@ -283,7 +283,7 @@ function get_rmsd(mol0, mol1, mapping) result(rmsd)
 end function
 
 function get_adjd(mol0, mol1, mapping) result(adjd)
-   type(cMol), intent(in) :: mol0, mol1
+   type(t_mol), intent(in) :: mol0, mol1
    integer :: mapping(:)
    integer :: adjd
 
@@ -293,7 +293,7 @@ end function
 
 function centroid_coords(mol) result(coords)
 ! Purpose: Get the centroid coordinates
-   type(cMol), intent(in) :: mol
+   type(t_mol), intent(in) :: mol
    ! Local variables
    integer :: i
    real(wp) :: coords(3)

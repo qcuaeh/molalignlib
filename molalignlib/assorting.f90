@@ -30,7 +30,7 @@ contains
 
 subroutine assort_atoms(mol)
 ! Purpose: Group atoms by atomic numbers and types
-   type(cMol), intent(inout) :: mol
+   type(t_mol), intent(inout) :: mol
 
    integer :: i, j
    integer :: neltype
@@ -100,7 +100,7 @@ end subroutine
 
 subroutine set_equiv_atoms(mol)
 ! Group atoms by MNA type at infinite level
-   type(cMol), intent(inout) :: mol
+   type(t_mol), intent(inout) :: mol
 
    integer :: i, natom, nin, nout
    integer, allocatable, dimension(:) :: intypes, outtypes, typemap
@@ -140,7 +140,7 @@ end subroutine
 
 subroutine assort_neighbors(mol)
 ! Purpose: Categorize atoms by eqtypes
-   type(cMol), intent(inout) :: mol
+   type(t_mol), intent(inout) :: mol
 
    integer :: i, h
    integer :: nadjs(mol%natom), adjlists(maxcoord, mol%natom)
@@ -163,7 +163,7 @@ subroutine assort_neighbors(mol)
 end subroutine
 
 subroutine getmnatypes(mol, nin, nout, intypes, outtypes, typemap)
-   type(cMol), intent(in) :: mol
+   type(t_mol), intent(in) :: mol
    integer, intent(in) :: nin
    integer, dimension(:), intent(in) :: intypes
    integer, intent(out) :: nout
@@ -207,7 +207,7 @@ end subroutine
 subroutine calcequivmat(mol0, mol1, nadjmna0, adjmnalen0, adjmnalist0, &
    nadjmna1, adjmnalen1, adjmnalist1, equivmat)
 ! Purpose: Calculate the maximum common MNA level for all atom cross assignments
-   type(cMol), intent(in) :: mol0, mol1
+   type(t_mol), intent(in) :: mol0, mol1
 
    integer, dimension(:, :), intent(out) :: nadjmna0, nadjmna1
    integer, dimension(:, :, :), intent(out) :: adjmnalen0, adjmnalen1
@@ -222,7 +222,7 @@ subroutine calcequivmat(mol0, mol1, nadjmna0, adjmnalen0, adjmnalist0, &
    integer :: h, i, j, offset, level, nin, nout
    integer, dimension(mol0%natom) :: intypes0, intypes1, outtypes0, outtypes1
    integer, dimension(maxcoord) :: indices, atomorder
-   type(cPart), allocatable, dimension(:) :: adjlists0, adjlists1
+   type(t_atomlist), allocatable, dimension(:) :: adjlists0, adjlists1
 
    natom = mol0%natom
    neltype = mol0%get_neltype()
@@ -276,7 +276,7 @@ end subroutine
 
 subroutine getmnacrosstypes(adjlists0, adjlists1, nin, intypes0, intypes1, &
       nout, outtypes0, outtypes1)
-   type(cPart), dimension(:), intent(in) :: adjlists0, adjlists1
+   type(t_atomlist), dimension(:), intent(in) :: adjlists0, adjlists1
    integer, intent(in) :: nin
    integer, dimension(:), intent(in) :: intypes0, intypes1
 !   integer, dimension(:), intent(in) :: nadjs0, nadjs1
