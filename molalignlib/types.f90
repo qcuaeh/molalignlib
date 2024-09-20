@@ -17,6 +17,7 @@ end type
 
 type, public :: cPartition
    type(cPart), allocatable :: parts(:)
+   integer, allocatable :: atom_order(:)
    integer, allocatable :: atom_mapping(:)
 contains
    procedure :: init => partition_init
@@ -53,7 +54,11 @@ contains
    procedure :: print_atoms
    procedure :: print_bonds
    procedure :: set_atomelnums
+   procedure :: get_atomelnums
+   procedure :: get_sorted_atomelnums
    procedure :: set_atomlabels
+   procedure :: get_atomlabels
+   procedure :: get_sorted_atomlabels
    procedure :: set_atomcoords
    procedure :: set_weights
    procedure :: set_adjlists
@@ -69,21 +74,24 @@ contains
    procedure :: mirror_atomcoords
    procedure :: translate_atomcoords
    procedure :: permutate_atoms
+   procedure :: get_natom
    procedure :: get_bonds
    procedure :: bonded
    procedure :: add_bond
    procedure :: remove_bond
    procedure :: get_atoms
    procedure :: get_sorted_atoms
+   procedure :: get_sorted_newadjlists
    procedure :: get_mnatypeparts
    procedure :: get_molfragparts
    procedure :: get_sorted_molfragparts
    procedure :: get_sorted_fragroots
+   procedure :: get_atomeltypes
+   procedure :: get_sorted_atomeltypes
    procedure, private :: get_default_nadjs
    procedure, private :: get_default_adjlists
    procedure, private :: get_default_adjmat
    procedure, private :: get_default_atomcoords
-   procedure, private :: get_default_atomeltypes
    procedure, private :: get_default_atomweights
    procedure, private :: get_default_natomneimnatypes
    procedure, private :: get_default_atomneimnatypepartlens
@@ -92,7 +100,6 @@ contains
    procedure, private :: get_sorted_adjlists
    procedure, private :: get_sorted_adjmat
    procedure, private :: get_sorted_atomcoords
-   procedure, private :: get_sorted_atomeltypes
    procedure, private :: get_sorted_atomweights
    procedure, private :: get_sorted_natomneimnatypes
    procedure, private :: get_sorted_atomneimnatypepartlens
@@ -103,7 +110,6 @@ contains
    generic :: get_adjlists => get_default_adjlists, get_sorted_adjlists
    generic :: get_adjmat => get_default_adjmat, get_sorted_adjmat
    generic :: get_atomcoords => get_default_atomcoords, get_sorted_atomcoords
-   generic :: get_atomeltypes => get_default_atomeltypes, get_sorted_atomeltypes
    generic :: get_atommnatypes => get_default_atommnatypes, get_sorted_atommnatypes
    generic :: get_atomneimnatypepartlens => get_default_atomneimnatypepartlens, get_sorted_atomneimnatypepartlens
    generic :: get_atomweights => get_default_atomweights, get_sorted_atomweights
@@ -118,6 +124,14 @@ function get_title(self) result(title)
    character(:), allocatable :: title
 
    title = self%title
+
+end function
+
+function get_natom(self) result(natom)
+   class(cMol), intent(in) :: self
+   integer :: natom
+
+   natom = size(self%atoms)
 
 end function
 
@@ -140,7 +154,7 @@ subroutine mirror_atomcoords(self)
    ! Local variables
    real(wp), allocatable :: coords(:, :)
 
-   allocate(coords(3, self%natom))
+   allocate(coords(3, size(self%atoms)))
 
    coords = self%get_atomcoords()
    coords(1, :) = -coords(1, :)
@@ -153,7 +167,7 @@ subroutine matrix_rotate_atomcoords(self, rotmat)
    ! Local variables
    real(wp), intent(in) :: rotmat(3, 3)
 
-   call self%set_atomcoords(matrix_rotated(self%natom, self%get_atomcoords(), rotmat))
+   call self%set_atomcoords(matrix_rotated(size(self%atoms), self%get_atomcoords(), rotmat))
 
 end subroutine
 
@@ -162,7 +176,7 @@ subroutine quater_rotate_atomcoords(self, rotquat)
    ! Local variables
    real(wp), intent(in) :: rotquat(4)
 
-   call self%set_atomcoords(quater_rotated(self%natom, self%get_atomcoords(), rotquat))
+   call self%set_atomcoords(quater_rotated(size(self%atoms), self%get_atomcoords(), rotquat))
 
 end subroutine
 
@@ -171,7 +185,7 @@ subroutine translate_atomcoords(self, travec)
    ! Local variables
    real(wp), intent(in) :: travec(3)
 
-   call self%set_atomcoords(translated(self%natom, self%get_atomcoords(), travec))
+   call self%set_atomcoords(translated(size(self%atoms), self%get_atomcoords(), travec))
 
 end subroutine
 
@@ -182,11 +196,11 @@ subroutine permutate_atoms(self, atom_order)
    integer :: i, k
    integer, allocatable :: atom_mapping(:)
 
-   allocate(atom_mapping(self%natom))
+   allocate(atom_mapping(size(self%atoms)))
 
    atom_mapping = inverse_mapping(atom_order)
    self%atoms = self%atoms(atom_order(:))
-   do i = 1, self%natom
+   do i = 1, size(self%atoms)
       do k = 1, size(self%atoms(i)%adjlist)
          self%atoms(i)%adjlist(k) = atom_mapping(self%atoms(i)%adjlist(k))
       end do
@@ -201,6 +215,22 @@ subroutine set_atomelnums(self, atomelnums)
    self%atoms(:)%elnum = atomelnums(:)
 
 end subroutine
+
+function get_atomelnums(self) result(atomelnums)
+   class(cMol), intent(in) :: self
+   integer, allocatable :: atomelnums(:)
+
+   atomelnums = self%atoms(:)%elnum
+
+end function
+
+function get_sorted_atomelnums(self) result(atomelnums)
+   class(cMol), intent(in) :: self
+   integer, allocatable :: atomelnums(:)
+
+   atomelnums = self%atoms(self%mnatypepartition%atom_order)%elnum
+
+end function
 
 function get_atoms(self) result(atoms)
    class(cMol), intent(in) :: self
@@ -236,6 +266,24 @@ subroutine set_atomlabels(self, atomlabels)
    self%atoms(:)%label = atomlabels(:)
 
 end subroutine
+
+function get_atomlabels(self) result(atomlabels)
+   class(cMol), intent(in) :: self
+   ! Local variables
+   integer, allocatable :: atomlabels(:)
+
+   atomlabels = self%atoms(:)%label
+
+end function
+
+function get_sorted_atomlabels(self) result(atomlabels)
+   class(cMol), intent(in) :: self
+   ! Local variables
+   integer, allocatable :: atomlabels(:)
+
+   atomlabels = self%atoms(self%mnatypepartition%atom_order)%label
+
+end function
 
 subroutine set_eltypes(self, neltype, atomeltypes)
    class(cMol), intent(inout) :: self
@@ -277,6 +325,7 @@ subroutine partition_init(self, npart, partidcs)
 
    allocate(n(npart))
    allocate(self%parts(npart))
+   allocate(self%atom_order(size(partidcs)))
    allocate(self%atom_mapping(size(partidcs)))
 
    n(:) = 0
@@ -297,6 +346,7 @@ subroutine partition_init(self, npart, partidcs)
    offset = 0
    do p = 1, size(self%parts)
       do i = 1, size(self%parts(p)%atomidcs)
+         self%atom_order(offset + i) = self%parts(p)%atomidcs(i)
          self%atom_mapping(self%parts(p)%atomidcs(i)) = offset + i
       end do
       offset = offset + size(self%parts(p)%atomidcs)
@@ -405,7 +455,7 @@ function get_sorted_fragroots(self) result(fragroots)
 
 end function
 
-function get_default_atomeltypes(self) result(atomeltypes)
+function get_atomeltypes(self) result(atomeltypes)
    class(cMol), intent(in) :: self
    ! Local variables
    integer, allocatable :: atomeltypes(:)
@@ -414,13 +464,12 @@ function get_default_atomeltypes(self) result(atomeltypes)
 
 end function
 
-function get_sorted_atomeltypes(self, atom_order) result(atomeltypes)
+function get_sorted_atomeltypes(self) result(atomeltypes)
    class(cMol), intent(in) :: self
-   integer, intent(in) :: atom_order(:)
    ! Local variables
    integer, allocatable :: atomeltypes(:)
 
-   atomeltypes = self%atoms(atom_order)%eltype
+   atomeltypes = self%atoms(self%mnatypepartition%atom_order)%eltype
 
 end function
 
@@ -445,7 +494,7 @@ end function
 
 subroutine set_weights(self, weights)
    class(cMol), intent(inout) :: self
-   real(wp), intent(in) :: weights(self%natom)
+   real(wp), intent(in) :: weights(size(self%atoms))
 
    self%atoms(:)%weight = weights(:)
 
@@ -472,11 +521,11 @@ end function
 
 subroutine set_atomcoords(self, coords)
    class(cMol), intent(inout) :: self
-   real(wp), intent(in) :: coords(3, self%natom)
+   real(wp), intent(in) :: coords(3, size(self%atoms))
    ! Local variables
    integer :: i
 
-   do i = 1, self%natom
+   do i = 1, size(self%atoms)
       self%atoms(i)%coords = coords(:, i)
    end do
 
@@ -488,9 +537,9 @@ function get_default_atomcoords(self) result(coords)
    integer :: i
    real(wp), allocatable :: coords(:, :)
 
-   allocate(coords(3, self%natom))
+   allocate(coords(3, size(self%atoms)))
 
-   do i = 1, self%natom
+   do i = 1, size(self%atoms)
       coords(:, i) = self%atoms(i)%coords(:)
    end do
 
@@ -503,9 +552,9 @@ function get_sorted_atomcoords(self, atom_order) result(coords)
    integer :: i
    real(wp), allocatable :: coords(:, :)
 
-   allocate(coords(3, self%natom))
+   allocate(coords(3, size(self%atoms)))
 
-   do i = 1, self%natom
+   do i = 1, size(self%atoms)
       coords(:, i) = self%atoms(atom_order(i))%coords(:)
    end do
 
@@ -518,11 +567,11 @@ function get_default_adjmat(self) result(adjmat)
    type(cAtom) :: atom
    logical, allocatable :: adjmat(:, :)
 
-   allocate(adjmat(self%natom, self%natom))
+   allocate(adjmat(size(self%atoms), size(self%atoms)))
 
    adjmat(:, :) = .false.
 
-   do i = 1, self%natom
+   do i = 1, size(self%atoms)
       atom = self%atoms(i)
       do k = 1, size(atom%adjlist)
          adjmat(i, atom%adjlist(k)) = .true.
@@ -541,10 +590,10 @@ function get_sorted_adjmat(self, atom_order) result(adjmat)
    logical, allocatable :: adjmat(:, :)
 
    atom_mapping = inverse_mapping(atom_order)
-   allocate(adjmat(self%natom, self%natom))
+   allocate(adjmat(size(self%atoms), size(self%atoms)))
    adjmat(:, :) = .false.
 
-   do i = 1, self%natom
+   do i = 1, size(self%atoms)
       atom = self%atoms(atom_order(i))
       do k = 1, size(atom%adjlist)
          adjmat(i, atom_mapping(atom%adjlist(k))) = .true.
@@ -588,7 +637,7 @@ subroutine set_adjlists(self, nadjs, adjlists)
    ! Local variables
    integer :: i
 
-   do i = 1, self%natom
+   do i = 1, size(self%atoms)
       self%atoms(i)%adjlist = adjlists(:nadjs(i), i)
    end do
 
@@ -600,9 +649,9 @@ function get_default_adjlists(self) result(adjlists)
    integer :: i
    integer, allocatable :: adjlists(:, :)
 
-   allocate(adjlists(maxcoord, self%natom))
+   allocate(adjlists(maxcoord, size(self%atoms)))
 
-   do i = 1, self%natom
+   do i = 1, size(self%atoms)
       adjlists(:size(self%atoms(i)%adjlist), i) = self%atoms(i)%adjlist
    end do
 
@@ -618,11 +667,25 @@ function get_sorted_adjlists(self, atom_order) result(adjlists)
    integer, allocatable :: adjlists(:, :)
 
    atom_mapping = inverse_mapping(atom_order)
-   allocate(adjlists(maxcoord, self%natom))
+   allocate(adjlists(maxcoord, size(self%atoms)))
 
-   do i = 1, self%natom
+   do i = 1, size(self%atoms)
       atom = self%atoms(atom_order(i))
       adjlists(:size(atom%adjlist), i) = atom_mapping(atom%adjlist)
+   end do
+
+end function
+
+function get_sorted_newadjlists(self) result(adjlists)
+   class(cMol), intent(in) :: self
+   ! Local variables
+   integer :: i
+   type(cPart), allocatable :: adjlists(:)
+
+   allocate(adjlists(size(self%atoms)))
+
+   do i = 1, size(self%atoms)
+      adjlists(i)%atomidcs = self%mnatypepartition%atom_mapping(self%atoms(self%mnatypepartition%atom_order(i))%adjlist)
    end do
 
 end function
