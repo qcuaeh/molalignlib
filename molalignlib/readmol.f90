@@ -153,9 +153,10 @@ subroutine set_bonds(mol)
    integer :: i, j
    integer :: nadjs(mol%natom)
    integer :: adjlists(maxcoord, mol%natom)
-   real(wp) :: atomdist
+   integer, allocatable :: atomelnums(:)
+   real(wp), allocatable :: atomcoords(:, :)
    real(wp), allocatable :: adjrads(:)
-   type(cAtom), allocatable :: atoms(:)
+   real(wp) :: atomdist
 
    ! Bond initialization
    nadjs(:) = 0
@@ -166,16 +167,17 @@ subroutine set_bonds(mol)
       return
    end if
 
-   atoms = mol%get_atoms()
+   atomelnums = mol%get_atomelnums()
+   atomcoords = mol%get_atomcoords()
 
    ! Set adjacency radii
-   adjrads = covrad(atoms%elnum) + 0.25*(vdwrad(atoms%elnum) - covrad(atoms%elnum))
+   adjrads = covrad(atomelnums) + 0.25*(vdwrad(atomelnums) - covrad(atomelnums))
 
    ! Register adjacency matrix i,j if atoms i and j are closer
    ! than the sum of their adjacency radius
    do i = 1, mol%natom
       do j = i + 1, mol%natom
-         atomdist = sqrt(sum((atoms(i)%coords - atoms(j)%coords)**2))
+         atomdist = sqrt(sum((atomcoords(:, i) - atomcoords(:, j))**2))
          if (atomdist < adjrads(i) + adjrads(j)) then
             nadjs(i) = nadjs(i) + 1
             nadjs(j) = nadjs(j) + 1

@@ -79,8 +79,7 @@ contains
    procedure :: bonded
    procedure :: add_bond
    procedure :: remove_bond
-   procedure :: get_atoms
-   procedure :: get_sorted_atoms
+   procedure :: get_newadjlists
    procedure :: get_sorted_newadjlists
    procedure :: get_mnatypeparts
    procedure :: get_molfragparts
@@ -88,6 +87,8 @@ contains
    procedure :: get_sorted_fragroots
    procedure :: get_atomeltypes
    procedure :: get_sorted_atomeltypes
+   procedure :: get_atommnatypes
+   procedure :: get_sorted_atommnatypes
    procedure, private :: get_default_nadjs
    procedure, private :: get_default_adjlists
    procedure, private :: get_default_adjmat
@@ -95,7 +96,6 @@ contains
    procedure, private :: get_default_atomweights
    procedure, private :: get_default_natomneimnatypes
    procedure, private :: get_default_atomneimnatypepartlens
-   procedure, private :: get_default_atommnatypes
    procedure, private :: get_sorted_nadjs
    procedure, private :: get_sorted_adjlists
    procedure, private :: get_sorted_adjmat
@@ -103,14 +103,12 @@ contains
    procedure, private :: get_sorted_atomweights
    procedure, private :: get_sorted_natomneimnatypes
    procedure, private :: get_sorted_atomneimnatypepartlens
-   procedure, private :: get_sorted_atommnatypes
    procedure, private :: matrix_rotate_atomcoords
    procedure, private :: quater_rotate_atomcoords
    generic :: get_nadjs => get_default_nadjs, get_sorted_nadjs
    generic :: get_adjlists => get_default_adjlists, get_sorted_adjlists
    generic :: get_adjmat => get_default_adjmat, get_sorted_adjmat
    generic :: get_atomcoords => get_default_atomcoords, get_sorted_atomcoords
-   generic :: get_atommnatypes => get_default_atommnatypes, get_sorted_atommnatypes
    generic :: get_atomneimnatypepartlens => get_default_atomneimnatypepartlens, get_sorted_atomneimnatypepartlens
    generic :: get_atomweights => get_default_atomweights, get_sorted_atomweights
    generic :: get_natomneimnatypes => get_default_natomneimnatypes, get_sorted_natomneimnatypes
@@ -229,33 +227,6 @@ function get_sorted_atomelnums(self) result(atomelnums)
    integer, allocatable :: atomelnums(:)
 
    atomelnums = self%atoms(self%mnatypepartition%atom_order)%elnum
-
-end function
-
-function get_atoms(self) result(atoms)
-   class(cMol), intent(in) :: self
-   ! Local variables
-   type(cAtom), allocatable :: atoms(:)
-
-   atoms = self%atoms
-
-end function
-
-function get_sorted_atoms(self) result(atoms)
-   class(cMol), intent(in) :: self
-   ! Local variables
-   integer :: p, offset, partsize
-   integer, allocatable :: atom_order(:)
-   type(cAtom), allocatable :: atoms(:)
-
-   allocate(atoms(size(self%atoms)))
-
-   offset = 0
-   do p = 1, size(self%mnatypepartition%parts)
-      partsize = size(self%mnatypepartition%parts(p)%atomidcs)
-      atoms(offset+1:offset+partsize) = self%atoms(self%mnatypepartition%parts(p)%atomidcs)
-      offset = offset + partsize
-   end do
 
 end function
 
@@ -434,21 +405,22 @@ function get_sorted_fragroots(self) result(fragroots)
    integer :: i
    integer, allocatable, dimension(:) :: order, order1, order2
    integer, allocatable :: fragroots(:)
-   integer, allocatable :: atommnatypes(:)
    integer, allocatable :: eltypepartlens(:)
    integer, allocatable :: mnatypepartlens(:)
+   integer, allocatable :: atomeltypes(:)
+   integer, allocatable :: atommnatypes(:)
    type(cPart), allocatable :: fragparts(:)
-   type(cAtom), allocatable :: atoms(:)
 
-   atoms = self%get_sorted_atoms()
+   atomeltypes = self%get_sorted_atomeltypes()
+   atommnatypes = self%get_sorted_atommnatypes()
    fragparts = self%get_sorted_molfragparts()
    eltypepartlens = self%get_eltypepartlens()
    mnatypepartlens = self%get_mnatypepartlens()
    allocate(fragroots(size(fragparts)))
 
    do i = 1, size(fragparts)
-      order1 = sorted_order(mnatypepartlens(atoms(fragparts(i)%atomidcs)%mnatype))
-      order2 = sorted_order(eltypepartlens(atoms(fragparts(i)%atomidcs(order1))%eltype))
+      order1 = sorted_order(mnatypepartlens(atommnatypes(fragparts(i)%atomidcs)))
+      order2 = sorted_order(eltypepartlens(atomeltypes(fragparts(i)%atomidcs(order1))))
       order = order1(order2)
       fragroots(i) = fragparts(i)%atomidcs(order(1))
    end do
@@ -473,7 +445,7 @@ function get_sorted_atomeltypes(self) result(atomeltypes)
 
 end function
 
-function get_default_atommnatypes(self) result(atommnatypes)
+function get_atommnatypes(self) result(atommnatypes)
    class(cMol), intent(in) :: self
    ! Local variables
    integer, allocatable :: atommnatypes(:)
@@ -482,13 +454,12 @@ function get_default_atommnatypes(self) result(atommnatypes)
 
 end function
 
-function get_sorted_atommnatypes(self, atom_order) result(atommnatypes)
+function get_sorted_atommnatypes(self) result(atommnatypes)
    class(cMol), intent(in) :: self
-   integer, intent(in) :: atom_order(:)
    ! Local variables
    integer, allocatable :: atommnatypes(:)
 
-   atommnatypes = self%atoms(atom_order)%mnatype
+   atommnatypes = self%atoms(self%mnatypepartition%atom_order)%mnatype
 
 end function
 
@@ -672,6 +643,20 @@ function get_sorted_adjlists(self, atom_order) result(adjlists)
    do i = 1, size(self%atoms)
       atom = self%atoms(atom_order(i))
       adjlists(:size(atom%adjlist), i) = atom_mapping(atom%adjlist)
+   end do
+
+end function
+
+function get_newadjlists(self) result(adjlists)
+   class(cMol), intent(in) :: self
+   ! Local variables
+   integer :: i
+   type(cPart), allocatable :: adjlists(:)
+
+   allocate(adjlists(size(self%atoms)))
+
+   do i = 1, size(self%atoms)
+      adjlists(i)%atomidcs = self%atoms(i)%adjlist
    end do
 
 end function

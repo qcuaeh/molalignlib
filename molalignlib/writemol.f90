@@ -30,18 +30,21 @@ subroutine writexyz(unit, mol)
    integer, intent(in) :: unit
    type(cMol) :: mol
    ! Local varibles
-   integer :: i
+   integer :: i, natom
    character(:), allocatable :: title
-   type(cAtom), allocatable :: atoms(:)
+   integer, allocatable :: atomelnums(:)
+   real(wp), allocatable :: atomcoords(:, :)
 
    title = mol%get_title()
-   atoms = mol%get_atoms()
+   natom = mol%get_natom()
+   atomelnums = mol%get_atomelnums()
+   atomcoords = mol%get_atomcoords()
 
-   write (unit, '(i0)') size(atoms)
+   write (unit, '(i0)') natom
    write (unit, '(a)') title
 
-   do i = 1, size(atoms)
-      write (unit, '(a,3(2x,f12.6))') elsym(atoms(i)%elnum), atoms(i)%coords
+   do i = 1, natom
+      write (unit, '(a,3(2x,f12.6))') elsym(atomelnums(i)), atomcoords(:, i)
    end do
 
 end subroutine
@@ -51,14 +54,17 @@ subroutine writemol2(unit, mol)
    integer, intent(in) :: unit
    type(cMol) :: mol
    ! Local varibles
-   integer :: i
+   integer :: i, natom
    character(:), allocatable :: title
-   type(cAtom), allocatable :: atoms(:)
    type(cBond), allocatable :: bonds(:)
+   integer, allocatable :: atomelnums(:)
+   real(wp), allocatable :: atomcoords(:, :)
 
    title = mol%get_title()
-   atoms = mol%get_atoms()
    bonds = mol%get_bonds()
+   natom = mol%get_natom()
+   atomelnums = mol%get_atomelnums()
+   atomcoords = mol%get_atomcoords()
 
    write (unit, '(a)') '@<TRIPOS>MOLECULE'
    if (title /= '') then
@@ -66,14 +72,14 @@ subroutine writemol2(unit, mol)
    else
       write (unit, '(a)') 'Untitled'
    end if
-   write (unit, '(5(i4,1x))') size(atoms), size(bonds), 0, 0, 0
+   write (unit, '(5(i4,1x))') natom, size(bonds), 0, 0, 0
    write (unit, '(a)') 'SMALL'
    write (unit, '(a)') 'NO_CHARGES'
    write (unit, '(a)') '@<TRIPOS>ATOM'
 
-   do i = 1, size(atoms)
+   do i = 1, natom
       write (unit, '(i4,1x,a2,3(1x,f12.6),1x,a8,1x,i2,1x,a4,1x,f7.3)') &
-         i, elsym(atoms(i)%elnum), atoms(i)%coords, elsym(atoms(i)%elnum), 1, 'MOL1', 0.
+         i, elsym(atomelnums(i)), atomcoords(:, i), elsym(atomelnums(i)), 1, 'MOL1', 0.
    end do
 
    write (unit, '(a)') '@<TRIPOS>BOND'

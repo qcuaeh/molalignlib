@@ -257,10 +257,12 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
    type(cMol), intent(inout) :: mol0, mol1
    integer, dimension(:), intent(in) :: mapping
 
-   integer :: natom
    integer :: i, j, k, l, j_, k_, l_
-   type(cAtom), allocatable, dimension(:) :: atoms0, atoms1
+   integer :: natom0, natom1
+   integer, allocatable, dimension(:) :: atomelnums0, atomelnums1
+   integer, allocatable, dimension(:) :: atommnatypes0, atommnatypes1
    logical, allocatable, dimension(:, :) :: adjmat0, adjmat1
+   type(cPart), allocatable, dimension(:) :: adjlists0, adjlists1
    type(cPart), allocatable, dimension(:) :: molfragparts0, molfragparts1
    type(cPart), allocatable, dimension(:) :: mnatypeparts0, mnatypeparts1
    integer, allocatable, dimension(:) :: mnatypepartidcs0, mnatypepartidcs1
@@ -277,10 +279,16 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
 
    ! Initialization
 
-   atoms0 = mol0%get_atoms()
-   atoms1 = mol1%get_atoms()
+   natom0 = mol0%get_natom()
+   natom1 = mol1%get_natom()
    adjmat0 = mol0%get_adjmat()
    adjmat1 = mol1%get_adjmat()
+   atomelnums0 = mol0%get_atomelnums()
+   atomelnums1 = mol1%get_atomelnums()
+   adjlists0 = mol0%get_newadjlists()
+   adjlists1 = mol1%get_newadjlists()
+   atommnatypes0 = mol0%get_atommnatypes()
+   atommnatypes1 = mol1%get_atommnatypes()
    mnatypeparts0 = mol0%get_mnatypeparts()
    mnatypeparts1 = mol1%get_mnatypeparts()
    molfragparts0 = mol0%get_molfragparts()
@@ -289,11 +297,11 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
 
    ! Remove mismatched bonds
 
-   do i = 1, size(atoms0)
-      do j_ = 1, size(atoms0(i)%adjlist)
-         j = atoms0(i)%adjlist(j_)
+   do i = 1, natom0
+      do j_ = 1, size(adjlists0(i)%atomidcs)
+         j = adjlists0(i)%atomidcs(j_)
          if (.not. adjmat1(mapping(i), mapping(j))) then
-            mnatypepartidcs0 = mnatypeparts0(atoms0(j)%mnatype)%atomidcs
+            mnatypepartidcs0 = mnatypeparts0(atommnatypes0(j))%atomidcs
             do k_ = 1, size(mnatypepartidcs0)
                k = mnatypepartidcs0(k_)
                call mol0%remove_bond(i, k)
@@ -303,11 +311,11 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
       end do
    end do
 
-   do i = 1, size(atoms1)
-      do j_ = 1, size(atoms1(i)%adjlist)
-         j = atoms1(i)%adjlist(j_)
+   do i = 1, natom1
+      do j_ = 1, size(adjlists1(i)%atomidcs)
+         j = adjlists1(i)%atomidcs(j_)
          if (.not. adjmat0(unmapping(i), unmapping(j))) then
-            mnatypepartidcs1 = mnatypeparts1(atoms1(j)%mnatype)%atomidcs
+            mnatypepartidcs1 = mnatypeparts1(atommnatypes1(j))%atomidcs
             do k_ = 1, size(mnatypepartidcs1)
                k = mnatypepartidcs1(k_)
                call mol1%remove_bond(i, k)
@@ -320,11 +328,11 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
    ! Remove water bonds
 
    do i = 1, size(molfragparts0)
-      if (all(sorted(atoms0(molfragparts0(i)%atomidcs)%elnum) == [1, 1, 8])) then
+      if (all(sorted(atomelnums0(molfragparts0(i)%atomidcs)) == [1, 1, 8])) then
          do j_ = 1, size(molfragparts0(i)%atomidcs)
             j = molfragparts0(i)%atomidcs(j_)
-            do k_ = 1, size(atoms0(j)%adjlist)
-               k = atoms0(j)%adjlist(k_)
+            do k_ = 1, size(adjlists0(j)%atomidcs)
+               k = adjlists0(j)%atomidcs(k_)
                call mol0%remove_bond(j, k)
             end do
          end do
@@ -332,11 +340,11 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
    end do
 
    do i = 1, size(molfragparts1)
-      if (all(sorted(atoms1(molfragparts1(i)%atomidcs)%elnum) == [1, 1, 8])) then
+      if (all(sorted(atomelnums1(molfragparts1(i)%atomidcs)) == [1, 1, 8])) then
          do j_ = 1, size(molfragparts1(i)%atomidcs)
             j = molfragparts1(i)%atomidcs(j_)
-            do k_ = 1, size(atoms1(j)%adjlist)
-               k = atoms1(j)%adjlist(k_)
+            do k_ = 1, size(adjlists1(j)%atomidcs)
+               k = adjlists1(j)%atomidcs(k_)
                call mol1%remove_bond(j, k)
             end do
          end do

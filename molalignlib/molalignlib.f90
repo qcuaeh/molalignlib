@@ -55,7 +55,6 @@ subroutine remap_atoms( &
    integer, allocatable, dimension(:) :: mnaord0, mnaord1
    real(wp) :: travec0(3), travec1(3)
    real(wp), allocatable, dimension(:, :) :: atomcoords0, atomcoords1
-   type(cAtom), allocatable, dimension(:) :: atoms0, atoms1
 
 !   integer, dimension(mol0%natom) :: mapping
 !   integer :: nbond0, bonds0(2, maxcoord*mol0%natom)
@@ -84,36 +83,24 @@ subroutine remap_atoms( &
    mnaord0 = sorted_order(mol0%get_atommnatypes())
    mnaord1 = sorted_order(mol1%get_atommnatypes())
 
-   ! Get sorted atoms lists
-
-   atoms0 = mol0%get_sorted_atoms()
-   atoms1 = mol1%get_sorted_atoms()
-
    ! Abort if molecules have different number of atoms
 
-   if (size(atoms0) /= size(atoms1)) then
+   if (mol0%get_natom() /= mol1%get_natom()) then
       write (stderr, '(a)') 'Error: These molecules are not isomers'
       stop
    end if
 
    ! Abort if molecules are not isomers
 
-   if (any(atoms0%elnum /= atoms1%elnum)) then
+   if (any(mol0%get_sorted_atomelnums() /= mol1%get_sorted_atomelnums())) then
       write (stderr, '(a)') 'Error: These molecules are not isomers'
       stop
    end if
 
    ! Abort if there are conflicting atomic types
 
-   if (any(atoms0%eltype /= atoms1%eltype)) then
+   if (any(mol0%get_sorted_atomeltypes() /= mol1%get_sorted_atomeltypes())) then
       write (stderr, '(a)') 'Error: There are conflicting atomic types'
-      stop
-   end if
-
-   ! Abort if there are conflicting weights
-
-   if (any(abs(atoms0%weight - atoms1%weight) > 1.E-6)) then
-      write (stderr, '(a)') 'Error: There are conflicting weights'
       stop
    end if
 
@@ -231,49 +218,38 @@ subroutine align_atoms( &
    type(cMol), intent(inout) :: mol0, mol1
    real(wp), intent(out) :: travec(3), rotmat(3, 3)
    real(wp) :: travec0(3), travec1(3), rotquat(4)
-   type(cAtom), allocatable, dimension(:) :: atoms0, atoms1
-
-   ! Get sorted atoms lists
-
-   atoms0 = mol0%get_sorted_atoms()
-   atoms1 = mol1%get_sorted_atoms()
 
    ! Abort if molecules have different number of atoms
 
-   if (size(atoms0) /= size(atoms1)) then
+   if (mol0%get_natom() /= mol1%get_natom()) then
       write (stderr, '(a)') 'Error: These molecules are not isomers'
       stop
    end if
 
    ! Abort if molecules are not isomers
 
-   if (any(atoms0%elnum /= atoms1%elnum)) then
+   if (any(mol0%get_sorted_atomelnums() /= mol1%get_sorted_atomelnums())) then
       write (stderr, '(a)') '*Error: These molecules are not isomers'
       stop
    end if
 
    ! Abort if there are conflicting atomic types
 
-   if (any(atoms0%eltype /= atoms1%eltype)) then
+   if (any(mol0%get_sorted_atomeltypes() /= mol1%get_sorted_atomeltypes())) then
       write (stderr, '(a)') 'Error: There are conflicting atomic types'
       stop
    end if
 
-   ! Get unsorted atoms lists
-
-   atoms0 = mol0%get_atoms()
-   atoms1 = mol1%get_atoms()
-
    ! Abort if atoms are not ordered
 
-   if (any(atoms0%elnum /= atoms1%elnum)) then
+   if (any(mol0%get_atomelnums() /= mol1%get_atomelnums())) then
       write (stderr, '(a)') 'Error: The atoms are not in the same order'
       stop
    end if
 
    ! Abort if atomic types are not ordered
 
-   if (any(atoms0%eltype /= atoms1%eltype)) then
+   if (any(mol0%get_atomeltypes() /= mol1%get_atomeltypes())) then
       write (stderr, '(a)') 'Error: Atomic types are not in the same order'
       stop
    end if
