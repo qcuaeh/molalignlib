@@ -52,7 +52,6 @@ subroutine remap_atoms( &
    integer, dimension(:), intent(inout) :: countlist
 
    integer :: i
-   integer, allocatable, dimension(:) :: mnaord0, mnaord1
    real(wp) :: travec0(3), travec1(3)
    real(wp), allocatable, dimension(:, :) :: atomcoords0, atomcoords1
 
@@ -77,11 +76,6 @@ subroutine remap_atoms( &
    else
       setcrossbias => setcrossbias_none
    end if
-
-   ! Set MNA equivalence partitions
-
-   mnaord0 = sorted_order(mol0%get_atommnatypes())
-   mnaord1 = sorted_order(mol1%get_atommnatypes())
 
    ! Abort if molecules have different number of atoms
 
@@ -131,7 +125,7 @@ subroutine remap_atoms( &
 
    ! Optimize assignment to minimize the AdjD and RMSD
 
-   call optimize_mapping(mol0, mol1, mnaord0, mnaord1, maplist, countlist, nrec)
+   call optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 
    ! Remove bonds from reactive sites and reoptimize assignment
 
@@ -143,7 +137,7 @@ subroutine remap_atoms( &
       call find_molfrags(mol1)
       call assort_neighbors(mol0)
       call assort_neighbors(mol1)
-      call optimize_mapping(mol0, mol1, mnaord0, mnaord1, maplist, countlist, nrec)
+      call optimize_mapping(mol0, mol1, maplist, countlist, nrec)
    end if
 
    ! Restore coordinates

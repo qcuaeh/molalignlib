@@ -40,9 +40,8 @@ public remove_reactive_bonds
 
 contains
 
-subroutine optimize_mapping(mol0, mol1, mnaord0, mnaord1, maplist, countlist, nrec)
+subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
    type(cMol), intent(in) :: mol0, mol1
-   integer, intent(in), dimension(:) :: mnaord0, mnaord1
    integer, intent(out) :: maplist(:, :)
    integer, intent(out) :: countlist(:)
    integer, intent(out) :: nrec
@@ -81,32 +80,31 @@ subroutine optimize_mapping(mol0, mol1, mnaord0, mnaord1, maplist, countlist, nr
 
    integer, allocatable, dimension(:) :: fragroots0, fragroots1
    integer, allocatable, dimension(:) :: mnatypepartlens0, mnatypepartlens1
-   integer, allocatable, dimension(:) :: unord0, unord1
 
    natom = mol0%natom
-   weights = mol0%get_atomweights(mnaord0)
-   coords0 = mol0%get_atomcoords(mnaord0)
-   coords1 = mol1%get_atomcoords(mnaord1)
-   adjmat0 = mol0%get_adjmat(mnaord0)
-   adjmat1 = mol1%get_adjmat(mnaord1)
+   weights = mol0%get_sorted_atomweights()
+   coords0 = mol0%get_sorted_atomcoords()
+   coords1 = mol1%get_sorted_atomcoords()
+   adjmat0 = mol0%get_sorted_adjmat()
+   adjmat1 = mol1%get_sorted_adjmat()
 
    neltype = mol0%get_neltype()
    eltypepartlens = mol0%get_eltypepartlens()
 
-   nadjs0 = mol0%get_nadjs(mnaord0)
-   nadjs1 = mol1%get_nadjs(mnaord1)
-   adjlists0 = mol0%get_adjlists(mnaord0)
-   adjlists1 = mol1%get_adjlists(mnaord1)
+   nadjs0 = mol0%get_sorted_nadjs()
+   nadjs1 = mol1%get_sorted_nadjs()
+   adjlists0 = mol0%get_sorted_adjlists()
+   adjlists1 = mol1%get_sorted_adjlists()
 
    nmnatype0 = mol0%get_nmnatype()
    nmnatype1 = mol1%get_nmnatype()
    mnatypepartlens0 = mol0%get_mnatypepartlens()
    mnatypepartlens1 = mol1%get_mnatypepartlens()
 
-   natomneimnatypes0 = mol0%get_natomneimnatypes(mnaord0)
-   natomneimnatypes1 = mol1%get_natomneimnatypes(mnaord1)
-   atomneimnatypepartlens0 = mol0%get_atomneimnatypepartlens(mnaord0)
-   atomneimnatypepartlens1 = mol1%get_atomneimnatypepartlens(mnaord1)
+   natomneimnatypes0 = mol0%get_sorted_natomneimnatypes()
+   natomneimnatypes1 = mol1%get_sorted_natomneimnatypes()
+   atomneimnatypepartlens0 = mol0%get_sorted_atomneimnatypepartlens()
+   atomneimnatypepartlens1 = mol1%get_sorted_atomneimnatypepartlens()
 
    fragroots0 = mol0%get_sorted_fragroots()
    fragroots1 = mol1%get_sorted_fragroots()
@@ -236,11 +234,8 @@ subroutine optimize_mapping(mol0, mol1, mnaord0, mnaord1, maplist, countlist, nr
 
    ! Reorder back to default atom ordering
 
-   unord0 = inverse_mapping(mnaord0)
-   unord1 = inverse_mapping(mnaord1)
-
    do i = 1, nrec
-      maplist(:, i) = mnaord1(maplist(unord0(:), i))
+      maplist(:, i) = mol1%mnatypepartition%atom_order(maplist(mol0%mnatypepartition%atom_mapping, i))
    end do
 
    ! Print stats if requested
