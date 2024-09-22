@@ -46,10 +46,10 @@ character(:), allocatable :: fmtin0, fmtin1, fmtout, optfmtin, optfmtout
 character(ll) :: posargs(2)
 logical :: fmtin_flag, fmtout_flag
 logical :: remap_flag, pipe_flag, nrec_flag
-real(wp) :: travec(3), rotmat(3, 3)
+real(rk) :: travec0(3), travec1(3), rotquat(4)
 type(t_mol) :: mol0, mol1, auxmol0, auxmol1
 integer :: adjd, minadjd
-real(wp) :: rmsd, minrmsd
+real(rk) :: rmsd, minrmsd
 
 ! Set default options
 
@@ -212,13 +212,15 @@ if (remap_flag) then
          mol0, &
          mol1, &
          maplist(:, i), &
-         travec, &
-         rotmat)
+         travec0, &
+         travec1, &
+         rotquat)
 
       auxmol1 = mol1
       call auxmol1%permutate_atoms(maplist(:, i))
-      call auxmol1%rotate_atomcoords(rotmat)
-      call auxmol1%translate_atomcoords(travec)
+      call auxmol1%translate_coords(travec1)
+      call auxmol1%rotate_coords(rotquat)
+      call auxmol1%translate_coords(-travec0)
 
 !      mapping = maplist(:, i)
       mapping = identity_mapping(size(mol0%atoms))
@@ -249,11 +251,13 @@ else
    call align_atoms( &
       mol0, &
       mol1, &
-      travec, &
-      rotmat)
+      travec0, &
+      travec1, &
+      rotquat)
 
-   call mol1%rotate_atomcoords(rotmat)
-   call mol1%translate_atomcoords(travec)
+   call mol1%translate_coords(travec1)
+   call mol1%rotate_coords(rotquat)
+   call mol1%translate_coords(-travec0)
 
    mapping = identity_mapping(size(mol0%atoms))
 

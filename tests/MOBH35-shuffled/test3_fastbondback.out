@@ -1,10 +1,10 @@
  Map    Count    Steps     Angle   AdjD       RMSD
 --------------------------------------------------
-   1       10      1.8     120.2      1     0.5811
-   2        1      2.0     104.6      1     0.9118
+   1       10      1.9     112.1      1     0.5811
+   2        3      2.0      98.2      1     0.9118
 --------------------------------------------------
-Random trials = 11
-Minimization steps = 20
+Random trials = 13
+Minimization steps = 25
 Visited local minima = 2
 23
 Map=1 RMSD=0.5811

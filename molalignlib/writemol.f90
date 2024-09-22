@@ -32,19 +32,19 @@ subroutine writexyz(unit, mol)
    ! Local varibles
    integer :: i, natom
    character(:), allocatable :: title
-   integer, allocatable :: atomelnums(:)
-   real(wp), allocatable :: atomcoords(:, :)
+   integer, allocatable :: elnums(:)
+   real(rk), allocatable :: coords(:, :)
 
    title = mol%get_title()
    natom = mol%get_natom()
-   atomelnums = mol%get_atomelnums()
-   atomcoords = mol%get_atomcoords()
+   elnums = mol%get_elnums()
+   coords = mol%get_coords()
 
    write (unit, '(i0)') natom
    write (unit, '(a)') title
 
    do i = 1, natom
-      write (unit, '(a,3(2x,f12.6))') elsym(atomelnums(i)), atomcoords(:, i)
+      write (unit, '(a,3(2x,f12.6))') elsym(elnums(i)), coords(:, i)
    end do
 
 end subroutine
@@ -57,14 +57,15 @@ subroutine writemol2(unit, mol)
    integer :: i, natom
    character(:), allocatable :: title
    type(t_bond), allocatable :: bonds(:)
-   integer, allocatable :: atomelnums(:)
-   real(wp), allocatable :: atomcoords(:, :)
+   integer, allocatable :: elnums(:), nadjs(:)
+   real(rk), allocatable :: coords(:, :)
 
    title = mol%get_title()
+   nadjs = mol%get_nadjs()
    bonds = mol%get_bonds()
    natom = mol%get_natom()
-   atomelnums = mol%get_atomelnums()
-   atomcoords = mol%get_atomcoords()
+   elnums = mol%get_elnums()
+   coords = mol%get_coords()
 
    write (unit, '(a)') '@<TRIPOS>MOLECULE'
    if (title /= '') then
@@ -78,8 +79,8 @@ subroutine writemol2(unit, mol)
    write (unit, '(a)') '@<TRIPOS>ATOM'
 
    do i = 1, natom
-      write (unit, '(i4,1x,a2,3(1x,f12.6),1x,a8,1x,i2,1x,a4,1x,f7.3)') &
-         i, elsym(atomelnums(i)), atomcoords(:, i), elsym(atomelnums(i)), 1, 'MOL1', 0.
+      write (unit, '(i4,2x,a2,3(1x,f12.6),2x,a4,1x,i2,1x,a4,1x,f7.3)') &
+         i, elsym(elnums(i)), coords(:, i), atomtype(elnums(i), nadjs(i)), 1, 'MOL1', 0.
    end do
 
    write (unit, '(a)') '@<TRIPOS>BOND'
@@ -89,5 +90,26 @@ subroutine writemol2(unit, mol)
    end do
 
 end subroutine
+
+function atomtype(elnum, nadj)
+   integer, intent(in) :: elnum, nadj
+   integer :: hybnum
+   character(4) :: atomtype
+
+   select case (elnum)
+   case (6)
+      hybnum = nadj - 1
+      atomtype = trim(elsym(elnum))//'.'//intstr(hybnum)
+   case (7, 15)
+      hybnum = min(nadj, 3)
+      atomtype = trim(elsym(elnum))//'.'//intstr(hybnum)
+   case (8, 16)
+      hybnum = min(nadj + 1, 3)
+      atomtype = trim(elsym(elnum))//'.'//intstr(hybnum)
+   case default
+      atomtype = elsym(elnum)
+   end select
+
+end function
 
 end module

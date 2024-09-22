@@ -33,21 +33,21 @@ subroutine minperm(n, p, q, pq, perm, dist)
 !     n  : System size
 !     p,q: Coordinate vectors (n particles)
 
-   integer n
-   real(wp) p(3, n), q(3, n)
-   real(wp) pq(n, n)
+   integer :: n
+   real(rk) p(3, n), q(3, n)
+   real(rk) pq(n, n)
 
 !   Output
 !     perm: Permutation so that p(i) <--> q(perm(i))
 !     dist: Minimum attainable distance
 !   We have
-   integer perm(n)
-   real(wp) dist
+   integer :: perm(n)
+   real(rk) dist
    
 !   Parameters
 !     scale : Precision
 !     maxnei: Maximum number of closest neighbours
-   real(wp), parameter :: scale = 1.0e6_wp
+   real(rk), parameter :: scale = 1.0e6_rk
    integer, parameter :: maxnei = 100
 
 !   Internal variables
@@ -59,15 +59,15 @@ subroutine minperm(n, p, q, pq, perm, dist)
 !     Column indexes of existing elements in row i
 !   cc(first(i)..first(i+1)-1):
 !     Matrix elements of row i
-   integer first(n+1), y(n)
-   integer m, i, j, k, l, l2, a, n8, sz8, t
-   integer(int64) u(n), v(n), d, h
+   integer :: first(n+1), y(n)
+   integer :: m, i, j, k, l, l2, a, n8, sz8, t
+   integer(int64) :: u(n), v(n), d, h
    integer, allocatable :: kk(:)
    integer(int64), allocatable :: cc(:)
    allocate(kk(n*maxnei), cc(n*maxnei))
 
 !   Distance function
-!    real(wp) permdist
+!    real(rk) permdist
 
    m = maxnei
    if (n .le. maxnei) m = n
@@ -211,7 +211,7 @@ subroutine minperm(n, p, q, pq, perm, dist)
       end if
    end do
 
-   dist = real(h, kind=wp) / scale
+   dist = real(h, rk) / scale
 
 end subroutine
    
@@ -256,13 +256,13 @@ subroutine jovosap(n,sz,cc,kk,first,x,y,u,v,h)
 ! If Y(:) is initialised to zero then we see segmentation faults if 
 ! a Y element is unset, etc.
 
-   integer n,sz
-   integer kk(sz),first(n+1),x(n),y(n)
-   integer i,i0,j,j0,j1,k,l,l0,t,t0,td,cnt
-   integer lab(n),free(n),todo(n)
-   integer(int64) cc(sz),u(n),v(n),d(n)
-   integer(int64) h,v0,vj,dj,min
-   logical ok(n)
+   integer :: n,sz
+   integer :: kk(sz),first(n+1),x(n),y(n)
+   integer :: i,i0,j,j0,j1,k,l,l0,t,t0,td,cnt
+   integer :: lab(n),free(n),todo(n)
+   integer(int64) :: cc(sz),u(n),v(n),d(n)
+   integer(int64) :: h,v0,vj,dj,min
+   logical :: ok(n)
 
    integer(int64), parameter :: bigint = 1000000000000_int64
 
@@ -298,25 +298,25 @@ subroutine jovosap(n,sz,cc,kk,first,x,y,u,v,h)
       end if
    end do
    l=0
-   do 40 i=1,n
+   do i=1,n
       if (x(i).eq.0) then
         l=l+1
         free(l)=i
-        goto 40
+        cycle
       end if
       if (x(i).lt.0) then
         x(i)=-x(i)
       else
         j1=x(i)
         min=bigint
-        do 31 t=first(i),first(i+1)-1
+        do t=first(i),first(i+1)-1
            j=kk(t)
-           if (j.eq.j1) goto 31
+           if (j.eq.j1) cycle
            if (cc(t)-v(j).lt.min) min=cc(t)-v(j)
-31      continue
+        end do
         v(j1)=v(j1)-min
       end if
-40 continue
+   end do
 ! improve the initial solution
    cnt=0
    if (l.eq.0) goto 1000

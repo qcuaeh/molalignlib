@@ -28,8 +28,8 @@ contains
 function translated(natom, coords, vector) result(transcoords)
 ! Purpose: Translate atomic coordinates to its vector of geometry
    integer, intent(in) :: natom
-   real(wp), intent(in) :: coords(3, natom), vector(3)
-   real(wp) :: transcoords(3, natom)
+   real(rk), intent(in) :: coords(3, natom), vector(3)
+   real(rk) :: transcoords(3, natom)
    integer :: i
 
    do i = 1, natom
@@ -41,8 +41,8 @@ end function
 subroutine translate(natom, coords, vector)
 ! Purpose: Translate atomic coordinates to its vector of geometry
    integer, intent(in) :: natom
-   real(wp), intent(in) :: vector(3)
-   real(wp), intent(inout) :: coords(3, natom)
+   real(rk), intent(in) :: vector(3)
+   real(rk), intent(inout) :: coords(3, natom)
    integer :: i
 
    do i = 1, natom

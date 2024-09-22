@@ -2,7 +2,7 @@ module pointers
 use kinds
 
 abstract interface
-   real(wp) function f_realint(z)
+   real(rk) function f_realint(z)
       use kinds
       integer, intent(in) :: z
    end function

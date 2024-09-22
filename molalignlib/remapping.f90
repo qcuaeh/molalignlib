@@ -50,12 +50,12 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
    integer :: natom
    integer :: neltype
    integer :: nmnatype0, nmnatype1
-   real(wp), dimension(:), allocatable :: weights
-   real(wp), dimension(:, :), allocatable :: coords0, coords1
+   real(rk), dimension(:), allocatable :: weights
+   real(rk), dimension(:, :), allocatable :: coords0, coords1
    logical, dimension(:, :), allocatable :: adjmat0, adjmat1
    logical :: visited, overflow
    integer :: nfrag0, nfrag1
-   integer irec, mrec, ntrial, nstep, steps
+   integer :: irec, mrec, ntrial, nstep, steps
    integer :: adjd, recadjd(maxrec)
    integer :: nadjs0(mol0%natom), adjlists0(maxcoord, mol0%natom)
    integer :: nadjs1(mol1%natom), adjlists1(maxcoord, mol1%natom)
@@ -66,25 +66,25 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
    integer, dimension(maxcoord, mol1%natom, maxlevel) :: adjmnalen1
    integer, dimension(maxcoord, mol0%natom, maxlevel) :: adjmnalist0
    integer, dimension(maxcoord, mol1%natom, maxlevel) :: adjmnalist1
-   integer, dimension(mol0%natom) :: natomneimnatypes0
-   integer, dimension(mol1%natom) :: natomneimnatypes1
-   integer, dimension(maxcoord, mol0%natom) :: atomneimnatypepartlens0
-   integer, dimension(maxcoord, mol1%natom) :: atomneimnatypepartlens1
+   integer, dimension(mol0%natom) :: nadjmnatypes0
+   integer, dimension(mol1%natom) :: nadjmnatypes1
+   integer, dimension(maxcoord, mol0%natom) :: adjmnatypepartlens0
+   integer, dimension(maxcoord, mol1%natom) :: adjmnatypepartlens1
    integer :: equivmat(mol0%natom, mol1%natom)
    integer, dimension(mol0%natom) :: mapping, newmapping
-   real(wp) :: rmsd, totalrot
-   real(wp), dimension(4) :: rotquat, prodquat
-   real(wp), dimension(maxrec) :: recrmsd, avgsteps, avgtotalrot, avgrealrot
-   real(wp) :: biasmat(mol0%natom, mol1%natom)
-   real(wp) :: workcoords1(3, mol1%natom)
+   real(rk) :: rmsd, totalrot
+   real(rk), dimension(4) :: rotquat, prodquat
+   real(rk), dimension(maxrec) :: recrmsd, avgsteps, avgtotalrot, avgrealrot
+   real(rk) :: biasmat(mol0%natom, mol1%natom)
+   real(rk) :: workcoords1(3, mol1%natom)
 
    integer, allocatable, dimension(:) :: fragroots0, fragroots1
    integer, allocatable, dimension(:) :: mnatypepartlens0, mnatypepartlens1
 
    natom = mol0%natom
-   weights = mol0%get_sorted_atomweights()
-   coords0 = mol0%get_sorted_atomcoords()
-   coords1 = mol1%get_sorted_atomcoords()
+   weights = mol0%get_sorted_weights()
+   coords0 = mol0%get_sorted_coords()
+   coords1 = mol1%get_sorted_coords()
    adjmat0 = mol0%get_sorted_adjmat()
    adjmat1 = mol1%get_sorted_adjmat()
 
@@ -101,10 +101,10 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
    mnatypepartlens0 = mol0%get_mnatypepartlens()
    mnatypepartlens1 = mol1%get_mnatypepartlens()
 
-   natomneimnatypes0 = mol0%get_sorted_natomneimnatypes()
-   natomneimnatypes1 = mol1%get_sorted_natomneimnatypes()
-   atomneimnatypepartlens0 = mol0%get_sorted_atomneimnatypepartlens()
-   atomneimnatypepartlens1 = mol1%get_sorted_atomneimnatypepartlens()
+   nadjmnatypes0 = mol0%get_sorted_nadjmnatypes()
+   nadjmnatypes1 = mol1%get_sorted_nadjmnatypes()
+   adjmnatypepartlens0 = mol0%get_sorted_adjmnatypepartlens()
+   adjmnatypepartlens1 = mol1%get_sorted_adjmnatypepartlens()
 
    fragroots0 = mol0%get_sorted_fragroots()
    fragroots1 = mol1%get_sorted_fragroots()
@@ -141,7 +141,7 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 
       ! Aply a random rotation to workcoords1
 
-      call rotate(natom, workcoords1, genrotquat(randarray(3)))
+      call rotate(natom, workcoords1, genrotquat(randvec()))
 
       ! Minimize the euclidean distance
 
@@ -174,7 +174,7 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
             mnatypepartlens0, workcoords1, nadjs1, adjlists1, adjmat1, nmnatype1, mnatypepartlens1, mapping, nfrag0, fragroots0)
 
          call eqvatomperm(natom, weights, coords0, adjmat0, adjlists0, nmnatype0, mnatypepartlens0, &
-            natomneimnatypes0, atomneimnatypepartlens0, workcoords1, adjmat1, mapping, nfrag0, fragroots0)
+            nadjmnatypes0, adjmnatypepartlens0, workcoords1, adjmat1, mapping, nfrag0, fragroots0)
 
       end if
 
@@ -254,23 +254,23 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
 
    integer :: i, j, k, l, j_, k_, l_
    integer :: natom0, natom1
-   integer, allocatable, dimension(:) :: atomelnums0, atomelnums1
-   integer, allocatable, dimension(:) :: atommnatypes0, atommnatypes1
+   integer, allocatable, dimension(:) :: elnums0, elnums1
+   integer, allocatable, dimension(:) :: mnatypes0, mnatypes1
    logical, allocatable, dimension(:, :) :: adjmat0, adjmat1
    type(t_atomlist), allocatable, dimension(:) :: adjlists0, adjlists1
    type(t_atomlist), allocatable, dimension(:) :: molfragparts0, molfragparts1
    type(t_atomlist), allocatable, dimension(:) :: mnatypeparts0, mnatypeparts1
    integer, allocatable, dimension(:) :: mnatypepartidcs0, mnatypepartidcs1
    integer, allocatable, dimension(:) :: unmapping
-   real(wp) :: rotquat(4)
+   real(rk) :: rotquat(4)
 
    ! Align coordinates
 
-   rotquat = leastrotquat(mol0%natom, mol0%get_atomweights(), mol0%get_atomcoords(), mol1%get_atomcoords(), mapping)
-   call mol1%rotate_atomcoords(rotquat)
+   rotquat = leastrotquat(mol0%natom, mol0%get_weights(), mol0%get_coords(), mol1%get_coords(), mapping)
+   call mol1%rotate_coords(rotquat)
 
-!   write (stderr, *) sqrt(squaredist(mol0%natom, mol0%get_atomweights(), mol0%get_atomcoords(), mol1%get_atomcoords(), mapping) &
-!         /sum(mol0%get_atomweights()))
+!   write (stderr, *) sqrt(squaredist(mol0%natom, mol0%get_weights(), mol0%get_coords(), mol1%get_coords(), mapping) &
+!         /sum(mol0%get_weights()))
 
    ! Initialization
 
@@ -278,12 +278,12 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
    natom1 = mol1%get_natom()
    adjmat0 = mol0%get_adjmat()
    adjmat1 = mol1%get_adjmat()
-   atomelnums0 = mol0%get_atomelnums()
-   atomelnums1 = mol1%get_atomelnums()
+   elnums0 = mol0%get_elnums()
+   elnums1 = mol1%get_elnums()
    adjlists0 = mol0%get_newadjlists()
    adjlists1 = mol1%get_newadjlists()
-   atommnatypes0 = mol0%get_atommnatypes()
-   atommnatypes1 = mol1%get_atommnatypes()
+   mnatypes0 = mol0%get_mnatypes()
+   mnatypes1 = mol1%get_mnatypes()
    mnatypeparts0 = mol0%get_mnatypeparts()
    mnatypeparts1 = mol1%get_mnatypeparts()
    molfragparts0 = mol0%get_molfragparts()
@@ -296,7 +296,7 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
       do j_ = 1, size(adjlists0(i)%atomidcs)
          j = adjlists0(i)%atomidcs(j_)
          if (.not. adjmat1(mapping(i), mapping(j))) then
-            mnatypepartidcs0 = mnatypeparts0(atommnatypes0(j))%atomidcs
+            mnatypepartidcs0 = mnatypeparts0(mnatypes0(j))%atomidcs
             do k_ = 1, size(mnatypepartidcs0)
                k = mnatypepartidcs0(k_)
                call mol0%remove_bond(i, k)
@@ -310,7 +310,7 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
       do j_ = 1, size(adjlists1(i)%atomidcs)
          j = adjlists1(i)%atomidcs(j_)
          if (.not. adjmat0(unmapping(i), unmapping(j))) then
-            mnatypepartidcs1 = mnatypeparts1(atommnatypes1(j))%atomidcs
+            mnatypepartidcs1 = mnatypeparts1(mnatypes1(j))%atomidcs
             do k_ = 1, size(mnatypepartidcs1)
                k = mnatypepartidcs1(k_)
                call mol1%remove_bond(i, k)
@@ -323,7 +323,7 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
    ! Remove water bonds
 
    do i = 1, size(molfragparts0)
-      if (all(sorted(atomelnums0(molfragparts0(i)%atomidcs)) == [1, 1, 8])) then
+      if (all(sorted(elnums0(molfragparts0(i)%atomidcs)) == [1, 1, 8])) then
          do j_ = 1, size(molfragparts0(i)%atomidcs)
             j = molfragparts0(i)%atomidcs(j_)
             do k_ = 1, size(adjlists0(j)%atomidcs)
@@ -335,7 +335,7 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
    end do
 
    do i = 1, size(molfragparts1)
-      if (all(sorted(atomelnums1(molfragparts1(i)%atomidcs)) == [1, 1, 8])) then
+      if (all(sorted(elnums1(molfragparts1(i)%atomidcs)) == [1, 1, 8])) then
          do j_ = 1, size(molfragparts1(i)%atomidcs)
             j = molfragparts1(i)%atomidcs(j_)
             do k_ = 1, size(adjlists1(j)%atomidcs)

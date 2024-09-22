@@ -61,8 +61,8 @@ end function
 
 function real_sorted_partial(x, n) result(y)
    integer, intent(in) :: n
-   real(wp), intent(in) :: x(:)
-   real(wp), allocatable :: y(:)
+   real(rk), intent(in) :: x(:)
+   real(rk), allocatable :: y(:)
    y = x(1:n)
    call realquicksort(y, 1, n)
 end function
@@ -84,7 +84,7 @@ end function
 
 function real_sorted_order_partial(x, n) result(o)
    integer, intent(in) :: n
-   real(wp), intent(in) :: x(:)
+   real(rk), intent(in) :: x(:)
    integer :: i, o(n), t((n+1)/2)
    o = [(i, i=1, n)]
    call realmergesort(x, o, n, t)
@@ -128,10 +128,10 @@ end subroutine
 
 recursive subroutine realquicksort(x, m, n)
    integer, intent(in) :: m, n
-   real(wp), intent(inout) :: x(:)
+   real(rk), intent(inout) :: x(:)
 
    integer :: i, j
-   real(wp) :: xi, xp
+   real(rk) :: xi, xp
 
    xp = x((m+n)/2)
    i = m
@@ -182,7 +182,7 @@ end subroutine
  
 subroutine realmerge(x, a, na, b, nb, c, nc)
    integer, intent(in) :: na, nb, nc
-   real(wp), intent(in) :: x(:)
+   real(rk), intent(in) :: x(:)
    integer, intent(in) :: b(nb)
    integer, intent(inout) :: a(na), c(nc)
     
@@ -208,7 +208,7 @@ end subroutine
  
 recursive subroutine realmergesort(x, o, n, t)
    integer, intent(in) :: n
-   real(wp), intent(in) :: x(:)
+   real(rk), intent(in) :: x(:)
    integer, intent(inout) :: o(n)
    integer, intent(out) :: t((n+1)/2)
     

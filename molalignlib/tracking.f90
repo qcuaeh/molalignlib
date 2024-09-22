@@ -59,7 +59,7 @@ recursive subroutine recrun (tracked, n, nfrag, fragidcs, fragsize)
    integer, intent(in) :: n, nfrag
    integer, intent(inout) :: fragidcs(:), fragsize(:)
    ! Local variables
-   integer i
+   integer :: i
 
    if (tracked(n)) return
 

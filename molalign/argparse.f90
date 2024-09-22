@@ -66,7 +66,7 @@ end subroutine
 
 logical function getarg(arg) result(success)
    character(:), allocatable, intent(out) :: arg
-   integer arglen
+   integer :: arglen
 
    iarg = iarg + 1
 
@@ -84,7 +84,7 @@ end function
 subroutine getoptarg(option, arg)
    character(*), intent(in) :: option
    character(:), allocatable, intent(out) :: arg
-   integer arglen
+   integer :: arglen
 
    iarg = iarg + 1
 
@@ -129,7 +129,7 @@ end subroutine
 
 subroutine readrealoptarg(option, optval)
    character(*), intent(in) :: option
-   real(wp), intent(out) :: optval
+   real(rk), intent(out) :: optval
    character(:), allocatable :: arg 
    integer :: stat
 

@@ -30,19 +30,19 @@ public readlabel
 
 contains
 
-real(wp) function unity(z) result(res)
+real(rk) function unity(z) result(res)
    integer, intent(in) :: z
    res = 1.
 end function
 
-real(wp) function stdmass(z) result(res)
+real(rk) function stdmass(z) result(res)
    integer, intent(in) :: z
    res = stdmasses(z)
 end function
 
-real(wp) function valency(z) result(res)
+real(rk) function valency(z) result(res)
    integer, intent(in) :: z
-   res = real(valencies(z), wp)
+   res = real(valencies(z), rk)
 end function
 
 subroutine readlabel(element, atomelnum, atomlabel)

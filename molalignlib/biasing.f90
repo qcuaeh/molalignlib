@@ -27,15 +27,15 @@ abstract interface
       use kinds
       integer, intent(in) :: natom, neltype
       integer, dimension(:), intent(in) :: eltypepartlens
-      real(wp), dimension(:, :), intent(in) :: coords0, coords1
+      real(rk), dimension(:, :), intent(in) :: coords0, coords1
       integer, dimension(:, :), intent(in) :: equivmat
-      real(wp), dimension(:, :), intent(out) :: biasmat
+      real(rk), dimension(:, :), intent(out) :: biasmat
    end subroutine
 end interface
 
-real(wp) :: bias_tol
-real(wp) :: bias_scale
-real(wp) :: bias_ratio
+real(rk) :: bias_tol
+real(rk) :: bias_scale
+real(rk) :: bias_ratio
 
 procedure(proc_setcrossbias), pointer :: setcrossbias
 procedure(proc_setcrossbias), pointer :: mapsetcrossbias
@@ -47,9 +47,9 @@ subroutine setcrossbias_none(natom, neltype, eltypepartlens, coords0, coords1, e
 
    integer, intent(in) :: natom, neltype
    integer, dimension(:), intent(in) :: eltypepartlens
-   real(wp), dimension(:, :), intent(in) :: coords0, coords1
+   real(rk), dimension(:, :), intent(in) :: coords0, coords1
    integer, dimension(:, :), intent(in) :: equivmat
-   real(wp), dimension(:, :), intent(out) :: biasmat
+   real(rk), dimension(:, :), intent(out) :: biasmat
 
    integer :: h, i, j, offset
 
@@ -71,12 +71,12 @@ subroutine setcrossbias_rd(natom, neltype, eltypepartlens, coords0, coords1, equ
 
    integer, intent(in) :: natom, neltype
    integer, dimension(:), intent(in) :: eltypepartlens
-   real(wp), dimension(:, :), intent(in) :: coords0, coords1
+   real(rk), dimension(:, :), intent(in) :: coords0, coords1
    integer, dimension(:, :), intent(in) :: equivmat
-   real(wp), dimension(:, :), intent(out) :: biasmat
+   real(rk), dimension(:, :), intent(out) :: biasmat
 
    integer :: h, i, j, offset
-   real(wp), allocatable :: d0(:, :), d1(:, :)
+   real(rk), allocatable :: d0(:, :), d1(:, :)
 
    allocate(d0(natom, natom), d1(natom, natom))
 
@@ -124,9 +124,9 @@ subroutine setcrossbias_mna(natom, neltype, eltypepartlens, coords0, coords1, eq
 
    integer, intent(in) :: natom, neltype
    integer, dimension(:), intent(in) :: eltypepartlens
-   real(wp), dimension(:, :), intent(in) :: coords0, coords1
+   real(rk), dimension(:, :), intent(in) :: coords0, coords1
    integer, dimension(:, :), intent(in) :: equivmat
-   real(wp), dimension(:, :), intent(out) :: biasmat
+   real(rk), dimension(:, :), intent(out) :: biasmat
    integer :: h, i, j, offset, maxequiv
 
    maxequiv = 0

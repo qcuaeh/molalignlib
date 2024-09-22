@@ -40,7 +40,7 @@ character(2), parameter :: elsym(nelem) = [ &
 ]
 
 ! Lit.: R.T. Sanderson, Inorganic Chemistry, Reinhold 1967
-real(wp), parameter :: covrad(nelem) = [ &
+real(rk), parameter :: covrad(nelem) = [ &
 0.31,                                                                                                 0.28, &
 1.28, 0.96,                                                             0.84, 0.76, 0.71, 0.66, 0.57, 0.58, &
 1.66, 1.41,                                                             1.21, 1.11, 1.07, 1.05, 1.02, 1.06, &
@@ -52,7 +52,7 @@ real(wp), parameter :: covrad(nelem) = [ &
 ]
 
 ! Lit.: A. Bondi, J. Phys. Chem. 68, 441 (1964)         
-real(wp), parameter :: vdwrad(nelem) = [ &
+real(rk), parameter :: vdwrad(nelem) = [ &
 1.20,                                                                                                 1.40, &
 1.82, 2.00,                                                             2.00, 1.70, 1.55, 1.52, 1.47, 1.54, &
 2.27, 1.73,                                                             2.00, 2.10, 1.80, 1.80, 1.75, 1.88, &
@@ -64,7 +64,7 @@ real(wp), parameter :: vdwrad(nelem) = [ &
 ]
 
 ! Lit.: CRC Handbook of Chemistry and Physics, 1989
-real(wp), parameter :: stdmasses(nelem) = [ &
+real(rk), parameter :: stdmasses(nelem) = [ &
 1.0,                                                                                                                     4.0, &
 6.9,     9.0,                                                                        10.8,  12.0,  14.0,  16.0,  19.0,  20.2, &
 23.0,   24.3,                                                                        27.0,  28.1,  31.0,  32.1,  35.5,  39.9, &

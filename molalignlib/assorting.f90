@@ -34,21 +34,21 @@ subroutine assort_atoms(mol)
 
    integer :: i, j
    integer :: neltype
-   integer :: atomeltypes(mol%natom)
+   integer :: eltypes(mol%natom)
    logical :: remaining(mol%natom)
-   integer, dimension(mol%natom) :: atomelnums, atomlabels
+   integer, dimension(mol%natom) :: elnums, labels
    integer, dimension(mol%natom) :: blockelnums, blocklabels
    integer, dimension(mol%natom) :: foreorder, backorder
 
-!   real(wp), allocatable :: weights(:)
+!   real(rk), allocatable :: weights(:)
 
    ! Initialization
 
    neltype = 0
    remaining = .true.
-   atomelnums = mol%get_atomelnums()
-   atomlabels = mol%get_atomlabels()
-!   weights = mol%get_atomweights()
+   elnums = mol%get_elnums()
+   labels = mol%get_labels()
+!   weights = mol%get_weights()
 
    ! Create block list
 
@@ -57,17 +57,17 @@ subroutine assort_atoms(mol)
       if (remaining(i)) then
 
          neltype = neltype + 1
-         atomeltypes(i) = neltype
-         blockelnums(neltype) = atomelnums(i)
-         blocklabels(neltype) = atomlabels(i)
+         eltypes(i) = neltype
+         blockelnums(neltype) = elnums(i)
+         blocklabels(neltype) = labels(i)
          remaining(i) = .false.
 
          do j = 1, mol%natom
             if (remaining(j)) then
-               if (atomelnums(i) == atomelnums(j) .and. atomlabels(i) == atomlabels(j)) then
+               if (elnums(i) == elnums(j) .and. labels(i) == labels(j)) then
 !                  if (weights(i) == weights(j)) then
                      remaining(j) = .false.
-                     atomeltypes(j) = neltype
+                     eltypes(j) = neltype
 !                     weights(j) = weights(i)
 !                  else
 !                     ! Abort if there are inconsistent weights
@@ -86,15 +86,15 @@ subroutine assort_atoms(mol)
 
    foreorder(:neltype) = sorted_order(blocklabels, neltype)
    backorder(:neltype) = inverse_mapping(foreorder(:neltype))
-   atomeltypes = backorder(atomeltypes)
+   eltypes = backorder(eltypes)
 
    ! Order parts by atomic number
 
    foreorder(:neltype) = sorted_order(blockelnums, neltype)
    backorder(:neltype) = inverse_mapping(foreorder(:neltype))
-   atomeltypes = backorder(atomeltypes)
+   eltypes = backorder(eltypes)
 
-   call mol%set_eltypes(neltype, atomeltypes) 
+   call mol%set_eltypes(neltype, eltypes) 
 
 end subroutine
 
@@ -114,7 +114,7 @@ subroutine set_equiv_atoms(mol)
    ! Initialization
 
    nin = mol%get_neltype()
-   intypes = mol%get_atomeltypes()
+   intypes = mol%get_eltypes()
    typemap(:nin) = [(i, i=1, nin)]
 
    ! Determine MNA types iteratively
@@ -144,21 +144,21 @@ subroutine assort_neighbors(mol)
 
    integer :: i, h
    integer :: nadjs(mol%natom), adjlists(maxcoord, mol%natom)
-   integer :: natomneimnatypes(mol%natom), atomneimnatypepartlens(maxcoord, mol%natom)
-   integer :: adjeqvid(maxcoord), atomorder(maxcoord), atommnatypes(mol%natom)
+   integer :: nadjmnatypes(mol%natom), adjmnatypepartlens(maxcoord, mol%natom)
+   integer :: adjeqvid(maxcoord), atomorder(maxcoord), mnatypes(mol%natom)
 
    nadjs = mol%get_nadjs()
    adjlists = mol%get_adjlists()
-   atommnatypes = mol%get_atommnatypes()
+   mnatypes = mol%get_mnatypes()
 
    do i = 1, mol%natom
-      call groupbytype(adjlists(:nadjs(i), i), atommnatypes, natomneimnatypes(i), atomneimnatypepartlens(:, i), adjeqvid)
+      call groupbytype(adjlists(:nadjs(i), i), mnatypes, nadjmnatypes(i), adjmnatypepartlens(:, i), adjeqvid)
       atomorder(:nadjs(i)) = sorted_order(adjeqvid, nadjs(i))
       adjlists(:nadjs(i), i) = adjlists(atomorder(:nadjs(i)), i)
    end do
 
    call mol%set_adjlists(nadjs, adjlists)
-   call mol%set_atomneimnatypepartlens(natomneimnatypes, atomneimnatypepartlens)
+   call mol%set_adjmnatypepartlens(nadjmnatypes, adjmnatypepartlens)
 
 end subroutine
 
@@ -231,8 +231,8 @@ subroutine calcequivmat(mol0, mol1, nadjmna0, adjmnalen0, adjmnalist0, &
    adjlists1 = mol1%get_sorted_newadjlists()
 
    nin = neltype
-   intypes0 = mol0%get_sorted_atomeltypes()
-   intypes1 = mol1%get_sorted_atomeltypes()
+   intypes0 = mol0%get_sorted_eltypes()
+   intypes1 = mol1%get_sorted_eltypes()
    level = 1
 
    do
@@ -284,9 +284,9 @@ subroutine getmnacrosstypes(adjlists0, adjlists1, nin, intypes0, intypes1, &
    integer, intent(out) :: nout
    integer, dimension(:), intent(out) :: outtypes0, outtypes1
 
-   integer i, j
-   integer archatom(size(adjlists0))
-   logical untyped(size(adjlists0))
+   integer :: i, j
+   integer :: archatom(size(adjlists0))
+   logical :: untyped(size(adjlists0))
 
    nout = 0
    untyped(:) = .true.
@@ -349,7 +349,7 @@ subroutine groupbytype(items, itemtypes, ngroup, grouplens, groupidcs)
     integer, dimension(:), intent(in) :: itemtypes, items
     integer, dimension(:), intent(out) :: groupidcs, grouplens
 
-    integer i, j
+    integer :: i, j
     integer, dimension(maxcoord) :: grouptype
     logical, dimension(maxcoord) :: remaining
     integer, dimension(maxcoord) :: foreorder, backorder

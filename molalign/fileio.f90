@@ -99,8 +99,8 @@ end subroutine
 
 subroutine writefile(unit, fmtout, mol)
 !   integer, intent(in) :: unit, natom
-!   integer, dimension(:), intent(in) :: atomelnums
-!   real(wp), dimension(:, :), intent(in) :: coords
+!   integer, dimension(:), intent(in) :: elnums
+!   real(rk), dimension(:, :), intent(in) :: coords
 !   logical, dimension(:, :), intent(in) :: adjmat
 !   character(*), intent(in) :: title, fmtout
    integer, intent(in) :: unit
@@ -111,8 +111,6 @@ subroutine writefile(unit, fmtout, mol)
    integer :: nbond
    integer :: bonds(2, mol%natom*maxcoord)
 
-   call adjmat2bonds(mol%natom, mol%get_adjmat(), nbond, bonds)
-
    select case (fmtout)
    case ('xyz')
       call writexyz(unit, mol)
@@ -122,6 +120,8 @@ subroutine writefile(unit, fmtout, mol)
       write (stderr, '(a,1x,a)') 'Invalid format:', fmtout
       stop
    end select
+
+   flush(stderr)
 
 end subroutine
 

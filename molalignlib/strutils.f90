@@ -65,12 +65,12 @@ function intstr(x) result(str)
 end function
 
 function realstr(x, n) result(str)
-   real(wp), intent(in) :: x
+   real(rk), intent(in) :: x
    integer, intent(in) :: n
    integer :: l
    character(32) format
    character(:), allocatable :: str
-   l = floor(log10(max(abs(x), 1.0_wp))) + n + 2
+   l = floor(log10(max(abs(x), 1.0_rk))) + n + 2
    if (x < 0) l = l + 1
    allocate(character(l) :: str)
    write (format, '(a,i0,a,i0,a)') '(f', l, '.', n, ')'
@@ -81,7 +81,7 @@ function baseext(path)
    character(*), intent(in) :: path
    character(:), allocatable :: basename
    character(:), allocatable :: baseext
-   integer pos
+   integer :: pos
    pos = index(path, '/', back=.true.)
    basename = path(pos+1:)
    pos = index(basename, '.', back=.true.)

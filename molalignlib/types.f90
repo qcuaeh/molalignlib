@@ -31,10 +31,10 @@ type, public :: t_atom
    integer :: mnatype
    integer :: fragidx
    integer, allocatable :: mnaid(:)
-   real(wp) :: weight
-   real(wp) :: coords(3)
+   real(rk) :: weight
+   real(rk) :: coords(3)
    integer, allocatable :: adjlist(:)
-   integer, allocatable :: atomneimnatypepartlens(:)
+   integer, allocatable :: adjmnatypepartlens(:)
 end type
 
 type, public :: t_bond
@@ -51,61 +51,59 @@ type, public :: t_mol
    type(t_partition) :: mnatypepartition
    type(t_partition) :: molfragpartition
 contains
-   procedure :: print_atoms
-   procedure :: print_bonds
-   procedure :: set_atomelnums
-   procedure :: get_atomelnums
-   procedure :: get_sorted_atomelnums
-   procedure :: set_atomlabels
-   procedure :: get_atomlabels
-   procedure :: get_sorted_atomlabels
-   procedure :: set_atomcoords
+   procedure :: get_natom
+   procedure :: set_elnums
+   procedure :: get_elnums
+   procedure :: set_labels
+   procedure :: get_labels
+   procedure :: set_coords
    procedure :: set_weights
    procedure :: set_adjlists
    procedure :: set_eltypes
    procedure :: set_mnatypes
    procedure :: set_molfrags
-   procedure :: set_atomneimnatypepartlens
+   procedure :: set_adjmnatypepartlens
    procedure :: get_title
    procedure :: get_neltype
    procedure :: get_nmnatype
    procedure :: get_eltypepartlens
    procedure :: get_mnatypepartlens
-   procedure :: mirror_atomcoords
-   procedure :: translate_atomcoords
-   procedure :: permutate_atoms
-   procedure :: get_natom
-   procedure :: get_bonds
    procedure :: bonded
    procedure :: add_bond
    procedure :: remove_bond
+   procedure :: get_bonds
    procedure :: get_newadjlists
-   procedure :: get_sorted_newadjlists
    procedure :: get_mnatypeparts
    procedure :: get_molfragparts
+   procedure :: get_eltypes
+   procedure :: get_mnatypes
+   procedure :: get_weights
+   procedure :: get_coords
+   procedure :: get_nadjs
+   procedure :: get_adjlists
+   procedure :: get_adjmat
+   procedure :: get_nadjmnatypes
+   procedure :: get_adjmnatypepartlens
+   procedure :: get_sorted_elnums
+   procedure :: get_sorted_labels
+   procedure :: get_sorted_newadjlists
    procedure :: get_sorted_molfragparts
    procedure :: get_sorted_fragroots
-   procedure :: get_atomeltypes
-   procedure :: get_sorted_atomeltypes
-   procedure :: get_atommnatypes
-   procedure :: get_sorted_atommnatypes
-   procedure :: get_atomweights
-   procedure :: get_sorted_atomweights
-   procedure :: get_atomcoords
-   procedure :: get_sorted_atomcoords
-   procedure :: get_adjmat
-   procedure :: get_sorted_adjmat
-   procedure :: get_nadjs
+   procedure :: get_sorted_eltypes
+   procedure :: get_sorted_mnatypes
+   procedure :: get_sorted_weights
+   procedure :: get_sorted_coords
    procedure :: get_sorted_nadjs
-   procedure :: get_adjlists
    procedure :: get_sorted_adjlists
-   procedure :: get_natomneimnatypes
-   procedure :: get_sorted_natomneimnatypes
-   procedure :: get_atomneimnatypepartlens
-   procedure :: get_sorted_atomneimnatypepartlens
-   procedure, private :: matrix_rotate_atomcoords
-   procedure, private :: quater_rotate_atomcoords
-   generic :: rotate_atomcoords => matrix_rotate_atomcoords, quater_rotate_atomcoords
+   procedure :: get_sorted_adjmat
+   procedure :: get_sorted_nadjmnatypes
+   procedure :: get_sorted_adjmnatypepartlens
+   procedure :: permutate_atoms
+   procedure :: mirror_coords
+   procedure :: translate_coords
+   procedure :: rotate_coords
+   procedure :: print_atoms
+   procedure :: print_bonds
 end type
 
 contains
@@ -140,43 +138,34 @@ integer function get_nmnatype(self) result(nmnatype)
 
 end function
 
-subroutine mirror_atomcoords(self)
+subroutine mirror_coords(self)
    class(t_mol), intent(inout) :: self
    ! Local variables
-   real(wp), allocatable :: coords(:, :)
+   real(rk), allocatable :: coords(:, :)
 
    allocate(coords(3, size(self%atoms)))
 
-   coords = self%get_atomcoords()
+   coords = self%get_coords()
    coords(1, :) = -coords(1, :)
-   call self%set_atomcoords(coords)
+   call self%set_coords(coords)
 
 end subroutine
 
-subroutine matrix_rotate_atomcoords(self, rotmat)
+subroutine rotate_coords(self, rotquat)
    class(t_mol), intent(inout) :: self
    ! Local variables
-   real(wp), intent(in) :: rotmat(3, 3)
+   real(rk), intent(in) :: rotquat(4)
 
-   call self%set_atomcoords(matrix_rotated(size(self%atoms), self%get_atomcoords(), rotmat))
+   call self%set_coords(quater_rotated(size(self%atoms), self%get_coords(), rotquat))
 
 end subroutine
 
-subroutine quater_rotate_atomcoords(self, rotquat)
+subroutine translate_coords(self, travec)
    class(t_mol), intent(inout) :: self
    ! Local variables
-   real(wp), intent(in) :: rotquat(4)
+   real(rk), intent(in) :: travec(3)
 
-   call self%set_atomcoords(quater_rotated(size(self%atoms), self%get_atomcoords(), rotquat))
-
-end subroutine
-
-subroutine translate_atomcoords(self, travec)
-   class(t_mol), intent(inout) :: self
-   ! Local variables
-   real(wp), intent(in) :: travec(3)
-
-   call self%set_atomcoords(translated(size(self%atoms), self%get_atomcoords(), travec))
+   call self%set_coords(translated(size(self%atoms), self%get_coords(), travec))
 
 end subroutine
 
@@ -199,73 +188,73 @@ subroutine permutate_atoms(self, atom_order)
 
 end subroutine
 
-subroutine set_atomelnums(self, atomelnums)
+subroutine set_elnums(self, elnums)
    class(t_mol), intent(inout) :: self
-   integer, intent(in) :: atomelnums(:)
+   integer, intent(in) :: elnums(:)
 
-   self%atoms(:)%elnum = atomelnums(:)
+   self%atoms(:)%elnum = elnums(:)
 
 end subroutine
 
-function get_atomelnums(self) result(atomelnums)
+function get_elnums(self) result(elnums)
    class(t_mol), intent(in) :: self
-   integer, allocatable :: atomelnums(:)
+   integer, allocatable :: elnums(:)
 
-   atomelnums = self%atoms(:)%elnum
+   elnums = self%atoms(:)%elnum
 
 end function
 
-function get_sorted_atomelnums(self) result(atomelnums)
+function get_sorted_elnums(self) result(elnums)
    class(t_mol), intent(in) :: self
-   integer, allocatable :: atomelnums(:)
+   integer, allocatable :: elnums(:)
 
-   atomelnums = self%atoms(self%mnatypepartition%atom_order)%elnum
+   elnums = self%atoms(self%mnatypepartition%atom_order)%elnum
 
 end function
 
-subroutine set_atomlabels(self, atomlabels)
+subroutine set_labels(self, labels)
    class(t_mol), intent(inout) :: self
-   integer, intent(in) :: atomlabels(:)
+   integer, intent(in) :: labels(:)
 
-   self%atoms(:)%label = atomlabels(:)
+   self%atoms(:)%label = labels(:)
 
 end subroutine
 
-function get_atomlabels(self) result(atomlabels)
+function get_labels(self) result(labels)
    class(t_mol), intent(in) :: self
    ! Local variables
-   integer, allocatable :: atomlabels(:)
+   integer, allocatable :: labels(:)
 
-   atomlabels = self%atoms(:)%label
+   labels = self%atoms(:)%label
 
 end function
 
-function get_sorted_atomlabels(self) result(atomlabels)
+function get_sorted_labels(self) result(labels)
    class(t_mol), intent(in) :: self
    ! Local variables
-   integer, allocatable :: atomlabels(:)
+   integer, allocatable :: labels(:)
 
-   atomlabels = self%atoms(self%mnatypepartition%atom_order)%label
+   labels = self%atoms(self%mnatypepartition%atom_order)%label
 
 end function
 
-subroutine set_eltypes(self, neltype, atomeltypes)
+subroutine set_eltypes(self, neltype, eltypes)
    class(t_mol), intent(inout) :: self
    integer, intent(in) :: neltype
-   integer, intent(in) :: atomeltypes(:)
+   integer, intent(in) :: eltypes(:)
 
-   self%atoms(:)%eltype = atomeltypes(:)
-   call self%eltypepartition%init(neltype, atomeltypes)
+   self%atoms(:)%eltype = eltypes(:)
+   call self%eltypepartition%init(neltype, eltypes)
 
 end subroutine
 
-subroutine set_mnatypes(self, nmnatype, atommnatypes)
+subroutine set_mnatypes(self, nmnatype, mnatypes)
    class(t_mol), intent(inout) :: self
    integer, intent(in) :: nmnatype
-   integer, intent(in) :: atommnatypes(:)
+   integer, intent(in) :: mnatypes(:)
 
-   self%atoms(:)%mnatype = atommnatypes(:)
-   call self%mnatypepartition%init(nmnatype, atommnatypes)
+   self%atoms(:)%mnatype = mnatypes(:)
+   call self%mnatypepartition%init(nmnatype, mnatypes)
 
 end subroutine
 
@@ -400,91 +389,91 @@ function get_sorted_fragroots(self) result(fragroots)
    integer, allocatable :: fragroots(:)
    integer, allocatable :: eltypepartlens(:)
    integer, allocatable :: mnatypepartlens(:)
-   integer, allocatable :: atomeltypes(:)
-   integer, allocatable :: atommnatypes(:)
+   integer, allocatable :: eltypes(:)
+   integer, allocatable :: mnatypes(:)
    type(t_atomlist), allocatable :: fragparts(:)
 
-   atomeltypes = self%get_sorted_atomeltypes()
-   atommnatypes = self%get_sorted_atommnatypes()
+   eltypes = self%get_sorted_eltypes()
+   mnatypes = self%get_sorted_mnatypes()
    fragparts = self%get_sorted_molfragparts()
    eltypepartlens = self%get_eltypepartlens()
    mnatypepartlens = self%get_mnatypepartlens()
    allocate(fragroots(size(fragparts)))
 
    do i = 1, size(fragparts)
-      order1 = sorted_order(mnatypepartlens(atommnatypes(fragparts(i)%atomidcs)))
-      order2 = sorted_order(eltypepartlens(atomeltypes(fragparts(i)%atomidcs(order1))))
+      order1 = sorted_order(mnatypepartlens(mnatypes(fragparts(i)%atomidcs)))
+      order2 = sorted_order(eltypepartlens(eltypes(fragparts(i)%atomidcs(order1))))
       order = order1(order2)
       fragroots(i) = fragparts(i)%atomidcs(order(1))
    end do
 
 end function
 
-function get_atomeltypes(self) result(atomeltypes)
+function get_eltypes(self) result(eltypes)
    class(t_mol), intent(in) :: self
    ! Local variables
-   integer, allocatable :: atomeltypes(:)
+   integer, allocatable :: eltypes(:)
 
-   atomeltypes = self%atoms(:)%eltype
+   eltypes = self%atoms(:)%eltype
 
 end function
 
-function get_sorted_atomeltypes(self) result(atomeltypes)
+function get_sorted_eltypes(self) result(eltypes)
    class(t_mol), intent(in) :: self
    ! Local variables
-   integer, allocatable :: atomeltypes(:)
+   integer, allocatable :: eltypes(:)
 
-   atomeltypes = self%atoms(self%mnatypepartition%atom_order)%eltype
+   eltypes = self%atoms(self%mnatypepartition%atom_order)%eltype
 
 end function
 
-function get_atommnatypes(self) result(atommnatypes)
+function get_mnatypes(self) result(mnatypes)
    class(t_mol), intent(in) :: self
    ! Local variables
-   integer, allocatable :: atommnatypes(:)
+   integer, allocatable :: mnatypes(:)
 
-   atommnatypes = self%atoms(:)%mnatype
+   mnatypes = self%atoms(:)%mnatype
 
 end function
 
-function get_sorted_atommnatypes(self) result(atommnatypes)
+function get_sorted_mnatypes(self) result(mnatypes)
    class(t_mol), intent(in) :: self
    ! Local variables
-   integer, allocatable :: atommnatypes(:)
+   integer, allocatable :: mnatypes(:)
 
-   atommnatypes = self%atoms(self%mnatypepartition%atom_order)%mnatype
+   mnatypes = self%atoms(self%mnatypepartition%atom_order)%mnatype
 
 end function
 
 subroutine set_weights(self, weights)
    class(t_mol), intent(inout) :: self
-   real(wp), intent(in) :: weights(size(self%atoms))
+   real(rk), intent(in) :: weights(size(self%atoms))
 
    self%atoms(:)%weight = weights(:)
 
 end subroutine
 
-function get_atomweights(self) result(weights)
+function get_weights(self) result(weights)
    class(t_mol), intent(in) :: self
    ! Local variables
-   real(wp), allocatable :: weights(:)
+   real(rk), allocatable :: weights(:)
 
    weights = self%atoms(:)%weight
 
 end function
 
-function get_sorted_atomweights(self) result(weights)
+function get_sorted_weights(self) result(weights)
    class(t_mol), intent(in) :: self
    ! Local variables
-   real(wp), allocatable :: weights(:)
+   real(rk), allocatable :: weights(:)
 
    weights = self%atoms(self%mnatypepartition%atom_order)%weight
 
 end function
 
-subroutine set_atomcoords(self, coords)
+subroutine set_coords(self, coords)
    class(t_mol), intent(inout) :: self
-   real(wp), intent(in) :: coords(3, size(self%atoms))
+   real(rk), intent(in) :: coords(3, size(self%atoms))
    ! Local variables
    integer :: i
 
@@ -494,11 +483,11 @@ subroutine set_atomcoords(self, coords)
 
 end subroutine
 
-function get_atomcoords(self) result(coords)
+function get_coords(self) result(coords)
    class(t_mol), intent(in) :: self
    ! Local variables
    integer :: i
-   real(wp), allocatable :: coords(:, :)
+   real(rk), allocatable :: coords(:, :)
 
    allocate(coords(3, size(self%atoms)))
 
@@ -508,11 +497,11 @@ function get_atomcoords(self) result(coords)
 
 end function
 
-function get_sorted_atomcoords(self) result(coords)
+function get_sorted_coords(self) result(coords)
    class(t_mol), intent(in) :: self
    ! Local variables
    integer :: i
-   real(wp), allocatable :: coords(:, :)
+   real(rk), allocatable :: coords(:, :)
 
    allocate(coords(3, size(self%atoms)))
 
@@ -592,6 +581,28 @@ function get_sorted_adjlists(self) result(adjlists)
 
 end function
 
+!function get_sorted_adjlists(self) result(adjlists)
+!   class(t_mol), intent(in) :: self
+!   ! Local variables
+!   integer :: i, p, offset
+!   type(t_atom) :: atom
+!   integer, allocatable :: adjlistpart(:)
+!   integer, allocatable :: adjlists(:, :)
+!
+!   allocate(adjlists(maxcoord, size(self%atoms)))
+!
+!   do i = 1, size(self%atoms)
+!      atom = self%atoms(self%mnatypepartition%atom_order(i))
+!      offset = 0
+!      do p = 1, size(self%mnatypepartition%parts)
+!         adjlistpart = intersection(atom%adjlist, self%mnatypepartition%parts(p)%atomidcs, size(self%atoms))
+!         adjlists(offset+1:offset+size(adjlistpart), i) = self%mnatypepartition%atom_mapping(adjlistpart)
+!         offset = offset + size(adjlistpart)
+!      end do
+!   end do
+!
+!end function
+
 function get_newadjlists(self) result(adjlists)
    class(t_mol), intent(in) :: self
    ! Local variables
@@ -659,78 +670,78 @@ function get_sorted_adjmat(self) result(adjmat)
 
 end function
 
-subroutine set_atomneimnatypepartlens(self, natomneimnatypes, atomneimnatypepartlens)
+subroutine set_adjmnatypepartlens(self, nadjmnatypes, adjmnatypepartlens)
    class(t_mol), intent(inout) :: self
-   integer, intent(in) :: natomneimnatypes(:)
-   integer, intent(in) :: atomneimnatypepartlens(:, :)
+   integer, intent(in) :: nadjmnatypes(:)
+   integer, intent(in) :: adjmnatypepartlens(:, :)
    ! Local variables
    integer :: i
 
    do i = 1, size(self%atoms)
-      if (.not. allocated(self%atoms(i)%atomneimnatypepartlens)) then
-         allocate(self%atoms(i)%atomneimnatypepartlens(natomneimnatypes(i)))
+      if (.not. allocated(self%atoms(i)%adjmnatypepartlens)) then
+         allocate(self%atoms(i)%adjmnatypepartlens(nadjmnatypes(i)))
       end if
-      self%atoms(i)%atomneimnatypepartlens = atomneimnatypepartlens(:natomneimnatypes(i), i)
+      self%atoms(i)%adjmnatypepartlens = adjmnatypepartlens(:nadjmnatypes(i), i)
    end do
 
 end subroutine
 
-function get_atomneimnatypepartlens(self) result(atomneimnatypepartlens)
+function get_adjmnatypepartlens(self) result(adjmnatypepartlens)
    class(t_mol), intent(in) :: self
    ! Local variables
    integer :: i
-   integer, allocatable :: atomneimnatypepartlens(:, :)
+   integer, allocatable :: adjmnatypepartlens(:, :)
 
-   allocate(atomneimnatypepartlens(maxcoord, size(self%atoms)))
+   allocate(adjmnatypepartlens(maxcoord, size(self%atoms)))
 
    do i = 1, size(self%atoms)
-      atomneimnatypepartlens(:size(self%atoms(i)%atomneimnatypepartlens), i) = self%atoms(i)%atomneimnatypepartlens
+      adjmnatypepartlens(:size(self%atoms(i)%adjmnatypepartlens), i) = self%atoms(i)%adjmnatypepartlens
    end do
 
 end function
 
-function get_sorted_atomneimnatypepartlens(self) result(atomneimnatypepartlens)
+function get_sorted_adjmnatypepartlens(self) result(adjmnatypepartlens)
    class(t_mol), intent(in) :: self
    ! Local variables
    integer :: i
    type(t_atom) :: atom
-   integer, allocatable :: atomneimnatypepartlens(:, :)
+   integer, allocatable :: adjmnatypepartlens(:, :)
 
-   allocate(atomneimnatypepartlens(maxcoord, size(self%atoms)))
+   allocate(adjmnatypepartlens(maxcoord, size(self%atoms)))
 
    do i = 1, size(self%atoms)
       atom = self%atoms(self%mnatypepartition%atom_order(i))
-      atomneimnatypepartlens(:size(atom%atomneimnatypepartlens), i) = atom%atomneimnatypepartlens
+      adjmnatypepartlens(:size(atom%adjmnatypepartlens), i) = atom%adjmnatypepartlens
    end do
 
 end function
 
-function get_natomneimnatypes(self) result(natomneimnatypes)
+function get_nadjmnatypes(self) result(nadjmnatypes)
    class(t_mol), intent(in) :: self
    ! Local variables
    integer :: i
-   integer, allocatable :: natomneimnatypes(:)
+   integer, allocatable :: nadjmnatypes(:)
 
-   allocate(natomneimnatypes(size(self%atoms)))
+   allocate(nadjmnatypes(size(self%atoms)))
 
    do i = 1, size(self%atoms)
-      natomneimnatypes(i) = size(self%atoms(i)%atomneimnatypepartlens)
+      nadjmnatypes(i) = size(self%atoms(i)%adjmnatypepartlens)
    end do
 
 end function
 
-function get_sorted_natomneimnatypes(self) result(natomneimnatypes)
+function get_sorted_nadjmnatypes(self) result(nadjmnatypes)
    class(t_mol), intent(in) :: self
    ! Local variables
    integer :: i
    type(t_atom) :: atom
-   integer, allocatable :: natomneimnatypes(:)
+   integer, allocatable :: nadjmnatypes(:)
 
-   allocate(natomneimnatypes(size(self%atoms)))
+   allocate(nadjmnatypes(size(self%atoms)))
 
    do i = 1, size(self%atoms)
       atom = self%atoms(self%mnatypepartition%atom_order(i))
-      natomneimnatypes(i) = size(atom%atomneimnatypepartlens)
+      nadjmnatypes(i) = size(atom%adjmnatypepartlens)
    end do
 
 end function
@@ -741,23 +752,20 @@ function get_bonds(self) result(bonds)
    integer :: i, j, nbond
    logical, allocatable :: adjmat(:, :)
    type(t_bond), allocatable :: bonds(:)
-   type(t_bond), allocatable :: bonds_buffer(:)
 
    adjmat = self%get_adjmat()
-   allocate(bonds_buffer(size(self%atoms)*maxcoord))
+   allocate(bonds(count(adjmat)/2))
 
    nbond = 0
    do i = 1, size(self%atoms)
       do j = i + 1, size(self%atoms)
          if (adjmat(i, j)) then
             nbond = nbond + 1
-            bonds_buffer(nbond)%atomidx1 = i
-            bonds_buffer(nbond)%atomidx2 = j
+            bonds(nbond)%atomidx1 = i
+            bonds(nbond)%atomidx2 = j
          end if
       end do
    end do
-
-   bonds = bonds_buffer(:nbond)
 
 end function
 

@@ -6,7 +6,6 @@ use discrete
 use adjacency
 use alignment
 use random
-use subset
 
 implicit none
 private
@@ -23,8 +22,8 @@ subroutine minadjdiff (natom, weights, neltype, eltypepartlens, coords0, nadjs0,
    integer, dimension(:), intent(in) :: eltypepartlens, nadjs0, nadjs1
    integer, dimension(:, :), intent(in) :: adjlists0, adjlists1
    integer, dimension(:), intent(in) :: mnatypepartlens0, mnatypepartlens1
-   real(wp), dimension(:), intent(in) :: weights
-   real(wp), dimension(:, :), intent(in) :: coords0, coords1
+   real(rk), dimension(:), intent(in) :: weights
+   real(rk), dimension(:, :), intent(in) :: coords0, coords1
    logical, dimension(:, :), intent(in) :: adjmat0, adjmat1
    integer, dimension(:), intent(inout) :: mapping
    integer, intent(in) :: nfrag0
@@ -32,13 +31,13 @@ subroutine minadjdiff (natom, weights, neltype, eltypepartlens, coords0, nadjs0,
 
    logical, parameter :: printInfo = .false.
 
-   integer blkidx(natom)
-   integer h, i, offset, moldiff
-   integer ntrack, track(natom)
-   integer unmapping(natom)
+   integer :: blkidx(natom)
+   integer :: h, i, offset, moldiff
+   integer :: ntrack, track(natom)
+   integer :: unmapping(natom)
    integer, dimension(natom) :: eqvidx0, eqvidx1
-   logical tracked(natom)
-   real(wp) moldist
+   logical :: tracked(natom)
+   real(rk) moldist
 
    ! set atoms block indices
 
@@ -130,19 +129,19 @@ subroutine minadjdiff (natom, weights, neltype, eltypepartlens, coords0, nadjs0,
       integer, intent(inout) :: mapping(natom), unmapping(natom)
       logical, intent(inout) :: tracked(natom)
       integer, intent(inout) :: moldiff, ntrack, track(natom)
-      real(wp), intent(inout) :: moldist
+      real(rk), intent(inout) :: moldist
 
       logical, parameter :: printInfo = .false.
 
-      integer nmatch, matches(natom)
-      integer nmismatch0, mismatches0(natom)
-      integer nmismatch1, mismatches1(natom)
-      integer mapping_branch(natom), moldiff_branch, unmapping_branch(natom)
-      integer ntrack_branch, track_branch(natom)
-      logical tracked_branch(natom)
+      integer :: nmatch, matches(natom)
+      integer :: nmismatch0, mismatches0(natom)
+      integer :: nmismatch1, mismatches1(natom)
+      integer :: mapping_branch(natom), moldiff_branch, unmapping_branch(natom)
+      integer :: ntrack_branch, track_branch(natom)
+      logical :: tracked_branch(natom)
       integer :: i, j
       logical :: matched0(natom), matched1(natom)
-      real(wp) :: moldist_branch, mol0local(3,natom), mol1local(3,natom)
+      real(rk) :: moldist_branch, mol0local(3,natom), mol1local(3,natom)
 
       ! reserve node node as tracked
       ntrack = ntrack + 1
@@ -161,9 +160,9 @@ subroutine minadjdiff (natom, weights, neltype, eltypepartlens, coords0, nadjs0,
       end if
 
       ! shuffle indices
-      call shuffle (matches, nmatch)
-      call shuffle (mismatches0, nmismatch0)
-      call shuffle (mismatches1, nmismatch1)
+      call shuffle (matches(:nmatch))
+      call shuffle (mismatches0(:nmismatch0))
+      call shuffle (mismatches1(:nmismatch1))
 
       ! run over matches neighbors
       do i = 1, nmatch
@@ -251,15 +250,15 @@ subroutine minadjdiff (natom, weights, neltype, eltypepartlens, coords0, nadjs0,
 end subroutine
 
 subroutine eqvatomperm (natom, weights, coords, adjmat, adjlists, nmnatype, mnatypepartlens, &
-   natomneimnatypes, atomneimnatypepartlens, refcoords, refadjmat, mapping, nfrag, fragroots)
+   nadjmnatypes, adjmnatypepartlens, refcoords, refadjmat, mapping, nfrag, fragroots)
 ! Purpose: Find best correspondence between points of graphs
 
    integer, intent(in) :: natom, nmnatype
-   integer, dimension(:), intent(in) :: mnatypepartlens, natomneimnatypes
-   integer, dimension(:, :), intent(in) :: adjlists, atomneimnatypepartlens
+   integer, dimension(:), intent(in) :: mnatypepartlens, nadjmnatypes
+   integer, dimension(:, :), intent(in) :: adjlists, adjmnatypepartlens
    integer, dimension(:), intent(inout) :: mapping
-   real(wp), dimension(:), intent(in) :: weights
-   real(wp), dimension(:, :), intent(in) :: coords, refcoords
+   real(rk), dimension(:), intent(in) :: weights
+   real(rk), dimension(:, :), intent(in) :: coords, refcoords
    logical, dimension(:, :), intent(in) :: adjmat, refadjmat
    integer, intent(in) :: nfrag
    integer, dimension(:), intent(in) :: fragroots
@@ -268,9 +267,9 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlists, nmnatype, mnat
    integer, dimension(natom) :: eqvos, eqvidx
    integer :: permcount, h, i, n, diff, fragcount, ntrack
    logical :: tracked(natom), held(natom)
-   real(wp) :: dist
+   real(rk) :: dist
 
-   integer offset
+   integer :: offset
 
    ! set equivalence group offsets
 
@@ -295,9 +294,9 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlists, nmnatype, mnat
 
 !   do i = 1, natom
 !      offset = 0
-!      do h = 1, natomneimnatypes(i)
-!         print *, i, ':', adjlists(offset+1:offset+atomneimnatypepartlens(h, i), i)
-!         offset = offset + atomneimnatypepartlens(h, i)
+!      do h = 1, nadjmnatypes(i)
+!         print *, i, ':', adjlists(offset+1:offset+adjmnatypepartlens(h, i), i)
+!         offset = offset + adjmnatypepartlens(h, i)
 !      end do
 !   end do
 
@@ -337,17 +336,17 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlists, nmnatype, mnat
       integer, intent(inout) :: mapping(natom)
       logical, dimension(natom), intent(inout) :: held
       logical, dimension(natom) :: locked_c
-      integer meqvnei, equiva(natom), equivb(natom)
-      integer h, i, offset, first, last
+      integer :: meqvnei, equiva(natom), equivb(natom)
+      integer :: h, i, offset, first, last
 
       first = eqvos(eqvidx(nodea)) + 1
       last = eqvos(eqvidx(nodea)) + mnatypepartlens(eqvidx(nodea))
       held(first:last) = .true.
       offset = 0
-      do h = 1, natomneimnatypes(nodea)
+      do h = 1, nadjmnatypes(nodea)
          ! find not tracked adjlists in group
          meqvnei = 0
-         do i = 1, atomneimnatypepartlens(h, nodea)
+         do i = 1, adjmnatypepartlens(h, nodea)
             if (.not. held(adjlists(offset+i, nodea))) then 
                meqvnei = meqvnei + 1
                equiva(meqvnei) = adjlists(offset+meqvnei, nodea)
@@ -362,7 +361,7 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlists, nmnatype, mnat
                   mapping, locked_c)
             end if
          end do
-         offset = offset + atomneimnatypepartlens(h, nodea)
+         offset = offset + adjmnatypepartlens(h, nodea)
       end do
    end subroutine recursive_remap
 
@@ -374,11 +373,11 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlists, nmnatype, mnat
       integer, dimension(natom), intent(inout) :: mapping, track
 
       logical :: locked_c(natom)
-      integer meqvnei, moldiff, track4ind(4), track4ind_c(4)
+      integer :: meqvnei, moldiff, track4ind(4), track4ind_c(4)
       integer, dimension(natom) :: mapping_p, mapping_min, equiv, perm, perm_min
-      real(wp) :: moldist, moldist_p, moldist_min, dihed0(maxcoord), dihed1(maxcoord)
-      logical :: nextperm, even, calcd, printInfo = .false.
-      integer :: h, i, j, offset, first, last
+      real(rk) :: moldist, moldist_p, moldist_min, dihed0(maxcoord), dihed1(maxcoord)
+      logical :: more, calcd, printInfo = .false.
+      integer :: h, i, j, offset, first, last, rank
       character(len=80) :: strfmt
 
       if ( printInfo ) then   ! print debugging info
@@ -400,10 +399,10 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlists, nmnatype, mnat
 
       offset = 0
       ! run over groups of atoms with equivalent type
-      do h = 1, natomneimnatypes(node)
+      do h = 1, nadjmnatypes(node)
          ! find not tracked adjlists in group
          meqvnei = 0
-         do i = 1, atomneimnatypepartlens(h, node)
+         do i = 1, adjmnatypepartlens(h, node)
             if (.not. tracked(adjlists(offset+i, node)) &
                .and. .not. held(adjlists(offset+i, node))) then
                meqvnei = meqvnei + 1
@@ -415,8 +414,8 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlists, nmnatype, mnat
             ! save initial state before permutations
             mapping_min(:) = mapping(:)
             ! run over all permutarions for the meqvnei equivalent atoms
-            nextperm = .false.
-            call perm1_next (meqvnei, perm, nextperm, even)
+            more = .false.
+            call perm1_next3 (meqvnei, perm, more, rank)
             perm_min(:) = perm(:)
             ! initialize state to test new permutation
             mapping_min(:) = mapping(:)
@@ -427,8 +426,8 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlists, nmnatype, mnat
                moldist_min = moldist_min &
                         + sum((refcoords(:, mapping_min(equiv(i))) - coords(:, equiv(i)))**2)
             end do
-            do while ( nextperm )
-               call perm1_next (meqvnei, perm, nextperm, even)
+            do while ( more )
+               call perm1_next3 (meqvnei, perm, more, rank)
                permcount = permcount + 1
                ! initialize state to test new permutation
                mapping_p(:) = mapping(:)
@@ -479,7 +478,7 @@ subroutine eqvatomperm (natom, weights, coords, adjmat, adjlists, nmnatype, mnat
                                 locked_c, ntrack, track)
             end do
          end if
-         offset = offset + atomneimnatypepartlens(h, node)
+         offset = offset + adjmnatypepartlens(h, node)
       end do
    end subroutine
 

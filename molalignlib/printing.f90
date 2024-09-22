@@ -26,7 +26,7 @@ abstract interface
       use kinds
       integer, intent(in) :: nrec
       integer, dimension(:), intent(in) :: matches, recadjd
-      real(wp), dimension(:), intent(in) :: avgsteps, avgtotalrot, avgrealrot, recrmsd
+      real(rk), dimension(:), intent(in) :: avgsteps, avgtotalrot, avgrealrot, recrmsd
    end subroutine
 end interface
 
@@ -40,7 +40,7 @@ contains
 subroutine print_stats_dist(nrec, matches, avgsteps, avgtotalrot, avgrealrot, recadjd, recrmsd)
    integer, intent(in) :: nrec
    integer, dimension(:), intent(in) :: matches, recadjd
-   real(wp), dimension(:), intent(in) :: avgsteps, avgtotalrot, avgrealrot, recrmsd
+   real(rk), dimension(:), intent(in) :: avgsteps, avgtotalrot, avgrealrot, recrmsd
    integer :: irec
    write (stderr, '(1x,a,4x,a,4x,a,5x,a,7x,a)') 'Map', 'Count', 'Steps', 'Angle', 'RMSD'
    write (stderr, '(a)') line1
@@ -49,12 +49,13 @@ subroutine print_stats_dist(nrec, matches, avgsteps, avgtotalrot, avgrealrot, re
          irec, matches(irec), avgsteps(irec), 90./asin(1.)*avgrealrot(irec), recrmsd(irec)
    end do
    write (stderr, '(a)') line1
+   flush(stderr)
 end subroutine
 
 subroutine print_stats_diff(nrec, matches, avgsteps, avgtotalrot, avgrealrot, recadjd, recrmsd)
    integer, intent(in) :: nrec
    integer, dimension(:), intent(in) :: matches, recadjd
-   real(wp), dimension(:), intent(in) :: avgsteps, avgtotalrot, avgrealrot, recrmsd
+   real(rk), dimension(:), intent(in) :: avgsteps, avgtotalrot, avgrealrot, recrmsd
    integer :: irec
    write (stderr, '(1x,a,4x,a,4x,a,5x,a,3x,a,7x,a)') 'Map', 'Count', 'Steps', 'Angle', 'AdjD', 'RMSD'
    write (stderr, '(a)') line2
@@ -63,6 +64,7 @@ subroutine print_stats_diff(nrec, matches, avgsteps, avgtotalrot, avgrealrot, re
          irec, matches(irec), avgsteps(irec), 90./asin(1.)*avgrealrot(irec), recadjd(irec), recrmsd(irec)
    end do
    write (stderr, '(a)') line2
+   flush(stderr)
 end subroutine
 
 subroutine print_final_stats(overflow, maxrec, nrec, ntrial, nstep)
@@ -75,6 +77,7 @@ subroutine print_final_stats(overflow, maxrec, nrec, ntrial, nstep)
    else
       write (stderr, '(a,1x,i0)') 'Visited local minima =', nrec
    end if
+   flush(stderr)
 end subroutine
 
 end module

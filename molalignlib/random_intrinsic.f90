@@ -17,7 +17,6 @@
 module random
 use kinds
 use flags
-use randlib
 
 implicit none
 
@@ -26,27 +25,26 @@ contains
 subroutine random_initialize()
 
    if (test_flag) then
-      call default_set_seeds()
+      call random_init(.true., .true.)
    else
-      call time_set_seeds()
+      call random_init(.false., .true.)
    end if
 
 end subroutine
 
 function randvec() result(r)
    real(rk) :: r(3)
-   r(1) = random_standard_uniform()
-   r(2) = random_standard_uniform()
-   r(3) = random_standard_uniform()
+   call random_number(r)
 end function
 
 subroutine shuffle(a)
 ! Fisher-Yates shuffle
    integer, intent(inout) :: a(:)
    integer :: i, j, temp
+   real(rk) :: r
    do i = size(a), 2, -1
-!      j = int(random_standard_uniform() * i) + 1
-      j = random_uniform_integer(1, i)
+      call random_number(r)
+      j = int(r * i) + 1
       temp = a(j)
       a(j) = a(i)
       a(i) = temp

@@ -21,9 +21,10 @@ compile() {
       exit 1
    fi
    pushd "$buildir" >/dev/null
-   comp_flags=("${base_flags[@]}")
+   comp_flags=("${std_flag[@]}")
+   comp_flags+=("${extra_flags[@]}")
    if $pic_build; then
-      comp_flags+=("${exec_flags[@]}")
+      comp_flags+=("${pic_flag[@]}")
    fi
    if $debug_build; then
       comp_flags+=("${debug_flags[@]}")
@@ -100,7 +101,7 @@ run_tests() {
       name=$(basename "$file" .xyz)_$suffix
       echo -n "Running test $subdir/$name... "
       if $write_test; then
-         "$executable" -pipe -test -stats -N 5 "$@" < "$file" 2>&1 > "$testdir/$subdir/$name.out"
+         "$executable" -pipe -test -stats -N 5 "$@" < "$file" > "$testdir/$subdir/$name.out" 2>&1
          echo done
       else
          if diff -bB "$testdir/$subdir/$name.out" <("$executable" -pipe -test -stats -N 5 "$@" < "$file" 2>&1); then
@@ -140,8 +141,9 @@ while IFS= read -r line; do
    declare -- "$var"="$value"
 done < <(grep -v -e^# -e^$ ./build.env)
 
-to_array base_flags
-to_array exec_flags
+to_array std_flag
+to_array extra_flags
+to_array pic_flag
 to_array optim_flags
 to_array debug_flags
 to_array link_flags
@@ -217,7 +219,7 @@ fi
 
 if $test_flag; then
    # Run tests
-#   run_tests fast17 jcim.2c01187/0.05 -remap -fast -tol 0.17
+   run_tests fast17 jcim.2c01187/0.05 -remap -fast -tol 0.17
    run_tests fastbond MOBH35-shuffled -remap -fast -bond
    run_tests fastbondback MOBH35-shuffled -remap -fast -bond -back
 #   run_tests fastbondbackreac MOBH35-shuffled -remap -fast -bond -back -reac

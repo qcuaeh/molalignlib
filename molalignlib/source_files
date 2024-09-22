@@ -6,7 +6,12 @@ pointers.f90
 strutils.f90
 discrete.f90
 sorting.f90
-linear.f90
+linalg.f90
+eigen.f90
+#eigen_lapack.f90
+randlib.f90
+random.f90
+#random_intrinsic.f90
 chemdata.f90
 chemutils.f90
 rotation.f90
@@ -14,9 +19,6 @@ translation.f90
 adjacency.f90
 alignment.f90
 types.f90
-rnglib.f90
-subset.f90
-random.f90
 printing.f90
 biasing.f90
 lapkm.f90

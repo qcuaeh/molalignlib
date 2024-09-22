@@ -38,10 +38,10 @@ abstract interface
       integer, dimension(:, :), intent(in) :: nadjmna0, nadjmna1
       integer, dimension(:, :, :), intent(in) :: adjmnalen0, adjmnalen1
       integer, dimension(:, :, :), intent(in) :: adjmnalist0, adjmnalist1
-      real(wp), dimension(:, :), intent(in) :: coords0, coords1
-      real(wp), dimension(:), intent(in) :: weights
+      real(rk), dimension(:, :), intent(in) :: coords0, coords1
+      real(rk), dimension(:), intent(in) :: weights
       integer, dimension(:, :), intent(in) :: equivmat
-      real(wp), dimension(:, :), intent(in) :: biasmat
+      real(rk), dimension(:, :), intent(in) :: biasmat
       integer, dimension(:), intent(out) :: mapping
    end subroutine
 end interface
@@ -58,14 +58,14 @@ subroutine mapatoms_free(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0, a
    integer, dimension(:, :), intent(in) :: nadjmna0, nadjmna1
    integer, dimension(:, :, :), intent(in) :: adjmnalen0, adjmnalen1
    integer, dimension(:, :, :), intent(in) :: adjmnalist0, adjmnalist1
-   real(wp), dimension(:, :), intent(in) :: coords0, coords1
-   real(wp), dimension(:), intent(in) :: weights
+   real(rk), dimension(:, :), intent(in) :: coords0, coords1
+   real(rk), dimension(:), intent(in) :: weights
    integer, dimension(:, :), intent(in) :: equivmat
-   real(wp), dimension(:, :), intent(in) :: biasmat
+   real(rk), dimension(:, :), intent(in) :: biasmat
    integer, dimension(:), intent(out) :: mapping
 
    integer :: h, offset
-   real(wp) :: dummy
+   real(rk) :: dummy
 
    ! Fill distance matrix for each block
 
@@ -89,16 +89,16 @@ subroutine mapatoms_bonded(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0,
    integer, dimension(:, :), intent(in) :: nadjmna0, nadjmna1
    integer, dimension(:, :, :), intent(in) :: adjmnalen0, adjmnalen1
    integer, dimension(:, :, :), intent(in) :: adjmnalist0, adjmnalist1
-   real(wp), dimension(:, :), intent(in) :: coords0, coords1
-   real(wp), dimension(:), intent(in) :: weights
+   real(rk), dimension(:, :), intent(in) :: coords0, coords1
+   real(rk), dimension(:), intent(in) :: weights
    integer, dimension(:, :), intent(in) :: equivmat
-   real(wp), dimension(:, :), intent(in) :: biasmat
+   real(rk), dimension(:, :), intent(in) :: biasmat
    integer, dimension(:), intent(out) :: mapping
 
    integer :: h, i, j, offset
-!   real(wp) :: costs(natom, natom) ! Causes allocation errors
-   real(wp), allocatable :: costs(:, :)
-   real(wp) :: dummy
+!   real(rk) :: costs(natom, natom) ! Causes allocation errors
+   real(rk), allocatable :: costs(:, :)
+   real(rk) :: dummy
 
    allocate(costs(natom, natom))
 
@@ -120,16 +120,16 @@ subroutine mapatoms_bonded(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0,
 
 end subroutine
 
-real(wp) function equivdist(natom, i, j, maxlevel, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
+real(rk) function equivdist(natom, i, j, maxlevel, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
       nadjmna1, adjmnalen1, adjmnalist1, coords1, weights)
    integer, intent(in) :: natom, i, j, maxlevel
    integer, dimension(:, :), intent(in) :: nadjmna0, nadjmna1
    integer, dimension(:, :, :), intent(in) :: adjmnalen0, adjmnalen1
    integer, dimension(:, :, :), intent(in) :: adjmnalist0, adjmnalist1
-   real(wp), dimension(:, :), intent(in) :: coords0, coords1
-   real(wp), dimension(:), intent(in) :: weights
+   real(rk), dimension(:, :), intent(in) :: coords0, coords1
+   real(rk), dimension(:), intent(in) :: weights
 
-   real(wp) :: totdist, totweight
+   real(rk) :: totdist, totweight
    logical, dimension(natom) :: mapped0, mapped1
 
    totdist = 0
@@ -149,15 +149,15 @@ recursive subroutine recursivemap(i, j, level, maxlevel, nadjmna0, adjmnalen0, a
    integer, dimension(:, :), intent(in) :: nadjmna0, nadjmna1
    integer, dimension(:, :, :), intent(in) :: adjmnalen0, adjmnalen1
    integer, dimension(:, :, :), intent(in) :: adjmnalist0, adjmnalist1
-   real(wp), dimension(:, :), intent(in) :: coords0, coords1
-   real(wp), dimension(:), intent(in) :: weights
-   real(wp), intent(out) :: totdist, totweight
+   real(rk), dimension(:, :), intent(in) :: coords0, coords1
+   real(rk), dimension(:), intent(in) :: weights
+   real(rk), intent(out) :: totdist, totweight
    logical, dimension(:), intent(inout) :: mapped0, mapped1
 
    integer :: h, k, l, m, n, offset
    integer, dimension(maxcoord) :: mapping, idx0, idx1
-   real(wp) :: distmat(maxcoord, maxcoord)
-   real(wp) :: dummy
+   real(rk) :: distmat(maxcoord, maxcoord)
+   real(rk) :: dummy
 
 !   print *, '>>>', i, j, ':', level, maxlevel - level
 !!   print *, i, ':', adjmnalist0(:4, i, maxlevel - level)

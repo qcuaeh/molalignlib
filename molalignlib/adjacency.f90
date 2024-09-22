@@ -63,9 +63,9 @@ function adjacencydiff(natom, adjmat0, adjmat1, mapping) result(diff)
    integer, intent(in) :: natom
    integer, dimension(:), intent(in) :: mapping
    logical, dimension(:, :), intent(in) :: adjmat0, adjmat1
-   integer diff
+   integer :: diff
 
-   integer i, j
+   integer :: i, j
 
    diff = 0
 
@@ -87,7 +87,7 @@ function adjacencydelta(nadjs0, adjlists0, adjmat1, mapping, k, l) result(delta)
    integer, dimension(:), intent(in) :: mapping, nadjs0
    integer, dimension(:, :), intent(in) :: adjlists0
    logical, dimension(:, :), intent(in) :: adjmat1
-   integer i, nkk, nkl, nll, nlk, delta
+   integer :: i, nkk, nkl, nll, nlk, delta
 
    nkk = 0
    nkl = 0
