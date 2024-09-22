@@ -26,6 +26,22 @@ end interface
 
 contains
 
+!function matmul(a, b, m, o, n) result(ab)
+!   integer, intent(in) :: m, o ,n
+!   real(wp), intent (in) :: a(m, o)
+!   real(wp), intent (in) :: b(o, n)
+!   real(wp) :: ab(m, n)
+!   integer :: i, j
+!
+!   do i = 1, n
+!      ab(:, i) = 0.0
+!      do j = 1, o
+!         ab(:, i) = ab(:, i) + a(:, j)*b(j, i)
+!      end do
+!   end do
+!
+!end function
+
 real(wp) function det3(a) result(det)
    real(wp), dimension(3,3), intent(in) :: a
 
@@ -62,22 +78,6 @@ function inv3(a) result(inv)
 
 end function
 
-function matmul(a, b, m, o, n) result(ab)
-   integer, intent(in) :: m, o ,n
-   real(wp), intent (in) :: a(m, o)
-   real(wp), intent (in) :: b(o, n)
-   real(wp) :: ab(m, n)
-   integer :: i, j
-
-   do i = 1, n
-      ab(:, i) = 0.0
-      do j = 1, o
-         ab(:, i) = ab(:, i) + a(:, j)*b(j, i)
-      end do
-   end do
-
-end function
-
 subroutine ssyeval4(a, w)
    real(sp), intent(in) :: a(4, 4)
    real(sp), intent(out) :: w(4)
@@ -95,7 +95,7 @@ subroutine dsyeval4(a, w)
 end subroutine
 
 subroutine ssyevec4(a, w)
-   real(sp), intent(in) :: a(4, 4)
+   real(sp), intent(inout) :: a(4, 4)
    real(sp), intent(out) :: w(4)
    integer :: info
    real(sp) work(25)
@@ -103,7 +103,7 @@ subroutine ssyevec4(a, w)
 end subroutine
 
 subroutine dsyevec4(a, w)
-   real(dp), intent(in) :: a(4, 4)
+   real(dp), intent(inout) :: a(4, 4)
    real(dp), intent(out) :: w(4)
    integer :: info
    real(dp) work(25)

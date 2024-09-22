@@ -49,15 +49,15 @@ function quat2rotmat(rotquat) result(rotmat)
 
 ! Calculate the rotation matrix
 
-   rotmat(1, 1) = rotquat(1)**2 + rotquat(2)**2 - rotquat(3)**2 - rotquat(4)**2
+   rotmat(1, 1) = 1.0_wp - 2*(rotquat(3)**2 + rotquat(4)**2)
    rotmat(1, 2) = 2*(rotquat(2)*rotquat(3) + rotquat(1)*rotquat(4))
    rotmat(1, 3) = 2*(rotquat(2)*rotquat(4) - rotquat(1)*rotquat(3))
    rotmat(2, 1) = 2*(rotquat(2)*rotquat(3) - rotquat(1)*rotquat(4))
-   rotmat(2, 2) = rotquat(1)**2 + rotquat(3)**2 - rotquat(2)**2 - rotquat(4)**2
+   rotmat(2, 2) = 1.0_wp - 2*(rotquat(2)**2 + rotquat(4)**2)
    rotmat(2, 3) = 2*(rotquat(3)*rotquat(4) + rotquat(1)*rotquat(2))
    rotmat(3, 1) = 2*(rotquat(2)*rotquat(4) + rotquat(1)*rotquat(3))
    rotmat(3, 2) = 2*(rotquat(3)*rotquat(4) - rotquat(1)*rotquat(2))
-   rotmat(3, 3) = rotquat(1)**2 + rotquat(4)**2 - rotquat(2)**2 - rotquat(3)**2
+   rotmat(3, 3) = 1.0_wp - 2*(rotquat(2)**2 + rotquat(3)**2)
 
 end function
 
