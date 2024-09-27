@@ -2,11 +2,21 @@ module lapjv
 use iso_fortran_env, only: int64
 use kinds
 use stdio
+use discrete
 implicit none
+private
+public minperm_fast
+public minperm_pruned
+
+!   Parameters
+!     scale : Precision
+!     maxnei: Maximum number of closest neighbours
+real(rk), parameter :: scale = 1.0e6_rk
+integer, parameter :: maxnei = 20
 
 contains
 
-subroutine minperm(n, p, q, pq, perm, dist)
+subroutine minperm_fast(n, p, q, mask, perm, dist)
 
 ! Adapted from GMIN: A program for finding global minima
 ! Copyright (C) 1999-2006 David J. Wales
@@ -35,7 +45,7 @@ subroutine minperm(n, p, q, pq, perm, dist)
 
    integer :: n
    real(rk) p(3, n), q(3, n)
-   real(rk) pq(n, n)
+   logical mask(n, n)
 
 !   Output
 !     perm: Permutation so that p(i) <--> q(perm(i))
@@ -44,12 +54,6 @@ subroutine minperm(n, p, q, pq, perm, dist)
    integer :: perm(n)
    real(rk) dist
    
-!   Parameters
-!     scale : Precision
-!     maxnei: Maximum number of closest neighbours
-   real(rk), parameter :: scale = 1.0e6_rk
-   integer, parameter :: maxnei = 100
-
 !   Internal variables
 !   cc, kk, first:
 !     Sparse matrix of distances
@@ -60,57 +64,44 @@ subroutine minperm(n, p, q, pq, perm, dist)
 !   cc(first(i)..first(i+1)-1):
 !     Matrix elements of row i
    integer :: first(n+1), y(n)
-   integer :: m, i, j, k, l, l2, a, n8, sz8, t
+   integer :: m, i, j, k, l, l2, a, sz, t
    integer(int64) :: u(n), v(n), d, h
    integer, allocatable :: kk(:)
    integer(int64), allocatable :: cc(:)
-   allocate(kk(n*maxnei), cc(n*maxnei))
 
 !   Distance function
 !    real(rk) permdist
 
-   m = maxnei
-   if (n .le. maxnei) m = n
-   sz8 = m*n
-   n8 = n
+   if (n <= maxnei) then
+      m = n
+   else
+      m = maxnei
+   end if
 
-   do i = 0, n
-      first(i+1) = i*m + 1
+   sz = m*n
+
+   allocate(kk(sz))
+   allocate(cc(sz))
+
+   first(1) = 1
+   do i = 1, n
+      first(i+1) = first(i) + m
    end do
 
-   if (m .eq. n) then
+   if (m == n) then
 
 !  Compute the full matrix...
+
       do i = 1, n
-         k = first(i) - 1
+         k = first(i)
          do j = 1, n
-            cc(k+j) = int((sum((p(:, i) - q(:, j))**2) + pq(j, i))*scale, int64)
-            kk(k+j) = j
-!            write(*,*) i, j, '-->', cc(k+j)
+            cc(k) = scale * sum((p(:, i) - q(:, j))**2)
+            kk(k) = j
+            k = k + 1
          end do
       end do
 
    else
-
-!  Create and maintain an ordered list, smallest to largest from kk(m*(i-1)+1:m*i) for atom i.
-!  NOTE that there is no symmetry with respect to exchange of I and J!
-!  This runs slower than the next heap algorithm.
-
-!      cc(1:m*n) = huge(1_int64)
-!      do i = 1, n
-!         k = first(i) - 1
-!         do j = 1, n
-!            d = int((sum((p(:, i) - q(:, j))**2) + pq(j, i))*scale, int64)
-!            if (d > cc(k+m)) cycle
-!            do j1 = m, 2, -1
-!               if (d > cc(k+j1-1)) exit
-!               cc(k+j1) = cc(k+j1-1)
-!               kk(k+j1) = kk(k+j1-1)
-!            end do
-!            cc(k+j1) = d
-!            kk(k+j1) = j
-!         end do
-!      end do
 
 !  We need to store the distances of the maxnei closeest neighbors
 !  of each particle. The following builds a heap to keep track of
@@ -121,12 +112,13 @@ subroutine minperm(n, p, q, pq, perm, dist)
       do i = 1, n
          k = first(i) - 1
          do j = 1, m
-            cc(k+j) = int((sum((p(:, i) - q(:, j))**2) + pq(j, i))*scale, int64)
+            d = scale * sum((p(:, i) - q(:, j))**2)
+            cc(k+j) = d
             kk(k+j) = j
             l = j
-10             if (l .le. 1) goto 11
+10             if (l <= 1) goto 11
             l2 = l/2
-            if (cc(k+l2) .lt. cc(k+l)) then
+            if (cc(k+l2) < cc(k+l)) then
                h = cc(k+l2)
                cc(k+l2) = cc(k+l)
                cc(k+l) = h
@@ -138,19 +130,19 @@ subroutine minperm(n, p, q, pq, perm, dist)
             end if
 11       end do
          do j = m+1, n
-            d = int((sum((p(:, i) - q(:, j))**2) + pq(j, i))*scale, int64)
-            if (d .lt. cc(k+1)) then
+            d = scale * sum((p(:, i) - q(:, j))**2)
+            if (d < cc(k+1)) then
                cc(k+1) = d
                kk(k+1) = j
                l = 1
 20                l2 = 2*l
-               if (l2+1 .gt. m) goto 21
-               if (cc(k+l2+1) .gt. cc(k+l2)) then
+               if (l2+1 > m) goto 21
+               if (cc(k+l2+1) > cc(k+l2)) then
                   a = k+l2+1
                else
                   a = k+l2
                end if
-               if (cc(a) .gt. cc(k+l)) then
+               if (cc(a) > cc(k+l)) then
                   h = cc(a)
                   cc(a) = cc(k+l)
                   cc(k+l) = h
@@ -160,8 +152,8 @@ subroutine minperm(n, p, q, pq, perm, dist)
                   l = a-k
                   goto 20
                end if
-21                if (l2 .le. m) then ! split if statements to avoid a segmentation fault
-                  if (cc(k+l2) .gt. cc(k+l)) then
+21             if (l2 <= m) then ! split if statements to avoid a segmentation fault
+                  if (cc(k+l2) > cc(k+l)) then
                      h = cc(k+l2)
                      cc(k+l2) = cc(k+l)
                      cc(k+l) = h
@@ -177,22 +169,42 @@ subroutine minperm(n, p, q, pq, perm, dist)
 !      PRINT '(12I15)',cc(m*(i-1)+1:m*i)
       end do
 
+!  Create and maintain an ordered list, smallest to largest from kk(m*(i-1)+1:m*i) for atom i.
+!  NOTE that there is no symmetry with respect to exchange of I and J!
+!  This runs slower than the above heap algorithm.
+!
+!      cc(1:m*n) = huge(1_int64)
+!      do i = 1, n
+!         k = first(i) - 1
+!         do j = 1, n
+!            d = scale * sum((p(:, i) - q(:, j))**2)
+!            if (d > cc(k+m)) cycle
+!            do l = m, 2, -1
+!               if (d > cc(k+l-1)) exit
+!               cc(k+l) = cc(k+l-1)
+!               kk(k+l) = kk(k+l-1)
+!            end do
+!            cc(k+l) = d
+!            kk(k+l) = j
+!         end do
+!      end do
+
    end if
 
 !   Call bipartite matching routine
-   call jovosap(n8, sz8, cc, kk, first, perm, y, u, v, h)
+   call jovosap(n, sz, cc, kk, first, perm, y, u, v, h)
 
-   if (h .lt. 0) then
+   if (h < 0) then
 !   If initial guess correct, deduce solution distance
 !   which is not done in jovosap
       h = 0
       do i = 1, n
          j = first(i)
-30       if (j .gt. n*maxnei) then
+30       if (j > sz) then
             write (stderr, '(a)') 'Error: Assignment failed'
             stop
          end if
-         if (kk(j) .ne. perm(i)) then
+         if (kk(j) /= perm(i)) then
             j = j + 1
             goto 30
          end if
@@ -200,16 +212,117 @@ subroutine minperm(n, p, q, pq, perm, dist)
       end do
    end if
 
-!  Test if perm is a valid permutation
+   if (.not. is_permutation(perm)) then
+      write (stderr, '(a)') 'Error: Assignment failed'
+      stop
+   end if
+
+   dist = real(h, rk) / scale
+
+end subroutine
+
+subroutine minperm_pruned(n, p, q, mask, perm, dist)
+
+! Adapted from GMIN: A program for finding global minima
+! Copyright (C) 1999-2006 David J. Wales
+
+!   Interface to spjv.f for calculating minimum distance
+!   of two atomic configurations with respect to
+!   particle permutations.
+!   The function permdist determines the distance or weight function,
+!   minperm is the main routine.
+!
+!       Tomas Oppelstrup, Jul 10, 2003
+!       tomaso@nada.kth.se
+!
+
+!   This is the main routine for minimum distance calculation.
+!   Given two coordinate vectors p,q of particles each, return
+!   the minimum distance in dist, and the permutation in perm.
+!   perm is an integer vector such that
+!     p(i) <--> q(perm(i))
+!   i.e.
+!     sum(i=1,n) permdist(p(i), q(perm(i))) == dist
+
+!   Input
+!     n  : System size
+!     p,q: Coordinate vectors (n particles)
+
+   integer :: n
+   real(rk) p(3, n), q(3, n)
+   logical mask(n, n)
+
+!   Output
+!     perm: Permutation so that p(i) <--> q(perm(i))
+!     dist: Minimum attainable distance
+!   We have
+   integer :: perm(n)
+   real(rk) dist
+   
+!   Internal variables
+!   cc, kk, first:
+!     Sparse matrix of distances
+!   first(i):
+!     Beginning of row i in data,index vectors
+!   kk(first(i)..first(i+1)-1):
+!     Column indexes of existing elements in row i
+!   cc(first(i)..first(i+1)-1):
+!     Matrix elements of row i
+   integer :: first(n+1), y(n)
+!   integer :: m, i, j, k, l, l2, a, sz, t
+   integer :: i, j, k, sz
+   integer(int64) :: u(n), v(n), d, h
+   integer, allocatable :: kk(:)
+   integer(int64), allocatable :: cc(:)
+
+   sz = count(mask)
+
+   allocate(kk(sz))
+   allocate(cc(sz))
+
+   first(1) = 1
    do i = 1, n
-      do j = 1, n
-         if (perm(j) == i) exit
-      end do
-      if (j == n + 1) then
-         write (stderr, '(a)') 'Error: Assignment failed'
-         stop
-      end if
+      first(i+1) = first(i) + count(mask(:, i))
    end do
+
+!  Compute the maskd cost matrix...
+
+   do i = 1, n
+      k = first(i)
+      do j = 1, n
+         if (mask(j, i)) then
+            cc(k) = scale * sum((p(:, i) - q(:, j))**2)
+            kk(k) = j
+            k = k + 1
+         end if
+      end do
+   end do
+
+!   Call bipartite matching routine
+   call jovosap(n, sz, cc, kk, first, perm, y, u, v, h)
+
+   if (h < 0) then
+!   If initial guess correct, deduce solution distance
+!   which is not done in jovosap
+      h = 0
+      do i = 1, n
+         j = first(i)
+30       if (j > sz) then
+            write (stderr, '(a)') 'Error: Assignment failed'
+            stop
+         end if
+         if (kk(j) /= perm(i)) then
+            j = j + 1
+            goto 30
+         end if
+         h = h + cc(j)
+      end do
+   end if
+
+   if (.not. is_permutation(perm)) then
+      write (stderr, '(a)') 'Error: Assignment failed'
+      stop
+   end if
 
    dist = real(h, rk) / scale
 
@@ -277,7 +390,7 @@ subroutine jovosap(n,sz,cc,kk,first,x,y,u,v,h)
       x(i)=0
       do t=first(i),first(i+1)-1
          j=kk(t)
-         if (cc(t).lt.v(j)) then
+         if (cc(t) < v(j)) then
            v(j)=cc(t)
            y(j)=i
          end if
@@ -286,11 +399,11 @@ subroutine jovosap(n,sz,cc,kk,first,x,y,u,v,h)
    do j=1,n
       j0=n-j+1
       i=y(j0)
-      if (i.eq.0) then
+      if (i == 0) then
 !         print '(a,i6,a)','minperm> warning b - matching failed'
          return
       end if
-      if (x(i).ne.0) then
+      if (x(i) /= 0) then
         x(i)=-abs(x(i))
         y(j0)=0
       else
@@ -299,27 +412,27 @@ subroutine jovosap(n,sz,cc,kk,first,x,y,u,v,h)
    end do
    l=0
    do i=1,n
-      if (x(i).eq.0) then
+      if (x(i) == 0) then
         l=l+1
         free(l)=i
         cycle
       end if
-      if (x(i).lt.0) then
+      if (x(i) < 0) then
         x(i)=-x(i)
       else
         j1=x(i)
         min=bigint
         do t=first(i),first(i+1)-1
            j=kk(t)
-           if (j.eq.j1) cycle
-           if (cc(t)-v(j).lt.min) min=cc(t)-v(j)
+           if (j == j1) cycle
+           if (cc(t)-v(j) < min) min=cc(t)-v(j)
         end do
         v(j1)=v(j1)-min
       end if
    end do
 ! improve the initial solution
    cnt=0
-   if (l.eq.0) goto 1000
+   if (l == 0) goto 1000
 41 l0=l
    k=1
    l=0
@@ -330,8 +443,8 @@ subroutine jovosap(n,sz,cc,kk,first,x,y,u,v,h)
    do t=first(i),first(i+1)-1
       j=kk(t)
       h=cc(t)-v(j)
-      if (h.lt.vj) then
-        if (h.ge.v0) then
+      if (h < vj) then
+        if (h >= v0) then
           vj=h
           j1=j
         else
@@ -343,15 +456,15 @@ subroutine jovosap(n,sz,cc,kk,first,x,y,u,v,h)
       end if
    end do
    i0=y(j0)
-   if (v0.lt.vj) then
+   if (v0 < vj) then
      v(j0)=v(j0)-vj+v0
    else
-     if (i0.eq.0) goto 43
+     if (i0 == 0) goto 43
      j0=j1
      i0=y(j1)
    end if
-   if (i0.eq.0) goto 43
-   if (v0.lt.vj) then
+   if (i0 == 0) goto 43
+   if (v0 < vj) then
      k=k-1
      free(k)=i0
    else
@@ -360,9 +473,9 @@ subroutine jovosap(n,sz,cc,kk,first,x,y,u,v,h)
    end if
 43 x(i)=j0
    y(j0)=i
-   if (k.le.l0) goto 50
+   if (k <= l0) goto 50
    cnt=cnt+1
-   if ((l.gt.0).and.(cnt.lt.2)) goto 41
+   if ((l > 0).and.(cnt < 2)) goto 41
 ! augmentation part
    l0=l
    do l=1,l0
@@ -378,8 +491,8 @@ subroutine jovosap(n,sz,cc,kk,first,x,y,u,v,h)
          dj=cc(t)-v(j)
          d(j)=dj
          lab(j)=i0
-         if (dj.le.min) then
-           if (dj.lt.min) then
+         if (dj <= min) then
+           if (dj < min) then
              min=dj
              k=1
              todo(1)=j
@@ -391,15 +504,15 @@ subroutine jovosap(n,sz,cc,kk,first,x,y,u,v,h)
       end do
       do j0=1,k
          j=todo(j0)
-         if (j.eq.0) then
+         if (j == 0) then
 !            print '(a,i6,a)','minperm> warning c - matching failed'
             return
          end if
-         if (y(j).eq.0) goto 80
+         if (y(j) == 0) goto 80
          ok(j)=.true.
       end do
 ! repeat until a free row has been found
-60    if (k.eq.0) then
+60    if (k == 0) then
 !         print '(a,i6,a)','minperm> warning d - matching failed'
          return
       end if
@@ -411,17 +524,17 @@ subroutine jovosap(n,sz,cc,kk,first,x,y,u,v,h)
       t0=first(i)
       t=t0-1
 61    t=t+1
-      if (kk(t).ne.j0) goto 61
+      if (kk(t) /= j0) goto 61
       h=cc(t)-v(j0)-min
       do t=t0,first(i+1)-1
          j=kk(t)
          if (.not. ok(j)) then
            vj=cc(t)-h-v(j)
-           if (vj.lt.d(j)) then
+           if (vj < d(j)) then
              d(j)=vj
              lab(j)=i
-             if (vj.eq.min) then
-               if (y(j).eq.0) goto 70
+             if (vj == min) then
+               if (y(j) == 0) goto 70
                k=k+1
                todo(k)=j
                ok(j)=.true.
@@ -429,12 +542,12 @@ subroutine jovosap(n,sz,cc,kk,first,x,y,u,v,h)
            end if
          end if
       end do
-      if (k.ne.0) goto 60
+      if (k /= 0) goto 60
       min=bigint-1
       do j=1,n
-         if (d(j).le.min) then
+         if (d(j) <= min) then
            if (.not. ok(j)) then
-             if (d(j).lt.min) then
+             if (d(j) < min) then
                min=d(j)
                k=1
                todo(1)=j
@@ -447,11 +560,11 @@ subroutine jovosap(n,sz,cc,kk,first,x,y,u,v,h)
       end do
       do j0=1,k
          j=todo(j0)
-         if (y(j).eq.0) goto 70
+         if (y(j) == 0) goto 70
          ok(j)=.true.
       end do
       goto 60
-70    if (min.eq.0) goto 80
+70    if (min == 0) goto 80
       do k=td+1,n
          j0=todo(k)
          v(j0)=v(j0)+d(j0)-min
@@ -461,18 +574,18 @@ subroutine jovosap(n,sz,cc,kk,first,x,y,u,v,h)
       k=j
       j=x(i)
       x(i)=k
-      if (i0.ne.i) goto 80
+      if (i0 /= i) goto 80
    end do
    h=0
    do i=1,n
       j=x(i)
       t=first(i)-1
 101   t=t+1
-      if (t.gt.sz) then
+      if (t > sz) then
          print '(a,i6,a)','minperm> warning d - atom ',i,' not matched - maximum number of neighbours too small?'
          return
       end if
-      if (kk(t).ne.j) goto 101
+      if (kk(t) /= j) goto 101
       dj=cc(t)
       u(i)=dj-v(j)
       h=h+dj

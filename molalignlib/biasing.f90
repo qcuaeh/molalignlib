@@ -23,12 +23,13 @@ use sorting
 implicit none
 
 abstract interface
-   subroutine proc_setcrossbias(natom, neltype, eltypepartlens, coords0, coords1, equivmat, biasmat)
+   subroutine f_cross(natom, neltype, eltypepartlens, coords0, coords1, equivmat, prunemat, biasmat)
       use kinds
       integer, intent(in) :: natom, neltype
       integer, dimension(:), intent(in) :: eltypepartlens
       real(rk), dimension(:, :), intent(in) :: coords0, coords1
       integer, dimension(:, :), intent(in) :: equivmat
+      logical, dimension(:, :), intent(out) :: prunemat
       real(rk), dimension(:, :), intent(out) :: biasmat
    end subroutine
 end interface
@@ -37,18 +38,18 @@ real(rk) :: bias_tol
 real(rk) :: bias_scale
 real(rk) :: bias_ratio
 
-procedure(proc_setcrossbias), pointer :: setcrossbias
-procedure(proc_setcrossbias), pointer :: mapsetcrossbias
+procedure(f_cross), pointer :: cross_function
 
 contains
 
-subroutine setcrossbias_none(natom, neltype, eltypepartlens, coords0, coords1, equivmat, biasmat)
+subroutine cross_none(natom, neltype, eltypepartlens, coords0, coords1, equivmat, prunemat, biasmat)
 ! Purpose: Set biases from sorted neighbors' distances equivalence
 
    integer, intent(in) :: natom, neltype
    integer, dimension(:), intent(in) :: eltypepartlens
    real(rk), dimension(:, :), intent(in) :: coords0, coords1
    integer, dimension(:, :), intent(in) :: equivmat
+   logical, dimension(:, :), intent(out) :: prunemat
    real(rk), dimension(:, :), intent(out) :: biasmat
 
    integer :: h, i, j, offset
@@ -59,6 +60,7 @@ subroutine setcrossbias_none(natom, neltype, eltypepartlens, coords0, coords1, e
       do i = offset + 1, offset + eltypepartlens(h)
          do j = offset + 1, offset + eltypepartlens(h)
             biasmat(j, i) = 0
+            prunemat(j, i) = .true.
          end do
       end do
       offset = offset + eltypepartlens(h)
@@ -66,13 +68,14 @@ subroutine setcrossbias_none(natom, neltype, eltypepartlens, coords0, coords1, e
 
 end subroutine
 
-subroutine setcrossbias_rd(natom, neltype, eltypepartlens, coords0, coords1, equivmat, biasmat)
+subroutine cross_prune_rd(natom, neltype, eltypepartlens, coords0, coords1, equivmat, prunemat, biasmat)
 ! Purpose: Set biases from sorted neighbors' distances equivalence
 
    integer, intent(in) :: natom, neltype
    integer, dimension(:), intent(in) :: eltypepartlens
    real(rk), dimension(:, :), intent(in) :: coords0, coords1
    integer, dimension(:, :), intent(in) :: equivmat
+   logical, dimension(:, :), intent(out) :: prunemat
    real(rk), dimension(:, :), intent(out) :: biasmat
 
    integer :: h, i, j, offset
@@ -108,9 +111,9 @@ subroutine setcrossbias_rd(natom, neltype, eltypepartlens, coords0, coords1, equ
       do i = offset + 1, offset + eltypepartlens(h)
          do j = offset + 1, offset + eltypepartlens(h)
             if (all(abs(d1(:, j) - d0(:, i)) < bias_tol)) then
-               biasmat(j, i) = 0
+               prunemat(j, i) = .true.
             else
-               biasmat(j, i) = bias_scale**2
+               prunemat(j, i) = .false.
             end if
          end do
       end do
@@ -119,13 +122,14 @@ subroutine setcrossbias_rd(natom, neltype, eltypepartlens, coords0, coords1, equ
 
 end subroutine
 
-subroutine setcrossbias_mna(natom, neltype, eltypepartlens, coords0, coords1, equivmat, biasmat)
+subroutine cross_bias_mna(natom, neltype, eltypepartlens, coords0, coords1, equivmat, prunemat, biasmat)
 ! Purpose: Set biases from sorted distances to neighbors equivalence
 
    integer, intent(in) :: natom, neltype
    integer, dimension(:), intent(in) :: eltypepartlens
    real(rk), dimension(:, :), intent(in) :: coords0, coords1
    integer, dimension(:, :), intent(in) :: equivmat
+   logical, dimension(:, :), intent(out) :: prunemat
    real(rk), dimension(:, :), intent(out) :: biasmat
    integer :: h, i, j, offset, maxequiv
 

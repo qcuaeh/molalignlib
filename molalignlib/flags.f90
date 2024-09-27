@@ -3,6 +3,8 @@ module flags
 logical :: iter_flag
 logical :: bias_flag
 logical :: test_flag
+logical :: fast_flag
+logical :: prune_flag
 logical :: bond_flag
 logical :: back_flag
 logical :: reac_flag

@@ -24,14 +24,15 @@ use lapjv
 implicit none
 
 private
-public mapatoms
-public mapatoms_free
-public mapatoms_bonded
-public proc_mapatoms
+public assign_atoms_function
+public assign_atoms_fast
+public assign_atoms_pruned
+public assign_atoms_biased
+public f_assign
 
 abstract interface
-   subroutine proc_mapatoms(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
-      nadjmna1, adjmnalen1, adjmnalist1, coords1, weights, equivmat, biasmat, mapping)
+   subroutine f_assign(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
+      nadjmna1, adjmnalen1, adjmnalist1, coords1, weights, equivmat, prunemat, biasmat, mapping)
       use kinds
       integer, intent(in) :: natom, neltype
       integer, dimension(:), intent(in) :: eltypepartlens
@@ -41,17 +42,18 @@ abstract interface
       real(rk), dimension(:, :), intent(in) :: coords0, coords1
       real(rk), dimension(:), intent(in) :: weights
       integer, dimension(:, :), intent(in) :: equivmat
+      logical, dimension(:, :), intent(in) :: prunemat
       real(rk), dimension(:, :), intent(in) :: biasmat
       integer, dimension(:), intent(out) :: mapping
    end subroutine
 end interface
 
-procedure(proc_mapatoms), pointer :: mapatoms
+procedure(f_assign), pointer :: assign_atoms_function
 
 contains
 
-subroutine mapatoms_free(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
-   nadjmna1, adjmnalen1, adjmnalist1, coords1, weights, equivmat, biasmat, mapping)
+subroutine assign_atoms_fast(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
+   nadjmna1, adjmnalen1, adjmnalist1, coords1, weights, equivmat, prunemat, biasmat, mapping)
 ! Find best correspondence between points sets with fixed orientation
    integer, intent(in) :: natom, neltype
    integer, dimension(:), intent(in) :: eltypepartlens
@@ -61,6 +63,7 @@ subroutine mapatoms_free(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0, a
    real(rk), dimension(:, :), intent(in) :: coords0, coords1
    real(rk), dimension(:), intent(in) :: weights
    integer, dimension(:, :), intent(in) :: equivmat
+   logical, dimension(:, :), intent(in) :: prunemat
    real(rk), dimension(:, :), intent(in) :: biasmat
    integer, dimension(:), intent(out) :: mapping
 
@@ -72,8 +75,8 @@ subroutine mapatoms_free(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0, a
    offset = 0
 
    do h = 1, neltype
-      call minperm(eltypepartlens(h), coords0(:, offset+1:offset+eltypepartlens(h)), &
-         coords1(:, offset+1:offset+eltypepartlens(h)), biasmat(offset+1:offset+eltypepartlens(h), &
+      call minperm_fast(eltypepartlens(h), coords0(:, offset+1:offset+eltypepartlens(h)), &
+         coords1(:, offset+1:offset+eltypepartlens(h)), prunemat(offset+1:offset+eltypepartlens(h), &
          offset+1:offset+eltypepartlens(h)), mapping(offset+1:), dummy)
       mapping(offset+1:offset+eltypepartlens(h)) = mapping(offset+1:offset+eltypepartlens(h)) + offset
       offset = offset + eltypepartlens(h)
@@ -81,8 +84,8 @@ subroutine mapatoms_free(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0, a
 
 end subroutine
 
-subroutine mapatoms_bonded(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
-   nadjmna1, adjmnalen1, adjmnalist1, coords1, weights, equivmat, biasmat, mapping)
+subroutine assign_atoms_pruned(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
+   nadjmna1, adjmnalen1, adjmnalist1, coords1, weights, equivmat, prunemat, biasmat, mapping)
 ! Find best correspondence between points sets with fixed orientation
    integer, intent(in) :: natom, neltype
    integer, dimension(:), intent(in) :: eltypepartlens
@@ -92,6 +95,39 @@ subroutine mapatoms_bonded(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0,
    real(rk), dimension(:, :), intent(in) :: coords0, coords1
    real(rk), dimension(:), intent(in) :: weights
    integer, dimension(:, :), intent(in) :: equivmat
+   logical, dimension(:, :), intent(in) :: prunemat
+   real(rk), dimension(:, :), intent(in) :: biasmat
+   integer, dimension(:), intent(out) :: mapping
+
+   integer :: h, offset
+   real(rk) :: dummy
+
+   ! Fill distance matrix for each block
+
+   offset = 0
+
+   do h = 1, neltype
+      call minperm_pruned(eltypepartlens(h), coords0(:, offset+1:offset+eltypepartlens(h)), &
+         coords1(:, offset+1:offset+eltypepartlens(h)), prunemat(offset+1:offset+eltypepartlens(h), &
+         offset+1:offset+eltypepartlens(h)), mapping(offset+1:), dummy)
+      mapping(offset+1:offset+eltypepartlens(h)) = mapping(offset+1:offset+eltypepartlens(h)) + offset
+      offset = offset + eltypepartlens(h)
+   end do
+
+end subroutine
+
+subroutine assign_atoms_biased(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
+   nadjmna1, adjmnalen1, adjmnalist1, coords1, weights, equivmat, prunemat, biasmat, mapping)
+! Find best correspondence between points sets with fixed orientation
+   integer, intent(in) :: natom, neltype
+   integer, dimension(:), intent(in) :: eltypepartlens
+   integer, dimension(:, :), intent(in) :: nadjmna0, nadjmna1
+   integer, dimension(:, :, :), intent(in) :: adjmnalen0, adjmnalen1
+   integer, dimension(:, :, :), intent(in) :: adjmnalist0, adjmnalist1
+   real(rk), dimension(:, :), intent(in) :: coords0, coords1
+   real(rk), dimension(:), intent(in) :: weights
+   integer, dimension(:, :), intent(in) :: equivmat
+   logical, dimension(:, :), intent(in) :: prunemat
    real(rk), dimension(:, :), intent(in) :: biasmat
    integer, dimension(:), intent(out) :: mapping
 

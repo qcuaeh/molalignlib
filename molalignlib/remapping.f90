@@ -75,6 +75,7 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
    real(rk) :: rmsd, totalrot
    real(rk), dimension(4) :: rotquat, prodquat
    real(rk), dimension(maxrec) :: recrmsd, avgsteps, avgtotalrot, avgrealrot
+   logical :: prunemat(mol0%natom, mol1%natom)
    real(rk) :: biasmat(mol0%natom, mol1%natom)
    real(rk) :: workcoords1(3, mol1%natom)
 
@@ -119,7 +120,7 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 
    ! Calculate bias matrix
 
-   call setcrossbias(natom, neltype, eltypepartlens, coords0, coords1, equivmat, biasmat)
+   call cross_function(natom, neltype, eltypepartlens, coords0, coords1, equivmat, prunemat, biasmat)
 
    ! Initialize loop variables
 
@@ -145,8 +146,8 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 
       ! Minimize the euclidean distance
 
-      call mapatoms(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
-         nadjmna1, adjmnalen1, adjmnalist1, workcoords1, weights, equivmat, biasmat, mapping)
+      call assign_atoms_function(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
+         nadjmna1, adjmnalen1, adjmnalist1, workcoords1, weights, equivmat, prunemat, biasmat, mapping)
       rotquat = leastrotquat(natom, weights, coords0, workcoords1, mapping)
       prodquat = rotquat
       totalrot = rotangle(rotquat)
@@ -155,8 +156,8 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
       steps = 1
 
       do while (iter_flag)
-         call mapatoms(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
-            nadjmna1, adjmnalen1, adjmnalist1, workcoords1, weights, equivmat, biasmat, newmapping)
+         call assign_atoms_function(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
+            nadjmna1, adjmnalen1, adjmnalist1, workcoords1, weights, equivmat, prunemat, biasmat, newmapping)
          if (all(newmapping == mapping)) exit
          rotquat = leastrotquat(natom, weights, coords0, workcoords1, newmapping)
          prodquat = quatmul(rotquat, prodquat)

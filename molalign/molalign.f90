@@ -94,14 +94,21 @@ do while (getarg(arg))
       test_flag = .true.
    case ('-remap')
       remap_flag = .true.
-   case ('-back')
-      back_flag = .true.
    case ('-fast')
+      bond_flag = .false.
+      iter_flag = .false.
+      fast_flag = .true.
+   case ('-prune')
+      bond_flag = .false.
       iter_flag = .true.
-      bias_flag = .true.
+      prune_flag = .true.
    case ('-bond')
       bond_flag = .true.
+      iter_flag = .true.
+      bias_flag = .true.
       print_stats => print_stats_diff
+   case ('-back')
+      back_flag = .true.
    case ('-reac')
       reac_flag = .true.
    case ('-mass')

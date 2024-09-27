@@ -86,6 +86,26 @@ function intersection(list1, list2, hash_size)
 
 end function
 
+logical function is_permutation(arr)
+   implicit none
+   integer, intent(in) :: arr(:)
+   integer :: i, N
+   logical :: seen(size(arr))
+   
+   N = size(arr)
+   seen = .false.
+   is_permutation = .true.
+   
+   do i = 1, N
+      if (arr(i) < 1 .or. arr(i) > N .or. seen(arr(i))) then
+         is_permutation = .false.
+         return
+      end if
+      seen(arr(i)) = .true.
+   end do
+
+end function
+
 subroutine perm1_next3 ( n, p, more, rank )
 !This subroutine was obtained from:
 !https://people.sc.fsu.edu/~jburkardt/f_src/subset/subset.f90
