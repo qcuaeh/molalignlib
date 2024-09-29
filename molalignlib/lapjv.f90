@@ -5,7 +5,7 @@ use stdio
 use discrete
 implicit none
 private
-public minperm_fast
+public minperm_nearest
 public minperm_pruned
 
 !   Parameters
@@ -16,7 +16,7 @@ integer, parameter :: maxnei = 20
 
 contains
 
-subroutine minperm_fast(n, p, q, mask, perm, dist)
+subroutine minperm_nearest(n, p, q, mask, perm, dist)
 
 ! Adapted from GMIN: A program for finding global minima
 ! Copyright (C) 1999-2006 David J. Wales

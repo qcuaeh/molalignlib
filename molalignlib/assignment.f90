@@ -25,7 +25,7 @@ implicit none
 
 private
 public assign_atoms_function
-public assign_atoms_fast
+public assign_atoms_nearest
 public assign_atoms_pruned
 public assign_atoms_biased
 public f_assign
@@ -52,7 +52,7 @@ procedure(f_assign), pointer :: assign_atoms_function
 
 contains
 
-subroutine assign_atoms_fast(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
+subroutine assign_atoms_nearest(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
    nadjmna1, adjmnalen1, adjmnalist1, coords1, weights, equivmat, prunemat, biasmat, mapping)
 ! Find best correspondence between points sets with fixed orientation
    integer, intent(in) :: natom, neltype
@@ -75,7 +75,7 @@ subroutine assign_atoms_fast(natom, neltype, eltypepartlens, nadjmna0, adjmnalen
    offset = 0
 
    do h = 1, neltype
-      call minperm_fast(eltypepartlens(h), coords0(:, offset+1:offset+eltypepartlens(h)), &
+      call minperm_nearest(eltypepartlens(h), coords0(:, offset+1:offset+eltypepartlens(h)), &
          coords1(:, offset+1:offset+eltypepartlens(h)), prunemat(offset+1:offset+eltypepartlens(h), &
          offset+1:offset+eltypepartlens(h)), mapping(offset+1:), dummy)
       mapping(offset+1:offset+eltypepartlens(h)) = mapping(offset+1:offset+eltypepartlens(h)) + offset

@@ -24,29 +24,33 @@ integer :: iarg, ipos
 
 private
 public ipos
-public getarg
-public readposarg
-public readoptarg
-public initarg
+public get_arg
+public read_posarg
+public read_optarg
+public init_args
 
-interface readoptarg
-   module procedure readstroptarg
-   module procedure readintoptarg
-   module procedure readrealoptarg
+type, public :: p_char
+   character(:), pointer :: var
+end type
+
+interface read_optarg
+   module procedure int_read_optarg
+   module procedure real_read_optarg
+   module procedure char_read_optarg
 end interface
 
 contains
 
-subroutine initarg()
+subroutine init_args()
 
    iarg = 0
    ipos = 0
 
 end subroutine
 
-subroutine readposarg(arg, posargs)
+subroutine read_posarg(arg, posargs)
    character(*), intent(in) :: arg
-   character(ll), intent(out) :: posargs(:)
+   type(p_char), intent(out) :: posargs(:)
 
    if (arg(1:1) == '-') then
       write (stderr, '(a,1x,a)') 'Unknown option:', arg
@@ -60,11 +64,11 @@ subroutine readposarg(arg, posargs)
       stop
    end if
 
-   posargs(ipos) = arg
+   posargs(ipos)%var = arg
 
 end subroutine
 
-logical function getarg(arg) result(success)
+logical function get_arg(arg) result(success)
    character(:), allocatable, intent(out) :: arg
    integer :: arglen
 
@@ -81,45 +85,44 @@ logical function getarg(arg) result(success)
 
 end function
 
-subroutine getoptarg(option, arg)
+subroutine get_optarg(option, optarg)
    character(*), intent(in) :: option
-   character(:), allocatable, intent(out) :: arg
+   character(:), allocatable, intent(out) :: optarg
    integer :: arglen
 
    iarg = iarg + 1
 
-   if (iarg <= command_argument_count()) then
+   if (iarg > command_argument_count()) then
+      write (stderr, '(a,1x,a,1x,a)') 'Option', option, 'requires an argument'
+      stop
+   else
       call get_command_argument(iarg, length=arglen)
-      allocate(character(arglen) :: arg)
-      call get_command_argument(iarg, arg)
-      if (arg(1:1) /= '-') then
-         return
+      allocate(character(arglen) :: optarg)
+      call get_command_argument(iarg, optarg)
+      if (optarg(1:1) == '-') then
+         write (stderr, '(a,1x,a,1x,a)') 'Option', option, 'requires an argument'
+         stop
       end if
    end if
 
-   write (stderr, '(a,1x,a,1x,a)') 'Option', option, 'requires an argument'
-   stop
+end subroutine
+
+subroutine char_read_optarg(option, optarg)
+   character(*), intent(in) :: option
+   character(:), allocatable, intent(out) :: optarg
+
+   call get_optarg(option, optarg)
 
 end subroutine
 
-subroutine readstroptarg(option, optval)
+subroutine int_read_optarg(option, optarg)
    character(*), intent(in) :: option
-   character(:), allocatable, intent(out) :: optval
-   character(:), allocatable :: arg 
-
-   call getoptarg(option, arg)
-   optval = arg
-
-end subroutine
-
-subroutine readintoptarg(option, optval)
-   character(*), intent(in) :: option
-   integer, intent(out) :: optval
-   character(:), allocatable :: arg 
+   integer, intent(out) :: optarg
+   character(:), allocatable :: chararg 
    integer :: stat
 
-   call getoptarg(option, arg)
-   read (arg, *, iostat=stat) optval
+   call get_optarg(option, chararg)
+   read (chararg, *, iostat=stat) optarg
    if (stat /= 0) then
       write (stderr, '(a,1x,a,1x,a)') 'Option', option, 'requires an integer argument'
       stop
@@ -127,14 +130,14 @@ subroutine readintoptarg(option, optval)
 
 end subroutine
 
-subroutine readrealoptarg(option, optval)
+subroutine real_read_optarg(option, optarg)
    character(*), intent(in) :: option
-   real(rk), intent(out) :: optval
-   character(:), allocatable :: arg 
+   real(rk), intent(out) :: optarg
+   character(:), allocatable :: chararg 
    integer :: stat
 
-   call getoptarg(option, arg)
-   read (arg, *, iostat=stat) optval
+   call get_optarg(option, chararg)
+   read (chararg, *, iostat=stat) optarg
    if (stat /= 0) then
       write (stderr, '(a,1x,a,1x,a)') 'Option', option, 'requires a numeric argument'
       stop

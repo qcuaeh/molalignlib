@@ -59,22 +59,6 @@ subroutine remap_atoms( &
 !   integer :: nbond0, bonds0(2, maxcoord*mol0%natom)
 !   integer :: nbond1, bonds1(2, maxcoord*mol1%natom)
 
-   !  Select assignment and bias functions
-
-   if (fast_flag) then
-      cross_function => cross_none
-      assign_atoms_function => assign_atoms_fast
-   else if (prune_flag) then
-      cross_function => cross_prune_rd
-      assign_atoms_function => assign_atoms_pruned
-   else if (bond_flag) then
-      cross_function => cross_bias_mna
-      assign_atoms_function => assign_atoms_biased
-   else
-      cross_function => cross_none
-      assign_atoms_function => assign_atoms_pruned
-   end if
-
    ! Abort if molecules have different number of atoms
 
    if (mol0%get_natom() /= mol1%get_natom()) then

@@ -34,27 +34,27 @@ use molalignlib
 
 implicit none
 
-integer :: i
-integer :: nrec
+integer :: i, nrec
 integer :: read_unit0, read_unit1, write_unit
 integer, allocatable :: countlist(:)
 integer, allocatable :: maplist(:, :)
 integer, allocatable :: mapping(:)
-character(:), allocatable :: arg
-character(:), allocatable :: pathin1, pathin2, pathout
-character(:), allocatable :: fmtin0, fmtin1, fmtout, optfmtin, optfmtout
-character(ll) :: posargs(2)
+character(:), allocatable :: arg, optarg
+character(:), allocatable :: fmtin0, fmtin1, fmtout
+character(:), allocatable :: optfmtin, optfmtout
+character(:), allocatable, target :: pathin1, pathin2
+character(:), allocatable :: pathout
 logical :: fmtin_flag, fmtout_flag
 logical :: remap_flag, pipe_flag, nrec_flag
 real(rk) :: travec0(3), travec1(3), rotquat(4)
-type(t_mol) :: mol0, mol1, auxmol0, auxmol1
 integer :: adjd, minadjd
 real(rk) :: rmsd, minrmsd
+type(p_char) :: posargs(2)
+type(t_mol) :: mol0, mol1, auxmol0, auxmol1
 
 ! Set default options
 
 iter_flag = .false.
-bias_flag = .false.
 bond_flag = .false.
 back_flag = .false.
 test_flag = .false.
@@ -73,19 +73,23 @@ maxcount = 10
 maxcoord = 16
 maxlevel = 16
 
-bias_tol = 0.35
+bias_tol = 0.5
 bias_scale = 1.e3
-
-pathout = 'aligned.xyz'
 
 weight_func => unity
 print_stats => print_stats_dist
+cross_function => cross_none
+assign_atoms_function => assign_atoms_pruned
+
+posargs(1)%var => pathin1
+posargs(2)%var => pathin2
+pathout = 'aligned.xyz'
 
 ! Get user options
 
-call initarg()
+call init_args()
 
-do while (getarg(arg))
+do while (get_arg(arg))
 
    select case (arg)
    case ('-stats')
@@ -94,18 +98,34 @@ do while (getarg(arg))
       test_flag = .true.
    case ('-remap')
       remap_flag = .true.
-   case ('-fast')
-      bond_flag = .false.
+   case ('-near')
       iter_flag = .false.
-      fast_flag = .true.
-   case ('-prune')
-      bond_flag = .false.
+      cross_function => cross_none
+      assign_atoms_function => assign_atoms_nearest
+   case ('-bias')
       iter_flag = .true.
-      prune_flag = .true.
+      assign_atoms_function => assign_atoms_biased
+      call read_optarg(arg, optarg)
+      select case (optarg)
+      case ('mna')
+         cross_function => cross_bias_mna
+      case default
+         write (stderr, '(a,1x,a)') 'Error: Unknown -bias option:', optarg
+         stop
+      end select
+   case ('-prune')
+      iter_flag = .true.
+      assign_atoms_function => assign_atoms_pruned
+      call read_optarg(arg, optarg)
+      select case (optarg)
+      case ('rd')
+         cross_function => cross_prune_rd
+      case default
+         write (stderr, '(a,1x,a)') 'Error: Unknown -prune option:', optarg
+         stop
+      end select
    case ('-bond')
       bond_flag = .true.
-      iter_flag = .true.
-      bias_flag = .true.
       print_stats => print_stats_diff
    case ('-back')
       back_flag = .true.
@@ -116,31 +136,29 @@ do while (getarg(arg))
    case ('-mirror')
       mirror_flag = .true.
    case ('-count')
-      call readoptarg(arg, maxcount)
+      call read_optarg(arg, maxcount)
    case ('-trials')
       trial_flag = .true.
-      call readoptarg(arg, maxtrials)
+      call read_optarg(arg, maxtrials)
    case ('-tol')
-      call readoptarg(arg, bias_tol)
+      call read_optarg(arg, bias_tol)
 !      case ('-scale')
-!         call readoptarg(arg, bias_scale)
+!         call read_optarg(arg, bias_scale)
    case ('-N')
       nrec_flag = .true.
-      call readoptarg(arg, maxrec)
+      call read_optarg(arg, maxrec)
    case ('-out')
-      call readoptarg(arg, pathout)
+      call read_optarg(arg, pathout)
    case ('-fmtin')
       fmtin_flag = .true.
-      call readoptarg(arg, optfmtin)
+      call read_optarg(arg, optfmtin)
    case ('-fmtout')
       fmtout_flag = .true.
-      call readoptarg(arg, optfmtout)
+      call read_optarg(arg, optfmtout)
    case ('-pipe')
       pipe_flag = .true.
-   case ('-to')
-      nrec_flag = .true.
    case default
-      call readposarg(arg, posargs)
+      call read_posarg(arg, posargs)
    end select
 
 end do
@@ -159,8 +177,6 @@ else
       write (stderr, '(a)') 'Error: Too few arguments'
       stop
    case (2)
-      pathin1 = trim(posargs(1))
-      pathin2 = trim(posargs(2))
       call open2read(pathin1, read_unit0, fmtin0)
       call open2read(pathin2, read_unit1, fmtin1)
    case default
