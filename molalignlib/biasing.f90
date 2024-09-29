@@ -81,7 +81,7 @@ subroutine cross_prune_rd(natom, neltype, eltypepartlens, coords0, coords1, equi
    integer :: h, i, j, offset
    real(rk), allocatable :: d0(:, :), d1(:, :)
 
-   allocate(d0(natom, natom), d1(natom, natom))
+   allocate (d0(natom, natom), d1(natom, natom))
 
    do i = 1, natom
       offset = 0

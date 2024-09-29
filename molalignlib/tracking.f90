@@ -22,9 +22,9 @@ subroutine find_molfrags (mol)
    integer, allocatable :: fragidcs(:), fragsize(:)
    logical, allocatable :: tracked(:)
 
-   allocate(fragidcs(size(mol%atoms)))
-   allocate(fragsize(size(mol%atoms)))
-   allocate(tracked(size(mol%atoms)))
+   allocate (fragidcs(size(mol%atoms)))
+   allocate (fragsize(size(mol%atoms)))
+   allocate (tracked(size(mol%atoms)))
 
    nadjs = mol%get_nadjs()
    adjlists = mol%get_adjlists()

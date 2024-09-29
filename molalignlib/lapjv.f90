@@ -80,8 +80,8 @@ subroutine minperm_nearest(n, p, q, mask, perm, dist)
 
    sz = m*n
 
-   allocate(kk(sz))
-   allocate(cc(sz))
+   allocate (kk(sz))
+   allocate (cc(sz))
 
    first(1) = 1
    do i = 1, n
@@ -277,8 +277,8 @@ subroutine minperm_pruned(n, p, q, mask, perm, dist)
 
    sz = count(mask)
 
-   allocate(kk(sz))
-   allocate(cc(sz))
+   allocate (kk(sz))
+   allocate (cc(sz))
 
    first(1) = 1
    do i = 1, n

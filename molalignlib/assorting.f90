@@ -106,10 +106,10 @@ subroutine set_equiv_atoms(mol)
    integer, allocatable, dimension(:) :: intypes, outtypes, typemap
    integer, allocatable, dimension(:) :: foreorder, backorder
 
-   allocate(outtypes(size(mol%atoms)))
-   allocate(typemap(size(mol%atoms)))
-   allocate(foreorder(size(mol%atoms)))
-   allocate(backorder(size(mol%atoms)))
+   allocate (outtypes(size(mol%atoms)))
+   allocate (typemap(size(mol%atoms)))
+   allocate (foreorder(size(mol%atoms)))
+   allocate (backorder(size(mol%atoms)))
 
    ! Initialization
 

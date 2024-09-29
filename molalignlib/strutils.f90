@@ -60,7 +60,7 @@ function intstr(x) result(str)
    integer :: l
    l = floor(log10(real(max(abs(x), 1)))) + 1
    if (x < 0) l = l + 1
-   allocate(character(l) :: str)
+   allocate (character(l) :: str)
    write (str, '(i0)') x
 end function
 
@@ -72,7 +72,7 @@ function realstr(x, n) result(str)
    character(:), allocatable :: str
    l = floor(log10(max(abs(x), 1.0_rk))) + n + 2
    if (x < 0) l = l + 1
-   allocate(character(l) :: str)
+   allocate (character(l) :: str)
    write (format, '(a,i0,a,i0,a)') '(f', l, '.', n, ')'
    write (str, format) x
 end function

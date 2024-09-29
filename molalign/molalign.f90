@@ -197,8 +197,8 @@ call readfile(read_unit1, fmtin1, mol1)
 
 ! Allocate arrays
 
-allocate(maplist(mol0%natom, maxrec))
-allocate(countlist(maxrec))
+allocate (maplist(mol0%natom, maxrec))
+allocate (countlist(maxrec))
 
 if (pipe_flag) then
    write_unit = stdout

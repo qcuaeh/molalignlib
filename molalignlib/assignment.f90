@@ -136,7 +136,7 @@ subroutine assign_atoms_biased(natom, neltype, eltypepartlens, nadjmna0, adjmnal
    real(rk), allocatable :: costs(:, :)
    real(rk) :: dummy
 
-   allocate(costs(natom, natom))
+   allocate (costs(natom, natom))
 
    offset = 0
    do h = 1, neltype

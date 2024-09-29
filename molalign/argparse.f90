@@ -76,7 +76,7 @@ logical function get_arg(arg) result(success)
 
    if (iarg <= command_argument_count()) then
       call get_command_argument(iarg, length=arglen)
-      allocate(character(arglen) :: arg)
+      allocate (character(arglen) :: arg)
       call get_command_argument(iarg, arg)
       success = .true.
    else
@@ -97,7 +97,7 @@ subroutine get_optarg(option, optarg)
       stop
    else
       call get_command_argument(iarg, length=arglen)
-      allocate(character(arglen) :: optarg)
+      allocate (character(arglen) :: optarg)
       call get_command_argument(iarg, optarg)
       if (optarg(1:1) == '-') then
          write (stderr, '(a,1x,a,1x,a)') 'Option', option, 'requires an argument'

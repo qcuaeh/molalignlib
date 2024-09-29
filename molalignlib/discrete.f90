@@ -40,7 +40,7 @@ function inverse_mapping(mapping)
    integer :: i
    integer, allocatable :: inverse_mapping(:)
 
-   allocate(inverse_mapping(size(mapping)))
+   allocate (inverse_mapping(size(mapping)))
 
    do i = 1, size(mapping)
       inverse_mapping(mapping(i)) = i
@@ -56,7 +56,7 @@ function intersection(list1, list2, hash_size)
    logical, allocatable :: hash_table(:)
    integer, allocatable :: intersection(:)
 
-   allocate(hash_table(hash_size))
+   allocate (hash_table(hash_size))
 
    hash_table = .false.
 
@@ -73,7 +73,7 @@ function intersection(list1, list2, hash_size)
       end if
    end do
 
-   allocate(intersection(n))
+   allocate (intersection(n))
 
    ! Store intersection elements
    n = 0

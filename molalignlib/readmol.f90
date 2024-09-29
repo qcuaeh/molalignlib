@@ -41,11 +41,11 @@ subroutine readxyz(unit, mol)
 
    read (unit, *, end=99) mol%natom
 
-   allocate(elnums(mol%natom))
-   allocate(labels(mol%natom))
-   allocate(weights(mol%natom))
-   allocate(coords(3, mol%natom))
-   allocate(mol%atoms(mol%natom))
+   allocate (elnums(mol%natom))
+   allocate (labels(mol%natom))
+   allocate (weights(mol%natom))
+   allocate (coords(3, mol%natom))
+   allocate (mol%atoms(mol%natom))
 
    read (unit, '(a)', end=99) buffer
    mol%title = trim(buffer)
@@ -90,13 +90,13 @@ subroutine readmol2(unit, mol)
    mol%title = trim(buffer)
    read (unit, *, end=99) mol%natom, nbond
 
-   allocate(elnums(mol%natom))
-   allocate(labels(mol%natom))
-   allocate(weights(mol%natom))
-   allocate(coords(3, mol%natom))
-   allocate(nadjs(mol%natom))
-   allocate(adjlists(mol%natom, mol%natom))
-   allocate(mol%atoms(mol%natom))
+   allocate (elnums(mol%natom))
+   allocate (labels(mol%natom))
+   allocate (weights(mol%natom))
+   allocate (coords(3, mol%natom))
+   allocate (nadjs(mol%natom))
+   allocate (adjlists(mol%natom, mol%natom))
+   allocate (mol%atoms(mol%natom))
 
    do
       read (unit, '(a)', end=99) buffer

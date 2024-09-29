@@ -143,7 +143,7 @@ subroutine mirror_coords(self)
    ! Local variables
    real(rk), allocatable :: coords(:, :)
 
-   allocate(coords(3, size(self%atoms)))
+   allocate (coords(3, size(self%atoms)))
 
    coords = self%get_coords()
    coords(1, :) = -coords(1, :)
@@ -176,7 +176,7 @@ subroutine permutate_atoms(self, atom_order)
    integer :: i, k
    integer, allocatable :: atom_mapping(:)
 
-   allocate(atom_mapping(size(self%atoms)))
+   allocate (atom_mapping(size(self%atoms)))
 
    atom_mapping = inverse_mapping(atom_order)
    self%atoms = self%atoms(atom_order(:))
@@ -276,10 +276,10 @@ subroutine partition_init(self, npart, partidcs)
    integer :: i, p, offset
    integer, allocatable :: n(:)
 
-   allocate(n(npart))
-   allocate(self%parts(npart))
-   allocate(self%atom_order(size(partidcs)))
-   allocate(self%atom_mapping(size(partidcs)))
+   allocate (n(npart))
+   allocate (self%parts(npart))
+   allocate (self%atom_order(size(partidcs)))
+   allocate (self%atom_mapping(size(partidcs)))
 
    n(:) = 0
    do i = 1, size(partidcs)
@@ -287,7 +287,7 @@ subroutine partition_init(self, npart, partidcs)
    end do
 
    do i = 1, npart
-      allocate(self%parts(i)%atomidcs(n(i)))
+      allocate (self%parts(i)%atomidcs(n(i)))
    end do
 
    n(:) = 0
@@ -313,7 +313,7 @@ function partition_lenlist(self) result(lenlist)
    integer :: i
    integer, allocatable :: lenlist(:)
 
-   allocate(lenlist(size(self%parts)))
+   allocate (lenlist(size(self%parts)))
 
    do i = 1, size(self%parts)
       lenlist(i) = size(self%parts(i)%atomidcs)
@@ -327,7 +327,7 @@ function get_mnatypeparts(self) result(parts)
    integer :: i
    type(t_atomlist), allocatable :: parts(:)
 
-   allocate(parts(size(self%mnatypepartition%parts)))
+   allocate (parts(size(self%mnatypepartition%parts)))
 
    do i = 1, size(self%mnatypepartition%parts)
       parts(i)%atomidcs = self%mnatypepartition%parts(i)%atomidcs(:)
@@ -359,7 +359,7 @@ function get_molfragparts(self) result(parts)
    integer :: i
    type(t_atomlist), allocatable :: parts(:)
 
-   allocate(parts(size(self%molfragpartition%parts)))
+   allocate (parts(size(self%molfragpartition%parts)))
 
    do i = 1, size(self%molfragpartition%parts)
       parts(i)%atomidcs = self%molfragpartition%parts(i)%atomidcs(:)
@@ -373,7 +373,7 @@ function get_sorted_molfragparts(self) result(parts)
    integer :: i
    type(t_atomlist), allocatable :: parts(:)
 
-   allocate(parts(size(self%molfragpartition%parts)))
+   allocate (parts(size(self%molfragpartition%parts)))
 
    do i = 1, size(self%molfragpartition%parts)
       parts(i)%atomidcs = self%mnatypepartition%atom_mapping(self%molfragpartition%parts(i)%atomidcs(:))
@@ -398,7 +398,7 @@ function get_sorted_fragroots(self) result(fragroots)
    fragparts = self%get_sorted_molfragparts()
    eltypepartlens = self%get_eltypepartlens()
    mnatypepartlens = self%get_mnatypepartlens()
-   allocate(fragroots(size(fragparts)))
+   allocate (fragroots(size(fragparts)))
 
    do i = 1, size(fragparts)
       order1 = sorted_order(mnatypepartlens(mnatypes(fragparts(i)%atomidcs)))
@@ -489,7 +489,7 @@ function get_coords(self) result(coords)
    integer :: i
    real(rk), allocatable :: coords(:, :)
 
-   allocate(coords(3, size(self%atoms)))
+   allocate (coords(3, size(self%atoms)))
 
    do i = 1, size(self%atoms)
       coords(:, i) = self%atoms(i)%coords(:)
@@ -503,7 +503,7 @@ function get_sorted_coords(self) result(coords)
    integer :: i
    real(rk), allocatable :: coords(:, :)
 
-   allocate(coords(3, size(self%atoms)))
+   allocate (coords(3, size(self%atoms)))
 
    do i = 1, size(self%atoms)
       coords(:, i) = self%atoms(self%mnatypepartition%atom_order(i))%coords(:)
@@ -530,7 +530,7 @@ function get_nadjs(self) result(nadjs)
    integer :: i
    integer, allocatable :: nadjs(:)
 
-   allocate(nadjs(size(self%atoms)))
+   allocate (nadjs(size(self%atoms)))
    do i = 1, size(self%atoms)
       nadjs(i) = size(self%atoms(i)%adjlist)
    end do
@@ -543,7 +543,7 @@ function get_sorted_nadjs(self) result(nadjs)
    integer :: i
    integer, allocatable :: nadjs(:)
 
-   allocate(nadjs(size(self%atoms)))
+   allocate (nadjs(size(self%atoms)))
 
    do i = 1, size(self%atoms)
       nadjs(i) = size(self%atoms(self%mnatypepartition%atom_order(i))%adjlist)
@@ -557,7 +557,7 @@ function get_adjlists(self) result(adjlists)
    integer :: i
    integer, allocatable :: adjlists(:, :)
 
-   allocate(adjlists(maxcoord, size(self%atoms)))
+   allocate (adjlists(maxcoord, size(self%atoms)))
 
    do i = 1, size(self%atoms)
       adjlists(:size(self%atoms(i)%adjlist), i) = self%atoms(i)%adjlist
@@ -572,7 +572,7 @@ function get_sorted_adjlists(self) result(adjlists)
    type(t_atom) :: atom
    integer, allocatable :: adjlists(:, :)
 
-   allocate(adjlists(maxcoord, size(self%atoms)))
+   allocate (adjlists(maxcoord, size(self%atoms)))
 
    do i = 1, size(self%atoms)
       atom = self%atoms(self%mnatypepartition%atom_order(i))
@@ -589,7 +589,7 @@ end function
 !   integer, allocatable :: adjlistpart(:)
 !   integer, allocatable :: adjlists(:, :)
 !
-!   allocate(adjlists(maxcoord, size(self%atoms)))
+!   allocate (adjlists(maxcoord, size(self%atoms)))
 !
 !   do i = 1, size(self%atoms)
 !      atom = self%atoms(self%mnatypepartition%atom_order(i))
@@ -609,7 +609,7 @@ function get_newadjlists(self) result(adjlists)
    integer :: i
    type(t_atomlist), allocatable :: adjlists(:)
 
-   allocate(adjlists(size(self%atoms)))
+   allocate (adjlists(size(self%atoms)))
 
    do i = 1, size(self%atoms)
       adjlists(i)%atomidcs = self%atoms(i)%adjlist
@@ -623,7 +623,7 @@ function get_sorted_newadjlists(self) result(adjlists)
    integer :: i
    type(t_atomlist), allocatable :: adjlists(:)
 
-   allocate(adjlists(size(self%atoms)))
+   allocate (adjlists(size(self%atoms)))
 
    do i = 1, size(self%atoms)
       adjlists(i)%atomidcs = self%mnatypepartition%atom_mapping(self%atoms(self%mnatypepartition%atom_order(i))%adjlist)
@@ -638,7 +638,7 @@ function get_adjmat(self) result(adjmat)
    type(t_atom) :: atom
    logical, allocatable :: adjmat(:, :)
 
-   allocate(adjmat(size(self%atoms), size(self%atoms)))
+   allocate (adjmat(size(self%atoms), size(self%atoms)))
 
    adjmat(:, :) = .false.
 
@@ -658,7 +658,7 @@ function get_sorted_adjmat(self) result(adjmat)
    type(t_atom) :: atom
    logical, allocatable :: adjmat(:, :)
 
-   allocate(adjmat(size(self%atoms), size(self%atoms)))
+   allocate (adjmat(size(self%atoms), size(self%atoms)))
    adjmat(:, :) = .false.
 
    do i = 1, size(self%atoms)
@@ -679,7 +679,7 @@ subroutine set_adjmnatypepartlens(self, nadjmnatypes, adjmnatypepartlens)
 
    do i = 1, size(self%atoms)
       if (.not. allocated(self%atoms(i)%adjmnatypepartlens)) then
-         allocate(self%atoms(i)%adjmnatypepartlens(nadjmnatypes(i)))
+         allocate (self%atoms(i)%adjmnatypepartlens(nadjmnatypes(i)))
       end if
       self%atoms(i)%adjmnatypepartlens = adjmnatypepartlens(:nadjmnatypes(i), i)
    end do
@@ -692,7 +692,7 @@ function get_adjmnatypepartlens(self) result(adjmnatypepartlens)
    integer :: i
    integer, allocatable :: adjmnatypepartlens(:, :)
 
-   allocate(adjmnatypepartlens(maxcoord, size(self%atoms)))
+   allocate (adjmnatypepartlens(maxcoord, size(self%atoms)))
 
    do i = 1, size(self%atoms)
       adjmnatypepartlens(:size(self%atoms(i)%adjmnatypepartlens), i) = self%atoms(i)%adjmnatypepartlens
@@ -707,7 +707,7 @@ function get_sorted_adjmnatypepartlens(self) result(adjmnatypepartlens)
    type(t_atom) :: atom
    integer, allocatable :: adjmnatypepartlens(:, :)
 
-   allocate(adjmnatypepartlens(maxcoord, size(self%atoms)))
+   allocate (adjmnatypepartlens(maxcoord, size(self%atoms)))
 
    do i = 1, size(self%atoms)
       atom = self%atoms(self%mnatypepartition%atom_order(i))
@@ -722,7 +722,7 @@ function get_nadjmnatypes(self) result(nadjmnatypes)
    integer :: i
    integer, allocatable :: nadjmnatypes(:)
 
-   allocate(nadjmnatypes(size(self%atoms)))
+   allocate (nadjmnatypes(size(self%atoms)))
 
    do i = 1, size(self%atoms)
       nadjmnatypes(i) = size(self%atoms(i)%adjmnatypepartlens)
@@ -737,7 +737,7 @@ function get_sorted_nadjmnatypes(self) result(nadjmnatypes)
    type(t_atom) :: atom
    integer, allocatable :: nadjmnatypes(:)
 
-   allocate(nadjmnatypes(size(self%atoms)))
+   allocate (nadjmnatypes(size(self%atoms)))
 
    do i = 1, size(self%atoms)
       atom = self%atoms(self%mnatypepartition%atom_order(i))
@@ -754,7 +754,7 @@ function get_bonds(self) result(bonds)
    type(t_bond), allocatable :: bonds(:)
 
    adjmat = self%get_adjmat()
-   allocate(bonds(count(adjmat)/2))
+   allocate (bonds(count(adjmat)/2))
 
    nbond = 0
    do i = 1, size(self%atoms)
@@ -815,7 +815,7 @@ function bonded(self, idx1, idx2) result(isbond)
    logical :: isbond, found1, found2
    integer, allocatable :: adjlist1(:), adjlist2(:)
 
-   allocate(adjlist1(maxcoord), adjlist2(maxcoord))
+   allocate (adjlist1(maxcoord), adjlist2(maxcoord))
 
 ! copy arrays of adjlist
    adjlist1 = self%atoms(idx1)%adjlist
@@ -858,7 +858,7 @@ subroutine remove_bond(self, idx1, idx2)
    integer :: i, pos1, pos2, nadj1, nadj2
    integer, allocatable :: adjlist1(:), adjlist2(:)
 
-   allocate(adjlist1(maxcoord), adjlist2(maxcoord))
+   allocate (adjlist1(maxcoord), adjlist2(maxcoord))
 
 ! copy adjlist arrays
    nadj1 = size(self%atoms(idx1)%adjlist)
@@ -910,7 +910,7 @@ subroutine add_bond(self, idx1, idx2)
    integer :: pos1, pos2, nadj1, nadj2
    integer, allocatable :: adjlist1(:), adjlist2(:)
 
-   allocate(adjlist1(maxcoord), adjlist2(maxcoord))
+   allocate (adjlist1(maxcoord), adjlist2(maxcoord))
 
 ! copy array of adjlist
    nadj1 = size(self%atoms(idx1)%adjlist)

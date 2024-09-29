@@ -52,7 +52,7 @@ end if
 
 imax = max(n,m)
 imin = min(n,m)
-allocate( iw(imax,6) )
+allocate ( iw(imax,6) )
 sum = 0.0
 if (n <= m) then
    do  i = 1, n
