@@ -32,8 +32,8 @@ end interface
 
 procedure(print_stats_proc), pointer :: print_stats
 
-character(*), parameter :: line1 = '-------------------------------------------'
-character(*), parameter :: line2 = '--------------------------------------------------'
+character(*), parameter :: line1 = '-----------------------------------------'
+character(*), parameter :: line2 = '------------------------------------------------'
 
 contains
 
@@ -42,10 +42,10 @@ subroutine print_stats_dist(nrec, matches, avgsteps, avgtotalrot, avgrealrot, re
    integer, dimension(:), intent(in) :: matches, recadjd
    real(rk), dimension(:), intent(in) :: avgsteps, avgtotalrot, avgrealrot, recrmsd
    integer :: irec
-   write (stderr, '(1x,a,4x,a,4x,a,5x,a,7x,a)') 'Map', 'Count', 'Steps', 'Angle', 'RMSD'
+   write (stderr, '(a,3x,a,4x,a,5x,a,6x,a)') 'Map', 'Count', 'Steps', 'Rotat.', 'RMSD'
    write (stderr, '(a)') line1
    do irec = 1, nrec
-      write (stderr, '(i4,3x,i6,5x,f4.1,5x,f5.1,3x,f8.4)') &
+      write (stderr, '(i3,4x,i4,4x,f5.1,5x,f5.1,3x,f8.4)') &
          irec, matches(irec), avgsteps(irec), 90./asin(1.)*avgrealrot(irec), recrmsd(irec)
    end do
    write (stderr, '(a)') line1
@@ -57,11 +57,11 @@ subroutine print_stats_diff(nrec, matches, avgsteps, avgtotalrot, avgrealrot, re
    integer, dimension(:), intent(in) :: matches, recadjd
    real(rk), dimension(:), intent(in) :: avgsteps, avgtotalrot, avgrealrot, recrmsd
    integer :: irec
-   write (stderr, '(1x,a,4x,a,4x,a,5x,a,3x,a,7x,a)') 'Map', 'Count', 'Steps', 'Angle', 'AdjD', 'RMSD'
+   write (stderr, '(a,3x,a,4x,a,5x,a,6x,a,3x,a)') 'Map', 'Count', 'Steps', 'Rotat.', 'RMSD', 'AdjΔ'
    write (stderr, '(a)') line2
    do irec = 1, nrec
-      write (stderr, '(i4,3x,i6,5x,f4.1,5x,f5.1,3x,i4,3x,f8.4)') &
-         irec, matches(irec), avgsteps(irec), 90./asin(1.)*avgrealrot(irec), recadjd(irec), recrmsd(irec)
+      write (stderr, '(i3,4x,i4,4x,f5.1,5x,f5.1,3x,f8.4,3x,i4)') &
+         irec, matches(irec), avgsteps(irec), 90./asin(1.)*avgrealrot(irec), recrmsd(irec), recadjd(irec)
    end do
    write (stderr, '(a)') line2
    flush(stderr)

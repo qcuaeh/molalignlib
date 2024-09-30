@@ -19,18 +19,17 @@ use kinds
 use types
 use flags
 use bounds
-use random
 use strutils
+use discrete
 use adjacency
 use rotation
 use translation
-use tracking
 use backtracking
+use assignment
 use alignment
 use assorting
 use printing
 use biasing
-use assignment
 
 implicit none
 
@@ -142,7 +141,7 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 
       ! Aply a random rotation to workcoords1
 
-      call rotate(natom, workcoords1, genrotquat(randvec()))
+      call rotate(natom, workcoords1, randrotquat())
 
       ! Minimize the euclidean distance
 

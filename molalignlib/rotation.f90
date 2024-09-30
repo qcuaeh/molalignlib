@@ -16,108 +16,87 @@
 
 module rotation
 use kinds
+use random
 
 implicit none
 
 private
 public rotate
 public rotated
-public matrix_rotated
-public quater_rotated
-public quat2rotmat
 public quatmul
 public rotangle
-public genrotmat
-public genrotquat
-
-interface rotate
-   module procedure matrix_rotate
-   module procedure quater_rotate
-end interface
-
-interface rotated
-   module procedure matrix_rotated
-   module procedure quater_rotated
-end interface
+public randrotquat
 
 contains
 
-function quat2rotmat(rotquat) result(rotmat)
+function quatrotmat(q) result(rotmat)
 ! Purpose: Apply rotation quaternion to atomic coordinates
-   real(rk), intent(in) :: rotquat(4)
+   real(rk), intent(in) :: q(4)
    real(rk) :: rotmat(3, 3)
 
 ! Calculate the rotation matrix
 
-   rotmat(1, 1) = 1.0_rk - 2*(rotquat(3)**2 + rotquat(4)**2)
-   rotmat(1, 2) = 2*(rotquat(2)*rotquat(3) + rotquat(1)*rotquat(4))
-   rotmat(1, 3) = 2*(rotquat(2)*rotquat(4) - rotquat(1)*rotquat(3))
-   rotmat(2, 1) = 2*(rotquat(2)*rotquat(3) - rotquat(1)*rotquat(4))
-   rotmat(2, 2) = 1.0_rk - 2*(rotquat(2)**2 + rotquat(4)**2)
-   rotmat(2, 3) = 2*(rotquat(3)*rotquat(4) + rotquat(1)*rotquat(2))
-   rotmat(3, 1) = 2*(rotquat(2)*rotquat(4) + rotquat(1)*rotquat(3))
-   rotmat(3, 2) = 2*(rotquat(3)*rotquat(4) - rotquat(1)*rotquat(2))
-   rotmat(3, 3) = 1.0_rk - 2*(rotquat(2)**2 + rotquat(3)**2)
+   rotmat(1, 1) = 1.0_rk - 2*(q(3)**2 + q(4)**2)
+   rotmat(2, 1) = 2*(q(2)*q(3) - q(1)*q(4))
+   rotmat(3, 1) = 2*(q(2)*q(4) + q(1)*q(3))
+   rotmat(1, 2) = 2*(q(2)*q(3) + q(1)*q(4))
+   rotmat(2, 2) = 1.0_rk - 2*(q(2)**2 + q(4)**2)
+   rotmat(3, 2) = 2*(q(3)*q(4) - q(1)*q(2))
+   rotmat(1, 3) = 2*(q(2)*q(4) - q(1)*q(3))
+   rotmat(2, 3) = 2*(q(3)*q(4) + q(1)*q(2))
+   rotmat(3, 3) = 1.0_rk - 2*(q(2)**2 + q(3)**2)
 
 end function
 
-subroutine matrix_rotate(natom, coords, rotmat)
-! Purpose: Apply rotation matrix to atomic coordinates
+subroutine rotate(natom, coords, q)
+! Purpose: Apply rotation quaternion to atomic coordinates
    integer, intent(in) :: natom
-   real(rk), intent (in) :: rotmat(3, 3)
-   real(rk), intent (inout) :: coords(3, natom)
+   real(rk), intent(in) :: q(4)
+   real(rk), intent(inout) :: coords(3, natom)
+   real(rk) :: rotmat(3, 3)
 
+! Rotate atomic coordinates
+
+   rotmat = quatrotmat(q)
    coords = matmul(rotmat, coords)
 
 end subroutine
 
-function matrix_rotated(natom, coords, rotmat) result(rotcoords)
-! Purpose: Apply rotation matrix to atomic coordinates
-   integer, intent(in) :: natom
-   real(rk), intent (in) :: rotmat(3, 3)
-   real(rk), intent (in) :: coords(3, natom)
-   real(rk) :: rotcoords(3, natom)
-
-   rotcoords = matmul(rotmat, coords)
-
-end function
-
-subroutine quater_rotate(natom, coords, rotquat)
+function rotated(natom, coords, q) result(rotated_coords)
 ! Purpose: Apply rotation quaternion to atomic coordinates
    integer, intent(in) :: natom
-   real(rk), intent(in) :: rotquat(4)
-   real(rk), intent(inout) :: coords(3, natom)
-
-! Rotate atomic coordinates
-
-!    call matrix_rotate(natom, quat2rotmat(rotquat), coords)
-    coords = matmul(quat2rotmat(rotquat), coords)
-
-end subroutine
-
-function quater_rotated(natom, coords, rotquat) result(rotcoords)
-! Purpose: Apply rotation quaternion to atomic coordinates
-   integer, intent(in) :: natom
-   real(rk), intent(in) :: rotquat(4)
+   real(rk), intent(in) :: q(4)
    real(rk), intent(in) :: coords(3, natom)
-   real(rk) :: rotcoords(3, natom)
 
-   rotcoords = matmul(quat2rotmat(rotquat), coords)
+   integer :: i
+   real(rk) :: rotmat(3, 3)
+   real(rk) :: rotated_coords(3, natom)
+
+   rotmat = quatrotmat(q)
+   rotated_coords = matmul(rotmat, coords)
 
 end function
 
-function quatmul(p, q) result(prod)
+function quatmul(p, q) result(pq)
 
    real(rk), dimension(4), intent(in) :: p, q
-   real(rk) :: prod(4)
-   real(rk) :: left(4, 4)
+   real(rk) :: pq(4)
+!   real(rk) :: matp(4, 4)
 
-   left(:, 1) = [ p(1), -p(2), -p(3), -p(4) ]
-   left(:, 2) = [ p(2),  p(1), -p(4),  p(3) ]
-   left(:, 3) = [ p(3),  p(4),  p(1), -p(2) ]
-   left(:, 4) = [ p(4), -p(3),  p(2),  p(1) ]
+! This matrix was wrongly defined in previous versions
+! (it was erroneously transposed), now it is correct
+!   matp(1, :) = [ p(1), -p(2), -p(3), -p(4) ]
+!   matp(2, :) = [ p(2),  p(1), -p(4),  p(3) ]
+!   matp(3, :) = [ p(3),  p(4),  p(1), -p(2) ]
+!   matp(4, :) = [ p(4), -p(3),  p(2),  p(1) ]
+!
+!   pq = matmul(matp, q)
 
-   prod = matmul(left, q)
+! Better to use direct quaternion multiplication
+   pq(1) = p(1)*q(1) - p(2)*q(2) - p(3)*q(3) - p(4)*q(4)
+   pq(2) = p(1)*q(2) + p(2)*q(1) + p(3)*q(4) - p(4)*q(3)
+   pq(3) = p(1)*q(3) - p(2)*q(4) + p(3)*q(1) + p(4)*q(2)
+   pq(4) = p(1)*q(4) + p(2)*q(3) - p(3)*q(2) + p(4)*q(1)
 
 end function
 
@@ -138,14 +117,18 @@ function rotangle(q) result(angle)
 
 end function
 
-function genrotquat(x) result(rotquat)
-! Purpose: Generate a random rotation quaternion.
+function randrotquat() result(rotquat)
+! Purpose: Generate a random unit quaternion.
 ! Reference: Academic Press Graphics Gems Series archive Graphics
 !            Gems III archive. Pages: 129 - 132.
-   real(rk), intent(in) :: x(3)
+   real(rk) :: x(3)
    real(rk) :: rotquat(4)
    real(rk) :: pi, a1, a2, r1, r2, s1, s2, c1, c2
 
+! Generate a random vector
+
+   x = randvec()
+
 ! Calculate auxiliar vectors and constants
 
    pi = 2*asin(1.)
@@ -159,56 +142,10 @@ function genrotquat(x) result(rotquat)
    s2 = sin(a2)
    c2 = cos(a2)
 
-!   Quaternion (w, x, y, z), w must be first as required by quat2rotmat
+!   Quaternion (w, x, y, z), w must be first as required by quatrotmat
    rotquat = [ c2*r2, s1*r1, c1*r1, s2*r2 ]
 
 !    print *, sum(rotquat**2)
-
-end function
-
-function genrotmat(x) result(rotmat)
-! Purpose: Generate a random rotation matrix.
-! Reference: Academic Press Graphics Gems Series archive Graphics
-!            Gems III archive. Pages: 117 - 120.
-   real(rk), intent(in) :: x(3)
-   real(rk) :: rotmat(3, 3)
-
-   integer :: i
-   real(rk) :: pi, a1, a2, r1, r2, s1, c1, s2, c2
-   real(rk) :: v(3), right(3, 3), left(3, 3)
-
-! Calculate auxiliar vectors and constants
-
-   pi = 2*asin(1.)
-   a1 = 2*pi*x(1)
-   a2 = 2*pi*x(2)
-   r1 = sqrt(1.0 - x(3))
-   r2 = sqrt(x(3))
-
-   s1 = sin(a1)
-   c1 = cos(a1)
-   s2 = sin(a2)
-   c2 = cos(a2)
-
-   right(1, :) = [ c1, s1, 0.0_rk ]
-   right(2, :) = [ -s1, c1, 0.0_rk ]
-   right(3, :) = [ 0.0_rk, 0.0_rk, 1.0_rk ]
-
-   v = [ c2*r2, s2*r2, r1 ]
-
-   do i = 1, 3
-      left(:, i) = 2*v(i)*v(:)
-   end do
-
-   do i = 1, 3
-      left(i, i) = left(i, i) - 1.0_rk
-   end do
-
-! Calculate the rotation matrix
-
-   rotmat = matmul(left, right)
-
-!    print *, matdet3(rotmat)
 
 end function
 

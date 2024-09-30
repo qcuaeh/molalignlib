@@ -156,7 +156,7 @@ subroutine rotate_coords(self, rotquat)
    ! Local variables
    real(rk), intent(in) :: rotquat(4)
 
-   call self%set_coords(quater_rotated(size(self%atoms), self%get_coords(), rotquat))
+   call self%set_coords(rotated(size(self%atoms), self%get_coords(), rotquat))
 
 end subroutine
 

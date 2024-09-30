@@ -213,7 +213,7 @@ subroutine minperm_nearest(n, p, q, mask, perm, dist)
    end if
 
    if (.not. is_permutation(perm)) then
-      write (stderr, '(a)') 'Error: Assignment failed'
+      write (stderr, '(a)') 'Error: Assignment returned by jovosap is not a permutation'
       stop
    end if
 
@@ -320,7 +320,7 @@ subroutine minperm_pruned(n, p, q, mask, perm, dist)
    end if
 
    if (.not. is_permutation(perm)) then
-      write (stderr, '(a)') 'Error: Assignment failed'
+      write (stderr, '(a)') 'Error: Assignment returned by jovosap is not a permutation'
       stop
    end if
 

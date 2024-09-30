@@ -219,8 +219,8 @@ fi
 
 if $test_flag; then
    # Run tests
-   run_tests fast17 jcim.2c01187/0.05 -remap -prune rd -tol 0.17
-   run_tests fastbond MOBH35-shuffled -remap -bond -bias mna
-   run_tests fastbondback MOBH35-shuffled -remap -bond -bias mna -back
-#   run_tests fastbondbackreac MOBH35-shuffled -remap -bond -back -reac
+   run_tests prune17 jcim.2c01187/0.05 -remap -prune rd -tol 0.17
+   run_tests bondbiasmna MOBH35-shuffled -remap -bond -bias mna
+   run_tests bondbiasmnaback MOBH35-shuffled -remap -bond -bias mna -back
+   run_tests bondbiasmnabackreac MOBH35-shuffled -remap -bond -bias mna -back -reac
 fi
