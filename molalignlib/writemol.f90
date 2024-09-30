@@ -16,7 +16,7 @@
 
 module writemol
 use stdio
-use types
+use molecule
 use bounds
 use strutils
 use chemdata

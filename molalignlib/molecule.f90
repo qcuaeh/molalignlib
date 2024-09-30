@@ -1,28 +1,18 @@
-module types
+module molecule
 use kinds
 use bounds
-use discrete
-use rotation
+use setutils
+use partition
+use permutation
 use translation
+use rotation
 use adjacency
 use alignment
 use strutils
 use chemdata
+
 implicit none
 private
-
-type, public :: t_atomlist
-   integer, allocatable :: atomidcs(:)
-end type
-
-type, public :: t_partition
-   type(t_atomlist), allocatable :: parts(:)
-   integer, allocatable :: atom_order(:)
-   integer, allocatable :: atom_mapping(:)
-contains
-   procedure :: init => partition_init
-   procedure :: get_lenlist => partition_lenlist
-end type
 
 type, public :: t_atom
    integer :: elnum
@@ -80,7 +70,7 @@ contains
    procedure :: get_weights
    procedure :: get_coords
    procedure :: get_nadjs
-   procedure :: get_adjlists
+   procedure :: get_oldadjlists
    procedure :: get_adjmat
    procedure :: get_nadjmnatypes
    procedure :: get_adjmnatypepartlens
@@ -94,7 +84,7 @@ contains
    procedure :: get_sorted_weights
    procedure :: get_sorted_coords
    procedure :: get_sorted_nadjs
-   procedure :: get_sorted_adjlists
+   procedure :: get_sorted_oldadjlists
    procedure :: get_sorted_adjmat
    procedure :: get_sorted_nadjmnatypes
    procedure :: get_sorted_adjmnatypepartlens
@@ -178,7 +168,7 @@ subroutine permutate_atoms(self, atom_order)
 
    allocate (atom_mapping(size(self%atoms)))
 
-   atom_mapping = inverse_mapping(atom_order)
+   atom_mapping = inverse_permutation(atom_order)
    self%atoms = self%atoms(atom_order(:))
    do i = 1, size(self%atoms)
       do k = 1, size(self%atoms(i)%adjlist)
@@ -267,59 +257,6 @@ subroutine set_molfrags(self, nfrag, fragidcs)
    call self%molfragpartition%init(nfrag, fragidcs)
 
 end subroutine
-
-subroutine partition_init(self, npart, partidcs)
-   class(t_partition), intent(out) :: self
-   integer, intent(in) :: npart
-   integer, intent(in) :: partidcs(:)
-   ! Local variables
-   integer :: i, p, offset
-   integer, allocatable :: n(:)
-
-   allocate (n(npart))
-   allocate (self%parts(npart))
-   allocate (self%atom_order(size(partidcs)))
-   allocate (self%atom_mapping(size(partidcs)))
-
-   n(:) = 0
-   do i = 1, size(partidcs)
-      n(partidcs(i)) = n(partidcs(i)) + 1
-   end do
-
-   do i = 1, npart
-      allocate (self%parts(i)%atomidcs(n(i)))
-   end do
-
-   n(:) = 0
-   do i = 1, size(partidcs)
-      n(partidcs(i)) = n(partidcs(i)) + 1
-      self%parts(partidcs(i))%atomidcs(n(partidcs(i))) = i
-   end do
-
-   offset = 0
-   do p = 1, size(self%parts)
-      do i = 1, size(self%parts(p)%atomidcs)
-         self%atom_order(offset + i) = self%parts(p)%atomidcs(i)
-         self%atom_mapping(self%parts(p)%atomidcs(i)) = offset + i
-      end do
-      offset = offset + size(self%parts(p)%atomidcs)
-   end do
-
-end subroutine
-
-function partition_lenlist(self) result(lenlist)
-   class(t_partition), intent(in) :: self
-   ! Local variables
-   integer :: i
-   integer, allocatable :: lenlist(:)
-
-   allocate (lenlist(size(self%parts)))
-
-   do i = 1, size(self%parts)
-      lenlist(i) = size(self%parts(i)%atomidcs)
-   end do
-
-end function
 
 function get_mnatypeparts(self) result(parts)
    class(t_mol), intent(in) :: self
@@ -551,7 +488,7 @@ function get_sorted_nadjs(self) result(nadjs)
 
 end function
 
-function get_adjlists(self) result(adjlists)
+function get_oldadjlists(self) result(adjlists)
    class(t_mol), intent(in) :: self
    ! Local variables
    integer :: i
@@ -565,7 +502,7 @@ function get_adjlists(self) result(adjlists)
 
 end function
 
-function get_sorted_adjlists(self) result(adjlists)
+function get_sorted_oldadjlists(self) result(adjlists)
    class(t_mol), intent(in) :: self
    ! Local variables
    integer :: i
@@ -580,28 +517,6 @@ function get_sorted_adjlists(self) result(adjlists)
    end do
 
 end function
-
-!function get_sorted_adjlists(self) result(adjlists)
-!   class(t_mol), intent(in) :: self
-!   ! Local variables
-!   integer :: i, p, offset
-!   type(t_atom) :: atom
-!   integer, allocatable :: adjlistpart(:)
-!   integer, allocatable :: adjlists(:, :)
-!
-!   allocate (adjlists(maxcoord, size(self%atoms)))
-!
-!   do i = 1, size(self%atoms)
-!      atom = self%atoms(self%mnatypepartition%atom_order(i))
-!      offset = 0
-!      do p = 1, size(self%mnatypepartition%parts)
-!         adjlistpart = intersection(atom%adjlist, self%mnatypepartition%parts(p)%atomidcs, size(self%atoms))
-!         adjlists(offset+1:offset+size(adjlistpart), i) = self%mnatypepartition%atom_mapping(adjlistpart)
-!         offset = offset + size(adjlistpart)
-!      end do
-!   end do
-!
-!end function
 
 function get_newadjlists(self) result(adjlists)
    class(t_mol), intent(in) :: self
@@ -627,6 +542,27 @@ function get_sorted_newadjlists(self) result(adjlists)
 
    do i = 1, size(self%atoms)
       adjlists(i)%atomidcs = self%mnatypepartition%atom_mapping(self%atoms(self%mnatypepartition%atom_order(i))%adjlist)
+   end do
+
+end function
+
+function get_sorted_neweradjlists(self) result(adjlists)
+   class(t_mol), intent(in) :: self
+   ! Local variables
+   integer :: i, p, offset
+   type(t_atom) :: atom
+   integer, allocatable :: adjlistpart(:)
+   type(t_atomlist), allocatable :: adjlists(:)
+
+   do i = 1, size(self%atoms)
+      atom = self%atoms(self%mnatypepartition%atom_order(i))
+      allocate (adjlists(i)%atomidcs(size(atom%adjlist)))
+      offset = 0
+      do p = 1, size(self%mnatypepartition%parts)
+         adjlistpart = intersection(atom%adjlist, self%mnatypepartition%parts(p)%atomidcs, size(self%atoms))
+         adjlists(i)%atomidcs(offset+1:offset+size(adjlistpart)) = self%mnatypepartition%atom_mapping(adjlistpart)
+         offset = offset + size(adjlistpart)
+      end do
    end do
 
 end function

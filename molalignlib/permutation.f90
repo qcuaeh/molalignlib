@@ -14,14 +14,14 @@
 ! You should have received a copy of the GNU General Public License
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-module discrete
+module permutation
 
 implicit none
 
 contains
 
 ! Get an identity permutation
-function identity_mapping(n) result(mapping)
+function identity_permutation(n) result(mapping)
    integer, intent(in) :: n
    ! Local variables
    integer :: i
@@ -34,54 +34,16 @@ function identity_mapping(n) result(mapping)
 end function
 
 ! Get the inverse mapping of mapping
-function inverse_mapping(mapping)
+function inverse_permutation(mapping)
    integer, intent(in) :: mapping(:)
    ! Local variables
    integer :: i
-   integer, allocatable :: inverse_mapping(:)
+   integer, allocatable :: inverse_permutation(:)
 
-   allocate (inverse_mapping(size(mapping)))
+   allocate (inverse_permutation(size(mapping)))
 
    do i = 1, size(mapping)
-      inverse_mapping(mapping(i)) = i
-   end do
-
-end function
-
-function intersection(list1, list2, hash_size)
-   integer, intent(in) :: hash_size
-   integer, intent(in) :: list1(:), list2(:)
-   ! Local variables
-   integer :: i, n
-   logical, allocatable :: hash_table(:)
-   integer, allocatable :: intersection(:)
-
-   allocate (hash_table(hash_size))
-
-   hash_table = .false.
-
-   ! Add elements in list1 to hash table
-   do i = 1, size(list1)
-      hash_table(list1(i)) = .true.
-   end do
-
-   ! Count intersection elements
-   n = 0
-   do i = 1, size(list2)
-      if (hash_table(list2(i))) then
-         n = n + 1
-      end if
-   end do
-
-   allocate (intersection(n))
-
-   ! Store intersection elements
-   n = 0
-   do i = 1, size(list2)
-      if (hash_table(list2(i))) then
-         n = n + 1
-         intersection(n) = list2(i)
-      end if
+      inverse_permutation(mapping(i)) = i
    end do
 
 end function

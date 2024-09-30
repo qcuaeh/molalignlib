@@ -16,7 +16,7 @@
 
 module readmol
 use stdio
-use types
+use molecule
 use flags
 use bounds
 use pointers

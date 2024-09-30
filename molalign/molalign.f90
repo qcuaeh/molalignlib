@@ -16,7 +16,7 @@
 
 program molalign
 use kinds
-use types
+use molecule
 use flags
 use bounds
 use pointers
@@ -27,7 +27,7 @@ use strutils
 use chemutils
 use alignment
 use adjacency
-use discrete
+use permutation
 use fileio
 use argparse
 use molalignlib
@@ -246,7 +246,7 @@ if (remap_flag) then
       call auxmol1%translate_coords(-travec0)
 
 !      mapping = maplist(:, i)
-      mapping = identity_mapping(size(mol0%atoms))
+      mapping = identity_permutation(size(mol0%atoms))
 
       adjd = get_adjd(mol0, auxmol1, mapping)
       minadjd = min(minadjd, adjd)
@@ -282,7 +282,7 @@ else
    call mol1%rotate_coords(rotquat)
    call mol1%translate_coords(-travec0)
 
-   mapping = identity_mapping(size(mol0%atoms))
+   mapping = identity_permutation(size(mol0%atoms))
 
    adjd = get_adjd(mol0, mol1, mapping)
    rmsd = get_rmsd(mol0, mol1, mapping)

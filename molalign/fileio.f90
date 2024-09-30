@@ -16,7 +16,7 @@
 
 module fileio
 use stdio
-use types
+use molecule
 use readmol
 use writemol
 use adjacency

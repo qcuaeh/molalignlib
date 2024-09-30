@@ -3,7 +3,7 @@
 module tracking
 
 use stdio
-use types
+use molecule
 use bounds
 use sorting
 
@@ -27,7 +27,7 @@ subroutine find_molfrags (mol)
    allocate (tracked(size(mol%atoms)))
 
    nadjs = mol%get_nadjs()
-   adjlists = mol%get_adjlists()
+   adjlists = mol%get_oldadjlists()
 
    ! initialization
 

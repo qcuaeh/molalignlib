@@ -17,12 +17,12 @@
 module molalignlib
 use stdio
 use kinds
-use types
+use molecule
 use bounds
 use random
 use linalg
 use sorting
-use discrete
+use permutation
 use rotation
 use translation
 use assorting
@@ -235,7 +235,7 @@ subroutine align_atoms( &
       mol0%get_weights(), &
       translated(mol0%natom, mol0%get_coords(), travec0), &
       translated(mol1%natom, mol1%get_coords(), travec1), &
-      identity_mapping(mol0%natom) &
+      identity_permutation(mol0%natom) &
    )
 
 end subroutine

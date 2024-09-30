@@ -2,7 +2,7 @@
 module backtracking
 use stdio
 use sorting
-use discrete
+use permutation
 use adjacency
 use alignment
 use random
@@ -65,7 +65,7 @@ subroutine minadjdiff (natom, weights, neltype, eltypepartlens, coords0, nadjs0,
 
    ntrack = 0
    tracked(:) = .false.
-   unmapping = inverse_mapping(mapping)
+   unmapping = inverse_permutation(mapping)
    moldiff = adjacencydiff (natom, adjmat0, adjmat1, mapping)
    moldist = squaredist (natom, weights, coords0, coords1, mapping)
 

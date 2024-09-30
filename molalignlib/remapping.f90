@@ -16,20 +16,20 @@
 
 module remapping
 use kinds
-use types
+use molecule
 use flags
 use bounds
 use strutils
-use discrete
-use adjacency
-use rotation
+use permutation
 use translation
-use backtracking
-use assignment
+use rotation
 use alignment
+use assignment
+use adjacency
 use assorting
-use printing
 use biasing
+use backtracking
+use printing
 
 implicit none
 
@@ -93,8 +93,8 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 
    nadjs0 = mol0%get_sorted_nadjs()
    nadjs1 = mol1%get_sorted_nadjs()
-   adjlists0 = mol0%get_sorted_adjlists()
-   adjlists1 = mol1%get_sorted_adjlists()
+   adjlists0 = mol0%get_sorted_oldadjlists()
+   adjlists1 = mol1%get_sorted_oldadjlists()
 
    nmnatype0 = mol0%get_nmnatype()
    nmnatype1 = mol1%get_nmnatype()
@@ -114,7 +114,7 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 
    ! Calculate MNA equivalence matrix
 
-   call calcequivmat(mol0, mol1, nadjmna0, adjmnalen0, adjmnalist0, nadjmna1, &
+   call assess_equivmat(mol0, mol1, nadjmna0, adjmnalen0, adjmnalist0, nadjmna1, &
          adjmnalen1, adjmnalist1, equivmat)
 
    ! Calculate bias matrix
@@ -288,7 +288,7 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
    mnatypeparts1 = mol1%get_mnatypeparts()
    molfragparts0 = mol0%get_molfragparts()
    molfragparts1 = mol1%get_molfragparts()
-   unmapping = inverse_mapping(mapping)
+   unmapping = inverse_permutation(mapping)
 
    ! Remove mismatched bonds
 

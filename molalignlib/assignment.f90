@@ -18,8 +18,8 @@ module assignment
 use stdio
 use kinds
 use bounds
-use lapkm
-use lapjv
+use lap_dense
+use lap_sparse
 
 implicit none
 

@@ -1,8 +1,8 @@
-module lapjv
+module lap_sparse
 use iso_fortran_env, only: int64
 use kinds
 use stdio
-use discrete
+use permutation
 implicit none
 private
 public minperm_nearest
