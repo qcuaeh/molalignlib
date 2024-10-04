@@ -29,6 +29,7 @@ use assorting
 use adjacency
 use alignment
 use remapping
+use reactivity
 use assignment
 use writemol
 use biasing

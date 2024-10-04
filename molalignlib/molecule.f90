@@ -546,7 +546,7 @@ function get_sorted_newadjlists(self) result(adjlists)
 
 end function
 
-function get_sorted_neweradjlists(self) result(adjlists)
+function get_adjpartitions(self) result(adjlists)
    class(t_mol), intent(in) :: self
    ! Result variable
    type(t_partition), allocatable :: adjlists(:)
