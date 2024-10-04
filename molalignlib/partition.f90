@@ -23,7 +23,7 @@ subroutine partition_init(self, npart, partidcs)
    integer, intent(in) :: npart
    integer, intent(in) :: partidcs(:)
    ! Local variables
-   integer :: i, p, offset
+   integer :: h, i, offset
    integer, allocatable :: n(:)
 
    allocate (n(npart))
@@ -47,12 +47,12 @@ subroutine partition_init(self, npart, partidcs)
    end do
 
    offset = 0
-   do p = 1, size(self%parts)
-      do i = 1, size(self%parts(p)%atomidcs)
-         self%atom_order(offset + i) = self%parts(p)%atomidcs(i)
-         self%atom_mapping(self%parts(p)%atomidcs(i)) = offset + i
+   do h = 1, size(self%parts)
+      do i = 1, size(self%parts(h)%atomidcs)
+         self%atom_order(offset + i) = self%parts(h)%atomidcs(i)
+         self%atom_mapping(self%parts(h)%atomidcs(i)) = offset + i
       end do
-      offset = offset + size(self%parts(p)%atomidcs)
+      offset = offset + size(self%parts(h)%atomidcs)
    end do
 
 end subroutine

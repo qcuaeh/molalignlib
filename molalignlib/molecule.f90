@@ -548,20 +548,20 @@ end function
 
 function get_sorted_neweradjlists(self) result(adjlists)
    class(t_mol), intent(in) :: self
+   ! Result variable
+   type(t_partition), allocatable :: adjlists(:)
    ! Local variables
-   integer :: i, p, offset
+   integer :: h, i
    type(t_atom) :: atom
    integer, allocatable :: adjlistpart(:)
-   type(t_atomlist), allocatable :: adjlists(:)
 
    do i = 1, size(self%atoms)
       atom = self%atoms(self%mnatypepartition%atom_order(i))
-      allocate (adjlists(i)%atomidcs(size(atom%adjlist)))
-      offset = 0
-      do p = 1, size(self%mnatypepartition%parts)
-         adjlistpart = intersection(atom%adjlist, self%mnatypepartition%parts(p)%atomidcs, size(self%atoms))
-         adjlists(i)%atomidcs(offset+1:offset+size(adjlistpart)) = self%mnatypepartition%atom_mapping(adjlistpart)
-         offset = offset + size(adjlistpart)
+      allocate (adjlists(i)%parts(size(self%mnatypepartition%parts)))
+      do h = 1, size(self%mnatypepartition%parts)
+         adjlistpart = intersection(atom%adjlist, self%mnatypepartition%parts(h)%atomidcs, size(self%atoms))
+         allocate (adjlists(i)%parts(h)%atomidcs(size(adjlistpart)))
+         adjlists(i)%parts(h)%atomidcs = self%mnatypepartition%atom_mapping(adjlistpart)
       end do
    end do
 

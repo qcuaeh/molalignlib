@@ -114,7 +114,7 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 
    ! Calculate MNA equivalence matrix
 
-   call assess_equivmat(mol0, mol1, nadjmna0, adjmnalen0, adjmnalist0, nadjmna1, &
+   call fill_equivmat(mol0, mol1, nadjmna0, adjmnalen0, adjmnalist0, nadjmna1, &
          adjmnalen1, adjmnalist1, equivmat)
 
    ! Calculate bias matrix

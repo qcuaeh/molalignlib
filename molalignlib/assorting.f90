@@ -29,10 +29,10 @@ implicit none
 
 contains
 
+! Group atoms by atomic number and label
 subroutine assort_atoms(mol)
-! Group atoms by atomic numbers and types
    type(t_mol), intent(inout) :: mol
-
+   ! Local variables
    integer :: i, j
    integer :: neltype
    integer :: eltypes(mol%natom)
@@ -40,10 +40,7 @@ subroutine assort_atoms(mol)
    integer, dimension(mol%natom) :: elnums, labels
    integer, dimension(mol%natom) :: blockelnums, blocklabels
    integer, dimension(mol%natom) :: foreorder, backorder
-
 !   real(rk), allocatable :: weights(:)
-
-   ! Initialization
 
    neltype = 0
    remaining = .true.
@@ -51,18 +48,13 @@ subroutine assort_atoms(mol)
    labels = mol%get_labels()
 !   weights = mol%get_weights()
 
-   ! Create block list
-
    do i = 1, mol%natom
-
       if (remaining(i)) then
-
          neltype = neltype + 1
          eltypes(i) = neltype
          blockelnums(neltype) = elnums(i)
          blocklabels(neltype) = labels(i)
          remaining(i) = .false.
-
          do j = 1, mol%natom
             if (remaining(j)) then
                if (elnums(i) == elnums(j) .and. labels(i) == labels(j)) then
@@ -78,19 +70,15 @@ subroutine assort_atoms(mol)
                end if
             end if
          end do
-
       end if
-
    end do
 
    ! Order parts by atom tag
-
    foreorder(:neltype) = sorted_order(blocklabels, neltype)
    backorder(:neltype) = inverse_permutation(foreorder(:neltype))
    eltypes = backorder(eltypes)
 
    ! Order parts by atomic number
-
    foreorder(:neltype) = sorted_order(blockelnums, neltype)
    backorder(:neltype) = inverse_permutation(foreorder(:neltype))
    eltypes = backorder(eltypes)
@@ -99,10 +87,10 @@ subroutine assort_atoms(mol)
 
 end subroutine
 
+! Assort atoms by MNA type at infinite level
 subroutine set_equiv_atoms(mol)
-! Group atoms by MNA type at infinite level
    type(t_mol), intent(inout) :: mol
-
+   ! Local variables
    integer :: i, natom, nintype, ntype
    integer, allocatable, dimension(:) :: intypes, types, typemap
    integer, allocatable, dimension(:) :: foreorder, backorder
@@ -113,8 +101,6 @@ subroutine set_equiv_atoms(mol)
    allocate (foreorder(size(mol%atoms)))
    allocate (backorder(size(mol%atoms)))
 
-   ! Initialization
-
    nintype = mol%get_neltype()
    intypes = mol%get_eltypes()
    typemap(:nintype) = [(i, i=1, nintype)]
@@ -123,14 +109,11 @@ subroutine set_equiv_atoms(mol)
    ! Determine MNA types iteratively
 
    do
-
-      call assess_mnatypes(adjlists, nintype, ntype, intypes, types, typemap)
-
+      call find_mnatypes(adjlists, nintype, ntype, intypes, types, typemap)
+      ! Exit the loop if types are unchanged
       if (all(types == intypes)) exit
-
       nintype = ntype
       intypes = types
-
    end do
 
    foreorder(:ntype) = sorted_order(typemap, ntype)
@@ -141,10 +124,10 @@ subroutine set_equiv_atoms(mol)
 
 end subroutine
 
+! Assort neighbors by MNA type
 subroutine assort_neighbors(mol)
-! Categorize atoms by eqtypes
    type(t_mol), intent(inout) :: mol
-
+   ! Local variables
    integer :: i, h
    integer :: nadjs(mol%natom), adjlists(maxcoord, mol%natom)
    integer :: nadjmnatypes(mol%natom), adjmnatypepartlens(maxcoord, mol%natom)
@@ -165,13 +148,14 @@ subroutine assort_neighbors(mol)
 
 end subroutine
 
-subroutine assess_mnatypes(adjlists, nintype, ntype, intypes, types, typemap)
+! Find next level MNA types
+subroutine find_mnatypes(adjlists, nintype, ntype, intypes, types, typemap)
    type(t_atomlist), intent(in) :: adjlists(:)
    integer, intent(in) :: nintype
    integer, dimension(:), intent(in) :: intypes
    integer, intent(out) :: ntype
    integer, dimension(:), intent(out) :: types, typemap
-
+   ! Local variables
    integer :: i, j
    logical :: untyped(size(adjlists))
    integer :: parentype(size(adjlists))
@@ -201,14 +185,15 @@ subroutine assess_mnatypes(adjlists, nintype, ntype, intypes, types, typemap)
 
 end subroutine
 
-subroutine assess_crossmnatypes(adjlists0, adjlists1, nintype, intypes0, intypes1, &
+! Find next level cross MNA types between mol0 and mol1
+subroutine find_crossmnatypes(adjlists0, adjlists1, nintype, intypes0, intypes1, &
       ntype, types0, types1)
    type(t_atomlist), dimension(:), intent(in) :: adjlists0, adjlists1
    integer, intent(in) :: nintype
    integer, dimension(:), intent(in) :: intypes0, intypes1
    integer, intent(out) :: ntype
    integer, dimension(:), intent(out) :: types0, types1
-
+   ! Local variables
    integer :: h, i, j
    logical :: untyped(size(adjlists0))
    integer :: archeatom(size(adjlists0))
@@ -268,43 +253,39 @@ subroutine assess_crossmnatypes(adjlists0, adjlists1, nintype, intypes0, intypes
 
 end subroutine
 
-subroutine group_by(items, itemtypes, ngroup, grouplens, groupidcs)
 ! Group atoms by types
-    integer, intent(out) :: ngroup
-    integer, dimension(:), intent(in) :: itemtypes, items
-    integer, dimension(:), intent(out) :: groupidcs, grouplens
+subroutine group_by(items, itemtypes, ngroup, grouplens, groupidcs)
+   integer, intent(out) :: ngroup
+   integer, dimension(:), intent(in) :: itemtypes, items
+   integer, dimension(:), intent(out) :: groupidcs, grouplens
+   ! Local variables
+   integer :: i, j
+   integer, dimension(maxcoord) :: grouptype
+   logical, dimension(maxcoord) :: remaining
+   integer, dimension(maxcoord) :: foreorder, backorder
 
-    integer :: i, j
-    integer, dimension(maxcoord) :: grouptype
-    logical, dimension(maxcoord) :: remaining
-    integer, dimension(maxcoord) :: foreorder, backorder
+   ngroup = 0
+   remaining = .true.
 
-! Initialization
+   do i = 1, size(items)
+       if (remaining(i)) then
+           ngroup = ngroup + 1
+           grouplens(ngroup) = 1
+           grouptype(ngroup) = itemtypes(items(i))
+           groupidcs(i) = ngroup
+           do j = i + 1, size(items)
+               if (remaining(i)) then
+                   if (itemtypes(items(j)) == itemtypes(items(i))) then
+                       groupidcs(j) = ngroup
+                       grouplens(ngroup) = grouplens(ngroup) + 1
+                       remaining(j) = .false.
+                   end if
+               end if
+           end do
+       end if
+   end do
 
-    ngroup = 0
-    remaining = .true.
-
-! Create group lists
-
-    do i = 1, size(items)
-        if (remaining(i)) then
-            ngroup = ngroup + 1
-            grouplens(ngroup) = 1
-            grouptype(ngroup) = itemtypes(items(i))
-            groupidcs(i) = ngroup
-            do j = i + 1, size(items)
-                if (remaining(i)) then
-                    if (itemtypes(items(j)) == itemtypes(items(i))) then
-                        groupidcs(j) = ngroup
-                        grouplens(ngroup) = grouplens(ngroup) + 1
-                        remaining(j) = .false.
-                    end if
-                end if
-            end do
-        end if
-    end do
-
-! Order groups by category type 
+! Order groups by type 
 
     foreorder(:ngroup) = sorted_order(grouptype, ngroup)
     backorder(:ngroup) = inverse_permutation(foreorder(:ngroup))
@@ -314,12 +295,14 @@ subroutine group_by(items, itemtypes, ngroup, grouplens, groupidcs)
 
 end subroutine
 
+! Test if adjacent atoms to a pair of atoms in mol0 and mol1 are the same
 function same_adjacency(neltype, atomtype0, adjlist0, atomtype1, adjlist1) result(sameadj)
    integer, intent(in) :: neltype
    integer, dimension(:), intent(in) :: adjlist0, adjlist1
    integer, dimension(:) :: atomtype0, atomtype1
+   ! Result variable
    logical :: sameadj
-
+   ! Local variables
    integer :: i0, i1
    integer, dimension(neltype) :: n0, n1
 
@@ -330,7 +313,7 @@ function same_adjacency(neltype, atomtype0, adjlist0, atomtype1, adjlist1) resul
       return
    end if
 
-!   If coordination number is the same check if coordinated atoms are the same
+!  Find if adjacent atoms are the same
 
    n0(:) = 0
    n1(:) = 0
@@ -350,9 +333,9 @@ function same_adjacency(neltype, atomtype0, adjlist0, atomtype1, adjlist1) resul
 
 end function
 
-subroutine assess_equivmat(mol0, mol1, nadjmna0, adjmnalen0, adjmnalist0, &
-   nadjmna1, adjmnalen1, adjmnalist1, equivmat)
 ! Calculate the maximum common MNA level for all atom cross assignments
+subroutine fill_equivmat(mol0, mol1, nadjmna0, adjmnalen0, adjmnalist0, &
+   nadjmna1, adjmnalen1, adjmnalist1, equivmat)
    type(t_mol), intent(in) :: mol0, mol1
 
    integer, dimension(:, :), intent(out) :: nadjmna0, nadjmna1
@@ -405,7 +388,7 @@ subroutine assess_equivmat(mol0, mol1, nadjmna0, adjmnalen0, adjmnalist0, &
          adjmnalist1(:size(adjlists1(i)%atomidcs), i, level) = adjlists1(i)%atomidcs(atomorder(:size(adjlists1(i)%atomidcs)))
       end do
 
-      call assess_crossmnatypes(adjlists0, adjlists1, nintype, intypes0, intypes1, ntype, types0, types1)
+      call find_crossmnatypes(adjlists0, adjlists1, nintype, intypes0, intypes1, ntype, types0, types1)
 
       if (all(types0 == intypes0) .and. all(types1 == intypes1)) exit
 
