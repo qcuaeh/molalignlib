@@ -24,7 +24,7 @@ use lap_sparse
 implicit none
 
 private
-public assign_atoms_function
+public assign_atoms
 public assign_atoms_nearest
 public assign_atoms_pruned
 public assign_atoms_biased
@@ -48,7 +48,7 @@ abstract interface
    end subroutine
 end interface
 
-procedure(f_assign), pointer :: assign_atoms_function
+procedure(f_assign), pointer :: assign_atoms
 
 contains
 

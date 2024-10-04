@@ -23,33 +23,40 @@ use sorting
 implicit none
 
 abstract interface
-   subroutine f_cross(natom, neltype, eltypepartlens, coords0, coords1, equivmat, prunemat, biasmat)
+   subroutine f_bias(natom, neltype, eltypepartlens, coords0, coords1, equivmat, biasmat)
+      use kinds
+      integer, intent(in) :: natom, neltype
+      integer, dimension(:), intent(in) :: eltypepartlens
+      real(rk), dimension(:, :), intent(in) :: coords0, coords1
+      integer, dimension(:, :), intent(in) :: equivmat
+      real(rk), dimension(:, :), intent(out) :: biasmat
+   end subroutine
+end interface
+
+abstract interface
+   subroutine f_prune(natom, neltype, eltypepartlens, coords0, coords1, equivmat, prunemat)
       use kinds
       integer, intent(in) :: natom, neltype
       integer, dimension(:), intent(in) :: eltypepartlens
       real(rk), dimension(:, :), intent(in) :: coords0, coords1
       integer, dimension(:, :), intent(in) :: equivmat
       logical, dimension(:, :), intent(out) :: prunemat
-      real(rk), dimension(:, :), intent(out) :: biasmat
    end subroutine
 end interface
 
 real(rk) :: bias_tol
 real(rk) :: bias_scale
-real(rk) :: bias_ratio
 
-procedure(f_cross), pointer :: cross_function
+procedure(f_bias), pointer :: bias_procedure
+procedure(f_prune), pointer :: prune_procedure
 
 contains
 
-subroutine cross_none(natom, neltype, eltypepartlens, coords0, coords1, equivmat, prunemat, biasmat)
-! Purpose: Set biases from sorted neighbors' distances equivalence
-
+subroutine bias_none(natom, neltype, eltypepartlens, coords0, coords1, equivmat, biasmat)
    integer, intent(in) :: natom, neltype
    integer, dimension(:), intent(in) :: eltypepartlens
    real(rk), dimension(:, :), intent(in) :: coords0, coords1
    integer, dimension(:, :), intent(in) :: equivmat
-   logical, dimension(:, :), intent(out) :: prunemat
    real(rk), dimension(:, :), intent(out) :: biasmat
 
    integer :: h, i, j, offset
@@ -59,7 +66,28 @@ subroutine cross_none(natom, neltype, eltypepartlens, coords0, coords1, equivmat
    do h = 1, neltype
       do i = offset + 1, offset + eltypepartlens(h)
          do j = offset + 1, offset + eltypepartlens(h)
-            biasmat(j, i) = 0
+            biasmat(j, i) = 0.
+         end do
+      end do
+      offset = offset + eltypepartlens(h)
+   end do
+
+end subroutine
+
+subroutine prune_none(natom, neltype, eltypepartlens, coords0, coords1, equivmat, prunemat)
+   integer, intent(in) :: natom, neltype
+   integer, dimension(:), intent(in) :: eltypepartlens
+   real(rk), dimension(:, :), intent(in) :: coords0, coords1
+   integer, dimension(:, :), intent(in) :: equivmat
+   logical, dimension(:, :), intent(out) :: prunemat
+
+   integer :: h, i, j, offset
+
+   offset = 0
+
+   do h = 1, neltype
+      do i = offset + 1, offset + eltypepartlens(h)
+         do j = offset + 1, offset + eltypepartlens(h)
             prunemat(j, i) = .true.
          end do
       end do
@@ -68,15 +96,12 @@ subroutine cross_none(natom, neltype, eltypepartlens, coords0, coords1, equivmat
 
 end subroutine
 
-subroutine cross_prune_rd(natom, neltype, eltypepartlens, coords0, coords1, equivmat, prunemat, biasmat)
-! Purpose: Set biases from sorted neighbors' distances equivalence
-
+subroutine prune_rd(natom, neltype, eltypepartlens, coords0, coords1, equivmat, prunemat)
    integer, intent(in) :: natom, neltype
    integer, dimension(:), intent(in) :: eltypepartlens
    real(rk), dimension(:, :), intent(in) :: coords0, coords1
    integer, dimension(:, :), intent(in) :: equivmat
    logical, dimension(:, :), intent(out) :: prunemat
-   real(rk), dimension(:, :), intent(out) :: biasmat
 
    integer :: h, i, j, offset
    real(rk), allocatable :: d0(:, :), d1(:, :)
@@ -122,14 +147,11 @@ subroutine cross_prune_rd(natom, neltype, eltypepartlens, coords0, coords1, equi
 
 end subroutine
 
-subroutine cross_bias_mna(natom, neltype, eltypepartlens, coords0, coords1, equivmat, prunemat, biasmat)
-! Purpose: Set biases from sorted distances to neighbors equivalence
-
+subroutine bias_mna(natom, neltype, eltypepartlens, coords0, coords1, equivmat, biasmat)
    integer, intent(in) :: natom, neltype
    integer, dimension(:), intent(in) :: eltypepartlens
    real(rk), dimension(:, :), intent(in) :: coords0, coords1
    integer, dimension(:, :), intent(in) :: equivmat
-   logical, dimension(:, :), intent(out) :: prunemat
    real(rk), dimension(:, :), intent(out) :: biasmat
    integer :: h, i, j, offset, maxequiv
 
@@ -149,7 +171,6 @@ subroutine cross_bias_mna(natom, neltype, eltypepartlens, coords0, coords1, equi
    do h = 1, neltype
       do i = offset + 1, offset + eltypepartlens(h)
          do j = offset + 1, offset + eltypepartlens(h)
-!            biasmat(j, i) = bias_scale**2*bias_ratio**(equivmat(j, i))
             biasmat(j, i) = bias_scale**2*(maxequiv - equivmat(j, i))
          end do
       end do

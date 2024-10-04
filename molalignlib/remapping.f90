@@ -84,9 +84,10 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
    call fill_equivmat(mol0, mol1, nadjmna0, adjmnalen0, adjmnalist0, nadjmna1, &
          adjmnalen1, adjmnalist1, equivmat)
 
-   ! Calculate bias matrix
+   ! Calculate bias and prune matrices
 
-   call cross_function(natom, neltype, eltypepartlens, coords0, coords1, equivmat, prunemat, biasmat)
+   call bias_procedure(natom, neltype, eltypepartlens, coords0, coords1, equivmat, biasmat)
+   call prune_procedure(natom, neltype, eltypepartlens, coords0, coords1, equivmat, prunemat)
 
    ! Initialize loop variables
 
@@ -112,7 +113,7 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
 
       ! Minimize the euclidean distance
 
-      call assign_atoms_function(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
+      call assign_atoms(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
          nadjmna1, adjmnalen1, adjmnalist1, workcoords1, weights, equivmat, prunemat, biasmat, mapping)
       rotquat = leastrotquat(natom, weights, coords0, workcoords1, mapping)
       prodquat = rotquat
@@ -122,7 +123,7 @@ subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
       steps = 1
 
       do while (iter_flag)
-         call assign_atoms_function(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
+         call assign_atoms(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
             nadjmna1, adjmnalen1, adjmnalist1, workcoords1, weights, equivmat, prunemat, biasmat, newmapping)
          if (all(newmapping == mapping)) exit
          rotquat = leastrotquat(natom, weights, coords0, workcoords1, newmapping)

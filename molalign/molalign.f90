@@ -78,8 +78,9 @@ bias_scale = 1.e3
 
 weight_func => unity
 print_stats => print_stats_dist
-cross_function => cross_none
-assign_atoms_function => assign_atoms_pruned
+assign_atoms => assign_atoms_pruned
+bias_procedure => bias_none
+prune_procedure => prune_none
 
 posargs(1)%var => pathin1
 posargs(2)%var => pathin2
@@ -100,26 +101,27 @@ do while (get_arg(arg))
       remap_flag = .true.
    case ('-near')
       iter_flag = .false.
-      cross_function => cross_none
-      assign_atoms_function => assign_atoms_nearest
+      bias_procedure => bias_none
+      prune_procedure => prune_none
+      assign_atoms => assign_atoms_nearest
    case ('-bias')
       iter_flag = .true.
-      assign_atoms_function => assign_atoms_biased
+      assign_atoms => assign_atoms_biased
       call read_optarg(arg, optarg)
       select case (optarg)
       case ('mna')
-         cross_function => cross_bias_mna
+         bias_procedure => bias_mna
       case default
          write (stderr, '(a,1x,a)') 'Error: Unknown -bias option:', optarg
          stop
       end select
    case ('-prune')
       iter_flag = .true.
-      assign_atoms_function => assign_atoms_pruned
+      assign_atoms => assign_atoms_pruned
       call read_optarg(arg, optarg)
       select case (optarg)
       case ('rd')
-         cross_function => cross_prune_rd
+         prune_procedure => prune_rd
       case default
          write (stderr, '(a,1x,a)') 'Error: Unknown -prune option:', optarg
          stop
