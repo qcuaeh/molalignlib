@@ -35,7 +35,7 @@ implicit none
 
 contains
 
-subroutine optimize_mapping(mol0, mol1, maplist, countlist, nrec)
+subroutine remap_atoms(mol0, mol1, maplist, countlist, nrec)
    type(t_mol), intent(in) :: mol0, mol1
    integer, intent(out) :: maplist(:, :)
    integer, intent(out) :: countlist(:)

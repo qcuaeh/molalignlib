@@ -217,7 +217,7 @@ if (remap_flag) then
 
    ! Remap atoms to minimize the MSD
 
-   call remap_atoms( &
+   call molecule_remap( &
       mol0, &
       mol1, &
       nrec, &
@@ -233,7 +233,7 @@ if (remap_flag) then
 
    do i = 1, nrec
 
-      call align_remapped_atoms( &
+      call remapped_molecule_align( &
          mol0, &
          mol1, &
          maplist(:, i), &
@@ -273,7 +273,7 @@ else
 
    ! Align atoms to minimize RMSD
 
-   call align_atoms( &
+   call molecule_align( &
       mol0, &
       mol1, &
       travec0, &

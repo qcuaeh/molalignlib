@@ -40,7 +40,7 @@ implicit none
 contains
 
 ! Assign atoms0 and atoms1
-subroutine remap_atoms( &
+subroutine molecule_remap( &
    mol0, &
    mol1, &
    nrec, &
@@ -108,7 +108,7 @@ subroutine remap_atoms( &
 
    ! Optimize assignment to minimize the AdjD and RMSD
 
-   call optimize_mapping(mol0, mol1, maplist, countlist, nrec)
+   call remap_atoms(mol0, mol1, maplist, countlist, nrec)
 
    ! Remove bonds from reactive sites and reoptimize assignment
 
@@ -120,7 +120,7 @@ subroutine remap_atoms( &
       call find_molfrags(mol1)
       call assort_neighbors(mol0)
       call assort_neighbors(mol1)
-      call optimize_mapping(mol0, mol1, maplist, countlist, nrec)
+      call remap_atoms(mol0, mol1, maplist, countlist, nrec)
    end if
 
    ! Restore coordinates
@@ -142,7 +142,7 @@ subroutine remap_atoms( &
 end subroutine
 
 ! Align atoms
-subroutine align_remapped_atoms( &
+subroutine remapped_molecule_align( &
    mol0, &
    mol1, &
    mapping, &
@@ -178,7 +178,7 @@ subroutine align_remapped_atoms( &
 
 end subroutine
 
-subroutine align_atoms( &
+subroutine molecule_align( &
 ! Purpose: Align atoms0 and atoms1
    mol0, &
    mol1, &
