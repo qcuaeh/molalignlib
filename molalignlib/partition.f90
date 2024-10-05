@@ -2,13 +2,19 @@ module partition
 
 implicit none
 private
+public make_partition
 
-type, public :: t_atomlist
+type, public :: atomlist_type
    integer, allocatable :: atomidcs(:)
 end type
 
-type, public :: t_partition
-   type(t_atomlist), allocatable :: parts(:)
+type, public :: atompartition_type
+   integer :: natom
+   type(atomlist_type), allocatable :: subsets(:)
+end type
+
+type, public :: partition_type
+   type(atomlist_type), allocatable :: parts(:)
    integer, allocatable :: atom_order(:)
    integer, allocatable :: atom_mapping(:)
 contains
@@ -18,8 +24,34 @@ end type
 
 contains
 
+function make_partition(typepops, atomtypes) result(partition)
+   integer, intent(in) :: typepops(:)
+   integer, intent(in) :: atomtypes(:)
+   ! Result variable
+   type(atompartition_type) :: partition
+   ! Local variables
+   integer :: i
+   integer, allocatable :: n(:)
+
+   allocate (n(size(typepops)))
+   allocate (partition%subsets(size(typepops)))
+
+   do i = 1, size(typepops)
+      allocate (partition%subsets(i)%atomidcs(typepops(i)))
+   end do
+
+   n(:) = 0
+   do i = 1, size(atomtypes)
+      n(atomtypes(i)) = n(atomtypes(i)) + 1
+      partition%subsets(atomtypes(i))%atomidcs(n(atomtypes(i))) = i
+   end do
+
+   partition%natom = size(atomtypes)
+
+end function
+
 subroutine partition_init(self, npart, partidcs)
-   class(t_partition), intent(out) :: self
+   class(partition_type), intent(out) :: self
    integer, intent(in) :: npart
    integer, intent(in) :: partidcs(:)
    ! Local variables
@@ -58,7 +90,7 @@ subroutine partition_init(self, npart, partidcs)
 end subroutine
 
 function partition_lenlist(self) result(lenlist)
-   class(t_partition), intent(in) :: self
+   class(partition_type), intent(in) :: self
    ! Local variables
    integer :: i
    integer, allocatable :: lenlist(:)

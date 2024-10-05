@@ -77,7 +77,7 @@ end subroutine
 subroutine readfile(unit, fmtin, mol)
    integer, intent(in) :: unit
    character(*), intent(in) :: fmtin
-   type(t_mol), intent(out) :: mol
+   type(molecule_type), intent(out) :: mol
 
    select case (fmtin)
    case ('xyz')
@@ -91,7 +91,7 @@ subroutine readfile(unit, fmtin, mol)
 
    call set_bonds(mol)
    call find_molfrags(mol)
-   call assort_atoms(mol)
+   call resolve_eltypes(mol)
    call set_equiv_atoms(mol)
    call assort_neighbors(mol)
 
@@ -105,7 +105,7 @@ subroutine writefile(unit, fmtout, mol)
 !   character(*), intent(in) :: title, fmtout
    integer, intent(in) :: unit
    character(*), intent(in) :: fmtout
-   type(t_mol), intent(in) :: mol
+   type(molecule_type), intent(in) :: mol
 
    integer :: i, j
    integer :: nbond

@@ -25,24 +25,37 @@ public sorted
 public sorted_order
 
 interface sort
+   module procedure int_sort
+   module procedure real_sort
    module procedure intquicksort
    module procedure realquicksort
 end interface
 
 interface sorted
    module procedure int_sorted
-   module procedure int_sorted_partial
-   module procedure real_sorted_partial
+   module procedure real_sorted
+   module procedure int_partsorted
+   module procedure real_partsorted
 end interface
 
 interface sorted_order
-   module procedure int_sorted_order
-   module procedure int_sorted_order_partial
-   module procedure real_sorted_order_partial
-   module procedure char_sorted_order_partial
+   module procedure int_sortorder
+   module procedure int_partsortorder
+   module procedure real_partsortorder
+   module procedure char_partsortorder
 end interface
 
 contains
+
+subroutine int_sort(x)
+   integer, intent(inout) :: x(:)
+   call intquicksort(x, 1, size(x))
+end subroutine
+
+subroutine real_sort(x)
+   real(rk), intent(inout) :: x(:)
+   call realquicksort(x, 1, size(x))
+end subroutine
 
 function int_sorted(x) result(y)
    integer, intent(in) :: x(:)
@@ -51,7 +64,14 @@ function int_sorted(x) result(y)
    call intquicksort(y, 1, size(y))
 end function
 
-function int_sorted_partial(x, n) result(y)
+function real_sorted(x) result(y)
+   real(rk), intent(in) :: x(:)
+   real(rk), allocatable :: y(:)
+   y = x(:)
+   call realquicksort(y, 1, size(y))
+end function
+
+function int_partsorted(x, n) result(y)
    integer, intent(in) :: n
    integer, intent(in) :: x(:)
    integer :: y(n)
@@ -59,7 +79,7 @@ function int_sorted_partial(x, n) result(y)
    call intquicksort(y, 1, n)
 end function
 
-function real_sorted_partial(x, n) result(y)
+function real_partsorted(x, n) result(y)
    integer, intent(in) :: n
    real(rk), intent(in) :: x(:)
    real(rk), allocatable :: y(:)
@@ -67,14 +87,14 @@ function real_sorted_partial(x, n) result(y)
    call realquicksort(y, 1, n)
 end function
 
-function int_sorted_order(x) result(o)
+function int_sortorder(x) result(o)
    integer, intent(in) :: x(:)
    integer :: i, o(size(x)), t((size(x)+1)/2)
    o = [(i, i=1, size(x))]
    call intmergesort(x, o, size(x), t)
 end function
 
-function int_sorted_order_partial(x, n) result(o)
+function int_partsortorder(x, n) result(o)
    integer, intent(in) :: n
    integer, intent(in) :: x(:)
    integer :: i, o(n), t((n+1)/2)
@@ -82,7 +102,7 @@ function int_sorted_order_partial(x, n) result(o)
    call intmergesort(x, o, n, t)
 end function
 
-function real_sorted_order_partial(x, n) result(o)
+function real_partsortorder(x, n) result(o)
    integer, intent(in) :: n
    real(rk), intent(in) :: x(:)
    integer :: i, o(n), t((n+1)/2)
@@ -90,7 +110,7 @@ function real_sorted_order_partial(x, n) result(o)
    call realmergesort(x, o, n, t)
 end function
 
-function char_sorted_order_partial(x, n) result(o)
+function char_partsortorder(x, n) result(o)
    integer, intent(in) :: n
    character(*), intent(in) :: x(:)
    integer :: i, o(n), t((n+1)/2)

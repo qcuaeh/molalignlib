@@ -31,6 +31,8 @@ use permutation
 use fileio
 use argparse
 use molalignlib
+use biasing
+use pruning
 
 implicit none
 
@@ -50,7 +52,7 @@ real(rk) :: travec0(3), travec1(3), rotquat(4)
 integer :: adjd, minadjd
 real(rk) :: rmsd, minrmsd
 type(p_char) :: posargs(2)
-type(t_mol) :: mol0, mol1, auxmol0, auxmol1
+type(molecule_type) :: mol0, mol1, auxmol0, auxmol1
 
 ! Set default options
 
@@ -73,7 +75,7 @@ maxcount = 10
 maxcoord = 16
 maxlevel = 16
 
-bias_tol = 0.5
+prune_tol = 0.5
 bias_scale = 1.e3
 
 weight_func => unity
@@ -143,7 +145,7 @@ do while (get_arg(arg))
       trial_flag = .true.
       call read_optarg(arg, maxtrials)
    case ('-tol')
-      call read_optarg(arg, bias_tol)
+      call read_optarg(arg, prune_tol)
 !      case ('-scale')
 !         call read_optarg(arg, bias_scale)
    case ('-N')

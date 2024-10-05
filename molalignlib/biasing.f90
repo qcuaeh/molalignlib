@@ -19,162 +19,147 @@ use kinds
 use flags
 use bounds
 use sorting
+use partition
+use assorting
 
 implicit none
 
 abstract interface
-   subroutine f_bias(natom, neltype, eltypepartlens, coords0, coords1, equivmat, biasmat)
+   subroutine f_bias( eltypes0, adjlists0, adjlists1, biasmat)
       use kinds
-      integer, intent(in) :: natom, neltype
-      integer, dimension(:), intent(in) :: eltypepartlens
-      real(rk), dimension(:, :), intent(in) :: coords0, coords1
-      integer, dimension(:, :), intent(in) :: equivmat
-      real(rk), dimension(:, :), intent(out) :: biasmat
+      use partition
+      type(atompartition_type), intent(in) :: eltypes0
+      type(atomlist_type), allocatable, dimension(:), intent(in) :: adjlists0, adjlists1
+      real(rk), intent(out) :: biasmat(:, :)
    end subroutine
 end interface
 
-abstract interface
-   subroutine f_prune(natom, neltype, eltypepartlens, coords0, coords1, equivmat, prunemat)
-      use kinds
-      integer, intent(in) :: natom, neltype
-      integer, dimension(:), intent(in) :: eltypepartlens
-      real(rk), dimension(:, :), intent(in) :: coords0, coords1
-      integer, dimension(:, :), intent(in) :: equivmat
-      logical, dimension(:, :), intent(out) :: prunemat
-   end subroutine
-end interface
-
-real(rk) :: bias_tol
 real(rk) :: bias_scale
-
 procedure(f_bias), pointer :: bias_procedure
-procedure(f_prune), pointer :: prune_procedure
 
 contains
 
-subroutine bias_none(natom, neltype, eltypepartlens, coords0, coords1, equivmat, biasmat)
-   integer, intent(in) :: natom, neltype
-   integer, dimension(:), intent(in) :: eltypepartlens
-   real(rk), dimension(:, :), intent(in) :: coords0, coords1
-   integer, dimension(:, :), intent(in) :: equivmat
-   real(rk), dimension(:, :), intent(out) :: biasmat
+subroutine bias_none( eltypes0, adjlists0, adjlists1, biasmat)
+   type(atompartition_type), intent(in) :: eltypes0
+   type(atomlist_type), allocatable, dimension(:), intent(in) :: adjlists0, adjlists1
+   real(rk), intent(out) :: biasmat(:, :)
+   ! Local variables
+   integer :: h, i, j
+   integer :: atomidx_i, atomidx_j
 
-   integer :: h, i, j, offset
-
-   offset = 0
-
-   do h = 1, neltype
-      do i = offset + 1, offset + eltypepartlens(h)
-         do j = offset + 1, offset + eltypepartlens(h)
-            biasmat(j, i) = 0.
+   do h = 1, size(eltypes0%subsets)
+      do i = 1, size(eltypes0%subsets(h)%atomidcs)
+         atomidx_i = eltypes0%subsets(h)%atomidcs(i)
+         do j = 1, size(eltypes0%subsets(h)%atomidcs)
+            atomidx_j = eltypes0%subsets(h)%atomidcs(j)
+            biasmat(atomidx_j, atomidx_i) = 0
          end do
       end do
-      offset = offset + eltypepartlens(h)
    end do
 
 end subroutine
 
-subroutine prune_none(natom, neltype, eltypepartlens, coords0, coords1, equivmat, prunemat)
-   integer, intent(in) :: natom, neltype
-   integer, dimension(:), intent(in) :: eltypepartlens
-   real(rk), dimension(:, :), intent(in) :: coords0, coords1
-   integer, dimension(:, :), intent(in) :: equivmat
-   logical, dimension(:, :), intent(out) :: prunemat
+subroutine bias_mna( eltypes0, adjlists0, adjlists1, biasmat)
+   type(atompartition_type), intent(in) :: eltypes0
+   type(atomlist_type), allocatable, dimension(:), intent(in) :: adjlists0, adjlists1
+   real(rk), intent(out) :: biasmat(:, :)
+   ! Local variables
+   integer :: h, i, j, maxequiv
+   integer :: atomidx_i, atomidx_j
+   integer, allocatable :: equivmat(:, :)
 
-   integer :: h, i, j, offset
-
-   offset = 0
-
-   do h = 1, neltype
-      do i = offset + 1, offset + eltypepartlens(h)
-         do j = offset + 1, offset + eltypepartlens(h)
-            prunemat(j, i) = .true.
-         end do
-      end do
-      offset = offset + eltypepartlens(h)
-   end do
-
-end subroutine
-
-subroutine prune_rd(natom, neltype, eltypepartlens, coords0, coords1, equivmat, prunemat)
-   integer, intent(in) :: natom, neltype
-   integer, dimension(:), intent(in) :: eltypepartlens
-   real(rk), dimension(:, :), intent(in) :: coords0, coords1
-   integer, dimension(:, :), intent(in) :: equivmat
-   logical, dimension(:, :), intent(out) :: prunemat
-
-   integer :: h, i, j, offset
-   real(rk), allocatable :: d0(:, :), d1(:, :)
-
-   allocate (d0(natom, natom), d1(natom, natom))
-
-   do i = 1, natom
-      offset = 0
-      do h = 1, neltype
-         do j = offset + 1, offset + eltypepartlens(h)
-            d0(j, i) = sqrt(sum((coords0(:, j) - coords0(:, i))**2))
-         end do
-         call sort(d0(:, i), offset + 1, offset + eltypepartlens(h))
-         offset = offset + eltypepartlens(h)
-      end do
-   end do
-
-   do i = 1, natom
-      offset = 0
-      do h = 1, neltype
-         do j = offset + 1, offset + eltypepartlens(h)
-            d1(j, i) = sqrt(sum((coords1(:, j) - coords1(:, i))**2))
-         end do
-         call sort(d1(:, i), offset + 1, offset + eltypepartlens(h))
-         offset = offset + eltypepartlens(h)
-      end do
-   end do
-
-   offset = 0
-
-   do h = 1, neltype
-      do i = offset + 1, offset + eltypepartlens(h)
-         do j = offset + 1, offset + eltypepartlens(h)
-            if (all(abs(d1(:, j) - d0(:, i)) < bias_tol)) then
-               prunemat(j, i) = .true.
-            else
-               prunemat(j, i) = .false.
-            end if
-         end do
-      end do
-      offset = offset + eltypepartlens(h)
-   end do
-
-end subroutine
-
-subroutine bias_mna(natom, neltype, eltypepartlens, coords0, coords1, equivmat, biasmat)
-   integer, intent(in) :: natom, neltype
-   integer, dimension(:), intent(in) :: eltypepartlens
-   real(rk), dimension(:, :), intent(in) :: coords0, coords1
-   integer, dimension(:, :), intent(in) :: equivmat
-   real(rk), dimension(:, :), intent(out) :: biasmat
-   integer :: h, i, j, offset, maxequiv
+   ! Calculate MNA equivalence matrix
+   call resolve_equivmat(eltypes0, adjlists0, adjlists1, equivmat)
 
    maxequiv = 0
-
-   offset = 0
-   do h = 1, neltype
-      do i = offset + 1, offset + eltypepartlens(h)
-         do j = offset + 1, offset + eltypepartlens(h)
-            maxequiv = max(maxequiv, equivmat(j, i))
+   do h = 1, size(eltypes0%subsets)
+      do i = 1, size(eltypes0%subsets(h)%atomidcs)
+         atomidx_i = eltypes0%subsets(h)%atomidcs(i)
+         do j = 1, size(eltypes0%subsets(h)%atomidcs)
+            atomidx_j = eltypes0%subsets(h)%atomidcs(j)
+            maxequiv = max(maxequiv, equivmat(atomidx_j, atomidx_i))
          end do
       end do
-      offset = offset + eltypepartlens(h)
    end do
 
-   offset = 0
-   do h = 1, neltype
-      do i = offset + 1, offset + eltypepartlens(h)
-         do j = offset + 1, offset + eltypepartlens(h)
-            biasmat(j, i) = bias_scale**2*(maxequiv - equivmat(j, i))
+   do h = 1, size(eltypes0%subsets)
+      do i = 1, size(eltypes0%subsets(h)%atomidcs)
+         atomidx_i = eltypes0%subsets(h)%atomidcs(i)
+         do j = 1, size(eltypes0%subsets(h)%atomidcs)
+            atomidx_j = eltypes0%subsets(h)%atomidcs(j)
+            biasmat(atomidx_j, atomidx_i) = bias_scale**2*(maxequiv - equivmat(atomidx_j, atomidx_i))
          end do
       end do
-      offset = offset + eltypepartlens(h)
+   end do
+
+end subroutine
+
+! Calculate the maximum common MNA level for all atom cross assignments
+subroutine resolve_equivmat( eltypes0, adjlists0, adjlists1, equivmat)
+   type(atompartition_type), intent(in) :: eltypes0
+   type(atomlist_type), allocatable, dimension(:), intent(in) :: adjlists0, adjlists1
+   integer, allocatable, dimension(:, :), intent(out) :: equivmat
+   ! Local variables
+   integer :: h, i, j
+   integer :: atomidx_i, atomidx_j
+   integer :: ntype, nintype, level
+   integer, dimension(maxcoord) :: indices, atomorder
+   integer, allocatable, dimension(:) :: types0, types1
+   integer, allocatable, dimension(:) :: intypes0, intypes1
+
+   allocate (equivmat(eltypes0%natom, eltypes0%natom))
+   allocate (types0(eltypes0%natom), types1(eltypes0%natom))
+   allocate (intypes0(eltypes0%natom), intypes1(eltypes0%natom))
+
+   do h = 1, size(eltypes0%subsets)
+      do i = 1, size(eltypes0%subsets(h)%atomidcs)
+         atomidx_i = eltypes0%subsets(h)%atomidcs(i)
+         intypes0(atomidx_i) = h
+         intypes1(atomidx_i) = h
+      end do
+   end do
+
+   level = 1
+   nintype = size(eltypes0%subsets)
+
+   do
+
+      do h = 1, size(eltypes0%subsets)
+         do i = 1, size(eltypes0%subsets(h)%atomidcs)
+            atomidx_i = eltypes0%subsets(h)%atomidcs(i)
+            do j = 1, size(eltypes0%subsets(h)%atomidcs)
+               atomidx_j = eltypes0%subsets(h)%atomidcs(j)
+               if (intypes0(atomidx_i) == intypes1(atomidx_j)) then
+                  equivmat(atomidx_j, atomidx_i) = level
+               end if
+            end do
+         end do
+      end do
+
+      call resolve_crossmnatypes(adjlists0, adjlists1, nintype, intypes0, intypes1, ntype, types0, types1)
+
+      if (all(types0 == intypes0) .and. all(types1 == intypes1)) exit
+
+      nintype = ntype
+      intypes0 = types0
+      intypes1 = types1
+      level = level + 1
+
+!      ! Save sorted adjacency lists adjmnalist0, adjmnalist1 sorted by MNA type at nth level
+!      ! along with number of subsets nadjmna0, nadjmna1 and subset lenghts adjmnalen0, adjmnalen1
+!
+!      do i = 1, size(adjlists0)
+!         call group_by(adjlists0(i)%atomidcs, intypes0, nadjmna0(i, level), adjmnalen0(:, i, level), indices)
+!         atomorder(:size(adjlists0(i)%atomidcs)) = sorted_order(indices, size(adjlists0(i)%atomidcs))
+!         adjmnalist0(:size(adjlists0(i)%atomidcs), i, level) = adjlists0(i)%atomidcs(atomorder(:size(adjlists0(i)%atomidcs)))
+!      end do
+!
+!      do i = 1, size(adjlists1)
+!         call group_by(adjlists1(i)%atomidcs, intypes1, nadjmna1(i, level), adjmnalen1(:, i, level), indices)
+!         atomorder(:size(adjlists1(i)%atomidcs)) = sorted_order(indices, size(adjlists1(i)%atomidcs))
+!         adjmnalist1(:size(adjlists1(i)%atomidcs), i, level) = adjlists1(i)%atomidcs(atomorder(:size(adjlists1(i)%atomidcs)))
+!      end do
+!
    end do
 
 end subroutine

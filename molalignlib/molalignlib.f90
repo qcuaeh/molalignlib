@@ -47,7 +47,7 @@ subroutine molecule_remap( &
    maplist, &
    countlist)
 
-   type(t_mol), intent(inout) :: mol0, mol1
+   type(molecule_type), intent(inout) :: mol0, mol1
    integer, intent(out) :: nrec
    integer, dimension(:, :), intent(inout) :: maplist
    integer, dimension(:), intent(inout) :: countlist
@@ -76,7 +76,7 @@ subroutine molecule_remap( &
 
    ! Abort if there are conflicting atomic types
 
-   if (any(mol0%get_sorted_eltypes() /= mol1%get_sorted_eltypes())) then
+   if (any(mol0%get_sorted_atomeltypes() /= mol1%get_sorted_atomeltypes())) then
       write (stderr, '(a)') 'Error: There are conflicting atomic types'
       stop
    end if
@@ -150,7 +150,7 @@ subroutine remapped_molecule_align( &
    travec1, &
    rotquat)
 
-   type(t_mol), intent(in) :: mol0, mol1
+   type(molecule_type), intent(in) :: mol0, mol1
    integer, intent(in) :: mapping(:)
    real(rk), intent(out) :: travec0(3), travec1(3), rotquat(4)
    ! Local variables
@@ -186,7 +186,7 @@ subroutine molecule_align( &
    travec1, &
    rotquat)
 
-   type(t_mol), intent(in) :: mol0, mol1
+   type(molecule_type), intent(in) :: mol0, mol1
    real(rk), intent(out) :: travec0(3), travec1(3), rotquat(4)
 
    ! Abort if molecules have different number of atoms
@@ -205,7 +205,7 @@ subroutine molecule_align( &
 
    ! Abort if there are conflicting atomic types
 
-   if (any(mol0%get_sorted_eltypes() /= mol1%get_sorted_eltypes())) then
+   if (any(mol0%get_sorted_atomeltypes() /= mol1%get_sorted_atomeltypes())) then
       write (stderr, '(a)') 'Error: There are conflicting atomic types'
       stop
    end if
@@ -219,7 +219,7 @@ subroutine molecule_align( &
 
    ! Abort if atomic types are not ordered
 
-   if (any(mol0%get_eltypes() /= mol1%get_eltypes())) then
+   if (any(mol0%get_atomeltypes() /= mol1%get_atomeltypes())) then
       write (stderr, '(a)') 'Error: Atomic types are not in the same order'
       stop
    end if
@@ -242,7 +242,7 @@ subroutine molecule_align( &
 end subroutine
 
 function get_rmsd(mol0, mol1, mapping) result(rmsd)
-   type(t_mol), intent(in) :: mol0, mol1
+   type(molecule_type), intent(in) :: mol0, mol1
    integer :: mapping(:)
    real(rk) :: rmsd
 
@@ -252,7 +252,7 @@ function get_rmsd(mol0, mol1, mapping) result(rmsd)
 end function
 
 function get_adjd(mol0, mol1, mapping) result(adjd)
-   type(t_mol), intent(in) :: mol0, mol1
+   type(molecule_type), intent(in) :: mol0, mol1
    integer :: mapping(:)
    integer :: adjd
 
@@ -262,7 +262,7 @@ end function
 
 function centroid(mol)
 ! Purpose: Get the centroid coordinates
-   type(t_mol), intent(in) :: mol
+   type(molecule_type), intent(in) :: mol
    ! Local variables
    integer :: i
    real(rk) :: centroid(3)

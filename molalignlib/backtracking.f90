@@ -19,7 +19,7 @@ contains
 
 ! Find best correspondence between points of graphs
 subroutine minadjdiff (mol0, mol1, mapping)
-   type(t_mol), intent(in) :: mol0, mol1
+   type(molecule_type), intent(in) :: mol0, mol1
    integer, dimension(:), intent(inout) :: mapping
 
    ! Local variables
@@ -298,7 +298,7 @@ end subroutine
 
 ! Find best correspondence between points of graphs
 subroutine eqvatomperm (mol0, mol1, workcoords1, mapping)
-   type(t_mol), intent(in) :: mol0, mol1
+   type(molecule_type), intent(in) :: mol0, mol1
    real(rk), intent(in) :: workcoords1(:, :)
    integer, intent(inout) :: mapping(:)
 

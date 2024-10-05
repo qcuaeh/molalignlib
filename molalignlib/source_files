@@ -14,6 +14,8 @@ eigen-jacobi.f90
 randlib.f90
 random-randlib.f90
 #random-builtin.f90
+lap_dense.f90
+lap_sparse.f90
 chemdata.f90
 chemutils.f90
 rotation.f90
@@ -22,11 +24,10 @@ adjacency.f90
 alignment.f90
 molecule.f90
 printing.f90
-biasing.f90
-lap_dense.f90
-lap_sparse.f90
-assignment.f90
 assorting.f90
+biasing.f90
+pruning.f90
+assignment.f90
 tracking.f90
 backtracking.f90
 remapping.f90

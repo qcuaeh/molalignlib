@@ -28,6 +28,7 @@ use assignment
 use adjacency
 use assorting
 use biasing
+use pruning
 use backtracking
 use printing
 
@@ -36,7 +37,7 @@ implicit none
 contains
 
 subroutine remap_atoms(mol0, mol1, maplist, countlist, nrec)
-   type(t_mol), intent(in) :: mol0, mol1
+   type(molecule_type), intent(in) :: mol0, mol1
    integer, intent(out) :: maplist(:, :)
    integer, intent(out) :: countlist(:)
    integer, intent(out) :: nrec
@@ -44,8 +45,6 @@ subroutine remap_atoms(mol0, mol1, maplist, countlist, nrec)
    ! Local variables
 
    integer :: natom
-   integer :: neltype
-   integer, dimension(mol0%natom) :: eltypepartlens
    logical, dimension(:, :), allocatable :: adjmat0, adjmat1
    real(rk), dimension(:, :), allocatable :: coords0, coords1
    real(rk), dimension(:), allocatable :: weights
@@ -53,7 +52,6 @@ subroutine remap_atoms(mol0, mol1, maplist, countlist, nrec)
    logical :: visited, overflow
    integer :: irec, krec, ntrial, nstep, steps
    integer :: adjd, recadjd(maxrec)
-   integer :: equivmat(mol0%natom, mol1%natom)
    integer, dimension(mol0%natom) :: mapping, newmapping
    real(rk) :: rmsd, totalrot
    real(rk), dimension(4) :: rotquat, prodquat
@@ -62,32 +60,36 @@ subroutine remap_atoms(mol0, mol1, maplist, countlist, nrec)
    real(rk) :: biasmat(mol0%natom, mol1%natom)
    real(rk) :: workcoords1(3, mol1%natom)
 
-   integer, dimension(mol0%natom, maxlevel) :: nadjmna0
-   integer, dimension(mol1%natom, maxlevel) :: nadjmna1
-   integer, dimension(maxcoord, mol0%natom, maxlevel) :: adjmnalen0
-   integer, dimension(maxcoord, mol1%natom, maxlevel) :: adjmnalen1
-   integer, dimension(maxcoord, mol0%natom, maxlevel) :: adjmnalist0
-   integer, dimension(maxcoord, mol1%natom, maxlevel) :: adjmnalist1
+   integer, allocatable, dimension(:) :: eltypepops0
+   integer, allocatable, dimension(:) :: atomeltypes0
+   type(atompartition_type), allocatable :: eltypes0
+   type(atomlist_type), allocatable, dimension(:) :: adjlists0, adjlists1
 
-   natom = mol0%natom
-   neltype = mol0%get_neltype()
-   eltypepartlens = mol0%get_eltypepartlens()
+   natom = mol0%get_natom()
 
-   adjmat0 = mol0%get_sorted_adjmat()
-   adjmat1 = mol1%get_sorted_adjmat()
+   eltypepops0 = mol0%get_eltypepops()
+   atomeltypes0 = mol0%get_sorted_atomeltypes()
+   eltypes0 = make_partition(eltypepops0, atomeltypes0)
+
+!   eltypepops1 = mol1%get_eltypepops()
+!   atomeltypes1 = mol1%get_sorted_atomeltypes()
+!   eltypesubsets1 = make_partition(eltypepops1, atomeltypes1)
+
    coords0 = mol0%get_sorted_coords()
    coords1 = mol1%get_sorted_coords()
    weights = mol0%get_sorted_weights()
+   adjmat0 = mol0%get_sorted_adjmat()
+   adjmat1 = mol1%get_sorted_adjmat()
+   adjlists0 = mol0%get_sorted_newadjlists()
+   adjlists1 = mol1%get_sorted_newadjlists()
 
-   ! Calculate MNA equivalence matrix
+   ! Calculate prune matrix
 
-   call fill_equivmat(mol0, mol1, nadjmna0, adjmnalen0, adjmnalist0, nadjmna1, &
-         adjmnalen1, adjmnalist1, equivmat)
+   call prune_procedure(eltypes0, coords0, coords1, prunemat)
 
-   ! Calculate bias and prune matrices
+   ! Calculate bias matrix
 
-   call bias_procedure(natom, neltype, eltypepartlens, coords0, coords1, equivmat, biasmat)
-   call prune_procedure(natom, neltype, eltypepartlens, coords0, coords1, equivmat, prunemat)
+   call bias_procedure(eltypes0, adjlists0, adjlists1, biasmat)
 
    ! Initialize loop variables
 
@@ -113,8 +115,7 @@ subroutine remap_atoms(mol0, mol1, maplist, countlist, nrec)
 
       ! Minimize the euclidean distance
 
-      call assign_atoms(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
-         nadjmna1, adjmnalen1, adjmnalist1, workcoords1, weights, equivmat, prunemat, biasmat, mapping)
+      call assign_atoms(eltypes0, coords0, workcoords1, prunemat, biasmat, mapping)
       rotquat = leastrotquat(natom, weights, coords0, workcoords1, mapping)
       prodquat = rotquat
       totalrot = rotangle(rotquat)
@@ -123,8 +124,7 @@ subroutine remap_atoms(mol0, mol1, maplist, countlist, nrec)
       steps = 1
 
       do while (iter_flag)
-         call assign_atoms(natom, neltype, eltypepartlens, nadjmna0, adjmnalen0, adjmnalist0, coords0, &
-            nadjmna1, adjmnalen1, adjmnalist1, workcoords1, weights, equivmat, prunemat, biasmat, newmapping)
+         call assign_atoms(eltypes0, coords0, workcoords1, prunemat, biasmat, newmapping)
          if (all(newmapping == mapping)) exit
          rotquat = leastrotquat(natom, weights, coords0, workcoords1, newmapping)
          prodquat = quatmul(rotquat, prodquat)

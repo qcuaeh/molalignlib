@@ -16,7 +16,7 @@ integer, allocatable :: nadjs(:), adjlists(:, :)
 contains
 
 subroutine find_molfrags (mol)
-   type(t_mol), intent(inout) :: mol
+   type(molecule_type), intent(inout) :: mol
    ! Local variables
    integer :: n, nfrag
    integer, allocatable :: fragidcs(:), fragsize(:)
