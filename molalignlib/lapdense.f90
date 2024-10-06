@@ -1,4 +1,4 @@
-module lap_dense
+module lapdense
 use kinds
 use stdio
 implicit none

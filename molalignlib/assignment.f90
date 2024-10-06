@@ -19,8 +19,8 @@ use stdio
 use kinds
 use bounds
 use partition
-use lap_dense
-use lap_sparse
+use lapdense
+use lapsparse
 
 implicit none
 

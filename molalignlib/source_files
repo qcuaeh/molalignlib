@@ -14,8 +14,8 @@ eigen-jacobi.f90
 randlib.f90
 random-randlib.f90
 #random-builtin.f90
-lap_dense.f90
-lap_sparse.f90
+lapdense.f90
+lapsparse.f90
 chemdata.f90
 chemutils.f90
 rotation.f90
