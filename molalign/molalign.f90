@@ -52,7 +52,7 @@ real(rk) :: travec0(3), travec1(3), rotquat(4)
 integer :: adjd, minadjd
 real(rk) :: rmsd, minrmsd
 type(p_char) :: posargs(2)
-type(molecule_type) :: mol0, mol1, auxmol0, auxmol1
+type(molecule_type) :: mol0, mol1, auxmol1
 
 ! Set default options
 

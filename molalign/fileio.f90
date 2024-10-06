@@ -107,10 +107,6 @@ subroutine writefile(unit, fmtout, mol)
    character(*), intent(in) :: fmtout
    type(molecule_type), intent(in) :: mol
 
-   integer :: i, j
-   integer :: nbond
-   integer :: bonds(2, mol%natom*maxcoord)
-
    select case (fmtout)
    case ('xyz')
       call writexyz(unit, mol)

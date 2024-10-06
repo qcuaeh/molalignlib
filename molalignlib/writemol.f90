@@ -61,7 +61,7 @@ subroutine writemol2(unit, mol)
    real(rk), allocatable :: coords(:, :)
 
    title = mol%get_title()
-   nadjs = mol%get_nadjs()
+   nadjs = mol%old_get_nadjs()
    bonds = mol%get_bonds()
    natom = mol%get_natom()
    elnums = mol%get_elnums()

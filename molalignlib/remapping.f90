@@ -45,9 +45,11 @@ subroutine remap_atoms(mol0, mol1, maplist, countlist, nrec)
    ! Local variables
 
    integer :: natom
-   logical, dimension(:, :), allocatable :: adjmat0, adjmat1
-   real(rk), dimension(:, :), allocatable :: coords0, coords1
    real(rk), dimension(:), allocatable :: weights
+   real(rk), dimension(:, :), allocatable :: coords0, coords1
+   logical, dimension(:, :), allocatable :: adjmat0, adjmat1
+   type(atomlist_type), allocatable, dimension(:) :: adjlists0, adjlists1
+   type(atompartition_type) :: eltypes0
 
    logical :: visited, overflow
    integer :: irec, krec, ntrial, nstep, steps
@@ -60,28 +62,15 @@ subroutine remap_atoms(mol0, mol1, maplist, countlist, nrec)
    real(rk) :: biasmat(mol0%natom, mol1%natom)
    real(rk) :: workcoords1(3, mol1%natom)
 
-   integer, allocatable, dimension(:) :: eltypepops0
-   integer, allocatable, dimension(:) :: atomeltypes0
-   type(atompartition_type), allocatable :: eltypes0
-   type(atomlist_type), allocatable, dimension(:) :: adjlists0, adjlists1
-
    natom = mol0%get_natom()
-
-   eltypepops0 = mol0%get_eltypepops()
-   atomeltypes0 = mol0%get_sorted_atomeltypes()
-   eltypes0 = make_partition(eltypepops0, atomeltypes0)
-
-!   eltypepops1 = mol1%get_eltypepops()
-!   atomeltypes1 = mol1%get_sorted_atomeltypes()
-!   eltypesubsets1 = make_partition(eltypepops1, atomeltypes1)
-
-   coords0 = mol0%get_sorted_coords()
-   coords1 = mol1%get_sorted_coords()
-   weights = mol0%get_sorted_weights()
-   adjmat0 = mol0%get_sorted_adjmat()
-   adjmat1 = mol1%get_sorted_adjmat()
-   adjlists0 = mol0%get_sorted_newadjlists()
-   adjlists1 = mol1%get_sorted_newadjlists()
+   weights = mol0%gather_weights()
+   coords0 = mol0%gather_coords()
+   coords1 = mol1%gather_coords()
+   eltypes0 = mol0%gather_eltypes()
+   adjlists0 = mol0%gather_adjlists()
+   adjlists1 = mol1%gather_adjlists()
+   adjmat0 = mol0%gather_adjmatrix()
+   adjmat1 = mol1%gather_adjmatrix()
 
    ! Calculate prune matrix
 
@@ -200,7 +189,7 @@ subroutine remap_atoms(mol0, mol1, maplist, countlist, nrec)
    ! Reorder back to default atom ordering
 
    do irec = 1, nrec
-      maplist(:, irec) = mol1%mnatypepartition%atom_order(maplist(mol0%mnatypepartition%atom_mapping, irec))
+      maplist(:, irec) = mol1%atomorder(maplist(mol0%atomordermap, irec))
    end do
 
    ! Print stats if requested

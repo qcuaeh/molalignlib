@@ -19,8 +19,6 @@ type, public :: atom_type
    integer :: label
    integer :: eltype
    integer :: mnatype
-   integer :: fragidx
-   integer, allocatable :: mnaid(:)
    real(rk) :: weight
    real(rk) :: coords(3)
    integer, allocatable :: adjlist(:)
@@ -34,66 +32,67 @@ end type
 
 type, public :: molecule_type
    integer :: natom
-   integer :: nfrag
-   integer, allocatable :: eltypepops(:)
+!   integer :: nfrag
    character(:), allocatable :: title
    type(atom_type), allocatable :: atoms(:)
-   type(partition_type) :: eltypepartition
-   type(partition_type) :: mnatypepartition
-   type(partition_type) :: molfragpartition
+   type(atompartition_type) :: eltypes
+   type(atompartition_type) :: mnatypes
+   type(atompartition_type) :: molfrags
+   type(atompartition_type) :: atompartition
+   integer, allocatable :: atomorder(:)
+   integer, allocatable :: atomordermap(:)
 contains
-   procedure :: get_natom
    procedure :: set_elnums
-   procedure :: get_elnums
    procedure :: set_labels
-   procedure :: get_labels
    procedure :: set_coords
    procedure :: set_weights
    procedure :: set_adjlists
    procedure :: set_eltypes
    procedure :: set_mnatypes
    procedure :: set_molfrags
+   procedure :: set_atompartition
    procedure :: set_adjmnatypepartlens
+   procedure :: get_natom
+   procedure :: get_elnums
+   procedure :: get_labels
+   procedure :: get_eltypes
+   procedure :: get_mnatypes
    procedure :: get_title
-   procedure :: get_neltype
-   procedure :: get_nmnatype
-   procedure :: get_eltypepops
-   procedure :: get_eltypepartlens
-   procedure :: get_mnatypepartlens
-   procedure :: bonded
-   procedure :: add_bond
-   procedure :: remove_bond
    procedure :: get_bonds
-   procedure :: get_newadjlists
-   procedure :: get_mnatypeparts
+   procedure :: get_adjlists
    procedure :: get_molfragparts
    procedure :: get_atomeltypes
    procedure :: get_atommnatypes
    procedure :: get_weights
    procedure :: get_coords
-   procedure :: get_nadjs
-   procedure :: get_oldadjlists
-   procedure :: get_adjmat
+   procedure :: old_get_nadjs
+   procedure :: olg_get_adjlists
+   procedure :: get_adjmatrix
    procedure :: get_nadjmnatypes
    procedure :: get_adjmnatypepartlens
-   procedure :: get_sorted_elnums
-   procedure :: get_sorted_labels
-   procedure :: get_sorted_newadjlists
-   procedure :: get_sorted_molfragparts
-   procedure :: get_sorted_fragroots
-   procedure :: get_sorted_atomeltypes
-   procedure :: get_sorted_atommnatypes
-   procedure :: get_sorted_weights
-   procedure :: get_sorted_coords
-   procedure :: get_sorted_nadjs
-   procedure :: get_sorted_oldadjlists
-   procedure :: get_sorted_adjmat
-   procedure :: get_sorted_nadjmnatypes
-   procedure :: get_sorted_adjmnatypepartlens
+   procedure :: gather_elnums
+   procedure :: gather_labels
+   procedure :: gather_adjlists
+   procedure :: gather_eltypes
+   procedure :: gather_mnatypes
+   procedure :: gather_molfragparts
+   procedure :: gather_fragroots
+   procedure :: gather_atomeltypes
+   procedure :: gather_atommnatypes
+   procedure :: gather_weights
+   procedure :: gather_coords
+   procedure :: old_gather_nadjs
+   procedure :: old_gather_adjlists
+   procedure :: gather_adjmatrix
+   procedure :: old_gather_nadjmnatypes
+   procedure :: old_gather_adjmnatypepartlens
    procedure :: permutate_atoms
    procedure :: mirror_coords
    procedure :: translate_coords
    procedure :: rotate_coords
+   procedure :: bonded
+   procedure :: add_bond
+   procedure :: remove_bond
    procedure :: print_atoms
    procedure :: print_bonds
 end type
@@ -113,20 +112,6 @@ function get_natom(self) result(natom)
    integer :: natom
 
    natom = size(self%atoms)
-
-end function
-
-integer function get_neltype(self) result(neltype)
-   class(molecule_type), intent(in) :: self
-
-   neltype = size(self%eltypepartition%parts)
-
-end function
-
-integer function get_nmnatype(self) result(nmnatype)
-   class(molecule_type), intent(in) :: self
-
-   nmnatype = size(self%mnatypepartition%parts)
 
 end function
 
@@ -180,6 +165,27 @@ subroutine permutate_atoms(self, atom_order)
 
 end subroutine
 
+subroutine set_atompartition(self, atompartition)
+   class(molecule_type), intent(inout) :: self
+   type(atompartition_type) :: atompartition
+
+   integer :: i, h, offset
+
+   self%atompartition = atompartition
+   allocate (self%atomorder(atompartition%natom))
+   allocate (self%atomordermap(atompartition%natom))
+
+   offset = 0
+   do h = 1, size(atompartition%subsets)
+      do i = 1, size(atompartition%subsets(h)%atomidcs)
+         self%atomorder(offset + i) = atompartition%subsets(h)%atomidcs(i)
+         self%atomordermap(atompartition%subsets(h)%atomidcs(i)) = offset + i
+      end do
+      offset = offset + size(atompartition%subsets(h)%atomidcs)
+   end do
+
+end subroutine
+
 subroutine set_elnums(self, elnums)
    class(molecule_type), intent(inout) :: self
    integer, intent(in) :: elnums(:)
@@ -196,11 +202,11 @@ function get_elnums(self) result(elnums)
 
 end function
 
-function get_sorted_elnums(self) result(elnums)
+function gather_elnums(self) result(elnums)
    class(molecule_type), intent(in) :: self
    integer, allocatable :: elnums(:)
 
-   elnums = self%atoms(self%mnatypepartition%atom_order)%elnum
+   elnums = self%atoms(self%atomorder)%elnum
 
 end function
 
@@ -221,86 +227,76 @@ function get_labels(self) result(labels)
 
 end function
 
-function get_sorted_labels(self) result(labels)
+function gather_labels(self) result(labels)
    class(molecule_type), intent(in) :: self
    ! Local variables
    integer, allocatable :: labels(:)
 
-   labels = self%atoms(self%mnatypepartition%atom_order)%label
+   labels = self%atoms(self%atomorder)%label
 
 end function
 
-subroutine set_eltypes(self, eltypepops, atomeltypes)
+subroutine set_eltypes(self, neltype, atomeltypes)
    class(molecule_type), intent(inout) :: self
-   integer, intent(in) :: eltypepops(:)
+   integer, intent(in) :: neltype
    integer, intent(in) :: atomeltypes(:)
 
-   self%eltypepops = eltypepops
    self%atoms%eltype = atomeltypes
-   call self%eltypepartition%init(size(eltypepops), atomeltypes)
+   self%eltypes = atompartition(neltype, atomeltypes)
 
 end subroutine
 
-subroutine set_mnatypes(self, nmnatype, mnatypes)
+function get_eltypes(self) result(eltypes)
+   class(molecule_type), intent(in) :: self
+   type(atompartition_type) :: eltypes
+
+   eltypes = self%eltypes
+
+end function
+
+function gather_eltypes(self) result(eltypes)
+   class(molecule_type), intent(in) :: self
+   type(atompartition_type) :: eltypes
+
+   eltypes = self%eltypes%mapped(self%atomordermap)
+
+end function
+
+subroutine set_mnatypes(self, nmnatype, atommnatypes)
    class(molecule_type), intent(inout) :: self
    integer, intent(in) :: nmnatype
-   integer, intent(in) :: mnatypes(:)
+   integer, intent(in) :: atommnatypes(:)
 
-   self%atoms%mnatype = mnatypes
-   call self%mnatypepartition%init(nmnatype, mnatypes)
+   self%atoms%mnatype = atommnatypes
+   self%mnatypes = atompartition(nmnatype, atommnatypes)
 
 end subroutine
+
+function get_mnatypes(self) result(mnatypes)
+   class(molecule_type), intent(in) :: self
+   type(atompartition_type) :: mnatypes
+
+   mnatypes = self%mnatypes
+
+end function
+
+function gather_mnatypes(self) result(mnatypes)
+   class(molecule_type), intent(in) :: self
+   type(atompartition_type) :: mnatypes
+
+   mnatypes = self%mnatypes%mapped(self%atomordermap)
+
+end function
 
 subroutine set_molfrags(self, nfrag, fragidcs)
    class(molecule_type), intent(inout) :: self
    integer, intent(in) :: nfrag
    integer, intent(in) :: fragidcs(:)
 
-   self%atoms%fragidx = fragidcs
-   call self%molfragpartition%init(nfrag, fragidcs)
+!   self%atoms%fragidx = fragidcs
+   self%molfrags = atompartition(nfrag, fragidcs)
 
 end subroutine
-
-function get_mnatypeparts(self) result(parts)
-   class(molecule_type), intent(in) :: self
-   ! Local variables
-   integer :: i
-   type(atomlist_type), allocatable :: parts(:)
-
-   allocate (parts(size(self%mnatypepartition%parts)))
-
-   do i = 1, size(self%mnatypepartition%parts)
-      parts(i)%atomidcs = self%mnatypepartition%parts(i)%atomidcs
-   end do
-
-end function
-
-function get_mnatypepartlens(self) result(mnatypepartlens)
-   class(molecule_type), intent(in) :: self
-   ! Local variables
-   integer, allocatable :: mnatypepartlens(:)
-
-   mnatypepartlens = self%mnatypepartition%get_lenlist()
-
-end function
-
-function get_eltypepops(self) result(eltypepops)
-   class(molecule_type), intent(in) :: self
-   ! Local variables
-   integer, allocatable :: eltypepops(:)
-
-   eltypepops = self%eltypepops
-
-end function
-
-function get_eltypepartlens(self) result(eltypepartlens)
-   class(molecule_type), intent(in) :: self
-   ! Local variables
-   integer, allocatable :: eltypepartlens(:)
-
-   eltypepartlens = self%eltypepartition%get_lenlist()
-
-end function
 
 function get_molfragparts(self) result(parts)
    class(molecule_type), intent(in) :: self
@@ -308,89 +304,87 @@ function get_molfragparts(self) result(parts)
    integer :: i
    type(atomlist_type), allocatable :: parts(:)
 
-   allocate (parts(size(self%molfragpartition%parts)))
+   allocate (parts(size(self%molfrags%subsets)))
 
-   do i = 1, size(self%molfragpartition%parts)
-      parts(i)%atomidcs = self%molfragpartition%parts(i)%atomidcs
+   do i = 1, size(self%molfrags%subsets)
+      parts(i)%atomidcs = self%molfrags%subsets(i)%atomidcs
    end do
 
 end function
 
-function get_sorted_molfragparts(self) result(parts)
+function gather_molfragparts(self) result(parts)
    class(molecule_type), intent(in) :: self
    ! Local variables
    integer :: i
    type(atomlist_type), allocatable :: parts(:)
 
-   allocate (parts(size(self%molfragpartition%parts)))
+   allocate (parts(size(self%molfrags%subsets)))
 
-   do i = 1, size(self%molfragpartition%parts)
-      parts(i)%atomidcs = self%mnatypepartition%atom_mapping(self%molfragpartition%parts(i)%atomidcs)
+   do i = 1, size(self%molfrags%subsets)
+      parts(i)%atomidcs = self%atomordermap(self%molfrags%subsets(i)%atomidcs)
    end do
 
 end function
 
-function get_sorted_fragroots(self) result(fragroots)
+function gather_fragroots(self) result(fragroots)
    class(molecule_type), intent(in) :: self
-   ! Local variables
-   integer :: i
-   integer, allocatable, dimension(:) :: order, order1, order2
+   ! Result variable
    integer, allocatable :: fragroots(:)
-   integer, allocatable :: eltypepartlens(:)
-   integer, allocatable :: mnatypepartlens(:)
-   integer, allocatable :: eltypes(:)
-   integer, allocatable :: mnatypes(:)
-   type(atomlist_type), allocatable :: fragparts(:)
+   ! Local variables
+   integer :: h, i
+   integer :: atomidx_i, atomidx_min
+   integer :: eltypepop_i, eltypepop_min
 
-   eltypes = self%get_sorted_atomeltypes()
-   mnatypes = self%get_sorted_atommnatypes()
-   fragparts = self%get_sorted_molfragparts()
-   eltypepartlens = self%get_eltypepartlens()
-   mnatypepartlens = self%get_mnatypepartlens()
-   allocate (fragroots(size(fragparts)))
+   allocate (fragroots(size(self%molfrags%subsets)))
 
-   do i = 1, size(fragparts)
-      order1 = sorted_order(mnatypepartlens(mnatypes(fragparts(i)%atomidcs)))
-      order2 = sorted_order(eltypepartlens(eltypes(fragparts(i)%atomidcs(order1))))
-      order = order1(order2)
-      fragroots(i) = fragparts(i)%atomidcs(order(1))
+   do h = 1, size(self%molfrags%subsets)
+      eltypepop_min = huge(eltypepop_min)
+      do i = 1, size(self%molfrags%subsets(h)%atomidcs)
+         atomidx_i = self%molfrags%subsets(h)%atomidcs(i)
+         eltypepop_i = size(self%eltypes%subsets(self%atoms(self%molfrags%subsets(h)%atomidcs(i))%eltype)%atomidcs)
+         if (eltypepop_i < eltypepop_min) then
+            atomidx_min = atomidx_i
+            eltypepop_min = eltypepop_i
+         end if
+         fragroots(h) = self%atomordermap(atomidx_min)
+      end do
    end do
 
 end function
 
-function get_atomeltypes(self) result(eltypes)
+function get_atomeltypes(self) result(atomeltypes)
    class(molecule_type), intent(in) :: self
    ! Local variables
-   integer, allocatable :: eltypes(:)
+   integer, allocatable :: atomeltypes(:)
 
-   eltypes = self%atoms%eltype
+   atomeltypes = self%atoms%eltype
 
 end function
 
-function get_sorted_atomeltypes(self) result(eltypes)
+function gather_atomeltypes(self) result(atomeltypes)
    class(molecule_type), intent(in) :: self
    ! Local variables
-   integer, allocatable :: eltypes(:)
+   integer, allocatable :: atomeltypes(:)
 
-   eltypes = self%atoms(self%mnatypepartition%atom_order)%eltype
+   atomeltypes = self%atoms(self%atomorder)%eltype
 
 end function
 
-function get_atommnatypes(self) result(mnatypes)
+function get_atommnatypes(self) result(atommnatypes)
    class(molecule_type), intent(in) :: self
    ! Local variables
-   integer, allocatable :: mnatypes(:)
+   integer, allocatable :: atommnatypes(:)
 
-   mnatypes = self%atoms%mnatype
+   atommnatypes = self%atoms%mnatype
 
 end function
 
-function get_sorted_atommnatypes(self) result(mnatypes)
+function gather_atommnatypes(self) result(atommnatypes)
    class(molecule_type), intent(in) :: self
    ! Local variables
-   integer, allocatable :: mnatypes(:)
+   integer, allocatable :: atommnatypes(:)
 
-   mnatypes = self%atoms(self%mnatypepartition%atom_order)%mnatype
+   atommnatypes = self%atoms(self%atomorder)%mnatype
 
 end function
 
@@ -411,12 +405,12 @@ function get_weights(self) result(weights)
 
 end function
 
-function get_sorted_weights(self) result(weights)
+function gather_weights(self) result(weights)
    class(molecule_type), intent(in) :: self
    ! Local variables
    real(rk), allocatable :: weights(:)
 
-   weights = self%atoms(self%mnatypepartition%atom_order)%weight
+   weights = self%atoms(self%atomorder)%weight
 
 end function
 
@@ -446,7 +440,7 @@ function get_coords(self) result(coords)
 
 end function
 
-function get_sorted_coords(self) result(coords)
+function gather_coords(self) result(coords)
    class(molecule_type), intent(in) :: self
    ! Local variables
    integer :: i
@@ -455,7 +449,7 @@ function get_sorted_coords(self) result(coords)
    allocate (coords(3, size(self%atoms)))
 
    do i = 1, size(self%atoms)
-      coords(:, i) = self%atoms(self%mnatypepartition%atom_order(i))%coords
+      coords(:, i) = self%atoms(self%atomorder(i))%coords
    end do
 
 end function
@@ -473,7 +467,7 @@ subroutine set_adjlists(self, nadjs, adjlists)
 
 end subroutine
 
-function get_nadjs(self) result(nadjs)
+function old_get_nadjs(self) result(nadjs)
    class(molecule_type), intent(in) :: self
    ! Local variables
    integer :: i
@@ -486,7 +480,7 @@ function get_nadjs(self) result(nadjs)
 
 end function
 
-function get_sorted_nadjs(self) result(nadjs)
+function old_gather_nadjs(self) result(nadjs)
    class(molecule_type), intent(in) :: self
    ! Local variables
    integer :: i
@@ -495,12 +489,12 @@ function get_sorted_nadjs(self) result(nadjs)
    allocate (nadjs(size(self%atoms)))
 
    do i = 1, size(self%atoms)
-      nadjs(i) = size(self%atoms(self%mnatypepartition%atom_order(i))%adjlist)
+      nadjs(i) = size(self%atoms(self%atomorder(i))%adjlist)
    end do
 
 end function
 
-function get_oldadjlists(self) result(adjlists)
+function olg_get_adjlists(self) result(adjlists)
    class(molecule_type), intent(in) :: self
    ! Local variables
    integer :: i
@@ -514,7 +508,7 @@ function get_oldadjlists(self) result(adjlists)
 
 end function
 
-function get_sorted_oldadjlists(self) result(adjlists)
+function old_gather_adjlists(self) result(adjlists)
    class(molecule_type), intent(in) :: self
    ! Local variables
    integer :: i
@@ -524,13 +518,13 @@ function get_sorted_oldadjlists(self) result(adjlists)
    allocate (adjlists(maxcoord, size(self%atoms)))
 
    do i = 1, size(self%atoms)
-      atom = self%atoms(self%mnatypepartition%atom_order(i))
-      adjlists(:size(atom%adjlist), i) = self%mnatypepartition%atom_mapping(atom%adjlist)
+      atom = self%atoms(self%atomorder(i))
+      adjlists(:size(atom%adjlist), i) = self%atomordermap(atom%adjlist)
    end do
 
 end function
 
-function get_newadjlists(self) result(adjlists)
+function get_adjlists(self) result(adjlists)
    class(molecule_type), intent(in) :: self
    ! Local variables
    integer :: i
@@ -544,7 +538,7 @@ function get_newadjlists(self) result(adjlists)
 
 end function
 
-function get_sorted_newadjlists(self) result(adjlists)
+function gather_adjlists(self) result(adjlists)
    class(molecule_type), intent(in) :: self
    ! Local variables
    integer :: i
@@ -553,33 +547,33 @@ function get_sorted_newadjlists(self) result(adjlists)
    allocate (adjlists(size(self%atoms)))
 
    do i = 1, size(self%atoms)
-      adjlists(i)%atomidcs = self%mnatypepartition%atom_mapping(self%atoms(self%mnatypepartition%atom_order(i))%adjlist)
+      adjlists(i)%atomidcs = self%atomordermap(self%atoms(self%atomorder(i))%adjlist)
    end do
 
 end function
 
-function get_adjpartitions(self) result(adjlists)
+function gather_adjpartitions(self) result(adjpartitions)
    class(molecule_type), intent(in) :: self
    ! Result variable
-   type(partition_type), allocatable :: adjlists(:)
+   type(atompartition_type), allocatable :: adjpartitions(:)
    ! Local variables
    integer :: h, i
    type(atom_type) :: atom
-   integer, allocatable :: adjlistpart(:)
+   integer, allocatable :: adjlistsubset(:)
 
    do i = 1, size(self%atoms)
-      atom = self%atoms(self%mnatypepartition%atom_order(i))
-      allocate (adjlists(i)%parts(size(self%mnatypepartition%parts)))
-      do h = 1, size(self%mnatypepartition%parts)
-         adjlistpart = intersection(atom%adjlist, self%mnatypepartition%parts(h)%atomidcs, size(self%atoms))
-         allocate (adjlists(i)%parts(h)%atomidcs(size(adjlistpart)))
-         adjlists(i)%parts(h)%atomidcs = self%mnatypepartition%atom_mapping(adjlistpart)
+      atom = self%atoms(self%atomorder(i))
+      allocate (adjpartitions(i)%subsets(size(self%atompartition%subsets)))
+      do h = 1, size(self%atompartition%subsets)
+         adjlistsubset = intersection(atom%adjlist, self%atompartition%subsets(h)%atomidcs, size(self%atoms))
+         allocate (adjpartitions(i)%subsets(h)%atomidcs(size(adjlistsubset)))
+         adjpartitions(i)%subsets(h)%atomidcs = self%atomordermap(adjlistsubset)
       end do
    end do
 
 end function
 
-function get_adjmat(self) result(adjmat)
+function get_adjmatrix(self) result(adjmat)
    class(molecule_type), intent(in) :: self
    ! Local variables
    integer :: i, k
@@ -599,7 +593,7 @@ function get_adjmat(self) result(adjmat)
 
 end function
 
-function get_sorted_adjmat(self) result(adjmat)
+function gather_adjmatrix(self) result(adjmat)
    class(molecule_type), intent(in) :: self
    ! Local variables
    integer :: i, k
@@ -610,9 +604,9 @@ function get_sorted_adjmat(self) result(adjmat)
    adjmat(:, :) = .false.
 
    do i = 1, size(self%atoms)
-      atom = self%atoms(self%mnatypepartition%atom_order(i))
+      atom = self%atoms(self%atomorder(i))
       do k = 1, size(atom%adjlist)
-         adjmat(i, self%mnatypepartition%atom_mapping(atom%adjlist(k))) = .true.
+         adjmat(i, self%atomordermap(atom%adjlist(k))) = .true.
       end do
    end do
 
@@ -648,7 +642,7 @@ function get_adjmnatypepartlens(self) result(adjmnatypepartlens)
 
 end function
 
-function get_sorted_adjmnatypepartlens(self) result(adjmnatypepartlens)
+function old_gather_adjmnatypepartlens(self) result(adjmnatypepartlens)
    class(molecule_type), intent(in) :: self
    ! Local variables
    integer :: i
@@ -658,7 +652,7 @@ function get_sorted_adjmnatypepartlens(self) result(adjmnatypepartlens)
    allocate (adjmnatypepartlens(maxcoord, size(self%atoms)))
 
    do i = 1, size(self%atoms)
-      atom = self%atoms(self%mnatypepartition%atom_order(i))
+      atom = self%atoms(self%atomorder(i))
       adjmnatypepartlens(:size(atom%adjmnatypepartlens), i) = atom%adjmnatypepartlens
    end do
 
@@ -678,7 +672,7 @@ function get_nadjmnatypes(self) result(nadjmnatypes)
 
 end function
 
-function get_sorted_nadjmnatypes(self) result(nadjmnatypes)
+function old_gather_nadjmnatypes(self) result(nadjmnatypes)
    class(molecule_type), intent(in) :: self
    ! Local variables
    integer :: i
@@ -688,7 +682,7 @@ function get_sorted_nadjmnatypes(self) result(nadjmnatypes)
    allocate (nadjmnatypes(size(self%atoms)))
 
    do i = 1, size(self%atoms)
-      atom = self%atoms(self%mnatypepartition%atom_order(i))
+      atom = self%atoms(self%atomorder(i))
       nadjmnatypes(i) = size(atom%adjmnatypepartlens)
    end do
 
@@ -701,7 +695,7 @@ function get_bonds(self) result(bonds)
    logical, allocatable :: adjmat(:, :)
    type(bond_type), allocatable :: bonds(:)
 
-   adjmat = self%get_adjmat()
+   adjmat = self%get_adjmatrix()
    allocate (bonds(count(adjmat)/2))
 
    nbond = 0

@@ -31,14 +31,14 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
    type(molecule_type), intent(inout) :: mol0, mol1
    integer, dimension(:), intent(in) :: mapping
 
-   integer :: i, j, k, l, j_, k_, l_
+   integer :: i, j, k, j_, k_
    integer :: natom0, natom1
+   type(atompartition_type) :: mnatypes0, mnatypes1
    integer, allocatable, dimension(:) :: elnums0, elnums1
-   integer, allocatable, dimension(:) :: mnatypes0, mnatypes1
-   logical, allocatable, dimension(:, :) :: adjmat0, adjmat1
+   integer, allocatable, dimension(:) :: atommnatypes0, atommnatypes1
    type(atomlist_type), allocatable, dimension(:) :: adjlists0, adjlists1
    type(atomlist_type), allocatable, dimension(:) :: molfragparts0, molfragparts1
-   type(atomlist_type), allocatable, dimension(:) :: mnatypeparts0, mnatypeparts1
+   logical, allocatable, dimension(:, :) :: adjmat0, adjmat1
    integer, allocatable, dimension(:) :: mnatypepartidcs0, mnatypepartidcs1
    integer, allocatable, dimension(:) :: unmapping
    real(rk) :: rotquat(4)
@@ -55,16 +55,16 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
 
    natom0 = mol0%get_natom()
    natom1 = mol1%get_natom()
-   adjmat0 = mol0%get_adjmat()
-   adjmat1 = mol1%get_adjmat()
+   adjmat0 = mol0%get_adjmatrix()
+   adjmat1 = mol1%get_adjmatrix()
    elnums0 = mol0%get_elnums()
    elnums1 = mol1%get_elnums()
-   adjlists0 = mol0%get_newadjlists()
-   adjlists1 = mol1%get_newadjlists()
-   mnatypes0 = mol0%get_atommnatypes()
-   mnatypes1 = mol1%get_atommnatypes()
-   mnatypeparts0 = mol0%get_mnatypeparts()
-   mnatypeparts1 = mol1%get_mnatypeparts()
+   adjlists0 = mol0%get_adjlists()
+   adjlists1 = mol1%get_adjlists()
+   mnatypes0 = mol0%get_mnatypes()
+   mnatypes1 = mol1%get_mnatypes()
+   atommnatypes0 = mol0%get_atommnatypes()
+   atommnatypes1 = mol1%get_atommnatypes()
    molfragparts0 = mol0%get_molfragparts()
    molfragparts1 = mol1%get_molfragparts()
    unmapping = inverse_permutation(mapping)
@@ -75,7 +75,7 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
       do j_ = 1, size(adjlists0(i)%atomidcs)
          j = adjlists0(i)%atomidcs(j_)
          if (.not. adjmat1(mapping(i), mapping(j))) then
-            mnatypepartidcs0 = mnatypeparts0(mnatypes0(j))%atomidcs
+            mnatypepartidcs0 = mnatypes0%subsets(atommnatypes0(j))%atomidcs
             do k_ = 1, size(mnatypepartidcs0)
                k = mnatypepartidcs0(k_)
                call mol0%remove_bond(i, k)
@@ -89,7 +89,7 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
       do j_ = 1, size(adjlists1(i)%atomidcs)
          j = adjlists1(i)%atomidcs(j_)
          if (.not. adjmat0(unmapping(i), unmapping(j))) then
-            mnatypepartidcs1 = mnatypeparts1(mnatypes1(j))%atomidcs
+            mnatypepartidcs1 = mnatypes1%subsets(atommnatypes1(j))%atomidcs
             do k_ = 1, size(mnatypepartidcs1)
                k = mnatypepartidcs1(k_)
                call mol1%remove_bond(i, k)

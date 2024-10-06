@@ -68,7 +68,6 @@ function rotated(natom, coords, q) result(rotated_coords)
    real(rk), intent(in) :: q(4)
    real(rk), intent(in) :: coords(3, natom)
 
-   integer :: i
    real(rk) :: rotmat(3, 3)
    real(rk) :: rotated_coords(3, natom)
 

@@ -103,7 +103,6 @@ subroutine resolve_equivmat( eltypes0, adjlists0, adjlists1, equivmat)
    integer :: h, i, j
    integer :: atomidx_i, atomidx_j
    integer :: ntype, nintype, level
-   integer, dimension(maxcoord) :: indices, atomorder
    integer, allocatable, dimension(:) :: types0, types1
    integer, allocatable, dimension(:) :: intypes0, intypes1
 

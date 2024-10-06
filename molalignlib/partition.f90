@@ -1,8 +1,9 @@
 module partition
+use stdio
 
 implicit none
 private
-public make_partition
+public atompartition
 
 type, public :: atomlist_type
    integer, allocatable :: atomidcs(:)
@@ -11,94 +12,55 @@ end type
 type, public :: atompartition_type
    integer :: natom
    type(atomlist_type), allocatable :: subsets(:)
-end type
-
-type, public :: partition_type
-   type(atomlist_type), allocatable :: parts(:)
-   integer, allocatable :: atom_order(:)
-   integer, allocatable :: atom_mapping(:)
 contains
-   procedure :: init => partition_init
-   procedure :: get_lenlist => partition_lenlist
+   procedure :: mapped
 end type
 
 contains
 
-function make_partition(typepops, atomtypes) result(partition)
-   integer, intent(in) :: typepops(:)
+function atompartition(ntype, atomtypes)
+   integer, intent(in) :: ntype
    integer, intent(in) :: atomtypes(:)
    ! Result variable
-   type(atompartition_type) :: partition
+   type(atompartition_type) :: atompartition
    ! Local variables
-   integer :: i
+   integer :: h
    integer, allocatable :: n(:)
 
-   allocate (n(size(typepops)))
-   allocate (partition%subsets(size(typepops)))
+   atompartition%natom = size(atomtypes)
 
-   do i = 1, size(typepops)
-      allocate (partition%subsets(i)%atomidcs(typepops(i)))
+   allocate (n(ntype))
+   allocate (atompartition%subsets(ntype))
+
+   n(:) = 0
+   do h = 1, size(atomtypes)
+      n(atomtypes(h)) = n(atomtypes(h)) + 1
+   end do
+
+   do h = 1, ntype
+      allocate (atompartition%subsets(h)%atomidcs(n(h)))
    end do
 
    n(:) = 0
-   do i = 1, size(atomtypes)
-      n(atomtypes(i)) = n(atomtypes(i)) + 1
-      partition%subsets(atomtypes(i))%atomidcs(n(atomtypes(i))) = i
+   do h = 1, size(atomtypes)
+      n(atomtypes(h)) = n(atomtypes(h)) + 1
+      atompartition%subsets(atomtypes(h))%atomidcs(n(atomtypes(h))) = h
    end do
-
-   partition%natom = size(atomtypes)
 
 end function
 
-subroutine partition_init(self, npart, partidcs)
-   class(partition_type), intent(out) :: self
-   integer, intent(in) :: npart
-   integer, intent(in) :: partidcs(:)
+function mapped(self, mapping) result(atompartition)
+   class(atompartition_type), intent(in) :: self
+   integer, intent(in) :: mapping(:)
+   ! Result variable
+   type(atompartition_type) :: atompartition
    ! Local variables
-   integer :: h, i, offset
-   integer, allocatable :: n(:)
+   integer :: h
 
-   allocate (n(npart))
-   allocate (self%parts(npart))
-   allocate (self%atom_order(size(partidcs)))
-   allocate (self%atom_mapping(size(partidcs)))
-
-   n(:) = 0
-   do i = 1, size(partidcs)
-      n(partidcs(i)) = n(partidcs(i)) + 1
-   end do
-
-   do i = 1, npart
-      allocate (self%parts(i)%atomidcs(n(i)))
-   end do
-
-   n(:) = 0
-   do i = 1, size(partidcs)
-      n(partidcs(i)) = n(partidcs(i)) + 1
-      self%parts(partidcs(i))%atomidcs(n(partidcs(i))) = i
-   end do
-
-   offset = 0
-   do h = 1, size(self%parts)
-      do i = 1, size(self%parts(h)%atomidcs)
-         self%atom_order(offset + i) = self%parts(h)%atomidcs(i)
-         self%atom_mapping(self%parts(h)%atomidcs(i)) = offset + i
-      end do
-      offset = offset + size(self%parts(h)%atomidcs)
-   end do
-
-end subroutine
-
-function partition_lenlist(self) result(lenlist)
-   class(partition_type), intent(in) :: self
-   ! Local variables
-   integer :: i
-   integer, allocatable :: lenlist(:)
-
-   allocate (lenlist(size(self%parts)))
-
-   do i = 1, size(self%parts)
-      lenlist(i) = size(self%parts(i)%atomidcs)
+   atompartition%natom = self%natom
+   allocate (atompartition%subsets(size(self%subsets)))
+   do h = 1, size(self%subsets)
+      atompartition%subsets(h)%atomidcs = mapping(self%subsets(h)%atomidcs)
    end do
 
 end function

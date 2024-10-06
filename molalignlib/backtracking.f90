@@ -3,6 +3,7 @@ module backtracking
 use stdio
 use sorting
 use molecule
+use partition
 use permutation
 use adjacency
 use alignment
@@ -24,24 +25,28 @@ subroutine minadjdiff (mol0, mol1, mapping)
 
    ! Local variables
 
-   integer :: blkidx(mol0%natom)
-   integer :: h, i, offset, moldiff
+   integer :: atomeltypes0(mol0%natom)
+   integer :: h, i, moldiff
    integer :: ntrack, track(mol0%natom)
    integer :: unmapping(mol0%natom)
-   integer, dimension(mol0%natom) :: eqvidx0, eqvidx1
+   integer, dimension(mol0%natom) :: atommnatypes0, atommnatypes1
    logical :: tracked(mol0%natom)
    real(rk) moldist
 
    integer :: natom
-   integer :: neltype
-   integer, dimension(mol0%natom) :: eltypepartlens
+   integer :: neltype0
+   integer :: nmnatype0, nmnatype1
+
+   type(atompartition_type) :: eltypes0
+   type(atompartition_type) :: mnatypes0, mnatypes1
+
+   integer, allocatable, dimension(:) :: eltypepops0
+   integer, allocatable, dimension(:) :: mnatypepops0, mnatypepops1
+   integer, allocatable, dimension(:) :: fragroots0, fragroots1
 
    logical, dimension(:, :), allocatable :: adjmat0, adjmat1
    real(rk), dimension(:, :), allocatable :: coords0, coords1
    real(rk), dimension(:), allocatable :: weights
-
-   integer :: nmnatype0, nmnatype1
-   integer, allocatable, dimension(:) :: mnatypepartlens0, mnatypepartlens1
 
    integer :: nadjs0(mol0%natom)
    integer :: nadjs1(mol1%natom)
@@ -52,61 +57,53 @@ subroutine minadjdiff (mol0, mol1, mapping)
    integer :: adjmnatypepartlens0(maxcoord, mol0%natom)
    integer :: adjmnatypepartlens1(maxcoord, mol1%natom)
 
-   integer :: nfrag0, nfrag1
-   integer, allocatable, dimension(:) :: fragroots0, fragroots1
+   natom = mol0%get_natom()
 
-   natom = mol0%natom
-   neltype = mol0%get_neltype()
-   eltypepartlens = mol0%get_eltypepartlens()
-
-   adjmat0 = mol0%get_sorted_adjmat()
-   adjmat1 = mol1%get_sorted_adjmat()
-   coords0 = mol0%get_sorted_coords()
-   coords1 = mol1%get_sorted_coords()
-   weights = mol0%get_sorted_weights()
-
-   nmnatype0 = mol0%get_nmnatype()
-   nmnatype1 = mol1%get_nmnatype()
-   mnatypepartlens0 = mol0%get_mnatypepartlens()
-   mnatypepartlens1 = mol1%get_mnatypepartlens()
-
-!   adjpartitions0 = mol0%get_adjpartitions()
-!   adjpartitions1 = mol1%get_adjpartitions()
-   nadjs0 = mol0%get_sorted_nadjs()
-   nadjs1 = mol1%get_sorted_nadjs()
-   adjlists0 = mol0%get_sorted_oldadjlists()
-   adjlists1 = mol1%get_sorted_oldadjlists()
-   nadjmnatypes0 = mol0%get_sorted_nadjmnatypes()
-   nadjmnatypes1 = mol1%get_sorted_nadjmnatypes()
-   adjmnatypepartlens0 = mol0%get_sorted_adjmnatypepartlens()
-   adjmnatypepartlens1 = mol1%get_sorted_adjmnatypepartlens()
-
-   fragroots0 = mol0%get_sorted_fragroots()
-   fragroots1 = mol1%get_sorted_fragroots()
-   nfrag0 = size(fragroots0)
-   nfrag1 = size(fragroots1)
-
-   ! set atoms block indices
-
-   offset = 0
-   do h = 1, neltype
-      blkidx(offset+1:offset+eltypepartlens(h)) = h
-      offset = offset + eltypepartlens(h)
+   eltypes0 = mol0%gather_eltypes()
+   neltype0 = size(eltypes0%subsets)
+   allocate (eltypepops0(neltype0))
+   do h = 1, neltype0
+      eltypepops0(h) = size(eltypes0%subsets(h)%atomidcs)
    end do
 
-   ! set atoms equivalence indices
-
-   offset = 0
+   mnatypes0 = mol0%gather_mnatypes()
+   mnatypes1 = mol1%gather_mnatypes()
+   nmnatype0 = size(mnatypes0%subsets)
+   nmnatype1 = size(mnatypes1%subsets)
+   allocate (mnatypepops0(nmnatype0))
+   allocate (mnatypepops1(nmnatype1))
    do h = 1, nmnatype0
-      eqvidx0(offset+1:offset+mnatypepartlens0(h)) = h
-      offset = offset + mnatypepartlens0(h)
+      mnatypepops0(h) = size(mnatypes0%subsets(h)%atomidcs)
+   end do
+   do h = 1, nmnatype1
+      mnatypepops1(h) = size(mnatypes1%subsets(h)%atomidcs)
    end do
 
-   offset = 0
-   do h = 1, nmnatype1
-      eqvidx1(offset+1:offset+mnatypepartlens1(h)) = h
-      offset = offset + mnatypepartlens1(h)
-   end do
+!   adjlists0 = mol0%gather_adjlists()
+!   adjlists1 = mol1%gather_adjlists()
+   nadjs0 = mol0%old_gather_nadjs()
+   nadjs1 = mol1%old_gather_nadjs()
+   adjlists0 = mol0%old_gather_adjlists()
+   adjlists1 = mol1%old_gather_adjlists()
+
+!   adjpartitions0 = mol0%gather_adjpartitions()
+!   adjpartitions1 = mol1%gather_adjpartitions()
+   nadjmnatypes0 = mol0%old_gather_nadjmnatypes()
+   nadjmnatypes1 = mol1%old_gather_nadjmnatypes()
+   adjmnatypepartlens0 = mol0%old_gather_adjmnatypepartlens()
+   adjmnatypepartlens1 = mol1%old_gather_adjmnatypepartlens()
+
+   coords0 = mol0%gather_coords()
+   coords1 = mol1%gather_coords()
+   weights = mol0%gather_weights()
+   adjmat0 = mol0%gather_adjmatrix()
+   adjmat1 = mol1%gather_adjmatrix()
+   fragroots0 = mol0%gather_fragroots()
+   fragroots1 = mol1%gather_fragroots()
+
+   atomeltypes0 = mol0%gather_atomeltypes()
+   atommnatypes0 = mol0%gather_atommnatypes()
+   atommnatypes1 = mol1%gather_atommnatypes()
 
    !  initialization
 
@@ -121,13 +118,13 @@ subroutine minadjdiff (mol0, mol1, mapping)
       print '(a,1x,f0.4)', "moldist:", moldist
    end if
 
-   do i = 1, nfrag0
+   do i = 1, size(fragroots0)
       call recursive_backtrack (fragroots0(i), mapping, unmapping, tracked, moldiff, moldist, ntrack, track)
 !        print *, ntrack
    end do
 
    if ( printInfo ) then
-      print '(a,1x,i0)', "countFrag:", nfrag0
+      print '(a,1x,i0)', "countFrag:", size(fragroots0)
       print '(a,1x,i0,1x,i0)', "moldiff:", adjacencydiff (natom, adjmat0, adjmat1, mapping), moldiff
       print '(a,1x,f0.4,1x,f0.4)', "moldist:", squaredist (natom, weights, coords0, coords1, mapping), moldist
    end if
@@ -227,7 +224,7 @@ subroutine minadjdiff (mol0, mol1, mapping)
          if (.not. tracked(mismatches0(i))) then
             do j = 1, nmismatch1
                if (.not. matched1(j)) then
-                  if (blkidx(mismatches0(i)) == blkidx(mismatches1(j))) then
+                  if (atomeltypes0(mismatches0(i)) == atomeltypes0(mismatches1(j))) then
 
                      ntrack_branch = ntrack
                      track_branch(:) = track(:)
@@ -261,8 +258,8 @@ subroutine minadjdiff (mol0, mol1, mapping)
                      if ( &
                         moldiff_branch < moldiff &
                         .and. ( &
-                           eqvidx0(mismatches0(i)) == eqvidx0(unmapping(mismatches1(j))) &
-                           .and. eqvidx1(mapping(mismatches0(i))) == eqvidx1(mismatches1(j)) &
+                           atommnatypes0(mismatches0(i)) == atommnatypes0(unmapping(mismatches1(j))) &
+                           .and. atommnatypes1(mapping(mismatches0(i))) == atommnatypes1(mismatches1(j)) &
                         ) &
                      ) then
                         ntrack = ntrack_branch
@@ -311,15 +308,19 @@ subroutine eqvatomperm (mol0, mol1, workcoords1, mapping)
    real(rk) :: dist
 
    integer :: natom
-   integer :: neltype
-   integer, dimension(mol0%natom) :: eltypepartlens
+   integer :: neltype0
+   integer :: nmnatype0, nmnatype1
+
+   type(atompartition_type) :: eltypes0
+   type(atompartition_type) :: mnatypes0, mnatypes1
+
+   integer, allocatable, dimension(:) :: eltypepops0
+   integer, allocatable, dimension(:) :: mnatypepops0, mnatypepops1
+   integer, allocatable, dimension(:) :: fragroots0, fragroots1
 
    logical, dimension(:, :), allocatable :: adjmat0, adjmat1
    real(rk), dimension(:, :), allocatable :: coords0, coords1
    real(rk), dimension(:), allocatable :: weights
-
-   integer :: nmnatype0, nmnatype1
-   integer, allocatable, dimension(:) :: mnatypepartlens0, mnatypepartlens1
 
    integer :: nadjs0(mol0%natom)
    integer :: nadjs1(mol1%natom)
@@ -330,51 +331,61 @@ subroutine eqvatomperm (mol0, mol1, workcoords1, mapping)
    integer :: adjmnatypepartlens0(maxcoord, mol0%natom)
    integer :: adjmnatypepartlens1(maxcoord, mol1%natom)
 
-   integer :: nfrag0, nfrag1
-   integer, allocatable, dimension(:) :: fragroots0, fragroots1
+   natom = mol0%get_natom()
 
-   natom = mol0%natom
-   neltype = mol0%get_neltype()
-   eltypepartlens = mol0%get_eltypepartlens()
+   eltypes0 = mol0%gather_eltypes()
+   neltype0 = size(eltypes0%subsets)
+   allocate (eltypepops0(neltype0))
+   do h = 1, neltype0
+      eltypepops0(h) = size(eltypes0%subsets(h)%atomidcs)
+   end do
 
-   adjmat0 = mol0%get_sorted_adjmat()
-   adjmat1 = mol1%get_sorted_adjmat()
-   coords0 = mol0%get_sorted_coords()
-   coords1 = mol1%get_sorted_coords()
-   weights = mol0%get_sorted_weights()
+   mnatypes0 = mol0%gather_mnatypes()
+   mnatypes1 = mol1%gather_mnatypes()
+   nmnatype0 = size(mnatypes0%subsets)
+   nmnatype1 = size(mnatypes1%subsets)
+   allocate (mnatypepops0(nmnatype0))
+   allocate (mnatypepops1(nmnatype1))
+   do h = 1, nmnatype0
+      mnatypepops0(h) = size(mnatypes0%subsets(h)%atomidcs)
+   end do
+   do h = 1, nmnatype1
+      mnatypepops1(h) = size(mnatypes1%subsets(h)%atomidcs)
+   end do
 
-   nmnatype0 = mol0%get_nmnatype()
-   nmnatype1 = mol1%get_nmnatype()
-   mnatypepartlens0 = mol0%get_mnatypepartlens()
-   mnatypepartlens1 = mol1%get_mnatypepartlens()
+!   adjlists0 = mol0%gather_adjlists()
+!   adjlists1 = mol1%gather_adjlists()
+   nadjs0 = mol0%old_gather_nadjs()
+   nadjs1 = mol1%old_gather_nadjs()
+   adjlists0 = mol0%old_gather_adjlists()
+   adjlists1 = mol1%old_gather_adjlists()
 
-!   adjpartitions0 = mol0%get_adjpartitions()
-!   adjpartitions1 = mol1%get_adjpartitions()
-   nadjs0 = mol0%get_sorted_nadjs()
-   nadjs1 = mol1%get_sorted_nadjs()
-   adjlists0 = mol0%get_sorted_oldadjlists()
-   adjlists1 = mol1%get_sorted_oldadjlists()
-   nadjmnatypes0 = mol0%get_sorted_nadjmnatypes()
-   nadjmnatypes1 = mol1%get_sorted_nadjmnatypes()
-   adjmnatypepartlens0 = mol0%get_sorted_adjmnatypepartlens()
-   adjmnatypepartlens1 = mol1%get_sorted_adjmnatypepartlens()
+!   adjpartitions0 = mol0%gather_adjpartitions()
+!   adjpartitions1 = mol1%gather_adjpartitions()
+   nadjmnatypes0 = mol0%old_gather_nadjmnatypes()
+   nadjmnatypes1 = mol1%old_gather_nadjmnatypes()
+   adjmnatypepartlens0 = mol0%old_gather_adjmnatypepartlens()
+   adjmnatypepartlens1 = mol1%old_gather_adjmnatypepartlens()
 
-   fragroots0 = mol0%get_sorted_fragroots()
-   fragroots1 = mol1%get_sorted_fragroots()
-   nfrag0 = size(fragroots0)
-   nfrag1 = size(fragroots1)
+   coords0 = mol0%gather_coords()
+   coords1 = mol1%gather_coords()
+   weights = mol0%gather_weights()
+   adjmat0 = mol0%gather_adjmatrix()
+   adjmat1 = mol1%gather_adjmatrix()
+   fragroots0 = mol0%gather_fragroots()
+   fragroots1 = mol1%gather_fragroots()
 
    ! set equivalence group offsets
 
    eqvos(1) = 0
    do h = 1, nmnatype0 - 1
-      eqvos(h+1) = eqvos(h) + mnatypepartlens0(h)
+      eqvos(h+1) = eqvos(h) + mnatypepops0(h)
    end do
 
    ! set atoms equivalence indices
 
    do h = 1, nmnatype0
-      eqvidx(eqvos(h)+1:eqvos(h)+mnatypepartlens0(h)) = h
+      eqvidx(eqvos(h)+1:eqvos(h)+mnatypepops0(h)) = h
    end do
 
    ! initialization
@@ -396,7 +407,7 @@ subroutine eqvatomperm (mol0, mol1, workcoords1, mapping)
 !        end if
 !    end do
 
-   do i = 1, nfrag0
+   do i = 1, size(fragroots0)
       call recursive_permut (fragroots0(i), mapping, tracked, held, ntrack, track)
 !        print *, ntrack
    end do
@@ -417,7 +428,7 @@ subroutine eqvatomperm (mol0, mol1, workcoords1, mapping)
       integer :: h, i, offset, first, last
 
       first = eqvos(eqvidx(nodea)) + 1
-      last = eqvos(eqvidx(nodea)) + mnatypepartlens0(eqvidx(nodea))
+      last = eqvos(eqvidx(nodea)) + mnatypepops0(eqvidx(nodea))
       held(first:last) = .true.
       offset = 0
       do h = 1, nadjmnatypes0(nodea)
@@ -470,7 +481,7 @@ subroutine eqvatomperm (mol0, mol1, workcoords1, mapping)
 
       ! reserves atoms with the same type as n
       first = eqvos(eqvidx(node)) + 1
-      last = eqvos(eqvidx(node)) + mnatypepartlens0(eqvidx(node))
+      last = eqvos(eqvidx(node)) + mnatypepops0(eqvidx(node))
       held(first:last) = .true.
 
       offset = 0

@@ -52,13 +52,15 @@ subroutine molecule_remap( &
    integer, dimension(:, :), intent(inout) :: maplist
    integer, dimension(:), intent(inout) :: countlist
 
-   integer :: i
    real(rk) :: travec0(3), travec1(3)
    real(rk), allocatable, dimension(:, :) :: coords0, coords1
 
 !   integer, dimension(mol0%natom) :: mapping
 !   integer :: nbond0, bonds0(2, maxcoord*mol0%natom)
 !   integer :: nbond1, bonds1(2, maxcoord*mol1%natom)
+
+   call mol0%set_atompartition(mol0%mnatypes)
+   call mol1%set_atompartition(mol1%mnatypes)
 
    ! Abort if molecules have different number of atoms
 
@@ -69,14 +71,14 @@ subroutine molecule_remap( &
 
    ! Abort if molecules are not isomers
 
-   if (any(mol0%get_sorted_elnums() /= mol1%get_sorted_elnums())) then
+   if (any(mol0%gather_elnums() /= mol1%gather_elnums())) then
       write (stderr, '(a)') 'Error: These molecules are not isomers'
       stop
    end if
 
    ! Abort if there are conflicting atomic types
 
-   if (any(mol0%get_sorted_atomeltypes() /= mol1%get_sorted_atomeltypes())) then
+   if (any(mol0%gather_atomeltypes() /= mol1%gather_atomeltypes())) then
       write (stderr, '(a)') 'Error: There are conflicting atomic types'
       stop
    end if
@@ -198,14 +200,14 @@ subroutine molecule_align( &
 
    ! Abort if molecules are not isomers
 
-   if (any(mol0%get_sorted_elnums() /= mol1%get_sorted_elnums())) then
+   if (any(mol0%gather_elnums() /= mol1%gather_elnums())) then
       write (stderr, '(a)') '*Error: These molecules are not isomers'
       stop
    end if
 
    ! Abort if there are conflicting atomic types
 
-   if (any(mol0%get_sorted_atomeltypes() /= mol1%get_sorted_atomeltypes())) then
+   if (any(mol0%gather_atomeltypes() /= mol1%gather_atomeltypes())) then
       write (stderr, '(a)') 'Error: There are conflicting atomic types'
       stop
    end if
@@ -256,7 +258,7 @@ function get_adjd(mol0, mol1, mapping) result(adjd)
    integer :: mapping(:)
    integer :: adjd
 
-   adjd = adjacencydiff(mol0%natom, mol0%get_adjmat(), mol1%get_adjmat(), mapping)
+   adjd = adjacencydiff(mol0%natom, mol0%get_adjmatrix(), mol1%get_adjmatrix(), mapping)
 
 end function
 

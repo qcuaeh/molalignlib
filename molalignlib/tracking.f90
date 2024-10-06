@@ -26,8 +26,8 @@ subroutine find_molfrags (mol)
    allocate (fragsize(size(mol%atoms)))
    allocate (tracked(size(mol%atoms)))
 
-   nadjs = mol%get_nadjs()
-   adjlists = mol%get_oldadjlists()
+   nadjs = mol%old_get_nadjs()
+   adjlists = mol%olg_get_adjlists()
 
    ! initialization
 

@@ -271,7 +271,7 @@ subroutine minperm_pruned(n, p, q, mask, perm, dist)
    integer :: first(n+1), y(n)
 !   integer :: m, i, j, k, l, l2, a, sz, t
    integer :: i, j, k, sz
-   integer(int64) :: u(n), v(n), d, h
+   integer(int64) :: u(n), v(n), h
    integer, allocatable :: kk(:)
    integer(int64), allocatable :: cc(:)
 

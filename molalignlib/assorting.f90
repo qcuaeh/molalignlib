@@ -88,7 +88,7 @@ subroutine resolve_eltypes(mol)
    eltypepops(:neltype) = eltypepops(foreorder(:neltype))
    atomeltypes = backorder(atomeltypes)
 
-   call mol%set_eltypes(eltypepops(:neltype), atomeltypes)
+   call mol%set_eltypes(neltype, atomeltypes)
 
 end subroutine
 
@@ -96,9 +96,10 @@ end subroutine
 subroutine set_equiv_atoms(mol)
    type(molecule_type), intent(inout) :: mol
    ! Local variables
-   integer :: i, natom, nintype, ntype
+   integer :: i, nintype, ntype
    integer, allocatable, dimension(:) :: intypes, types, typemap
    integer, allocatable, dimension(:) :: foreorder, backorder
+   type(atompartition_type) :: eltypes
    type(atomlist_type), allocatable :: adjlists(:)
 
    allocate (types(size(mol%atoms)))
@@ -106,10 +107,11 @@ subroutine set_equiv_atoms(mol)
    allocate (foreorder(size(mol%atoms)))
    allocate (backorder(size(mol%atoms)))
 
-   nintype = mol%get_neltype()
+   eltypes = mol%get_eltypes()
+   nintype = size(eltypes%subsets)
    intypes = mol%get_atomeltypes()
    typemap(:nintype) = [(i, i=1, nintype)]
-   adjlists = mol%get_newadjlists()
+   adjlists = mol%get_adjlists()
 
    ! Determine MNA types iteratively
 
@@ -125,6 +127,8 @@ subroutine set_equiv_atoms(mol)
    backorder(:ntype) = inverse_permutation(foreorder(:ntype))
    types = backorder(types)
 
+!   mnatypes = atompartition(ntype, types)
+!   call mol%set_mnatypes(mnatypes)
    call mol%set_mnatypes(ntype, types)
 
 end subroutine
@@ -133,17 +137,17 @@ end subroutine
 subroutine assort_neighbors(mol)
    type(molecule_type), intent(inout) :: mol
    ! Local variables
-   integer :: i, h
+   integer :: i
    integer :: nadjs(mol%natom), adjlists(maxcoord, mol%natom)
    integer :: nadjmnatypes(mol%natom), adjmnatypepartlens(maxcoord, mol%natom)
-   integer :: adjeqvid(maxcoord), atomorder(maxcoord), mnatypes(mol%natom)
+   integer :: adjeqvid(maxcoord), atomorder(maxcoord), atommnatypes(mol%natom)
 
-   nadjs = mol%get_nadjs()
-   adjlists = mol%get_oldadjlists()
-   mnatypes = mol%get_atommnatypes()
+   nadjs = mol%old_get_nadjs()
+   adjlists = mol%olg_get_adjlists()
+   atommnatypes = mol%get_atommnatypes()
 
    do i = 1, mol%natom
-      call group_by(adjlists(:nadjs(i), i), mnatypes, nadjmnatypes(i), adjmnatypepartlens(:, i), adjeqvid)
+      call group_by(adjlists(:nadjs(i), i), atommnatypes, nadjmnatypes(i), adjmnatypepartlens(:, i), adjeqvid)
       atomorder(:nadjs(i)) = sorted_order(adjeqvid, nadjs(i))
       adjlists(:nadjs(i), i) = adjlists(atomorder(:nadjs(i)), i)
    end do
