@@ -69,7 +69,7 @@ subroutine bias_mna( eltypes0, adjlists0, adjlists1, biasmat)
    integer, allocatable :: equivmat(:, :)
 
    ! Calculate MNA equivalence matrix
-   call resolve_equivmat(eltypes0, adjlists0, adjlists1, equivmat)
+   call compute_equivmat(eltypes0, adjlists0, adjlists1, equivmat)
 
    maxequiv = 0
    do h = 1, size(eltypes0%subsets)
@@ -95,7 +95,7 @@ subroutine bias_mna( eltypes0, adjlists0, adjlists1, biasmat)
 end subroutine
 
 ! Calculate the maximum common MNA level for all atom cross assignments
-subroutine resolve_equivmat( eltypes0, adjlists0, adjlists1, equivmat)
+subroutine compute_equivmat( eltypes0, adjlists0, adjlists1, equivmat)
    type(atompartition_type), intent(in) :: eltypes0
    type(atomlist_type), allocatable, dimension(:), intent(in) :: adjlists0, adjlists1
    integer, allocatable, dimension(:, :), intent(out) :: equivmat
@@ -135,7 +135,7 @@ subroutine resolve_equivmat( eltypes0, adjlists0, adjlists1, equivmat)
          end do
       end do
 
-      call resolve_crossmnatypes(adjlists0, adjlists1, nintype, intypes0, intypes1, ntype, types0, types1)
+      call compute_crossmnatypes(adjlists0, adjlists1, nintype, intypes0, intypes1, ntype, types0, types1)
 
       if (all(types0 == intypes0) .and. all(types1 == intypes1)) exit
 
@@ -148,13 +148,13 @@ subroutine resolve_equivmat( eltypes0, adjlists0, adjlists1, equivmat)
 !      ! along with number of subsets nadjmna0, nadjmna1 and subset lenghts adjmnalen0, adjmnalen1
 !
 !      do i = 1, size(adjlists0)
-!         call group_by(adjlists0(i)%atomidcs, intypes0, nadjmna0(i, level), adjmnalen0(:, i, level), indices)
+!         call assort_groups(adjlists0(i)%atomidcs, intypes0, nadjmna0(i, level), adjmnalen0(:, i, level), indices)
 !         atomorder(:size(adjlists0(i)%atomidcs)) = sorted_order(indices, size(adjlists0(i)%atomidcs))
 !         adjmnalist0(:size(adjlists0(i)%atomidcs), i, level) = adjlists0(i)%atomidcs(atomorder(:size(adjlists0(i)%atomidcs)))
 !      end do
 !
 !      do i = 1, size(adjlists1)
-!         call group_by(adjlists1(i)%atomidcs, intypes1, nadjmna1(i, level), adjmnalen1(:, i, level), indices)
+!         call assort_groups(adjlists1(i)%atomidcs, intypes1, nadjmna1(i, level), adjmnalen1(:, i, level), indices)
 !         atomorder(:size(adjlists1(i)%atomidcs)) = sorted_order(indices, size(adjlists1(i)%atomidcs))
 !         adjmnalist1(:size(adjlists1(i)%atomidcs), i, level) = adjlists1(i)%atomidcs(atomorder(:size(adjlists1(i)%atomidcs)))
 !      end do

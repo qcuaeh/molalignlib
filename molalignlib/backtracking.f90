@@ -98,8 +98,8 @@ subroutine minadjdiff (mol0, mol1, mapping)
    weights = mol0%gather_weights()
    adjmat0 = mol0%gather_adjmatrix()
    adjmat1 = mol1%gather_adjmatrix()
-   fragroots0 = mol0%gather_fragroots()
-   fragroots1 = mol1%gather_fragroots()
+   fragroots0 = mol0%gather_molfragroots()
+   fragroots1 = mol1%gather_molfragroots()
 
    atomeltypes0 = mol0%gather_atomeltypes()
    atommnatypes0 = mol0%gather_atommnatypes()
@@ -372,8 +372,8 @@ subroutine eqvatomperm (mol0, mol1, workcoords1, mapping)
    weights = mol0%gather_weights()
    adjmat0 = mol0%gather_adjmatrix()
    adjmat1 = mol1%gather_adjmatrix()
-   fragroots0 = mol0%gather_fragroots()
-   fragroots1 = mol1%gather_fragroots()
+   fragroots0 = mol0%gather_molfragroots()
+   fragroots1 = mol1%gather_molfragroots()
 
    ! set equivalence group offsets
 

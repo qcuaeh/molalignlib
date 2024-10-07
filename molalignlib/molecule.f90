@@ -32,7 +32,6 @@ end type
 
 type, public :: molecule_type
    integer :: natom
-!   integer :: nfrag
    character(:), allocatable :: title
    type(atom_type), allocatable :: atoms(:)
    type(atompartition_type) :: eltypes
@@ -60,7 +59,7 @@ contains
    procedure :: get_title
    procedure :: get_bonds
    procedure :: get_adjlists
-   procedure :: get_molfragparts
+   procedure :: get_molfrags
    procedure :: get_atomeltypes
    procedure :: get_atommnatypes
    procedure :: get_weights
@@ -75,8 +74,8 @@ contains
    procedure :: gather_adjlists
    procedure :: gather_eltypes
    procedure :: gather_mnatypes
-   procedure :: gather_molfragparts
-   procedure :: gather_fragroots
+   procedure :: gather_molfrags
+   procedure :: gather_molfragroots
    procedure :: gather_atomeltypes
    procedure :: gather_atommnatypes
    procedure :: gather_weights
@@ -298,7 +297,7 @@ subroutine set_molfrags(self, nfrag, fragidcs)
 
 end subroutine
 
-function get_molfragparts(self) result(parts)
+function get_molfrags(self) result(parts)
    class(molecule_type), intent(in) :: self
    ! Local variables
    integer :: i
@@ -312,7 +311,7 @@ function get_molfragparts(self) result(parts)
 
 end function
 
-function gather_molfragparts(self) result(parts)
+function gather_molfrags(self) result(parts)
    class(molecule_type), intent(in) :: self
    ! Local variables
    integer :: i
@@ -326,7 +325,7 @@ function gather_molfragparts(self) result(parts)
 
 end function
 
-function gather_fragroots(self) result(fragroots)
+function gather_molfragroots(self) result(fragroots)
    class(molecule_type), intent(in) :: self
    ! Result variable
    integer, allocatable :: fragroots(:)

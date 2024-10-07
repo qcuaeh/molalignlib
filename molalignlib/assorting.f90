@@ -30,7 +30,7 @@ implicit none
 contains
 
 ! Group atoms by atomic number and label
-subroutine resolve_eltypes(mol)
+subroutine compute_eltypes(mol)
    type(molecule_type), intent(inout) :: mol
    ! Local variables
    integer :: i, j
@@ -93,7 +93,7 @@ subroutine resolve_eltypes(mol)
 end subroutine
 
 ! Assort atoms by MNA type at infinite level
-subroutine set_equiv_atoms(mol)
+subroutine compute_mnatypes(mol)
    type(molecule_type), intent(inout) :: mol
    ! Local variables
    integer :: i, nintype, ntype
@@ -116,7 +116,7 @@ subroutine set_equiv_atoms(mol)
    ! Determine MNA types iteratively
 
    do
-      call resolve_mnatypes(adjlists, nintype, ntype, intypes, types, typemap)
+      call compute_lvlmnatypes(adjlists, nintype, ntype, intypes, types, typemap)
       ! Exit the loop if types are unchanged
       if (all(types == intypes)) exit
       nintype = ntype
@@ -133,32 +133,8 @@ subroutine set_equiv_atoms(mol)
 
 end subroutine
 
-! Assort neighbors by MNA type
-subroutine assort_neighbors(mol)
-   type(molecule_type), intent(inout) :: mol
-   ! Local variables
-   integer :: i
-   integer :: nadjs(mol%natom), adjlists(maxcoord, mol%natom)
-   integer :: nadjmnatypes(mol%natom), adjmnatypepartlens(maxcoord, mol%natom)
-   integer :: adjeqvid(maxcoord), atomorder(maxcoord), atommnatypes(mol%natom)
-
-   nadjs = mol%old_get_nadjs()
-   adjlists = mol%olg_get_adjlists()
-   atommnatypes = mol%get_atommnatypes()
-
-   do i = 1, mol%natom
-      call group_by(adjlists(:nadjs(i), i), atommnatypes, nadjmnatypes(i), adjmnatypepartlens(:, i), adjeqvid)
-      atomorder(:nadjs(i)) = sorted_order(adjeqvid, nadjs(i))
-      adjlists(:nadjs(i), i) = adjlists(atomorder(:nadjs(i)), i)
-   end do
-
-   call mol%set_adjlists(nadjs, adjlists)
-   call mol%set_adjmnatypepartlens(nadjmnatypes, adjmnatypepartlens)
-
-end subroutine
-
 ! Find next level MNA types
-subroutine resolve_mnatypes(adjlists, nintype, ntype, intypes, types, typemap)
+subroutine compute_lvlmnatypes(adjlists, nintype, ntype, intypes, types, typemap)
    type(atomlist_type), intent(in) :: adjlists(:)
    integer, intent(in) :: nintype
    integer, dimension(:), intent(in) :: intypes
@@ -195,7 +171,7 @@ subroutine resolve_mnatypes(adjlists, nintype, ntype, intypes, types, typemap)
 end subroutine
 
 ! Find next level cross MNA types between mol0 and mol1
-subroutine resolve_crossmnatypes(adjlists0, adjlists1, nintype, intypes0, intypes1, &
+subroutine compute_crossmnatypes(adjlists0, adjlists1, nintype, intypes0, intypes1, &
       ntype, types0, types1)
    type(atomlist_type), dimension(:), intent(in) :: adjlists0, adjlists1
    integer, intent(in) :: nintype
@@ -262,8 +238,32 @@ subroutine resolve_crossmnatypes(adjlists0, adjlists1, nintype, intypes0, intype
 
 end subroutine
 
+! Assort neighbors by MNA type
+subroutine assort_neighbors(mol)
+   type(molecule_type), intent(inout) :: mol
+   ! Local variables
+   integer :: i
+   integer :: nadjs(mol%natom), adjlists(maxcoord, mol%natom)
+   integer :: nadjmnatypes(mol%natom), adjmnatypepartlens(maxcoord, mol%natom)
+   integer :: adjeqvid(maxcoord), atomorder(maxcoord), atommnatypes(mol%natom)
+
+   nadjs = mol%old_get_nadjs()
+   adjlists = mol%olg_get_adjlists()
+   atommnatypes = mol%get_atommnatypes()
+
+   do i = 1, mol%natom
+      call assort_groups(adjlists(:nadjs(i), i), atommnatypes, nadjmnatypes(i), adjmnatypepartlens(:, i), adjeqvid)
+      atomorder(:nadjs(i)) = sorted_order(adjeqvid, nadjs(i))
+      adjlists(:nadjs(i), i) = adjlists(atomorder(:nadjs(i)), i)
+   end do
+
+   call mol%set_adjlists(nadjs, adjlists)
+   call mol%set_adjmnatypepartlens(nadjmnatypes, adjmnatypepartlens)
+
+end subroutine
+
 ! Group atoms by types
-subroutine group_by(items, itemtypes, ngroup, grouplens, groupidcs)
+subroutine assort_groups(items, itemtypes, ngroup, grouplens, groupidcs)
    integer, intent(out) :: ngroup
    integer, dimension(:), intent(in) :: itemtypes, items
    integer, dimension(:), intent(out) :: groupidcs, grouplens

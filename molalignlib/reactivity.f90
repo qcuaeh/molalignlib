@@ -65,8 +65,8 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
    mnatypes1 = mol1%get_mnatypes()
    atommnatypes0 = mol0%get_atommnatypes()
    atommnatypes1 = mol1%get_atommnatypes()
-   molfragparts0 = mol0%get_molfragparts()
-   molfragparts1 = mol1%get_molfragparts()
+   molfragparts0 = mol0%get_molfrags()
+   molfragparts1 = mol1%get_molfrags()
    unmapping = inverse_permutation(mapping)
 
    ! Remove mismatched bonds

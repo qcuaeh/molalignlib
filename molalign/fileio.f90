@@ -91,8 +91,8 @@ subroutine readfile(unit, fmtin, mol)
 
    call set_bonds(mol)
    call find_molfrags(mol)
-   call resolve_eltypes(mol)
-   call set_equiv_atoms(mol)
+   call compute_eltypes(mol)
+   call compute_mnatypes(mol)
    call assort_neighbors(mol)
 
 end subroutine
