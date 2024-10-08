@@ -60,6 +60,8 @@ subroutine minadjdiff (mol0, mol1, mapping)
    natom = mol0%get_natom()
 
    eltypes0 = mol0%gather_eltypes()
+   atomeltypes0 = eltypes0%get_atomtypes()
+
    neltype0 = size(eltypes0%subsets)
    allocate (eltypepops0(neltype0))
    do h = 1, neltype0
@@ -68,6 +70,9 @@ subroutine minadjdiff (mol0, mol1, mapping)
 
    mnatypes0 = mol0%gather_mnatypes()
    mnatypes1 = mol1%gather_mnatypes()
+   atommnatypes0 = mnatypes0%get_atomtypes()
+   atommnatypes1 = mnatypes1%get_atomtypes()
+
    nmnatype0 = size(mnatypes0%subsets)
    nmnatype1 = size(mnatypes1%subsets)
    allocate (mnatypepops0(nmnatype0))
@@ -100,10 +105,6 @@ subroutine minadjdiff (mol0, mol1, mapping)
    adjmat1 = mol1%gather_adjmatrix()
    fragroots0 = mol0%gather_molfragroots()
    fragroots1 = mol1%gather_molfragroots()
-
-   atomeltypes0 = mol0%gather_atomeltypes()
-   atommnatypes0 = mol0%gather_atommnatypes()
-   atommnatypes1 = mol1%gather_atommnatypes()
 
    !  initialization
 
@@ -334,6 +335,7 @@ subroutine eqvatomperm (mol0, mol1, workcoords1, mapping)
    natom = mol0%get_natom()
 
    eltypes0 = mol0%gather_eltypes()
+
    neltype0 = size(eltypes0%subsets)
    allocate (eltypepops0(neltype0))
    do h = 1, neltype0
@@ -342,6 +344,7 @@ subroutine eqvatomperm (mol0, mol1, workcoords1, mapping)
 
    mnatypes0 = mol0%gather_mnatypes()
    mnatypes1 = mol1%gather_mnatypes()
+
    nmnatype0 = size(mnatypes0%subsets)
    nmnatype1 = size(mnatypes1%subsets)
    allocate (mnatypepops0(nmnatype0))

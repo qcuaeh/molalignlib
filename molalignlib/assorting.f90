@@ -36,11 +36,11 @@ subroutine compute_eltypes(mol)
    integer :: i, j
    integer :: neltype
    integer :: atomeltypes(mol%natom)
-   integer :: eltypepops(mol%natom)
    logical :: untyped(mol%natom)
    integer, dimension(mol%natom) :: elnums, labels
    integer, dimension(mol%natom) :: groupelnums, grouplabels
    integer, dimension(mol%natom) :: foreorder, backorder
+   type(atompartition_type) :: eltypes
 !   real(rk), allocatable :: weights(:)
 
    neltype = 0
@@ -52,7 +52,6 @@ subroutine compute_eltypes(mol)
    do i = 1, mol%natom
       if (untyped(i)) then
          neltype = neltype + 1
-         eltypepops(neltype) = 1
          groupelnums(neltype) = elnums(i)
          grouplabels(neltype) = labels(i)
          atomeltypes(i) = neltype
@@ -63,7 +62,6 @@ subroutine compute_eltypes(mol)
 !                  if (weights(i) == weights(j)) then
                      untyped(j) = .false.
                      atomeltypes(j) = neltype
-                     eltypepops(neltype) = eltypepops(neltype) + 1
 !                     weights(j) = weights(i)
 !                  else
 !                     ! Abort if there are inconsistent weights
@@ -79,16 +77,15 @@ subroutine compute_eltypes(mol)
    ! Order parts by atom tag
    foreorder(:neltype) = sorted_order(grouplabels, neltype)
    backorder(:neltype) = inverse_permutation(foreorder(:neltype))
-   eltypepops(:neltype) = eltypepops(foreorder(:neltype))
    atomeltypes = backorder(atomeltypes)
 
    ! Order parts by atomic number
    foreorder(:neltype) = sorted_order(groupelnums, neltype)
    backorder(:neltype) = inverse_permutation(foreorder(:neltype))
-   eltypepops(:neltype) = eltypepops(foreorder(:neltype))
    atomeltypes = backorder(atomeltypes)
 
-   call mol%set_eltypes(neltype, atomeltypes)
+   eltypes = atompartition(neltype, atomeltypes)
+   call mol%set_eltypes(eltypes)
 
 end subroutine
 
@@ -99,17 +96,16 @@ subroutine compute_mnatypes(mol)
    integer :: i, nintype, ntype
    integer, allocatable, dimension(:) :: intypes, types, typemap
    integer, allocatable, dimension(:) :: foreorder, backorder
-   type(atompartition_type) :: eltypes
    type(atomlist_type), allocatable :: adjlists(:)
+   type(atompartition_type) :: mnatypes
 
    allocate (types(size(mol%atoms)))
    allocate (typemap(size(mol%atoms)))
    allocate (foreorder(size(mol%atoms)))
    allocate (backorder(size(mol%atoms)))
 
-   eltypes = mol%get_eltypes()
-   nintype = size(eltypes%subsets)
-   intypes = mol%get_atomeltypes()
+   nintype = size(mol%eltypes%subsets)
+   intypes = mol%eltypes%get_atomtypes()
    typemap(:nintype) = [(i, i=1, nintype)]
    adjlists = mol%get_adjlists()
 
@@ -127,9 +123,8 @@ subroutine compute_mnatypes(mol)
    backorder(:ntype) = inverse_permutation(foreorder(:ntype))
    types = backorder(types)
 
-!   mnatypes = atompartition(ntype, types)
-!   call mol%set_mnatypes(mnatypes)
-   call mol%set_mnatypes(ntype, types)
+   mnatypes = atompartition(ntype, types)
+   call mol%set_mnatypes(mnatypes)
 
 end subroutine
 
@@ -249,7 +244,7 @@ subroutine assort_neighbors(mol)
 
    nadjs = mol%old_get_nadjs()
    adjlists = mol%olg_get_adjlists()
-   atommnatypes = mol%get_atommnatypes()
+   atommnatypes = mol%mnatypes%get_atomtypes()
 
    do i = 1, mol%natom
       call assort_groups(adjlists(:nadjs(i), i), atommnatypes, nadjmnatypes(i), adjmnatypepartlens(:, i), adjeqvid)

@@ -64,7 +64,7 @@ subroutine molecule_remap( &
 
    ! Abort if molecules have different number of atoms
 
-   if (mol0%get_natom() /= mol1%get_natom()) then
+   if (size(mol0%atoms) /= size(mol1%atoms)) then
       write (stderr, '(a)') 'Error: These molecules are not isomers'
       stop
    end if
@@ -78,7 +78,7 @@ subroutine molecule_remap( &
 
    ! Abort if there are conflicting atomic types
 
-   if (any(mol0%gather_atomeltypes() /= mol1%gather_atomeltypes())) then
+   if (.not. mol0%eltypes == mol1%eltypes) then
       write (stderr, '(a)') 'Error: There are conflicting atomic types'
       stop
    end if
@@ -193,7 +193,7 @@ subroutine molecule_align( &
 
    ! Abort if molecules have different number of atoms
 
-   if (mol0%get_natom() /= mol1%get_natom()) then
+   if (size(mol0%atoms) /= size(mol1%atoms)) then
       write (stderr, '(a)') 'Error: These molecules are not isomers'
       stop
    end if
@@ -207,7 +207,7 @@ subroutine molecule_align( &
 
    ! Abort if there are conflicting atomic types
 
-   if (any(mol0%gather_atomeltypes() /= mol1%gather_atomeltypes())) then
+   if (.not. mol0%eltypes == mol1%eltypes) then
       write (stderr, '(a)') 'Error: There are conflicting atomic types'
       stop
    end if
@@ -221,7 +221,7 @@ subroutine molecule_align( &
 
    ! Abort if atomic types are not ordered
 
-   if (any(mol0%get_atomeltypes() /= mol1%get_atomeltypes())) then
+   if (.not. mol0%eltypes == mol1%eltypes) then
       write (stderr, '(a)') 'Error: Atomic types are not in the same order'
       stop
    end if

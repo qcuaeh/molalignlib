@@ -110,16 +110,10 @@ subroutine compute_equivmat( eltypes0, adjlists0, adjlists1, equivmat)
    allocate (types0(eltypes0%natom), types1(eltypes0%natom))
    allocate (intypes0(eltypes0%natom), intypes1(eltypes0%natom))
 
-   do h = 1, size(eltypes0%subsets)
-      do i = 1, size(eltypes0%subsets(h)%atomidcs)
-         atomidx_i = eltypes0%subsets(h)%atomidcs(i)
-         intypes0(atomidx_i) = h
-         intypes1(atomidx_i) = h
-      end do
-   end do
-
    level = 1
    nintype = size(eltypes0%subsets)
+   intypes0 = eltypes0%get_atomtypes()
+   intypes1 = intypes0
 
    do
 
