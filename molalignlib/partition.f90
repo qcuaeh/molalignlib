@@ -11,6 +11,7 @@ end type
 
 type, public :: atompartition_type
    integer :: natom
+   integer :: largest
    type(atomlist_type), allocatable :: subsets(:)
 contains
    procedure :: mapped
@@ -27,8 +28,6 @@ function atompartition(ntype, atomtypes)
    integer :: h
    integer, allocatable :: n(:)
 
-   atompartition%natom = size(atomtypes)
-
    allocate (n(ntype))
    allocate (atompartition%subsets(ntype))
 
@@ -36,6 +35,9 @@ function atompartition(ntype, atomtypes)
    do h = 1, size(atomtypes)
       n(atomtypes(h)) = n(atomtypes(h)) + 1
    end do
+
+   atompartition%natom = sum(n)
+   atompartition%largest = maxval(n)
 
    do h = 1, ntype
       allocate (atompartition%subsets(h)%atomidcs(n(h)))
@@ -57,8 +59,7 @@ function mapped(self, mapping) result(atompartition)
    ! Local variables
    integer :: h
 
-   atompartition%natom = self%natom
-   allocate (atompartition%subsets(size(self%subsets)))
+   atompartition = self
    do h = 1, size(self%subsets)
       atompartition%subsets(h)%atomidcs = mapping(self%subsets(h)%atomidcs)
    end do

@@ -5,6 +5,27 @@ implicit none
 
 contains
 
+subroutine minperm_biased(coords0, coords1, biasmat, mapping)
+   real(rk), dimension(:, :), intent(in) :: coords0, coords1
+   real(rk), dimension(:, :), intent(in) :: biasmat
+   integer, dimension(:), intent(out) :: mapping
+   ! Local variables
+   integer :: i, j
+   real(rk), allocatable :: costs(:, :)
+   real(rk) :: dummy
+
+   allocate (costs(size(coords0, dim=2), size(coords1, dim=2)))
+
+   do i = 1, size(coords0, dim=2)
+      do j = 1, size(coords1, dim=2)
+         costs(i, j) = sum((coords0(:, i) - coords1(:, j))**2) + biasmat(j, i)
+      end do
+   end do
+
+   call assndx(1, costs, size(coords0, dim=2), size(coords1, dim=2), mapping, dummy)
+
+end subroutine
+
 subroutine assndx(mode, a, n, m, k, sum)
 !https://wp.csiro.au/alanmiller/assndx.f90
 ! Code converted using TO_F90 by Alan Miller

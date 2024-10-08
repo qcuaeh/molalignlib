@@ -19,6 +19,7 @@ use stdio
 use kinds
 use bounds
 use partition
+use permutation
 use lapdense
 use lapsparse
 
@@ -55,24 +56,19 @@ subroutine assign_atoms_nearest( eltypes0, coords0, coords1, prunemat, biasmat, 
    real(rk), dimension(:, :), intent(in) :: biasmat
    integer, dimension(:), intent(out) :: mapping
    ! Local variables
-   integer :: h, offset
-   integer, allocatable :: eltypesubsetlens(:)
+   integer :: h
+   integer, allocatable :: atomidcs(:)
+   integer, allocatable :: auxmap(:)
    real(rk) :: dummy
 
-   allocate (eltypesubsetlens(size(eltypes0%subsets)))
-   do h = 1, size(eltypes0%subsets)
-      eltypesubsetlens(h) = size(eltypes0%subsets(h)%atomidcs)
-   end do
+   allocate (auxmap(eltypes0%largest))
 
    ! Fill distance matrix for each block
 
-   offset = 0
    do h = 1, size(eltypes0%subsets)
-      call minperm_nearest(eltypesubsetlens(h), coords0(:, offset+1:offset+eltypesubsetlens(h)), &
-         coords1(:, offset+1:offset+eltypesubsetlens(h)), prunemat(offset+1:offset+eltypesubsetlens(h), &
-         offset+1:offset+eltypesubsetlens(h)), mapping(offset+1:), dummy)
-      mapping(offset+1:offset+eltypesubsetlens(h)) = mapping(offset+1:offset+eltypesubsetlens(h)) + offset
-      offset = offset + eltypesubsetlens(h)
+      atomidcs = eltypes0%subsets(h)%atomidcs 
+      call minperm_nearest(size(atomidcs), coords0(:, atomidcs), coords1(:, atomidcs), auxmap, dummy)
+      mapping(atomidcs) = atomidcs(auxmap(:size(atomidcs)))
    end do
 
 end subroutine
@@ -85,25 +81,20 @@ subroutine assign_atoms_pruned( eltypes0, coords0, coords1, prunemat, biasmat, m
    real(rk), dimension(:, :), intent(in) :: biasmat
    integer, dimension(:), intent(out) :: mapping
    ! Local variables
-   integer :: h, offset
-   integer, allocatable :: eltypesubsetlens(:)
+   integer :: h
+   integer, allocatable :: atomidcs(:)
+   integer, allocatable :: auxmap(:)
    real(rk) :: dummy
 
-   allocate (eltypesubsetlens(size(eltypes0%subsets)))
-   do h = 1, size(eltypes0%subsets)
-      eltypesubsetlens(h) = size(eltypes0%subsets(h)%atomidcs)
-   end do
+   allocate (auxmap(eltypes0%largest))
 
    ! Fill distance matrix for each block
 
-   offset = 0
-
    do h = 1, size(eltypes0%subsets)
-      call minperm_pruned(eltypesubsetlens(h), coords0(:, offset+1:offset+eltypesubsetlens(h)), &
-         coords1(:, offset+1:offset+eltypesubsetlens(h)), prunemat(offset+1:offset+eltypesubsetlens(h), &
-         offset+1:offset+eltypesubsetlens(h)), mapping(offset+1:), dummy)
-      mapping(offset+1:offset+eltypesubsetlens(h)) = mapping(offset+1:offset+eltypesubsetlens(h)) + offset
-      offset = offset + eltypesubsetlens(h)
+      atomidcs = eltypes0%subsets(h)%atomidcs 
+      call minperm_pruned(size(atomidcs), coords0(:, atomidcs), coords1(:, atomidcs), &
+           prunemat(atomidcs, atomidcs), auxmap, dummy)
+      mapping(atomidcs) = atomidcs(auxmap(:size(atomidcs)))
    end do
 
 end subroutine
@@ -116,28 +107,18 @@ subroutine assign_atoms_biased( eltypes0, coords0, coords1, prunemat, biasmat, m
    real(rk), dimension(:, :), intent(in) :: biasmat
    integer, dimension(:), intent(out) :: mapping
    ! Local variables
-   integer :: h, i, j, offset
-   real(rk), allocatable :: costs(:, :)
-   integer, allocatable :: eltypesubsetlens(:)
-   real(rk) :: dummy
+   integer :: h
+   integer, allocatable :: atomidcs(:)
+   integer, allocatable :: auxmap(:)
 
-   allocate (eltypesubsetlens(size(eltypes0%subsets)))
+   allocate (auxmap(eltypes0%largest))
+
+   ! Fill distance matrix for each block
+
    do h = 1, size(eltypes0%subsets)
-      eltypesubsetlens(h) = size(eltypes0%subsets(h)%atomidcs)
-   end do
-
-   allocate (costs(size(coords0, dim=2), size(coords0, dim=2)))
-
-   offset = 0
-   do h = 1, size(eltypes0%subsets)
-      do i = offset + 1, offset + eltypesubsetlens(h)
-         do j = offset + 1, offset + eltypesubsetlens(h)
-            costs(i, j) = sum((coords0(:, i) - coords1(:, j))**2) + biasmat(j, i)
-         end do
-      end do
-      call assndx(1, costs(offset+1:, offset+1:), eltypesubsetlens(h), eltypesubsetlens(h), mapping(offset+1:), dummy)
-      mapping(offset+1:offset+eltypesubsetlens(h)) = mapping(offset+1:offset+eltypesubsetlens(h)) + offset
-      offset = offset + eltypesubsetlens(h)
+      atomidcs = eltypes0%subsets(h)%atomidcs 
+      call minperm_biased(coords0(:, atomidcs), coords1(:, atomidcs), biasmat(atomidcs, atomidcs), auxmap)
+      mapping(atomidcs) = atomidcs(auxmap(:size(atomidcs)))
    end do
 
 end subroutine

@@ -16,7 +16,7 @@ integer, parameter :: maxnei = 20
 
 contains
 
-subroutine minperm_nearest(n, p, q, mask, perm, dist)
+subroutine minperm_nearest(n, p, q, perm, dist)
 
 ! Adapted from GMIN: A program for finding global minima
 ! Copyright (C) 1999-2006 David J. Wales
@@ -45,7 +45,6 @@ subroutine minperm_nearest(n, p, q, mask, perm, dist)
 
    integer :: n
    real(rk) p(3, n), q(3, n)
-   logical mask(n, n)
 
 !   Output
 !     perm: Permutation so that p(i) <--> q(perm(i))
