@@ -163,8 +163,8 @@ subroutine set_atompartition(self, atompartition)
    integer :: i, h, offset
 
    self%atompartition = atompartition
-   allocate (self%atomorder(atompartition%natom))
-   allocate (self%atomordermap(atompartition%natom))
+   allocate (self%atomorder(atompartition%subsetsum))
+   allocate (self%atomordermap(atompartition%subsetsum))
 
    offset = 0
    do h = 1, size(atompartition%subsets)

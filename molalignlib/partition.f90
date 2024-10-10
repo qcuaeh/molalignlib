@@ -3,13 +3,33 @@ use stdio
 
 implicit none
 
+type, public :: new_atomlist_type
+   integer, pointer :: atomidcs(:) => null()
+   integer, pointer :: atomidcs_allocation(:)
+contains
+   procedure :: append
+end type
+
+type, public :: new_atompartition_type
+   integer :: subsetsum
+   integer :: subsetmax
+   integer :: maxsize  ! Store the maximum size
+   type(new_atomlist_type), pointer :: subsets(:) => null()
+   type(new_atomlist_type), pointer :: subsets_allocation(:)
+contains
+   procedure :: new_subset
+   procedure :: allocate_partition
+!   procedure :: get_atomtypes
+!   procedure :: mapped
+end type
+
 type, public :: atomlist_type
    integer, allocatable :: atomidcs(:)
 end type
 
 type, public :: atompartition_type
-   integer :: natom
-   integer :: largest
+   integer :: subsetsum
+   integer :: subsetmax
    type(atomlist_type), allocatable :: subsets(:)
 contains
    procedure :: get_atomtypes
@@ -21,6 +41,38 @@ interface operator (==)
 end interface
 
 contains
+
+subroutine allocate_partition(self, maxsize)
+   class(new_atompartition_type), intent(inout) :: self
+   integer, intent(in) :: maxsize
+
+   self%maxsize = maxsize
+   allocate(self%subsets_allocation(maxsize))
+   self%subsets => self%subsets_allocation(1:0)
+
+end subroutine
+
+subroutine append(self, element)
+   class(new_atomlist_type), intent(inout) :: self
+   integer, intent(in) :: element
+   integer :: new_size
+
+   new_size = size(self%atomidcs) + 1
+   self%atomidcs_allocation(new_size) = element
+   self%atomidcs => self%atomidcs_allocation(1:new_size)
+
+end subroutine
+
+function new_subset(self) result(index)
+   class(new_atompartition_type), intent(inout) :: self
+   integer :: index
+
+   index = size(self%subsets) + 1
+   allocate(self%subsets_allocation(index)%atomidcs_allocation(self%maxsize))
+   self%subsets_allocation(index)%atomidcs => self%subsets_allocation(index)%atomidcs_allocation(1:0)
+   self%subsets => self%subsets_allocation(1:index)
+
+end function
 
 function atompartition(ntype, atomtypes)
    integer, intent(in) :: ntype
@@ -39,8 +91,8 @@ function atompartition(ntype, atomtypes)
       n(atomtypes(h)) = n(atomtypes(h)) + 1
    end do
 
-   atompartition%natom = sum(n)
-   atompartition%largest = maxval(n)
+   atompartition%subsetsum = sum(n)
+   atompartition%subsetmax = maxval(n)
 
    do h = 1, ntype
       allocate (atompartition%subsets(h)%atomidcs(n(h)))
@@ -62,7 +114,7 @@ function get_atomtypes(self) result(atomtypes)
    integer :: h, i
    integer :: atomidx_i
 
-   allocate (atomtypes(self%natom))
+   allocate (atomtypes(self%subsetsum))
 
    do h = 1, size(self%subsets)
       do i = 1, size(self%subsets(h)%atomidcs)

@@ -29,21 +29,54 @@ implicit none
 
 contains
 
+! Partition atoms by atomic number
+subroutine compute_crosseltypes(mol0, mol1)
+   type(molecule_type), intent(inout) :: mol0, mol1
+   ! Local variables
+   integer :: i, elnum_i
+   integer, allocatable :: typedict(:)
+   type(new_atompartition_type) :: eltypes0, eltypes1
+
+   call eltypes0%allocate_partition(size(mol0%atoms))
+   allocate (typedict(size(mol0%atoms)))
+   typedict(:) = 0
+
+   do i = 1, size(mol0%atoms)
+      elnum_i = mol0%atoms(i)%elnum
+      if (typedict(elnum_i) == 0) then
+         typedict(elnum_i) = eltypes0%new_subset()
+      end if
+      call eltypes0%subsets(typedict(elnum_i))%append(i)
+   end do
+
+   do i = 1, size(mol1%atoms)
+      elnum_i = mol1%atoms(i)%elnum
+      if (typedict(elnum_i) == 0) then
+         typedict(elnum_i) = eltypes1%new_subset()
+      end if
+      call eltypes1%subsets(typedict(elnum_i))%append(i)
+   end do
+
+!   call mol0%set_eltypes(eltypes0)
+!   call mol1%set_eltypes(eltypes1)
+
+end subroutine
+
 ! Group atoms by atomic number and label
 subroutine compute_eltypes(mol)
    type(molecule_type), intent(inout) :: mol
    ! Local variables
    integer :: i, j
-   integer :: neltype
+   integer :: ntype
    integer :: atomeltypes(mol%natom)
    logical :: untyped(mol%natom)
    integer, dimension(mol%natom) :: elnums, labels
-   integer, dimension(mol%natom) :: groupelnums, grouplabels
+   integer, dimension(mol%natom) :: typeelnums, typelabels
    integer, dimension(mol%natom) :: foreorder, backorder
    type(atompartition_type) :: eltypes
 !   real(rk), allocatable :: weights(:)
 
-   neltype = 0
+   ntype = 0
    untyped(:) = .true.
    elnums = mol%get_elnums()
    labels = mol%get_labels()
@@ -51,17 +84,17 @@ subroutine compute_eltypes(mol)
 
    do i = 1, mol%natom
       if (untyped(i)) then
-         neltype = neltype + 1
-         groupelnums(neltype) = elnums(i)
-         grouplabels(neltype) = labels(i)
-         atomeltypes(i) = neltype
+         ntype = ntype + 1
+         typeelnums(ntype) = elnums(i)
+         typelabels(ntype) = labels(i)
+         atomeltypes(i) = ntype
          untyped(i) = .false.
          do j = 1, mol%natom
             if (untyped(j)) then
                if (elnums(i) == elnums(j) .and. labels(i) == labels(j)) then
 !                  if (weights(i) == weights(j)) then
                      untyped(j) = .false.
-                     atomeltypes(j) = neltype
+                     atomeltypes(j) = ntype
 !                     weights(j) = weights(i)
 !                  else
 !                     ! Abort if there are inconsistent weights
@@ -75,17 +108,22 @@ subroutine compute_eltypes(mol)
    end do
 
    ! Order parts by atom tag
-   foreorder(:neltype) = sorted_order(grouplabels, neltype)
-   backorder(:neltype) = inverse_permutation(foreorder(:neltype))
+   foreorder(:ntype) = sorted_order(typelabels, ntype)
+   backorder(:ntype) = inverse_permutation(foreorder(:ntype))
    atomeltypes = backorder(atomeltypes)
 
    ! Order parts by atomic number
-   foreorder(:neltype) = sorted_order(groupelnums, neltype)
-   backorder(:neltype) = inverse_permutation(foreorder(:neltype))
+   foreorder(:ntype) = sorted_order(typeelnums, ntype)
+   backorder(:ntype) = inverse_permutation(foreorder(:ntype))
    atomeltypes = backorder(atomeltypes)
 
-   eltypes = atompartition(neltype, atomeltypes)
+   eltypes = atompartition(ntype, atomeltypes)
    call mol%set_eltypes(eltypes)
+!   print '(25(i3,1x))', atomeltypes
+!   do i = 1, size(eltypes%subsets)
+!      print '(50(i3,1x))', eltypes%subsets(i)%atomidcs
+!   end do
+
 
 end subroutine
 
@@ -125,6 +163,10 @@ subroutine compute_mnatypes(mol)
 
    mnatypes = atompartition(ntype, types)
    call mol%set_mnatypes(mnatypes)
+!   print '(10(i3,1x))', types
+!   do i = 1, size(mnatypes%subsets)
+!      print '(50(i3,1x))', mnatypes%subsets(i)%atomidcs
+!   end do
 
 end subroutine
 

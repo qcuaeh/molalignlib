@@ -106,9 +106,9 @@ subroutine compute_equivmat( eltypes0, adjlists0, adjlists1, equivmat)
    integer, allocatable, dimension(:) :: types0, types1
    integer, allocatable, dimension(:) :: intypes0, intypes1
 
-   allocate (equivmat(eltypes0%natom, eltypes0%natom))
-   allocate (types0(eltypes0%natom), types1(eltypes0%natom))
-   allocate (intypes0(eltypes0%natom), intypes1(eltypes0%natom))
+   allocate (equivmat(eltypes0%subsetsum, eltypes0%subsetsum))
+   allocate (types0(eltypes0%subsetsum), types1(eltypes0%subsetsum))
+   allocate (intypes0(eltypes0%subsetsum), intypes1(eltypes0%subsetsum))
 
    level = 1
    nintype = size(eltypes0%subsets)
