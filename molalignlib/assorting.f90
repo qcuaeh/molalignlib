@@ -275,30 +275,6 @@ subroutine compute_crossmnatypes(adjlists0, adjlists1, nintype, intypes0, intype
 
 end subroutine
 
-! Assort neighbors by MNA type
-subroutine assort_neighbors(mol)
-   type(molecule_type), intent(inout) :: mol
-   ! Local variables
-   integer :: i
-   integer :: nadjs(mol%natom), adjlists(maxcoord, mol%natom)
-   integer :: nadjmnatypes(mol%natom), adjmnatypepartlens(maxcoord, mol%natom)
-   integer :: adjeqvid(maxcoord), atomorder(maxcoord), atommnatypes(mol%natom)
-
-   nadjs = mol%old_get_nadjs()
-   adjlists = mol%olg_get_adjlists()
-   atommnatypes = mol%mnatypes%get_atomtypes()
-
-   do i = 1, mol%natom
-      call assort_groups(adjlists(:nadjs(i), i), atommnatypes, nadjmnatypes(i), adjmnatypepartlens(:, i), adjeqvid)
-      atomorder(:nadjs(i)) = sorted_order(adjeqvid, nadjs(i))
-      adjlists(:nadjs(i), i) = adjlists(atomorder(:nadjs(i)), i)
-   end do
-
-   call mol%set_adjlists(nadjs, adjlists)
-   call mol%set_adjmnatypepartlens(nadjmnatypes, adjmnatypepartlens)
-
-end subroutine
-
 ! Group atoms by types
 subroutine assort_groups(items, itemtypes, ngroup, grouplens, groupidcs)
    integer, intent(out) :: ngroup

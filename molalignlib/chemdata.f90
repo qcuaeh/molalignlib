@@ -18,9 +18,9 @@ module chemdata
 ! Purpose: Definition of physical constants
 use kinds
 
-! elsym: Element symbols
-! covrad: Atomic covalent radii (Angstrom)
-! vdwrad: Atomic van der Waals radii (Angstrom)
+! elsyms: Element symbols
+! covradii: Atomic covalent radii (Angstrom)
+! vdwradii: Atomic van der Waals radii (Angstrom)
 ! stdmasses: Standard atomic masses
 ! valencies: Element valenc
 
@@ -28,7 +28,7 @@ implicit none
 
 integer, parameter :: nelem = 103
 
-character(2), parameter :: elsym(nelem) = [ &
+character(2), parameter :: elsyms(nelem) = [ &
 'H ',                                                                                                 'He', &
 'Li', 'Be',                                                             'B ', 'C ', 'N ', 'O ', 'F ', 'Ne', &
 'Na', 'Mg',                                                             'Al', 'Si', 'P ', 'S ', 'Cl', 'Ar', &
@@ -40,7 +40,7 @@ character(2), parameter :: elsym(nelem) = [ &
 ]
 
 ! Lit.: R.T. Sanderson, Inorganic Chemistry, Reinhold 1967
-real(rk), parameter :: covrad(nelem) = [ &
+real(rk), parameter :: covradii(nelem) = [ &
 0.31,                                                                                                 0.28, &
 1.28, 0.96,                                                             0.84, 0.76, 0.71, 0.66, 0.57, 0.58, &
 1.66, 1.41,                                                             1.21, 1.11, 1.07, 1.05, 1.02, 1.06, &
@@ -52,7 +52,7 @@ real(rk), parameter :: covrad(nelem) = [ &
 ]
 
 ! Lit.: A. Bondi, J. Phys. Chem. 68, 441 (1964)         
-real(rk), parameter :: vdwrad(nelem) = [ &
+real(rk), parameter :: vdwradii(nelem) = [ &
 1.20,                                                                                                 1.40, &
 1.82, 2.00,                                                             2.00, 1.70, 1.55, 1.52, 1.47, 1.54, &
 2.27, 1.73,                                                             2.00, 2.10, 1.80, 1.80, 1.75, 1.88, &

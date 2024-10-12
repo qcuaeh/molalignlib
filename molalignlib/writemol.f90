@@ -20,6 +20,7 @@ use molecule
 use bounds
 use strutils
 use chemdata
+use partition
 
 implicit none
 
@@ -44,7 +45,7 @@ subroutine writexyz(unit, mol)
    write (unit, '(a)') title
 
    do i = 1, natom
-      write (unit, '(a,3(2x,f12.6))') elsym(elnums(i)), coords(:, i)
+      write (unit, '(a,3(2x,f12.6))') elsyms(elnums(i)), coords(:, i)
    end do
 
 end subroutine
@@ -57,14 +58,13 @@ subroutine writemol2(unit, mol)
    integer :: i, natom
    character(:), allocatable :: title
    type(bond_type), allocatable :: bonds(:)
-   integer, allocatable :: elnums(:), nadjs(:)
    real(rk), allocatable :: coords(:, :)
+   type(atom_type), allocatable :: atoms(:)
 
    title = mol%get_title()
-   nadjs = mol%old_get_nadjs()
+   atoms = mol%get_atoms()
    bonds = mol%get_bonds()
    natom = mol%get_natom()
-   elnums = mol%get_elnums()
    coords = mol%get_coords()
 
    write (unit, '(a)') '@<TRIPOS>MOLECULE'
@@ -80,7 +80,7 @@ subroutine writemol2(unit, mol)
 
    do i = 1, natom
       write (unit, '(i4,2x,a2,3(1x,f12.6),2x,a4,1x,i2,1x,a4,1x,f7.3)') &
-         i, elsym(elnums(i)), coords(:, i), atomtype(elnums(i), nadjs(i)), 1, 'MOL1', 0.
+         i, elsyms(atoms(i)%elnum), coords(:, i), atomtype(atoms(i)), 1, 'MOL1', 0.
    end do
 
    write (unit, '(a)') '@<TRIPOS>BOND'
@@ -91,23 +91,27 @@ subroutine writemol2(unit, mol)
 
 end subroutine
 
-function atomtype(elnum, nadj)
-   integer, intent(in) :: elnum, nadj
-   integer :: hybnum
-   character(4) :: atomtype
+function atomtype(atom)
+   type(atom_type), intent(in) :: atom
+   ! Local variables
+   integer :: nadj, hybnum
+   character(4) :: elsym, atomtype
 
-   select case (elnum)
+   nadj = size(atom%adjlist)
+   elsym = elsyms(atom%elnum)
+
+   select case (atom%elnum)
    case (6)
       hybnum = nadj - 1
-      atomtype = trim(elsym(elnum))//'.'//intstr(hybnum)
+      atomtype = trim(elsym)//'.'//intstr(hybnum)
    case (7, 15)
       hybnum = min(nadj, 3)
-      atomtype = trim(elsym(elnum))//'.'//intstr(hybnum)
+      atomtype = trim(elsym)//'.'//intstr(hybnum)
    case (8, 16)
       hybnum = min(nadj + 1, 3)
-      atomtype = trim(elsym(elnum))//'.'//intstr(hybnum)
+      atomtype = trim(elsym)//'.'//intstr(hybnum)
    case default
-      atomtype = elsym(elnum)
+      atomtype = elsym
    end select
 
 end function

@@ -20,7 +20,6 @@ contains
    procedure :: new_subset
    procedure :: allocate_partition
 !   procedure :: get_atomtypes
-!   procedure :: mapped
 end type
 
 type, public :: atomlist_type
@@ -33,7 +32,6 @@ type, public :: atompartition_type
    type(atomlist_type), allocatable :: subsets(:)
 contains
    procedure :: get_atomtypes
-   procedure :: mapped
 end type
 
 interface operator (==)
@@ -145,21 +143,6 @@ function is_equal(self, other)
    end do
 
    is_equal = .true.
-
-end function
-
-function mapped(self, mapping) result(atompartition)
-   class(atompartition_type), intent(in) :: self
-   integer, intent(in) :: mapping(:)
-   ! Result variable
-   type(atompartition_type) :: atompartition
-   ! Local variables
-   integer :: h
-
-   atompartition = self
-   do h = 1, size(self%subsets)
-      atompartition%subsets(h)%atomidcs = mapping(self%subsets(h)%atomidcs)
-   end do
 
 end function
 

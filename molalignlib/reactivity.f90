@@ -21,6 +21,7 @@ use permutation
 use alignment
 use partition
 use molecule
+use tracking
 
 implicit none
 
@@ -124,6 +125,9 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
          end do
       end if
    end do
+
+   call find_molfrags(mol0)
+   call find_molfrags(mol1)
 
 end subroutine
 

@@ -93,7 +93,6 @@ subroutine readfile(unit, fmtin, mol)
    call find_molfrags(mol)
    call compute_eltypes(mol)
    call compute_mnatypes(mol)
-   call assort_neighbors(mol)
 
 end subroutine
 

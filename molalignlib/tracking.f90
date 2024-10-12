@@ -6,12 +6,13 @@ use stdio
 use molecule
 use bounds
 use sorting
+use partition
 
 implicit none
 private
 public find_molfrags
 
-integer, allocatable :: nadjs(:), adjlists(:, :)
+type(atomlist_type), allocatable :: adjlists(:)
 
 contains
 
@@ -26,8 +27,7 @@ subroutine find_molfrags (mol)
    allocate (fragsize(size(mol%atoms)))
    allocate (tracked(size(mol%atoms)))
 
-   nadjs = mol%old_get_nadjs()
-   adjlists = mol%olg_get_adjlists()
+   adjlists = mol%get_adjlists()
 
    ! initialization
 
@@ -67,8 +67,8 @@ recursive subroutine recrun (tracked, n, nfrag, fragidcs, fragsize)
    fragidcs(n) = nfrag
    fragsize(nfrag) = fragsize(nfrag) + 1
    
-   do i = 1, nadjs(n)
-      call recrun(tracked, adjlists(i, n), nfrag, fragidcs, fragsize)
+   do i = 1, size(adjlists(n)%atomidcs)
+      call recrun(tracked, adjlists(n)%atomidcs(i), nfrag, fragidcs, fragsize)
    end do
 
 end subroutine

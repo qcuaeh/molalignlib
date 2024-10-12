@@ -29,8 +29,8 @@ use adjacency
 use assorting
 use biasing
 use pruning
-use backtracking
 use printing
+!use backtracking
 
 implicit none
 
@@ -49,7 +49,7 @@ subroutine remap_atoms(mol0, mol1, maplist, countlist, nrec)
    real(rk), dimension(:, :), allocatable :: coords0, coords1
    logical, dimension(:, :), allocatable :: adjmat0, adjmat1
    type(atomlist_type), allocatable, dimension(:) :: adjlists0, adjlists1
-   type(atompartition_type) :: eltypes0
+   type(atompartition_type) :: eltypes0, eltypes1
 
    logical :: visited, overflow
    integer :: irec, krec, ntrial, nstep, steps
@@ -62,23 +62,26 @@ subroutine remap_atoms(mol0, mol1, maplist, countlist, nrec)
    real(rk) :: biasmat(mol0%natom, mol1%natom)
    real(rk) :: workcoords1(3, mol1%natom)
 
+   integer h
+
    natom = mol0%get_natom()
-   weights = mol0%gather_weights()
-   coords0 = mol0%gather_coords()
-   coords1 = mol1%gather_coords()
-   eltypes0 = mol0%gather_eltypes()
-   adjlists0 = mol0%gather_adjlists()
-   adjlists1 = mol1%gather_adjlists()
-   adjmat0 = mol0%gather_adjmatrix()
-   adjmat1 = mol1%gather_adjmatrix()
+   weights = mol0%get_weights()
+   coords0 = mol0%get_coords()
+   coords1 = mol1%get_coords()
+   eltypes0 = mol0%get_eltypes()
+   eltypes1 = mol1%get_eltypes()
+   adjlists0 = mol0%get_adjlists()
+   adjlists1 = mol1%get_adjlists()
+   adjmat0 = mol0%get_adjmatrix()
+   adjmat1 = mol1%get_adjmatrix()
 
    ! Calculate prune matrix
 
-   call prune_procedure(eltypes0, coords0, coords1, prunemat)
+   call prune_procedure(eltypes0, eltypes1, coords0, coords1, prunemat)
 
    ! Calculate bias matrix
 
-   call bias_procedure(eltypes0, adjlists0, adjlists1, biasmat)
+   call bias_procedure(eltypes0, eltypes1, adjlists0, adjlists1, biasmat)
 
    ! Initialize loop variables
 
@@ -104,16 +107,18 @@ subroutine remap_atoms(mol0, mol1, maplist, countlist, nrec)
 
       ! Minimize the euclidean distance
 
-      call assign_atoms(eltypes0, coords0, workcoords1, prunemat, biasmat, mapping)
+      call assign_atoms(eltypes0, eltypes1, coords0, workcoords1, prunemat, biasmat, mapping)
       rotquat = leastrotquat(natom, weights, coords0, workcoords1, mapping)
       prodquat = rotquat
       totalrot = rotangle(rotquat)
       call rotate(natom, workcoords1, rotquat)
+!      print *, sqrt(leastsquaredist(natom, weights, coords0, coords1, mapping)/sum(weights))
+!      stop
 
       steps = 1
 
       do while (iter_flag)
-         call assign_atoms(eltypes0, coords0, workcoords1, prunemat, biasmat, newmapping)
+         call assign_atoms(eltypes0, eltypes1, coords0, workcoords1, prunemat, biasmat, newmapping)
          if (all(newmapping == mapping)) exit
          rotquat = leastrotquat(natom, weights, coords0, workcoords1, newmapping)
          prodquat = quatmul(rotquat, prodquat)
@@ -125,12 +130,10 @@ subroutine remap_atoms(mol0, mol1, maplist, countlist, nrec)
 
       nstep = nstep + steps
 
-      if (back_flag) then
-
-         call minadjdiff(mol0, mol1, mapping)
-         call eqvatomperm(mol0, mol1, workcoords1, mapping)
-
-      end if
+!      if (back_flag) then
+!         call minadjdiff(mol0, mol1, mapping)
+!         call eqvatomperm(mol0, mol1, workcoords1, mapping)
+!      end if
 
       adjd = adjacencydiff(natom, adjmat0, adjmat1, mapping)
       rmsd = sqrt(leastsquaredist(natom, weights, coords0, coords1, mapping)/sum(weights))
@@ -188,9 +191,9 @@ subroutine remap_atoms(mol0, mol1, maplist, countlist, nrec)
 
    ! Reorder back to default atom ordering
 
-   do irec = 1, nrec
-      maplist(:, irec) = mol1%atomorder(maplist(mol0%atomordermap, irec))
-   end do
+!   do irec = 1, nrec
+!      maplist(:, irec) = mol1%atomorder(maplist(mol0%atomordermap, irec))
+!   end do
 
    ! Print stats if requested
 

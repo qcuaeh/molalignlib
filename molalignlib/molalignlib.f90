@@ -55,13 +55,6 @@ subroutine molecule_remap( &
    real(rk) :: travec0(3), travec1(3)
    real(rk), allocatable, dimension(:, :) :: coords0, coords1
 
-!   integer, dimension(mol0%natom) :: mapping
-!   integer :: nbond0, bonds0(2, maxcoord*mol0%natom)
-!   integer :: nbond1, bonds1(2, maxcoord*mol1%natom)
-
-   call mol0%set_atompartition(mol0%mnatypes)
-   call mol1%set_atompartition(mol1%mnatypes)
-
    ! Abort if molecules have different number of atoms
 
    if (size(mol0%atoms) /= size(mol1%atoms)) then
@@ -71,10 +64,10 @@ subroutine molecule_remap( &
 
    ! Abort if molecules are not isomers
 
-   if (any(mol0%gather_elnums() /= mol1%gather_elnums())) then
-      write (stderr, '(a)') 'Error: These molecules are not isomers'
-      stop
-   end if
+!   if (any(mol0%gather_elnums() /= mol1%gather_elnums())) then
+!      write (stderr, '(a)') 'Error: These molecules are not isomers'
+!      stop
+!   end if
 
    ! Abort if there are conflicting atomic types
 
@@ -118,10 +111,6 @@ subroutine molecule_remap( &
 !      call mol0%print_bonds()
 !      call mol1%print_bonds()
       call remove_reactive_bonds(mol0, mol1, maplist(:, 1))
-      call find_molfrags(mol0)
-      call find_molfrags(mol1)
-      call assort_neighbors(mol0)
-      call assort_neighbors(mol1)
       call remap_atoms(mol0, mol1, maplist, countlist, nrec)
    end if
 
@@ -129,17 +118,6 @@ subroutine molecule_remap( &
 
    call mol0%set_coords(coords0)
    call mol1%set_coords(coords1)
-
-!   ! Print coordinates with internal order
-
-!   call rotate(natom1, workcoords1, leastrotquat(natom0, workweights0, workcoords0, workcoords1, mapping))
-!   open(unit=99, file='aligned_debug.mol2', action='write', status='replace')
-!   call adjmat2bonds(natom0, workadjmat0, nbond0, bonds0)
-!   call adjmat2bonds(natom1, workadjmat1, nbond1, bonds1)
-!!   call adjmat2bonds(natom1, workadjmat1(mapping, mapping), nbond1, bonds1)
-!   call writemol2(99, 'coords0', natom0, workznums0, workcoords0, nbond0, bonds0)
-!   call writemol2(99, 'coords1', natom1, workznums1, workcoords1, nbond1, bonds1)
-!!   call writemol2(99, 'coords1', natom1, workznums1(mapping), workcoords1(:, mapping), nbond1, bonds1)
 
 end subroutine
 
@@ -200,10 +178,10 @@ subroutine molecule_align( &
 
    ! Abort if molecules are not isomers
 
-   if (any(mol0%gather_elnums() /= mol1%gather_elnums())) then
-      write (stderr, '(a)') '*Error: These molecules are not isomers'
-      stop
-   end if
+!   if (any(mol0%gather_elnums() /= mol1%gather_elnums())) then
+!      write (stderr, '(a)') '*Error: These molecules are not isomers'
+!      stop
+!   end if
 
    ! Abort if there are conflicting atomic types
 

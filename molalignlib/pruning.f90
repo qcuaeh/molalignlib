@@ -32,10 +32,10 @@ type subsets_type
 end type
 
 abstract interface
-   subroutine f_prune( eltypes0, coords0, coords1, prunemat)
+   subroutine f_prune( eltypes0, eltypes1, coords0, coords1, prunemat)
       use kinds
       use partition
-      type(atompartition_type), intent(in) :: eltypes0
+      type(atompartition_type), intent(in) :: eltypes0, eltypes1
       real(rk), dimension(:, :), intent(in) :: coords0, coords1
       logical, dimension(:, :), intent(out) :: prunemat
    end subroutine
@@ -46,8 +46,8 @@ procedure(f_prune), pointer :: prune_procedure
 
 contains
 
-subroutine prune_none( eltypes0, coords0, coords1, prunemat)
-   type(atompartition_type), intent(in) :: eltypes0
+subroutine prune_none( eltypes0, eltypes1, coords0, coords1, prunemat)
+   type(atompartition_type), intent(in) :: eltypes0, eltypes1
    real(rk), dimension(:, :), intent(in) :: coords0, coords1
    logical, dimension(:, :), intent(out) :: prunemat
    ! Local variables
@@ -57,8 +57,8 @@ subroutine prune_none( eltypes0, coords0, coords1, prunemat)
    do h = 1, size(eltypes0%subsets)
       do i = 1, size(eltypes0%subsets(h)%atomidcs)
          atomidx_i = eltypes0%subsets(h)%atomidcs(i)
-         do j = 1, size(eltypes0%subsets(h)%atomidcs)
-            atomidx_j = eltypes0%subsets(h)%atomidcs(j)
+         do j = 1, size(eltypes1%subsets(h)%atomidcs)
+            atomidx_j = eltypes1%subsets(h)%atomidcs(j)
             prunemat(atomidx_j, atomidx_i) = .true.
          end do
       end do
@@ -66,8 +66,8 @@ subroutine prune_none( eltypes0, coords0, coords1, prunemat)
 
 end subroutine
 
-subroutine prune_rd( eltypes0, coords0, coords1, prunemat)
-   type(atompartition_type), intent(in) :: eltypes0
+subroutine prune_rd( eltypes0, eltypes1, coords0, coords1, prunemat)
+   type(atompartition_type), intent(in) :: eltypes0, eltypes1
    real(rk), dimension(:, :), intent(in) :: coords0, coords1
    logical, dimension(:, :), intent(out) :: prunemat
    ! Local variables
@@ -80,10 +80,10 @@ subroutine prune_rd( eltypes0, coords0, coords1, prunemat)
    allocate (d1(size(coords1, dim=2)))
    do i = 1, size(coords0, dim=2)
       allocate (d0(i)%subsets(size(eltypes0%subsets)))
-      allocate (d1(i)%subsets(size(eltypes0%subsets)))
+      allocate (d1(i)%subsets(size(eltypes1%subsets)))
       do h = 1, size(eltypes0%subsets)
          allocate (d0(i)%subsets(h)%dists(size(eltypes0%subsets(h)%atomidcs)))
-         allocate (d1(i)%subsets(h)%dists(size(eltypes0%subsets(h)%atomidcs)))
+         allocate (d1(i)%subsets(h)%dists(size(eltypes1%subsets(h)%atomidcs)))
       end do
    end do
 
@@ -98,9 +98,9 @@ subroutine prune_rd( eltypes0, coords0, coords1, prunemat)
    end do
 
    do i = 1, size(coords1, dim=2)
-      do h = 1, size(eltypes0%subsets)
-         do j = 1, size(eltypes0%subsets(h)%atomidcs)
-            atomidx_j = eltypes0%subsets(h)%atomidcs(j)
+      do h = 1, size(eltypes1%subsets)
+         do j = 1, size(eltypes1%subsets(h)%atomidcs)
+            atomidx_j = eltypes1%subsets(h)%atomidcs(j)
             d1(i)%subsets(h)%dists(j) = sqrt(sum((coords1(:, atomidx_j) - coords1(:, i))**2))
          end do
          call sort(d1(i)%subsets(h)%dists)
@@ -110,8 +110,8 @@ subroutine prune_rd( eltypes0, coords0, coords1, prunemat)
    do h = 1, size(eltypes0%subsets)
       do i = 1, size(eltypes0%subsets(h)%atomidcs)
          atomidx_i = eltypes0%subsets(h)%atomidcs(i)
-         do j = 1, size(eltypes0%subsets(h)%atomidcs)
-            atomidx_j = eltypes0%subsets(h)%atomidcs(j)
+         do j = 1, size(eltypes1%subsets(h)%atomidcs)
+            atomidx_j = eltypes1%subsets(h)%atomidcs(j)
             pruned = .false.
             do k = 1, size(eltypes0%subsets)
                if (any(abs(d1(atomidx_j)%subsets(k)%dists - d0(atomidx_i)%subsets(k)%dists) > prune_tol)) then

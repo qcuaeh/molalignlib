@@ -71,7 +71,7 @@ function atomic_number(symbol) result(z)
    integer :: z
 
    do z = 1, nelem
-      if (uppercase(symbol) == uppercase(elsym(z))) then
+      if (uppercase(symbol) == uppercase(elsyms(z))) then
          return
       end if
    end do

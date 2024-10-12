@@ -25,10 +25,10 @@ use assorting
 implicit none
 
 abstract interface
-   subroutine f_bias( eltypes0, adjlists0, adjlists1, biasmat)
+   subroutine f_bias( eltypes0, eltypes1, adjlists0, adjlists1, biasmat)
       use kinds
       use partition
-      type(atompartition_type), intent(in) :: eltypes0
+      type(atompartition_type), intent(in) :: eltypes0, eltypes1
       type(atomlist_type), allocatable, dimension(:), intent(in) :: adjlists0, adjlists1
       real(rk), intent(out) :: biasmat(:, :)
    end subroutine
@@ -39,8 +39,8 @@ procedure(f_bias), pointer :: bias_procedure
 
 contains
 
-subroutine bias_none( eltypes0, adjlists0, adjlists1, biasmat)
-   type(atompartition_type), intent(in) :: eltypes0
+subroutine bias_none( eltypes0, eltypes1, adjlists0, adjlists1, biasmat)
+   type(atompartition_type), intent(in) :: eltypes0, eltypes1
    type(atomlist_type), allocatable, dimension(:), intent(in) :: adjlists0, adjlists1
    real(rk), intent(out) :: biasmat(:, :)
    ! Local variables
@@ -50,8 +50,8 @@ subroutine bias_none( eltypes0, adjlists0, adjlists1, biasmat)
    do h = 1, size(eltypes0%subsets)
       do i = 1, size(eltypes0%subsets(h)%atomidcs)
          atomidx_i = eltypes0%subsets(h)%atomidcs(i)
-         do j = 1, size(eltypes0%subsets(h)%atomidcs)
-            atomidx_j = eltypes0%subsets(h)%atomidcs(j)
+         do j = 1, size(eltypes1%subsets(h)%atomidcs)
+            atomidx_j = eltypes1%subsets(h)%atomidcs(j)
             biasmat(atomidx_j, atomidx_i) = 0
          end do
       end do
@@ -59,8 +59,8 @@ subroutine bias_none( eltypes0, adjlists0, adjlists1, biasmat)
 
 end subroutine
 
-subroutine bias_mna( eltypes0, adjlists0, adjlists1, biasmat)
-   type(atompartition_type), intent(in) :: eltypes0
+subroutine bias_mna( eltypes0, eltypes1, adjlists0, adjlists1, biasmat)
+   type(atompartition_type), intent(in) :: eltypes0, eltypes1
    type(atomlist_type), allocatable, dimension(:), intent(in) :: adjlists0, adjlists1
    real(rk), intent(out) :: biasmat(:, :)
    ! Local variables
@@ -69,14 +69,14 @@ subroutine bias_mna( eltypes0, adjlists0, adjlists1, biasmat)
    integer, allocatable :: equivmat(:, :)
 
    ! Calculate MNA equivalence matrix
-   call compute_equivmat(eltypes0, adjlists0, adjlists1, equivmat)
+   call compute_equivmat(eltypes0, eltypes1, adjlists0, adjlists1, equivmat)
 
    maxequiv = 0
    do h = 1, size(eltypes0%subsets)
       do i = 1, size(eltypes0%subsets(h)%atomidcs)
          atomidx_i = eltypes0%subsets(h)%atomidcs(i)
-         do j = 1, size(eltypes0%subsets(h)%atomidcs)
-            atomidx_j = eltypes0%subsets(h)%atomidcs(j)
+         do j = 1, size(eltypes1%subsets(h)%atomidcs)
+            atomidx_j = eltypes1%subsets(h)%atomidcs(j)
             maxequiv = max(maxequiv, equivmat(atomidx_j, atomidx_i))
          end do
       end do
@@ -85,8 +85,8 @@ subroutine bias_mna( eltypes0, adjlists0, adjlists1, biasmat)
    do h = 1, size(eltypes0%subsets)
       do i = 1, size(eltypes0%subsets(h)%atomidcs)
          atomidx_i = eltypes0%subsets(h)%atomidcs(i)
-         do j = 1, size(eltypes0%subsets(h)%atomidcs)
-            atomidx_j = eltypes0%subsets(h)%atomidcs(j)
+         do j = 1, size(eltypes1%subsets(h)%atomidcs)
+            atomidx_j = eltypes1%subsets(h)%atomidcs(j)
             biasmat(atomidx_j, atomidx_i) = bias_scale**2*(maxequiv - equivmat(atomidx_j, atomidx_i))
          end do
       end do
@@ -95,8 +95,8 @@ subroutine bias_mna( eltypes0, adjlists0, adjlists1, biasmat)
 end subroutine
 
 ! Calculate the maximum common MNA level for all atom cross assignments
-subroutine compute_equivmat( eltypes0, adjlists0, adjlists1, equivmat)
-   type(atompartition_type), intent(in) :: eltypes0
+subroutine compute_equivmat( eltypes0, eltypes1, adjlists0, adjlists1, equivmat)
+   type(atompartition_type), intent(in) :: eltypes0, eltypes1
    type(atomlist_type), allocatable, dimension(:), intent(in) :: adjlists0, adjlists1
    integer, allocatable, dimension(:, :), intent(out) :: equivmat
    ! Local variables
@@ -106,22 +106,22 @@ subroutine compute_equivmat( eltypes0, adjlists0, adjlists1, equivmat)
    integer, allocatable, dimension(:) :: types0, types1
    integer, allocatable, dimension(:) :: intypes0, intypes1
 
-   allocate (equivmat(eltypes0%subsetsum, eltypes0%subsetsum))
-   allocate (types0(eltypes0%subsetsum), types1(eltypes0%subsetsum))
-   allocate (intypes0(eltypes0%subsetsum), intypes1(eltypes0%subsetsum))
+   allocate (equivmat(eltypes1%subsetsum, eltypes0%subsetsum))
+   allocate (types0(eltypes0%subsetsum), types1(eltypes1%subsetsum))
+   allocate (intypes0(eltypes0%subsetsum), intypes1(eltypes1%subsetsum))
 
    level = 1
    nintype = size(eltypes0%subsets)
    intypes0 = eltypes0%get_atomtypes()
-   intypes1 = intypes0
+   intypes1 = eltypes1%get_atomtypes()
 
    do
 
       do h = 1, size(eltypes0%subsets)
          do i = 1, size(eltypes0%subsets(h)%atomidcs)
             atomidx_i = eltypes0%subsets(h)%atomidcs(i)
-            do j = 1, size(eltypes0%subsets(h)%atomidcs)
-               atomidx_j = eltypes0%subsets(h)%atomidcs(j)
+            do j = 1, size(eltypes1%subsets(h)%atomidcs)
+               atomidx_j = eltypes1%subsets(h)%atomidcs(j)
                if (intypes0(atomidx_i) == intypes1(atomidx_j)) then
                   equivmat(atomidx_j, atomidx_i) = level
                end if

@@ -171,7 +171,7 @@ subroutine set_bonds(mol)
    coords = mol%get_coords()
 
    ! Set adjacency radii
-   adjrads = covrad(elnums) + 0.25*(vdwrad(elnums) - covrad(elnums))
+   adjrads = covradii(elnums) + 0.25*(vdwradii(elnums) - covradii(elnums))
 
    ! Register adjacency matrix i,j if atoms i and j are closer
    ! than the sum of their adjacency radius
