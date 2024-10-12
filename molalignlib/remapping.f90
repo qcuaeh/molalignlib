@@ -62,8 +62,6 @@ subroutine remap_atoms(mol0, mol1, maplist, countlist, nrec)
    real(rk) :: biasmat(mol0%natom, mol1%natom)
    real(rk) :: workcoords1(3, mol1%natom)
 
-   integer h
-
    natom = mol0%get_natom()
    weights = mol0%get_weights()
    coords0 = mol0%get_coords()

@@ -21,7 +21,7 @@ use readmol
 use writemol
 use adjacency
 use assorting
-use tracking
+!use tracking
 
 implicit none
 
@@ -90,9 +90,9 @@ subroutine readfile(unit, fmtin, mol)
    end select
 
    call set_bonds(mol)
-   call find_molfrags(mol)
-   call compute_eltypes(mol)
-   call compute_mnatypes(mol)
+!   call find_molfrags(mol)
+!   call compute_eltypes(mol)
+!   call compute_mnatypes(mol)
 
 end subroutine
 

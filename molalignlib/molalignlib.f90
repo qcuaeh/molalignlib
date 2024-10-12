@@ -29,11 +29,10 @@ use assorting
 use adjacency
 use alignment
 use remapping
-use reactivity
 use assignment
 use writemol
 use biasing
-use tracking
+!use reactivity
 
 implicit none
 
@@ -107,12 +106,10 @@ subroutine molecule_remap( &
 
    ! Remove bonds from reactive sites and reoptimize assignment
 
-   if (reac_flag) then
-!      call mol0%print_bonds()
-!      call mol1%print_bonds()
-      call remove_reactive_bonds(mol0, mol1, maplist(:, 1))
-      call remap_atoms(mol0, mol1, maplist, countlist, nrec)
-   end if
+!   if (reac_flag) then
+!      call remove_reactive_bonds(mol0, mol1, maplist(:, 1))
+!      call remap_atoms(mol0, mol1, maplist, countlist, nrec)
+!   end if
 
    ! Restore coordinates
 

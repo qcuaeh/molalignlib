@@ -215,6 +215,10 @@ if (fmtout_flag) then
    fmtout = optfmtout
 end if
 
+! Compute cross eltypes
+
+call compute_crosseltypes(mol0, mol1)
+
 if (remap_flag) then
 
    ! Remap atoms to minimize the MSD

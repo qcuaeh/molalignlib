@@ -28,10 +28,10 @@ assorting.f90
 biasing.f90
 pruning.f90
 assignment.f90
-tracking.f90
+#tracking.f90
 #backtracking.f90
+#reactivity.f90
 remapping.f90
-reactivity.f90
 readmol.f90
 writemol.f90
 molalignlib.f90

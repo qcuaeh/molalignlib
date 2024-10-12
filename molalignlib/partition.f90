@@ -3,35 +3,27 @@ use stdio
 
 implicit none
 
-type, public :: new_atomlist_type
-   integer, pointer :: atomidcs(:) => null()
-   integer, pointer :: atomidcs_allocation(:)
-contains
-   procedure :: append
-end type
-
-type, public :: new_atompartition_type
-   integer :: subsetsum
-   integer :: subsetmax
-   integer :: maxsize  ! Store the maximum size
-   type(new_atomlist_type), pointer :: subsets(:) => null()
-   type(new_atomlist_type), pointer :: subsets_allocation(:)
-contains
-   procedure :: new_subset
-   procedure :: allocate_partition
-!   procedure :: get_atomtypes
-end type
-
 type, public :: atomlist_type
    integer, allocatable :: atomidcs(:)
 end type
 
+type, public :: atompartitionlist_type
+   integer, pointer :: atomidcs(:) => null()
+   integer, pointer :: atomidcs_allocation(:)
+end type
+
 type, public :: atompartition_type
-   integer :: subsetsum
-   integer :: subsetmax
-   type(atomlist_type), allocatable :: subsets(:)
+   integer :: max_size
+   integer :: tot_size
+   integer :: maxsize  ! Store the maximum size
+   type(atompartitionlist_type), pointer :: subsets(:) => null()
+   type(atompartitionlist_type), pointer :: subsets_allocation(:)
 contains
+   procedure :: append
+   procedure :: new_subset
+   procedure :: add_subset
    procedure :: get_atomtypes
+   procedure :: allocate => allocate_partition
 end type
 
 interface operator (==)
@@ -41,68 +33,56 @@ end interface
 contains
 
 subroutine allocate_partition(self, maxsize)
-   class(new_atompartition_type), intent(inout) :: self
+   class(atompartition_type), intent(inout) :: self
    integer, intent(in) :: maxsize
 
    self%maxsize = maxsize
-   allocate(self%subsets_allocation(maxsize))
-   self%subsets => self%subsets_allocation(1:0)
+   allocate (self%subsets_allocation(maxsize))
+   self%subsets => self%subsets_allocation(:0)
 
 end subroutine
 
-subroutine append(self, element)
-   class(new_atomlist_type), intent(inout) :: self
-   integer, intent(in) :: element
+subroutine append(self, index, element)
+   class(atompartition_type), intent(inout) :: self
+   integer, intent(in) :: index, element
    integer :: new_size
 
-   new_size = size(self%atomidcs) + 1
-   self%atomidcs_allocation(new_size) = element
-   self%atomidcs => self%atomidcs_allocation(1:new_size)
+   new_size = size(self%subsets(index)%atomidcs) + 1
+   self%subsets(index)%atomidcs_allocation(new_size) = element
+   self%subsets(index)%atomidcs => self%subsets(index)%atomidcs_allocation(:new_size)
+
+   if (new_size > self%max_size) then
+      self%max_size = new_size
+   end if
+
+   self%tot_size = self%tot_size + 1
 
 end subroutine
 
 function new_subset(self) result(index)
-   class(new_atompartition_type), intent(inout) :: self
+   class(atompartition_type), intent(inout) :: self
    integer :: index
 
    index = size(self%subsets) + 1
-   allocate(self%subsets_allocation(index)%atomidcs_allocation(self%maxsize))
-   self%subsets_allocation(index)%atomidcs => self%subsets_allocation(index)%atomidcs_allocation(1:0)
-   self%subsets => self%subsets_allocation(1:index)
+   allocate (self%subsets_allocation(index)%atomidcs_allocation(self%maxsize))
+   self%subsets_allocation(index)%atomidcs => self%subsets_allocation(index)%atomidcs_allocation(:0)
+   self%subsets => self%subsets_allocation(:index)
 
 end function
 
-function atompartition(ntype, atomtypes)
-   integer, intent(in) :: ntype
-   integer, intent(in) :: atomtypes(:)
-   ! Result variable
-   type(atompartition_type) :: atompartition
-   ! Local variables
-   integer :: h
-   integer, allocatable :: n(:)
+subroutine add_subset(self, index)
+   class(atompartition_type), intent(inout) :: self
+   integer, intent(in) :: index
 
-   allocate (n(ntype))
-   allocate (atompartition%subsets(ntype))
+   if (index /= size(self%subsets) + 1) then
+      write (stderr, '(a)') 'Error: index does not match subset size'
+   end if
 
-   n(:) = 0
-   do h = 1, size(atomtypes)
-      n(atomtypes(h)) = n(atomtypes(h)) + 1
-   end do
+   allocate (self%subsets_allocation(index)%atomidcs_allocation(self%maxsize))
+   self%subsets_allocation(index)%atomidcs => self%subsets_allocation(index)%atomidcs_allocation(:0)
+   self%subsets => self%subsets_allocation(:index)
 
-   atompartition%subsetsum = sum(n)
-   atompartition%subsetmax = maxval(n)
-
-   do h = 1, ntype
-      allocate (atompartition%subsets(h)%atomidcs(n(h)))
-   end do
-
-   n(:) = 0
-   do h = 1, size(atomtypes)
-      n(atomtypes(h)) = n(atomtypes(h)) + 1
-      atompartition%subsets(atomtypes(h))%atomidcs(n(atomtypes(h))) = h
-   end do
-
-end function
+end subroutine
 
 function get_atomtypes(self) result(atomtypes)
    class(atompartition_type), intent(in) :: self
@@ -112,7 +92,7 @@ function get_atomtypes(self) result(atomtypes)
    integer :: h, i
    integer :: atomidx_i
 
-   allocate (atomtypes(self%subsetsum))
+   allocate (atomtypes(self%tot_size))
 
    do h = 1, size(self%subsets)
       do i = 1, size(self%subsets(h)%atomidcs)

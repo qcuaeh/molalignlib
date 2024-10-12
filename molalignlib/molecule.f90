@@ -43,7 +43,7 @@ contains
    procedure :: set_adjlists
    procedure :: set_eltypes
    procedure :: set_mnatypes
-   procedure :: set_molfrags
+!   procedure :: set_molfrags
    procedure :: set_adjmnatypepartlens
    procedure :: get_natom
    procedure :: get_atoms
@@ -214,15 +214,14 @@ function get_mnatypes(self) result(mnatypes)
 
 end function
 
-subroutine set_molfrags(self, nfrag, fragidcs)
-   class(molecule_type), intent(inout) :: self
-   integer, intent(in) :: nfrag
-   integer, intent(in) :: fragidcs(:)
-
-!   self%atoms%fragidx = fragidcs
-   self%molfrags = atompartition(nfrag, fragidcs)
-
-end subroutine
+!subroutine set_molfrags(self, nfrag, fragidcs)
+!   class(molecule_type), intent(inout) :: self
+!   integer, intent(in) :: nfrag
+!   integer, intent(in) :: fragidcs(:)
+!
+!   self%molfrags = atompartition(nfrag, fragidcs)
+!
+!end subroutine
 
 function get_molfrags(self) result(parts)
    class(molecule_type), intent(in) :: self

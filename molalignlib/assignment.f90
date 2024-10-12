@@ -61,7 +61,7 @@ subroutine assign_atoms_nearest( eltypes0, eltypes1, coords0, coords1, prunemat,
    integer, allocatable, dimension(:) :: atomidcs0, atomidcs1
    real(rk) :: dummy
 
-   allocate (auxmap(eltypes0%subsetmax))
+   allocate (auxmap(eltypes0%max_size))
 
    ! Fill distance matrix for each block
 
@@ -87,7 +87,7 @@ subroutine assign_atoms_pruned( eltypes0, eltypes1, coords0, coords1, prunemat, 
    integer, allocatable, dimension(:) :: atomidcs0, atomidcs1
    real(rk) :: dummy
 
-   allocate (auxmap(eltypes0%subsetmax))
+   allocate (auxmap(eltypes0%max_size))
 
    ! Fill distance matrix for each block
 
@@ -113,7 +113,7 @@ subroutine assign_atoms_biased( eltypes0, eltypes1, coords0, coords1, prunemat, 
    integer, allocatable :: auxmap(:)
    integer, allocatable, dimension(:) :: atomidcs0, atomidcs1
 
-   allocate (auxmap(eltypes0%subsetmax))
+   allocate (auxmap(eltypes0%max_size))
 
    ! Fill distance matrix for each block
 
