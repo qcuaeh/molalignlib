@@ -32,9 +32,9 @@ type, public :: molecule_type
    integer :: natom
    character(:), allocatable :: title
    type(atom_type), allocatable :: atoms(:)
-   type(atompartition_type) :: eltypes
-   type(atompartition_type) :: mnatypes
-   type(atompartition_type) :: molfrags
+   type(partition_type) :: eltypes
+   type(partition_type) :: mnatypes
+   type(partition_type) :: molfrags
 contains
    procedure :: set_elnums
    procedure :: set_labels
@@ -184,7 +184,7 @@ end function
 
 subroutine set_eltypes(self, eltypes)
    class(molecule_type), intent(inout) :: self
-   type(atompartition_type), intent(in) :: eltypes
+   type(partition_type), intent(in) :: eltypes
 
    self%eltypes = eltypes
 
@@ -192,7 +192,7 @@ end subroutine
 
 function get_eltypes(self) result(eltypes)
    class(molecule_type), intent(in) :: self
-   type(atompartition_type) :: eltypes
+   type(partition_type) :: eltypes
 
    eltypes = self%eltypes
 
@@ -200,7 +200,7 @@ end function
 
 subroutine set_mnatypes(self, mnatypes)
    class(molecule_type), intent(inout) :: self
-   type(atompartition_type), intent(in) :: mnatypes
+   type(partition_type), intent(in) :: mnatypes
 
    self%mnatypes = mnatypes
 
@@ -208,7 +208,7 @@ end subroutine
 
 function get_mnatypes(self) result(mnatypes)
    class(molecule_type), intent(in) :: self
-   type(atompartition_type) :: mnatypes
+   type(partition_type) :: mnatypes
 
    mnatypes = self%mnatypes
 
@@ -227,12 +227,12 @@ function get_molfrags(self) result(parts)
    class(molecule_type), intent(in) :: self
    ! Local variables
    integer :: i
-   type(atomlist_type), allocatable :: parts(:)
+   type(indexlist_type), allocatable :: parts(:)
 
-   allocate (parts(size(self%molfrags%subsets)))
+   allocate (parts(size(self%molfrags%parts)))
 
-   do i = 1, size(self%molfrags%subsets)
-      parts(i)%atomidcs = self%molfrags%subsets(i)%atomidcs
+   do i = 1, size(self%molfrags%parts)
+      parts(i)%indices = self%molfrags%parts(i)%indices
    end do
 
 end function
@@ -247,14 +247,14 @@ function get_molfragroots(self) result(fragroots)
    integer :: eltypepop_i, eltypepop_min
    integer, allocatable :: atomeltypes(:)
 
-   allocate (fragroots(size(self%molfrags%subsets)))
+   allocate (fragroots(size(self%molfrags%parts)))
 
-   atomeltypes = self%eltypes%get_atomtypes()
-   do h = 1, size(self%molfrags%subsets)
+   atomeltypes = self%eltypes%get_item_types()
+   do h = 1, size(self%molfrags%parts)
       eltypepop_min = huge(eltypepop_min)
-      do i = 1, size(self%molfrags%subsets(h)%atomidcs)
-         atomidx_i = self%molfrags%subsets(h)%atomidcs(i)
-         eltypepop_i = size(self%eltypes%subsets(atomeltypes(atomidx_i))%atomidcs)
+      do i = 1, size(self%molfrags%parts(h)%indices)
+         atomidx_i = self%molfrags%parts(h)%indices(i)
+         eltypepop_i = size(self%eltypes%parts(atomeltypes(atomidx_i))%indices)
          if (eltypepop_i < eltypepop_min) then
             atomidx_min = atomidx_i
             eltypepop_min = eltypepop_i
@@ -325,21 +325,21 @@ function get_adjlists(self) result(adjlists)
    class(molecule_type), intent(in) :: self
    ! Local variables
    integer :: i
-   type(atomlist_type), allocatable :: adjlists(:)
+   type(indexlist_type), allocatable :: adjlists(:)
 
    allocate (adjlists(size(self%atoms)))
 
    do i = 1, size(self%atoms)
-      adjlists(i)%atomidcs = self%atoms(i)%adjlist
+      adjlists(i)%indices = self%atoms(i)%adjlist
    end do
 
 end function
 
 function get_adjpartitions(self, partition) result(adjpartitions)
    class(molecule_type), intent(in) :: self
-   type(atompartition_type), intent(in) :: partition
+   type(partition_type), intent(in) :: partition
    ! Result variable
-   type(atompartition_type), allocatable :: adjpartitions(:)
+   type(partition_type), allocatable :: adjpartitions(:)
    ! Local variables
    integer :: h, i
    type(atom_type) :: atom
@@ -347,11 +347,11 @@ function get_adjpartitions(self, partition) result(adjpartitions)
 
    do i = 1, size(self%atoms)
       atom = self%atoms(i)
-      allocate (adjpartitions(i)%subsets(size(partition%subsets)))
-      do h = 1, size(partition%subsets)
-         adjlistsubset = intersection(atom%adjlist, partition%subsets(h)%atomidcs, size(self%atoms))
-         allocate (adjpartitions(i)%subsets(h)%atomidcs(size(adjlistsubset)))
-         adjpartitions(i)%subsets(h)%atomidcs = adjlistsubset
+      allocate (adjpartitions(i)%parts(size(partition%parts)))
+      do h = 1, size(partition%parts)
+         adjlistsubset = intersection(atom%adjlist, partition%parts(h)%indices, size(self%atoms))
+         allocate (adjpartitions(i)%parts(h)%indices(size(adjlistsubset)))
+         adjpartitions(i)%parts(h)%indices = adjlistsubset
       end do
    end do
 

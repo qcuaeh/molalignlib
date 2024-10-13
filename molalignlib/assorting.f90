@@ -33,9 +33,9 @@ contains
 subroutine compute_crosseltypes(mol0, mol1)
    type(molecule_type), intent(inout) :: mol0, mol1
    ! Local variables
-   integer :: i, elnum, index
+   integer :: i, elnum, typeidx
    integer, allocatable :: typedict(:)
-   type(atompartition_type) :: eltypes0, eltypes1
+   type(partition_type) :: eltypes0, eltypes1
 
    call eltypes0%allocate(size(mol0%atoms))
    call eltypes1%allocate(size(mol1%atoms))
@@ -46,21 +46,21 @@ subroutine compute_crosseltypes(mol0, mol1)
    do i = 1, size(mol0%atoms)
       elnum = mol0%atoms(i)%elnum
       if (typedict(elnum) == 0) then
-         index = eltypes0%new_subset()
-         call eltypes1%add_subset(index)
-         typedict(elnum) = index
+         typeidx = eltypes0%new_part()
+         call eltypes1%add_part(typeidx)
+         typedict(elnum) = typeidx
       end if
-      call eltypes0%append(typedict(elnum), i)
+      call eltypes0%append_to_part(typedict(elnum), i)
    end do
 
    do i = 1, size(mol1%atoms)
       elnum = mol1%atoms(i)%elnum
       if (typedict(elnum) == 0) then
-         index = eltypes1%new_subset()
-         call eltypes0%add_subset(index)
-         typedict(elnum) = index
+         typeidx = eltypes1%new_part()
+         call eltypes0%add_part(typeidx)
+         typedict(elnum) = typeidx
       end if
-      call eltypes1%append(typedict(elnum), i)
+      call eltypes1%append_to_part(typedict(elnum), i)
    end do
 
    call mol0%set_eltypes(eltypes0)
@@ -68,86 +68,89 @@ subroutine compute_crosseltypes(mol0, mol1)
 
 end subroutine
 
-! Assort atoms by MNA type at infinite level
+! Iteratively compute MNA types at all levels
 subroutine compute_mnatypes(mol)
    type(molecule_type), intent(inout) :: mol
    ! Local variables
-   integer :: i, nintype, ntype
-   integer, allocatable, dimension(:) :: intypes, types, typemap
-   integer, allocatable, dimension(:) :: foreorder, backorder
-   type(atomlist_type), allocatable :: adjlists(:)
-   type(atompartition_type) :: mnatypes
+   type(partition_type) :: intypes, types
+!   integer h
 
-   allocate (types(size(mol%atoms)))
-   allocate (typemap(size(mol%atoms)))
-   allocate (foreorder(size(mol%atoms)))
-   allocate (backorder(size(mol%atoms)))
-
-   nintype = size(mol%eltypes%subsets)
-   intypes = mol%eltypes%get_atomtypes()
-   typemap(:nintype) = [(i, i=1, nintype)]
-   adjlists = mol%get_adjlists()
-
-   ! Determine MNA types iteratively
+   intypes = mol%eltypes
 
    do
-      call compute_lvlmnatypes(adjlists, nintype, ntype, intypes, types, typemap)
+      ! Compute MNA types at next level
+      call compute_nextmnatypes(mol%atoms, intypes, types)
       ! Exit the loop if types are unchanged
-      if (all(types == intypes)) exit
-      nintype = ntype
+      if (types == intypes) exit
       intypes = types
    end do
 
-   foreorder(:ntype) = sorted_order(typemap, ntype)
-   backorder(:ntype) = inverse_permutation(foreorder(:ntype))
-   types = backorder(types)
-
-!   mnatypes = atompartition(ntype, types)
-!   call mol%set_mnatypes(mnatypes)
+   call mol%set_mnatypes(types)
+!   do h = 1 , size(types%parts)
+!      print *, types%parts(h)%indices
+!   end do
 
 end subroutine
 
-! Find next level MNA types
-subroutine compute_lvlmnatypes(adjlists, nintype, ntype, intypes, types, typemap)
-   type(atomlist_type), intent(in) :: adjlists(:)
-   integer, intent(in) :: nintype
-   integer, dimension(:), intent(in) :: intypes
-   integer, intent(out) :: ntype
-   integer, dimension(:), intent(out) :: types, typemap
+! Assort atoms by MNA type at next level
+subroutine compute_nextmnatypes(atoms, intypes, types)
+   type(atom_type), dimension(:), intent(in) :: atoms
+   type(partition_type), intent(in) :: intypes
+   type(partition_type), intent(out) :: types
    ! Local variables
-   integer :: i, j
-   logical :: untyped(size(adjlists))
-   integer :: parentype(size(adjlists))
+   integer :: h, k, i
+   integer :: atomidx, typeidx
+   integer, allocatable :: adjlist(:)
+   integer, allocatable :: atomintypes(:)
+   integer, allocatable :: adjtypecounts(:)
+   type(partitionlist_type) :: subtypelist
+   type(countlist_type), allocatable :: adjtypeaccounting(:)
 
-   ntype = 0
-   untyped(:) = .true.
+   call types%allocate(size(atoms))
+   allocate (adjtypeaccounting(size(atoms)))
+   atomintypes = intypes%get_item_types()
 
-   do i = 1, size(adjlists)
-      if (untyped(i)) then
-         ntype = ntype + 1
-         types(i) = ntype
-         parentype(ntype) = intypes(i)
-         do j = i + 1, size(adjlists)
-            if (untyped(j)) then
-               if (intypes(j) == intypes(i)) then
-                  if (same_adjacency(nintype, intypes, adjlists(i)%atomidcs, intypes, adjlists(j)%atomidcs)) then
-                     types(j) = ntype
-                     untyped(j) = .false.
-                  end if
-               end if
+   do h = 1, size(intypes%parts)
+      call subtypelist%allocate(size(atoms))
+      outer: do i = 1, size(intypes%parts(h)%indices)
+         atomidx = intypes%parts(h)%indices(i)
+         adjlist = atoms(atomidx)%adjlist
+         adjtypecounts = typecounts(atomintypes, adjlist)
+         do k = 1, size(subtypelist%indices)
+            if (all(adjtypecounts == adjtypeaccounting(subtypelist%indices(k))%counts)) then
+               call types%append_to_part(subtypelist%indices(k), atomidx)
+               cycle outer
             end if
          end do
-      end if
+         typeidx = types%new_part()
+         call subtypelist%append(typeidx)
+         call types%append_to_part(typeidx, atomidx)
+         adjtypeaccounting(typeidx)%counts = typecounts(atomintypes, adjlist)
+      end do outer
    end do
 
-   typemap(:ntype) = typemap(parentype(:ntype))
-
 end subroutine
+
+function typecounts(atomtypes, adjlist)
+   integer, intent(in) :: atomtypes(:)
+   integer, intent(in) :: adjlist(:)
+   integer, allocatable :: typecounts(:)
+   ! Local variables
+   integer :: i
+
+   allocate(typecounts(size(atomtypes)))
+   typecounts(:) = 0
+
+   do i = 1, size(adjlist)
+      typecounts(atomtypes(adjlist(i))) = typecounts(atomtypes(adjlist(i))) + 1
+   end do
+
+end function
 
 ! Find next level cross MNA types between mol0 and mol1
 subroutine compute_crossmnatypes(adjlists0, adjlists1, nintype, intypes0, intypes1, &
       ntype, types0, types1)
-   type(atomlist_type), dimension(:), intent(in) :: adjlists0, adjlists1
+   type(indexlist_type), dimension(:), intent(in) :: adjlists0, adjlists1
    integer, intent(in) :: nintype
    integer, dimension(:), intent(in) :: intypes0, intypes1
    integer, intent(out) :: ntype
@@ -168,7 +171,7 @@ subroutine compute_crossmnatypes(adjlists0, adjlists1, nintype, intypes0, intype
          do j = i + 1, size(adjlists0)
             if (untyped(j)) then
                if (intypes0(j) == intypes0(i)) then
-                  if (same_adjacency(nintype, intypes0, adjlists0(i)%atomidcs, intypes0, adjlists0(j)%atomidcs)) then
+                  if (same_adjacency(nintype, intypes0, adjlists0(i)%indices, intypes0, adjlists0(j)%indices)) then
                      types0(j) = ntype
                      untyped(j) = .false.
                   end if
@@ -184,7 +187,7 @@ subroutine compute_crossmnatypes(adjlists0, adjlists1, nintype, intypes0, intype
       do i = 1, size(adjlists0)
          if (untyped(i)) then
             if (intypes1(i) == intypes0(archeatom(h))) then
-               if (same_adjacency(nintype, intypes0, adjlists0(archeatom(h))%atomidcs, intypes1, adjlists1(i)%atomidcs)) then
+               if (same_adjacency(nintype, intypes0, adjlists0(archeatom(h))%indices, intypes1, adjlists1(i)%indices)) then
                   types1(i) = h
                   untyped(i) = .false.
                end if
@@ -200,7 +203,7 @@ subroutine compute_crossmnatypes(adjlists0, adjlists1, nintype, intypes0, intype
          do j = i + 1, size(adjlists0)
             if (untyped(j)) then
                if (intypes1(j) == intypes1(i)) then
-                  if (same_adjacency(nintype, intypes1, adjlists1(i)%atomidcs, intypes1, adjlists1(j)%atomidcs)) then
+                  if (same_adjacency(nintype, intypes1, adjlists1(i)%indices, intypes1, adjlists1(j)%indices)) then
                      types1(j) = ntype
                      untyped(j) = .false.
                   end if
@@ -209,48 +212,6 @@ subroutine compute_crossmnatypes(adjlists0, adjlists1, nintype, intypes0, intype
          end do
       end if
    end do
-
-end subroutine
-
-! Group atoms by types
-subroutine assort_groups(items, itemtypes, ngroup, grouplens, groupidcs)
-   integer, intent(out) :: ngroup
-   integer, dimension(:), intent(in) :: itemtypes, items
-   integer, dimension(:), intent(out) :: groupidcs, grouplens
-   ! Local variables
-   integer :: i, j
-   integer, dimension(maxcoord) :: grouptype
-   logical, dimension(maxcoord) :: untyped
-   integer, dimension(maxcoord) :: foreorder, backorder
-
-   ngroup = 0
-   untyped = .true.
-
-   do i = 1, size(items)
-       if (untyped(i)) then
-           ngroup = ngroup + 1
-           grouplens(ngroup) = 1
-           grouptype(ngroup) = itemtypes(items(i))
-           groupidcs(i) = ngroup
-           do j = i + 1, size(items)
-               if (untyped(i)) then
-                   if (itemtypes(items(j)) == itemtypes(items(i))) then
-                       groupidcs(j) = ngroup
-                       grouplens(ngroup) = grouplens(ngroup) + 1
-                       untyped(j) = .false.
-                   end if
-               end if
-           end do
-       end if
-   end do
-
-! Order groups by type 
-
-    foreorder(:ngroup) = sorted_order(grouptype, ngroup)
-    backorder(:ngroup) = inverse_permutation(foreorder(:ngroup))
-    grouptype(:ngroup) = grouptype(foreorder(:ngroup))
-    grouplens(:ngroup) = grouplens(foreorder(:ngroup))
-    groupidcs(:size(items)) = backorder(groupidcs(:size(items)))
 
 end subroutine
 

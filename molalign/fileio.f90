@@ -91,8 +91,6 @@ subroutine readfile(unit, fmtin, mol)
 
    call set_bonds(mol)
 !   call find_molfrags(mol)
-!   call compute_eltypes(mol)
-!   call compute_mnatypes(mol)
 
 end subroutine
 

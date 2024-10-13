@@ -12,7 +12,7 @@ implicit none
 private
 public find_molfrags
 
-type(atomlist_type), allocatable :: adjlists(:)
+type(indexlist_type), allocatable :: adjlists(:)
 
 contains
 
@@ -67,8 +67,8 @@ recursive subroutine recrun (tracked, n, nfrag, fragidcs, fragsize)
    fragidcs(n) = nfrag
    fragsize(nfrag) = fragsize(nfrag) + 1
    
-   do i = 1, size(adjlists(n)%atomidcs)
-      call recrun(tracked, adjlists(n)%atomidcs(i), nfrag, fragidcs, fragsize)
+   do i = 1, size(adjlists(n)%indices)
+      call recrun(tracked, adjlists(n)%indices(i), nfrag, fragidcs, fragsize)
    end do
 
 end subroutine

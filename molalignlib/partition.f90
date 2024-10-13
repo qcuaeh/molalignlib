@@ -3,26 +3,33 @@ use stdio
 
 implicit none
 
-type, public :: atomlist_type
-   integer, allocatable :: atomidcs(:)
+type, public :: countlist_type
+   integer, allocatable :: counts(:)
 end type
 
-type, public :: atompartitionlist_type
-   integer, pointer :: atomidcs(:) => null()
-   integer, pointer :: atomidcs_allocation(:)
+type, public :: indexlist_type
+   integer, allocatable :: indices(:)
 end type
 
-type, public :: atompartition_type
-   integer :: max_size
-   integer :: tot_size
-   integer :: maxsize  ! Store the maximum size
-   type(atompartitionlist_type), pointer :: subsets(:) => null()
-   type(atompartitionlist_type), pointer :: subsets_allocation(:)
+type, public :: partitionlist_type
+   integer, pointer :: indices(:) => null()
+   integer, pointer :: indices_allocation(:)
 contains
    procedure :: append
-   procedure :: new_subset
-   procedure :: add_subset
-   procedure :: get_atomtypes
+   procedure :: allocate => allocate_part
+end type
+
+type, public :: partition_type
+   integer :: max_size
+   integer :: tot_size
+   integer :: allocation_size
+   type(partitionlist_type), pointer :: parts(:) => null()
+   type(partitionlist_type), pointer :: parts_allocation(:)
+contains
+   procedure :: new_part
+   procedure :: add_part
+   procedure :: get_item_types
+   procedure :: append_to_part
    procedure :: allocate => allocate_partition
 end type
 
@@ -32,91 +39,109 @@ end interface
 
 contains
 
-subroutine allocate_partition(self, maxsize)
-   class(atompartition_type), intent(inout) :: self
-   integer, intent(in) :: maxsize
+subroutine allocate_part(self, allocation_size)
+   class(partitionlist_type), intent(inout) :: self
+   integer, intent(in) :: allocation_size
 
-   self%maxsize = maxsize
-   allocate (self%subsets_allocation(maxsize))
-   self%subsets => self%subsets_allocation(:0)
+   allocate (self%indices_allocation(allocation_size))
+   self%indices => self%indices_allocation(:0)
 
 end subroutine
 
-subroutine append(self, index, element)
-   class(atompartition_type), intent(inout) :: self
+subroutine allocate_partition(self, allocation_size)
+   class(partition_type), intent(inout) :: self
+   integer, intent(in) :: allocation_size
+
+   self%allocation_size = allocation_size
+   allocate (self%parts_allocation(allocation_size))
+   self%parts => self%parts_allocation(:0)
+
+end subroutine
+
+subroutine append(self, element)
+   class(partitionlist_type), intent(inout) :: self
+   integer, intent(in) :: element
+   integer :: new_size
+
+   new_size = size(self%indices) + 1
+   self%indices_allocation(new_size) = element
+   self%indices => self%indices_allocation(:new_size)
+
+end subroutine
+
+subroutine append_to_part(self, index, element)
+   class(partition_type), intent(inout) :: self
    integer, intent(in) :: index, element
    integer :: new_size
 
-   new_size = size(self%subsets(index)%atomidcs) + 1
-   self%subsets(index)%atomidcs_allocation(new_size) = element
-   self%subsets(index)%atomidcs => self%subsets(index)%atomidcs_allocation(:new_size)
+   call self%parts(index)%append(element)
 
+   self%tot_size = self%tot_size + 1
+
+   new_size = size(self%parts(index)%indices)
    if (new_size > self%max_size) then
       self%max_size = new_size
    end if
 
-   self%tot_size = self%tot_size + 1
-
 end subroutine
 
-function new_subset(self) result(index)
-   class(atompartition_type), intent(inout) :: self
+function new_part(self) result(index)
+   class(partition_type), intent(inout) :: self
    integer :: index
 
-   index = size(self%subsets) + 1
-   allocate (self%subsets_allocation(index)%atomidcs_allocation(self%maxsize))
-   self%subsets_allocation(index)%atomidcs => self%subsets_allocation(index)%atomidcs_allocation(:0)
-   self%subsets => self%subsets_allocation(:index)
+   index = size(self%parts) + 1
+
+   call self%parts_allocation(index)%allocate(self%allocation_size)
+   self%parts => self%parts_allocation(:index)
 
 end function
 
-subroutine add_subset(self, index)
-   class(atompartition_type), intent(inout) :: self
+subroutine add_part(self, index)
+   class(partition_type), intent(inout) :: self
    integer, intent(in) :: index
 
-   if (index /= size(self%subsets) + 1) then
-      write (stderr, '(a)') 'Error: index does not match subset size'
+   if (index /= size(self%parts) + 1) then
+      write (stderr, '(a)') 'Error: index does not match part size'
    end if
 
-   allocate (self%subsets_allocation(index)%atomidcs_allocation(self%maxsize))
-   self%subsets_allocation(index)%atomidcs => self%subsets_allocation(index)%atomidcs_allocation(:0)
-   self%subsets => self%subsets_allocation(:index)
+   call self%parts_allocation(index)%allocate(self%allocation_size)
+   self%parts => self%parts_allocation(:index)
 
 end subroutine
 
-function get_atomtypes(self) result(atomtypes)
-   class(atompartition_type), intent(in) :: self
+function get_item_types(self) result(types)
+   class(partition_type), intent(in) :: self
    ! Result variable
-   integer, allocatable :: atomtypes(:)
+   integer, allocatable :: types(:)
    ! Local variables
    integer :: h, i
-   integer :: atomidx_i
+   integer :: index
 
-   allocate (atomtypes(self%tot_size))
+   allocate (types(self%tot_size))
 
-   do h = 1, size(self%subsets)
-      do i = 1, size(self%subsets(h)%atomidcs)
-         atomidx_i = self%subsets(h)%atomidcs(i)
-         atomtypes(atomidx_i) = h
+   do h = 1, size(self%parts)
+      do i = 1, size(self%parts(h)%indices)
+         index = self%parts(h)%indices(i)
+         types(index) = h
       end do
    end do
 
 end function
 
 function is_equal(self, other)
-   type(atompartition_type), intent(in) :: self, other
+   type(partition_type), intent(in) :: self, other
    ! Result variable
    logical :: is_equal
    ! Local variables
    integer :: h
 
-   if (size(self%subsets) /= size(other%subsets)) then
+   if (size(self%parts) /= size(other%parts)) then
       is_equal = .false.
       return
    end if
 
-   do h = 1, size(self%subsets)
-      if (size(self%subsets(h)%atomidcs) /= size(other%subsets(h)%atomidcs)) then
+   do h = 1, size(self%parts)
+      if (size(self%parts(h)%indices) /= size(other%parts(h)%indices)) then
          is_equal = .false.
          return
       end if

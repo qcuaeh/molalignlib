@@ -28,8 +28,8 @@ abstract interface
    subroutine f_bias( eltypes0, eltypes1, adjlists0, adjlists1, biasmat)
       use kinds
       use partition
-      type(atompartition_type), intent(in) :: eltypes0, eltypes1
-      type(atomlist_type), allocatable, dimension(:), intent(in) :: adjlists0, adjlists1
+      type(partition_type), intent(in) :: eltypes0, eltypes1
+      type(indexlist_type), allocatable, dimension(:), intent(in) :: adjlists0, adjlists1
       real(rk), intent(out) :: biasmat(:, :)
    end subroutine
 end interface
@@ -40,18 +40,18 @@ procedure(f_bias), pointer :: bias_procedure
 contains
 
 subroutine bias_none( eltypes0, eltypes1, adjlists0, adjlists1, biasmat)
-   type(atompartition_type), intent(in) :: eltypes0, eltypes1
-   type(atomlist_type), allocatable, dimension(:), intent(in) :: adjlists0, adjlists1
+   type(partition_type), intent(in) :: eltypes0, eltypes1
+   type(indexlist_type), allocatable, dimension(:), intent(in) :: adjlists0, adjlists1
    real(rk), intent(out) :: biasmat(:, :)
    ! Local variables
    integer :: h, i, j
    integer :: atomidx_i, atomidx_j
 
-   do h = 1, size(eltypes0%subsets)
-      do i = 1, size(eltypes0%subsets(h)%atomidcs)
-         atomidx_i = eltypes0%subsets(h)%atomidcs(i)
-         do j = 1, size(eltypes1%subsets(h)%atomidcs)
-            atomidx_j = eltypes1%subsets(h)%atomidcs(j)
+   do h = 1, size(eltypes0%parts)
+      do i = 1, size(eltypes0%parts(h)%indices)
+         atomidx_i = eltypes0%parts(h)%indices(i)
+         do j = 1, size(eltypes1%parts(h)%indices)
+            atomidx_j = eltypes1%parts(h)%indices(j)
             biasmat(atomidx_j, atomidx_i) = 0
          end do
       end do
@@ -60,8 +60,8 @@ subroutine bias_none( eltypes0, eltypes1, adjlists0, adjlists1, biasmat)
 end subroutine
 
 subroutine bias_mna( eltypes0, eltypes1, adjlists0, adjlists1, biasmat)
-   type(atompartition_type), intent(in) :: eltypes0, eltypes1
-   type(atomlist_type), allocatable, dimension(:), intent(in) :: adjlists0, adjlists1
+   type(partition_type), intent(in) :: eltypes0, eltypes1
+   type(indexlist_type), allocatable, dimension(:), intent(in) :: adjlists0, adjlists1
    real(rk), intent(out) :: biasmat(:, :)
    ! Local variables
    integer :: h, i, j, maxequiv
@@ -72,21 +72,21 @@ subroutine bias_mna( eltypes0, eltypes1, adjlists0, adjlists1, biasmat)
    call compute_equivmat(eltypes0, eltypes1, adjlists0, adjlists1, equivmat)
 
    maxequiv = 0
-   do h = 1, size(eltypes0%subsets)
-      do i = 1, size(eltypes0%subsets(h)%atomidcs)
-         atomidx_i = eltypes0%subsets(h)%atomidcs(i)
-         do j = 1, size(eltypes1%subsets(h)%atomidcs)
-            atomidx_j = eltypes1%subsets(h)%atomidcs(j)
+   do h = 1, size(eltypes0%parts)
+      do i = 1, size(eltypes0%parts(h)%indices)
+         atomidx_i = eltypes0%parts(h)%indices(i)
+         do j = 1, size(eltypes1%parts(h)%indices)
+            atomidx_j = eltypes1%parts(h)%indices(j)
             maxequiv = max(maxequiv, equivmat(atomidx_j, atomidx_i))
          end do
       end do
    end do
 
-   do h = 1, size(eltypes0%subsets)
-      do i = 1, size(eltypes0%subsets(h)%atomidcs)
-         atomidx_i = eltypes0%subsets(h)%atomidcs(i)
-         do j = 1, size(eltypes1%subsets(h)%atomidcs)
-            atomidx_j = eltypes1%subsets(h)%atomidcs(j)
+   do h = 1, size(eltypes0%parts)
+      do i = 1, size(eltypes0%parts(h)%indices)
+         atomidx_i = eltypes0%parts(h)%indices(i)
+         do j = 1, size(eltypes1%parts(h)%indices)
+            atomidx_j = eltypes1%parts(h)%indices(j)
             biasmat(atomidx_j, atomidx_i) = bias_scale**2*(maxequiv - equivmat(atomidx_j, atomidx_i))
          end do
       end do
@@ -96,8 +96,8 @@ end subroutine
 
 ! Calculate the maximum common MNA level for all atom cross assignments
 subroutine compute_equivmat( eltypes0, eltypes1, adjlists0, adjlists1, equivmat)
-   type(atompartition_type), intent(in) :: eltypes0, eltypes1
-   type(atomlist_type), allocatable, dimension(:), intent(in) :: adjlists0, adjlists1
+   type(partition_type), intent(in) :: eltypes0, eltypes1
+   type(indexlist_type), allocatable, dimension(:), intent(in) :: adjlists0, adjlists1
    integer, allocatable, dimension(:, :), intent(out) :: equivmat
    ! Local variables
    integer :: h, i, j
@@ -111,17 +111,17 @@ subroutine compute_equivmat( eltypes0, eltypes1, adjlists0, adjlists1, equivmat)
    allocate (intypes0(eltypes0%tot_size), intypes1(eltypes1%tot_size))
 
    level = 1
-   nintype = size(eltypes0%subsets)
-   intypes0 = eltypes0%get_atomtypes()
-   intypes1 = eltypes1%get_atomtypes()
+   nintype = size(eltypes0%parts)
+   intypes0 = eltypes0%get_item_types()
+   intypes1 = eltypes1%get_item_types()
 
    do
 
-      do h = 1, size(eltypes0%subsets)
-         do i = 1, size(eltypes0%subsets(h)%atomidcs)
-            atomidx_i = eltypes0%subsets(h)%atomidcs(i)
-            do j = 1, size(eltypes1%subsets(h)%atomidcs)
-               atomidx_j = eltypes1%subsets(h)%atomidcs(j)
+      do h = 1, size(eltypes0%parts)
+         do i = 1, size(eltypes0%parts(h)%indices)
+            atomidx_i = eltypes0%parts(h)%indices(i)
+            do j = 1, size(eltypes1%parts(h)%indices)
+               atomidx_j = eltypes1%parts(h)%indices(j)
                if (intypes0(atomidx_i) == intypes1(atomidx_j)) then
                   equivmat(atomidx_j, atomidx_i) = level
                end if
@@ -138,21 +138,6 @@ subroutine compute_equivmat( eltypes0, eltypes1, adjlists0, adjlists1, equivmat)
       intypes1 = types1
       level = level + 1
 
-!      ! Save sorted adjacency lists adjmnalist0, adjmnalist1 sorted by MNA type at nth level
-!      ! along with number of subsets nadjmna0, nadjmna1 and subset lenghts adjmnalen0, adjmnalen1
-!
-!      do i = 1, size(adjlists0)
-!         call assort_groups(adjlists0(i)%atomidcs, intypes0, nadjmna0(i, level), adjmnalen0(:, i, level), indices)
-!         atomorder(:size(adjlists0(i)%atomidcs)) = sorted_order(indices, size(adjlists0(i)%atomidcs))
-!         adjmnalist0(:size(adjlists0(i)%atomidcs), i, level) = adjlists0(i)%atomidcs(atomorder(:size(adjlists0(i)%atomidcs)))
-!      end do
-!
-!      do i = 1, size(adjlists1)
-!         call assort_groups(adjlists1(i)%atomidcs, intypes1, nadjmna1(i, level), adjmnalen1(:, i, level), indices)
-!         atomorder(:size(adjlists1(i)%atomidcs)) = sorted_order(indices, size(adjlists1(i)%atomidcs))
-!         adjmnalist1(:size(adjlists1(i)%atomidcs), i, level) = adjlists1(i)%atomidcs(atomorder(:size(adjlists1(i)%atomidcs)))
-!      end do
-!
    end do
 
 end subroutine

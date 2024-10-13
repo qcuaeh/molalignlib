@@ -34,11 +34,11 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
 
    integer :: i, j, k, j_, k_
    integer :: natom0, natom1
-   type(atompartition_type) :: mnatypes0, mnatypes1
+   type(partition_type) :: mnatypes0, mnatypes1
    integer, allocatable, dimension(:) :: elnums0, elnums1
    integer, allocatable, dimension(:) :: atommnatypes0, atommnatypes1
-   type(atomlist_type), allocatable, dimension(:) :: adjlists0, adjlists1
-   type(atomlist_type), allocatable, dimension(:) :: molfragparts0, molfragparts1
+   type(indexlist_type), allocatable, dimension(:) :: adjlists0, adjlists1
+   type(indexlist_type), allocatable, dimension(:) :: molfragparts0, molfragparts1
    logical, allocatable, dimension(:, :) :: adjmat0, adjmat1
    integer, allocatable, dimension(:) :: mnatypepartidcs0, mnatypepartidcs1
    integer, allocatable, dimension(:) :: unmapping
@@ -64,8 +64,8 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
    adjlists1 = mol1%get_adjlists()
    mnatypes0 = mol0%mnatypes
    mnatypes1 = mol1%mnatypes
-   atommnatypes0 = mol0%mnatypes%get_atomtypes()
-   atommnatypes1 = mol1%mnatypes%get_atomtypes()
+   atommnatypes0 = mol0%mnatypes%get_item_types()
+   atommnatypes1 = mol1%mnatypes%get_item_types()
    molfragparts0 = mol0%get_molfrags()
    molfragparts1 = mol1%get_molfrags()
    unmapping = inverse_permutation(mapping)
@@ -73,10 +73,10 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
    ! Remove mismatched bonds
 
    do i = 1, natom0
-      do j_ = 1, size(adjlists0(i)%atomidcs)
-         j = adjlists0(i)%atomidcs(j_)
+      do j_ = 1, size(adjlists0(i)%indices)
+         j = adjlists0(i)%indices(j_)
          if (.not. adjmat1(mapping(i), mapping(j))) then
-            mnatypepartidcs0 = mnatypes0%subsets(atommnatypes0(j))%atomidcs
+            mnatypepartidcs0 = mnatypes0%parts(atommnatypes0(j))%indices
             do k_ = 1, size(mnatypepartidcs0)
                k = mnatypepartidcs0(k_)
                call mol0%remove_bond(i, k)
@@ -87,10 +87,10 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
    end do
 
    do i = 1, natom1
-      do j_ = 1, size(adjlists1(i)%atomidcs)
-         j = adjlists1(i)%atomidcs(j_)
+      do j_ = 1, size(adjlists1(i)%indices)
+         j = adjlists1(i)%indices(j_)
          if (.not. adjmat0(unmapping(i), unmapping(j))) then
-            mnatypepartidcs1 = mnatypes1%subsets(atommnatypes1(j))%atomidcs
+            mnatypepartidcs1 = mnatypes1%parts(atommnatypes1(j))%indices
             do k_ = 1, size(mnatypepartidcs1)
                k = mnatypepartidcs1(k_)
                call mol1%remove_bond(i, k)
@@ -103,11 +103,11 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
    ! Remove water bonds
 
    do i = 1, size(molfragparts0)
-      if (all(sorted(elnums0(molfragparts0(i)%atomidcs)) == [1, 1, 8])) then
-         do j_ = 1, size(molfragparts0(i)%atomidcs)
-            j = molfragparts0(i)%atomidcs(j_)
-            do k_ = 1, size(adjlists0(j)%atomidcs)
-               k = adjlists0(j)%atomidcs(k_)
+      if (all(sorted(elnums0(molfragparts0(i)%indices)) == [1, 1, 8])) then
+         do j_ = 1, size(molfragparts0(i)%indices)
+            j = molfragparts0(i)%indices(j_)
+            do k_ = 1, size(adjlists0(j)%indices)
+               k = adjlists0(j)%indices(k_)
                call mol0%remove_bond(j, k)
             end do
          end do
@@ -115,11 +115,11 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
    end do
 
    do i = 1, size(molfragparts1)
-      if (all(sorted(elnums1(molfragparts1(i)%atomidcs)) == [1, 1, 8])) then
-         do j_ = 1, size(molfragparts1(i)%atomidcs)
-            j = molfragparts1(i)%atomidcs(j_)
-            do k_ = 1, size(adjlists1(j)%atomidcs)
-               k = adjlists1(j)%atomidcs(k_)
+      if (all(sorted(elnums1(molfragparts1(i)%indices)) == [1, 1, 8])) then
+         do j_ = 1, size(molfragparts1(i)%indices)
+            j = molfragparts1(i)%indices(j_)
+            do k_ = 1, size(adjlists1(j)%indices)
+               k = adjlists1(j)%indices(k_)
                call mol1%remove_bond(j, k)
             end do
          end do

@@ -48,8 +48,8 @@ subroutine remap_atoms(mol0, mol1, maplist, countlist, nrec)
    real(rk), dimension(:), allocatable :: weights
    real(rk), dimension(:, :), allocatable :: coords0, coords1
    logical, dimension(:, :), allocatable :: adjmat0, adjmat1
-   type(atomlist_type), allocatable, dimension(:) :: adjlists0, adjlists1
-   type(atompartition_type) :: eltypes0, eltypes1
+   type(indexlist_type), allocatable, dimension(:) :: adjlists0, adjlists1
+   type(partition_type) :: eltypes0, eltypes1
 
    logical :: visited, overflow
    integer :: irec, krec, ntrial, nstep, steps
@@ -196,6 +196,7 @@ subroutine remap_atoms(mol0, mol1, maplist, countlist, nrec)
    ! Print stats if requested
 
    if (stats_flag) then
+      print_flag = .false.
       call print_stats(nrec, countlist, avgsteps, avgtotalrot, avgrealrot, recadjd, recrmsd)
       call print_final_stats(overflow, maxrec, nrec, ntrial, nstep)
    end if

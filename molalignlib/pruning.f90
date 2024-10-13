@@ -23,19 +23,19 @@ use partition
 
 implicit none
 
-type dists_type
+type distlist_type
    real(rk), allocatable :: dists(:)
 end type
 
-type subsets_type
-   type(dists_type), allocatable :: subsets(:)
+type distpartition_type
+   type(distlist_type), allocatable :: parts(:)
 end type
 
 abstract interface
    subroutine f_prune( eltypes0, eltypes1, coords0, coords1, prunemat)
       use kinds
       use partition
-      type(atompartition_type), intent(in) :: eltypes0, eltypes1
+      type(partition_type), intent(in) :: eltypes0, eltypes1
       real(rk), dimension(:, :), intent(in) :: coords0, coords1
       logical, dimension(:, :), intent(out) :: prunemat
    end subroutine
@@ -47,18 +47,18 @@ procedure(f_prune), pointer :: prune_procedure
 contains
 
 subroutine prune_none( eltypes0, eltypes1, coords0, coords1, prunemat)
-   type(atompartition_type), intent(in) :: eltypes0, eltypes1
+   type(partition_type), intent(in) :: eltypes0, eltypes1
    real(rk), dimension(:, :), intent(in) :: coords0, coords1
    logical, dimension(:, :), intent(out) :: prunemat
    ! Local variables
    integer :: h, i, j
    integer :: atomidx_i, atomidx_j
 
-   do h = 1, size(eltypes0%subsets)
-      do i = 1, size(eltypes0%subsets(h)%atomidcs)
-         atomidx_i = eltypes0%subsets(h)%atomidcs(i)
-         do j = 1, size(eltypes1%subsets(h)%atomidcs)
-            atomidx_j = eltypes1%subsets(h)%atomidcs(j)
+   do h = 1, size(eltypes0%parts)
+      do i = 1, size(eltypes0%parts(h)%indices)
+         atomidx_i = eltypes0%parts(h)%indices(i)
+         do j = 1, size(eltypes1%parts(h)%indices)
+            atomidx_j = eltypes1%parts(h)%indices(j)
             prunemat(atomidx_j, atomidx_i) = .true.
          end do
       end do
@@ -67,54 +67,54 @@ subroutine prune_none( eltypes0, eltypes1, coords0, coords1, prunemat)
 end subroutine
 
 subroutine prune_rd( eltypes0, eltypes1, coords0, coords1, prunemat)
-   type(atompartition_type), intent(in) :: eltypes0, eltypes1
+   type(partition_type), intent(in) :: eltypes0, eltypes1
    real(rk), dimension(:, :), intent(in) :: coords0, coords1
    logical, dimension(:, :), intent(out) :: prunemat
    ! Local variables
    integer :: h, i, j, k
    integer :: atomidx_i, atomidx_j
-   type(subsets_type), allocatable, dimension(:) :: d0, d1
+   type(distpartition_type), allocatable, dimension(:) :: d0, d1
    logical :: pruned
 
    allocate (d0(size(coords0, dim=2)))
    allocate (d1(size(coords1, dim=2)))
    do i = 1, size(coords0, dim=2)
-      allocate (d0(i)%subsets(size(eltypes0%subsets)))
-      allocate (d1(i)%subsets(size(eltypes1%subsets)))
-      do h = 1, size(eltypes0%subsets)
-         allocate (d0(i)%subsets(h)%dists(size(eltypes0%subsets(h)%atomidcs)))
-         allocate (d1(i)%subsets(h)%dists(size(eltypes1%subsets(h)%atomidcs)))
+      allocate (d0(i)%parts(size(eltypes0%parts)))
+      allocate (d1(i)%parts(size(eltypes1%parts)))
+      do h = 1, size(eltypes0%parts)
+         allocate (d0(i)%parts(h)%dists(size(eltypes0%parts(h)%indices)))
+         allocate (d1(i)%parts(h)%dists(size(eltypes1%parts(h)%indices)))
       end do
    end do
 
    do i = 1, size(coords0, dim=2)
-      do h = 1, size(eltypes0%subsets)
-         do j = 1, size(eltypes0%subsets(h)%atomidcs)
-            atomidx_j = eltypes0%subsets(h)%atomidcs(j)
-            d0(i)%subsets(h)%dists(j) = sqrt(sum((coords0(:, atomidx_j) - coords0(:, i))**2))
+      do h = 1, size(eltypes0%parts)
+         do j = 1, size(eltypes0%parts(h)%indices)
+            atomidx_j = eltypes0%parts(h)%indices(j)
+            d0(i)%parts(h)%dists(j) = sqrt(sum((coords0(:, atomidx_j) - coords0(:, i))**2))
          end do
-         call sort(d0(i)%subsets(h)%dists)
+         call sort(d0(i)%parts(h)%dists)
       end do
    end do
 
    do i = 1, size(coords1, dim=2)
-      do h = 1, size(eltypes1%subsets)
-         do j = 1, size(eltypes1%subsets(h)%atomidcs)
-            atomidx_j = eltypes1%subsets(h)%atomidcs(j)
-            d1(i)%subsets(h)%dists(j) = sqrt(sum((coords1(:, atomidx_j) - coords1(:, i))**2))
+      do h = 1, size(eltypes1%parts)
+         do j = 1, size(eltypes1%parts(h)%indices)
+            atomidx_j = eltypes1%parts(h)%indices(j)
+            d1(i)%parts(h)%dists(j) = sqrt(sum((coords1(:, atomidx_j) - coords1(:, i))**2))
          end do
-         call sort(d1(i)%subsets(h)%dists)
+         call sort(d1(i)%parts(h)%dists)
       end do
    end do
 
-   do h = 1, size(eltypes0%subsets)
-      do i = 1, size(eltypes0%subsets(h)%atomidcs)
-         atomidx_i = eltypes0%subsets(h)%atomidcs(i)
-         do j = 1, size(eltypes1%subsets(h)%atomidcs)
-            atomidx_j = eltypes1%subsets(h)%atomidcs(j)
+   do h = 1, size(eltypes0%parts)
+      do i = 1, size(eltypes0%parts(h)%indices)
+         atomidx_i = eltypes0%parts(h)%indices(i)
+         do j = 1, size(eltypes1%parts(h)%indices)
+            atomidx_j = eltypes1%parts(h)%indices(j)
             pruned = .false.
-            do k = 1, size(eltypes0%subsets)
-               if (any(abs(d1(atomidx_j)%subsets(k)%dists - d0(atomidx_i)%subsets(k)%dists) > prune_tol)) then
+            do k = 1, size(eltypes0%parts)
+               if (any(abs(d1(atomidx_j)%parts(k)%dists - d0(atomidx_i)%parts(k)%dists) > prune_tol)) then
                   pruned = .true.
                   exit
                end if

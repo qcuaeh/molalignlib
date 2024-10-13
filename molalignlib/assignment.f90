@@ -36,7 +36,7 @@ abstract interface
    subroutine f_assign( eltypes0, eltypes1, coords0, coords1, prunemat, biasmat, mapping)
       use kinds
       use partition
-      type(atompartition_type), intent(in) :: eltypes0, eltypes1
+      type(partition_type), intent(in) :: eltypes0, eltypes1
       real(rk), dimension(:, :), intent(in) :: coords0, coords1
       logical, dimension(:, :), intent(in) :: prunemat
       real(rk), dimension(:, :), intent(in) :: biasmat
@@ -50,7 +50,7 @@ contains
 
 ! Find best correspondence between points sets with fixed orientation
 subroutine assign_atoms_nearest( eltypes0, eltypes1, coords0, coords1, prunemat, biasmat, mapping)
-   type(atompartition_type), intent(in) :: eltypes0, eltypes1
+   type(partition_type), intent(in) :: eltypes0, eltypes1
    real(rk), dimension(:, :), intent(in) :: coords0, coords1
    logical, dimension(:, :), intent(in) :: prunemat
    real(rk), dimension(:, :), intent(in) :: biasmat
@@ -65,9 +65,9 @@ subroutine assign_atoms_nearest( eltypes0, eltypes1, coords0, coords1, prunemat,
 
    ! Fill distance matrix for each block
 
-   do h = 1, size(eltypes0%subsets)
-      atomidcs0 = eltypes0%subsets(h)%atomidcs 
-      atomidcs1 = eltypes1%subsets(h)%atomidcs 
+   do h = 1, size(eltypes0%parts)
+      atomidcs0 = eltypes0%parts(h)%indices 
+      atomidcs1 = eltypes1%parts(h)%indices 
       call minperm_nearest(size(atomidcs0), coords0(:, atomidcs0), coords1(:, atomidcs1), auxmap, dummy)
       mapping(atomidcs0) = atomidcs1(auxmap(:size(atomidcs0)))
    end do
@@ -76,7 +76,7 @@ end subroutine
 
 ! Find best correspondence between points sets with fixed orientation
 subroutine assign_atoms_pruned( eltypes0, eltypes1, coords0, coords1, prunemat, biasmat, mapping)
-   type(atompartition_type), intent(in) :: eltypes0, eltypes1
+   type(partition_type), intent(in) :: eltypes0, eltypes1
    real(rk), dimension(:, :), intent(in) :: coords0, coords1
    logical, dimension(:, :), intent(in) :: prunemat
    real(rk), dimension(:, :), intent(in) :: biasmat
@@ -91,9 +91,9 @@ subroutine assign_atoms_pruned( eltypes0, eltypes1, coords0, coords1, prunemat, 
 
    ! Fill distance matrix for each block
 
-   do h = 1, size(eltypes0%subsets)
-      atomidcs0 = eltypes0%subsets(h)%atomidcs 
-      atomidcs1 = eltypes1%subsets(h)%atomidcs 
+   do h = 1, size(eltypes0%parts)
+      atomidcs0 = eltypes0%parts(h)%indices 
+      atomidcs1 = eltypes1%parts(h)%indices 
       call minperm_pruned(size(atomidcs0), coords0(:, atomidcs0), coords1(:, atomidcs1), &
            prunemat(atomidcs1, atomidcs0), auxmap, dummy)
       mapping(atomidcs0) = atomidcs1(auxmap(:size(atomidcs0)))
@@ -103,7 +103,7 @@ end subroutine
 
 ! Find best correspondence between points sets with fixed orientation
 subroutine assign_atoms_biased( eltypes0, eltypes1, coords0, coords1, prunemat, biasmat, mapping)
-   type(atompartition_type), intent(in) :: eltypes0, eltypes1
+   type(partition_type), intent(in) :: eltypes0, eltypes1
    real(rk), dimension(:, :), intent(in) :: coords0, coords1
    logical, dimension(:, :), intent(in) :: prunemat
    real(rk), dimension(:, :), intent(in) :: biasmat
@@ -117,9 +117,9 @@ subroutine assign_atoms_biased( eltypes0, eltypes1, coords0, coords1, prunemat, 
 
    ! Fill distance matrix for each block
 
-   do h = 1, size(eltypes0%subsets)
-      atomidcs0 = eltypes0%subsets(h)%atomidcs 
-      atomidcs1 = eltypes1%subsets(h)%atomidcs 
+   do h = 1, size(eltypes0%parts)
+      atomidcs0 = eltypes0%parts(h)%indices 
+      atomidcs1 = eltypes1%parts(h)%indices 
       call minperm_biased(coords0(:, atomidcs0), coords1(:, atomidcs1), biasmat(atomidcs1, atomidcs0), auxmap)
       mapping(atomidcs0) = atomidcs1(auxmap(:size(atomidcs0)))
    end do

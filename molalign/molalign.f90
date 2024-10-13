@@ -61,6 +61,7 @@ bond_flag = .false.
 back_flag = .false.
 test_flag = .false.
 reac_flag = .false.
+print_flag = .true.
 stats_flag = .false.
 trial_flag = .false.
 mirror_flag = .false.
@@ -218,6 +219,7 @@ end if
 ! Compute cross eltypes
 
 call compute_crosseltypes(mol0, mol1)
+call compute_mnatypes(mol0)
 
 if (remap_flag) then
 
@@ -256,24 +258,16 @@ if (remap_flag) then
 !      mapping = maplist(:, i)
       mapping = identity_permutation(size(mol0%atoms))
 
-      adjd = get_adjd(mol0, auxmol1, mapping)
-      minadjd = min(minadjd, adjd)
-
       rmsd = get_rmsd(mol0, auxmol1, mapping)
+      adjd = get_adjd(mol0, auxmol1, mapping)
+
       minrmsd = min(minrmsd, rmsd)
+      minadjd = min(minadjd, adjd)
 
       auxmol1%title = 'Map='//intstr(i)//' RMSD='//realstr(rmsd, 4)
       call writefile(write_unit, fmtout, auxmol1)
 
    end do
-
-   if (.not. stats_flag) then
-      if (bond_flag) then
-         write (stderr, '(a,",",a)') intstr(minadjd), realstr(minrmsd, 4)
-      else
-         write (stderr, '(a)') realstr(minrmsd, 4)
-      end if
-   end if
 
 else
 
@@ -292,18 +286,20 @@ else
 
    mapping = identity_permutation(size(mol0%atoms))
 
-   adjd = get_adjd(mol0, mol1, mapping)
-   rmsd = get_rmsd(mol0, mol1, mapping)
-
-   if (bond_flag) then
-      write (stderr, '(a,",",a)') intstr(adjd), realstr(rmsd, 4)
-   else
-      write (stderr, '(a)') realstr(rmsd, 4)
-   end if
+   minrmsd = get_rmsd(mol0, mol1, mapping)
+   minadjd = get_adjd(mol0, mol1, mapping)
 
    mol1%title = 'RMSD='//realstr(rmsd, 4)
    call writefile(write_unit, fmtout, mol1)
 
+end if
+
+if (print_flag) then
+   if (bond_flag) then
+      write (stderr, "(f9.4,',',i4)") minrmsd, minadjd
+   else
+      write (stderr, '(i4)') minrmsd
+   end if
 end if
 
 end program

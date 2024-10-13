@@ -37,8 +37,8 @@ subroutine minadjdiff (mol0, mol1, mapping)
    integer :: neltype0
    integer :: nmnatype0, nmnatype1
 
-   type(atompartition_type) :: eltypes0
-   type(atompartition_type) :: mnatypes0, mnatypes1
+   type(partition_type) :: eltypes0
+   type(partition_type) :: mnatypes0, mnatypes1
 
    integer, allocatable, dimension(:) :: eltypepops0
    integer, allocatable, dimension(:) :: mnatypepops0, mnatypepops1
@@ -60,28 +60,28 @@ subroutine minadjdiff (mol0, mol1, mapping)
    natom = mol0%get_natom()
 
    eltypes0 = mol0%gather_eltypes()
-   atomeltypes0 = eltypes0%get_atomtypes()
+   atomeltypes0 = eltypes0%get_item_types()
 
-   neltype0 = size(eltypes0%subsets)
+   neltype0 = size(eltypes0%parts)
    allocate (eltypepops0(neltype0))
    do h = 1, neltype0
-      eltypepops0(h) = size(eltypes0%subsets(h)%atomidcs)
+      eltypepops0(h) = size(eltypes0%parts(h)%indices)
    end do
 
    mnatypes0 = mol0%gather_mnatypes()
    mnatypes1 = mol1%gather_mnatypes()
-   atommnatypes0 = mnatypes0%get_atomtypes()
-   atommnatypes1 = mnatypes1%get_atomtypes()
+   atommnatypes0 = mnatypes0%get_item_types()
+   atommnatypes1 = mnatypes1%get_item_types()
 
-   nmnatype0 = size(mnatypes0%subsets)
-   nmnatype1 = size(mnatypes1%subsets)
+   nmnatype0 = size(mnatypes0%parts)
+   nmnatype1 = size(mnatypes1%parts)
    allocate (mnatypepops0(nmnatype0))
    allocate (mnatypepops1(nmnatype1))
    do h = 1, nmnatype0
-      mnatypepops0(h) = size(mnatypes0%subsets(h)%atomidcs)
+      mnatypepops0(h) = size(mnatypes0%parts(h)%indices)
    end do
    do h = 1, nmnatype1
-      mnatypepops1(h) = size(mnatypes1%subsets(h)%atomidcs)
+      mnatypepops1(h) = size(mnatypes1%parts(h)%indices)
    end do
 
 !   adjlists0 = mol0%gather_adjlists()
@@ -312,8 +312,8 @@ subroutine eqvatomperm (mol0, mol1, workcoords1, mapping)
    integer :: neltype0
    integer :: nmnatype0, nmnatype1
 
-   type(atompartition_type) :: eltypes0
-   type(atompartition_type) :: mnatypes0, mnatypes1
+   type(partition_type) :: eltypes0
+   type(partition_type) :: mnatypes0, mnatypes1
 
    integer, allocatable, dimension(:) :: eltypepops0
    integer, allocatable, dimension(:) :: mnatypepops0, mnatypepops1
@@ -336,24 +336,24 @@ subroutine eqvatomperm (mol0, mol1, workcoords1, mapping)
 
    eltypes0 = mol0%gather_eltypes()
 
-   neltype0 = size(eltypes0%subsets)
+   neltype0 = size(eltypes0%parts)
    allocate (eltypepops0(neltype0))
    do h = 1, neltype0
-      eltypepops0(h) = size(eltypes0%subsets(h)%atomidcs)
+      eltypepops0(h) = size(eltypes0%parts(h)%indices)
    end do
 
    mnatypes0 = mol0%gather_mnatypes()
    mnatypes1 = mol1%gather_mnatypes()
 
-   nmnatype0 = size(mnatypes0%subsets)
-   nmnatype1 = size(mnatypes1%subsets)
+   nmnatype0 = size(mnatypes0%parts)
+   nmnatype1 = size(mnatypes1%parts)
    allocate (mnatypepops0(nmnatype0))
    allocate (mnatypepops1(nmnatype1))
    do h = 1, nmnatype0
-      mnatypepops0(h) = size(mnatypes0%subsets(h)%atomidcs)
+      mnatypepops0(h) = size(mnatypes0%parts(h)%indices)
    end do
    do h = 1, nmnatype1
-      mnatypepops1(h) = size(mnatypes1%subsets(h)%atomidcs)
+      mnatypepops1(h) = size(mnatypes1%parts(h)%indices)
    end do
 
 !   adjlists0 = mol0%gather_adjlists()
