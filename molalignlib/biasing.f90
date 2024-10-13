@@ -47,10 +47,10 @@ subroutine bias_none( eltypes0, eltypes1, adjlists0, adjlists1, biasmat)
    integer :: h, i, j
    integer :: atomidx_i, atomidx_j
 
-   do h = 1, size(eltypes0%parts)
-      do i = 1, size(eltypes0%parts(h)%indices)
+   do h = 1, eltypes0%size
+      do i = 1, eltypes0%parts(h)%size
          atomidx_i = eltypes0%parts(h)%indices(i)
-         do j = 1, size(eltypes1%parts(h)%indices)
+         do j = 1, eltypes1%parts(h)%size
             atomidx_j = eltypes1%parts(h)%indices(j)
             biasmat(atomidx_j, atomidx_i) = 0
          end do
@@ -72,20 +72,20 @@ subroutine bias_mna( eltypes0, eltypes1, adjlists0, adjlists1, biasmat)
    call compute_equivmat(eltypes0, eltypes1, adjlists0, adjlists1, equivmat)
 
    maxequiv = 0
-   do h = 1, size(eltypes0%parts)
-      do i = 1, size(eltypes0%parts(h)%indices)
+   do h = 1, eltypes0%size
+      do i = 1, eltypes0%parts(h)%size
          atomidx_i = eltypes0%parts(h)%indices(i)
-         do j = 1, size(eltypes1%parts(h)%indices)
+         do j = 1, eltypes1%parts(h)%size
             atomidx_j = eltypes1%parts(h)%indices(j)
             maxequiv = max(maxequiv, equivmat(atomidx_j, atomidx_i))
          end do
       end do
    end do
 
-   do h = 1, size(eltypes0%parts)
-      do i = 1, size(eltypes0%parts(h)%indices)
+   do h = 1, eltypes0%size
+      do i = 1, eltypes0%parts(h)%size
          atomidx_i = eltypes0%parts(h)%indices(i)
-         do j = 1, size(eltypes1%parts(h)%indices)
+         do j = 1, eltypes1%parts(h)%size
             atomidx_j = eltypes1%parts(h)%indices(j)
             biasmat(atomidx_j, atomidx_i) = bias_scale**2*(maxequiv - equivmat(atomidx_j, atomidx_i))
          end do
@@ -106,21 +106,21 @@ subroutine compute_equivmat( eltypes0, eltypes1, adjlists0, adjlists1, equivmat)
    integer, allocatable, dimension(:) :: types0, types1
    integer, allocatable, dimension(:) :: intypes0, intypes1
 
-   allocate (equivmat(eltypes1%tot_size, eltypes0%tot_size))
-   allocate (types0(eltypes0%tot_size), types1(eltypes1%tot_size))
-   allocate (intypes0(eltypes0%tot_size), intypes1(eltypes1%tot_size))
+   allocate (equivmat(eltypes1%total_size, eltypes0%total_size))
+   allocate (types0(eltypes0%total_size), types1(eltypes1%total_size))
+   allocate (intypes0(eltypes0%total_size), intypes1(eltypes1%total_size))
 
    level = 1
-   nintype = size(eltypes0%parts)
-   intypes0 = eltypes0%get_item_types()
-   intypes1 = eltypes1%get_item_types()
+   nintype = eltypes0%size
+   intypes0 = eltypes0%idxmap
+   intypes1 = eltypes1%idxmap
 
    do
 
-      do h = 1, size(eltypes0%parts)
-         do i = 1, size(eltypes0%parts(h)%indices)
+      do h = 1, eltypes0%size
+         do i = 1, eltypes0%parts(h)%size
             atomidx_i = eltypes0%parts(h)%indices(i)
-            do j = 1, size(eltypes1%parts(h)%indices)
+            do j = 1, eltypes1%parts(h)%size
                atomidx_j = eltypes1%parts(h)%indices(j)
                if (intypes0(atomidx_i) == intypes1(atomidx_j)) then
                   equivmat(atomidx_j, atomidx_i) = level

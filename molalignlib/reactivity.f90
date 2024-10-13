@@ -36,7 +36,7 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
    integer :: natom0, natom1
    type(partition_type) :: mnatypes0, mnatypes1
    integer, allocatable, dimension(:) :: elnums0, elnums1
-   integer, allocatable, dimension(:) :: atommnatypes0, atommnatypes1
+   integer, allocatable, dimension(:) :: mnatypemap0, mnatypemap1
    type(indexlist_type), allocatable, dimension(:) :: adjlists0, adjlists1
    type(indexlist_type), allocatable, dimension(:) :: molfragparts0, molfragparts1
    logical, allocatable, dimension(:, :) :: adjmat0, adjmat1
@@ -64,8 +64,8 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
    adjlists1 = mol1%get_adjlists()
    mnatypes0 = mol0%mnatypes
    mnatypes1 = mol1%mnatypes
-   atommnatypes0 = mol0%mnatypes%get_item_types()
-   atommnatypes1 = mol1%mnatypes%get_item_types()
+   mnatypemap0 = mol0%mnatypes%idxmap
+   mnatypemap1 = mol1%mnatypes%idxmap
    molfragparts0 = mol0%get_molfrags()
    molfragparts1 = mol1%get_molfrags()
    unmapping = inverse_permutation(mapping)
@@ -76,7 +76,7 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
       do j_ = 1, size(adjlists0(i)%indices)
          j = adjlists0(i)%indices(j_)
          if (.not. adjmat1(mapping(i), mapping(j))) then
-            mnatypepartidcs0 = mnatypes0%parts(atommnatypes0(j))%indices
+            mnatypepartidcs0 = mnatypes0%parts(mnatypemap0(j))%indices
             do k_ = 1, size(mnatypepartidcs0)
                k = mnatypepartidcs0(k_)
                call mol0%remove_bond(i, k)
@@ -90,7 +90,7 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
       do j_ = 1, size(adjlists1(i)%indices)
          j = adjlists1(i)%indices(j_)
          if (.not. adjmat0(unmapping(i), unmapping(j))) then
-            mnatypepartidcs1 = mnatypes1%parts(atommnatypes1(j))%indices
+            mnatypepartidcs1 = mnatypes1%parts(mnatypemap1(j))%indices
             do k_ = 1, size(mnatypepartidcs1)
                k = mnatypepartidcs1(k_)
                call mol1%remove_bond(i, k)

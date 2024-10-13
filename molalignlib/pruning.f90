@@ -54,10 +54,10 @@ subroutine prune_none( eltypes0, eltypes1, coords0, coords1, prunemat)
    integer :: h, i, j
    integer :: atomidx_i, atomidx_j
 
-   do h = 1, size(eltypes0%parts)
-      do i = 1, size(eltypes0%parts(h)%indices)
+   do h = 1, eltypes0%size
+      do i = 1, eltypes0%parts(h)%size
          atomidx_i = eltypes0%parts(h)%indices(i)
-         do j = 1, size(eltypes1%parts(h)%indices)
+         do j = 1, eltypes1%parts(h)%size
             atomidx_j = eltypes1%parts(h)%indices(j)
             prunemat(atomidx_j, atomidx_i) = .true.
          end do
@@ -79,17 +79,17 @@ subroutine prune_rd( eltypes0, eltypes1, coords0, coords1, prunemat)
    allocate (d0(size(coords0, dim=2)))
    allocate (d1(size(coords1, dim=2)))
    do i = 1, size(coords0, dim=2)
-      allocate (d0(i)%parts(size(eltypes0%parts)))
-      allocate (d1(i)%parts(size(eltypes1%parts)))
-      do h = 1, size(eltypes0%parts)
-         allocate (d0(i)%parts(h)%dists(size(eltypes0%parts(h)%indices)))
-         allocate (d1(i)%parts(h)%dists(size(eltypes1%parts(h)%indices)))
+      allocate (d0(i)%parts(eltypes0%size))
+      allocate (d1(i)%parts(eltypes1%size))
+      do h = 1, eltypes0%size
+         allocate (d0(i)%parts(h)%dists(eltypes0%parts(h)%size))
+         allocate (d1(i)%parts(h)%dists(eltypes1%parts(h)%size))
       end do
    end do
 
    do i = 1, size(coords0, dim=2)
-      do h = 1, size(eltypes0%parts)
-         do j = 1, size(eltypes0%parts(h)%indices)
+      do h = 1, eltypes0%size
+         do j = 1, eltypes0%parts(h)%size
             atomidx_j = eltypes0%parts(h)%indices(j)
             d0(i)%parts(h)%dists(j) = sqrt(sum((coords0(:, atomidx_j) - coords0(:, i))**2))
          end do
@@ -98,8 +98,8 @@ subroutine prune_rd( eltypes0, eltypes1, coords0, coords1, prunemat)
    end do
 
    do i = 1, size(coords1, dim=2)
-      do h = 1, size(eltypes1%parts)
-         do j = 1, size(eltypes1%parts(h)%indices)
+      do h = 1, eltypes1%size
+         do j = 1, eltypes1%parts(h)%size
             atomidx_j = eltypes1%parts(h)%indices(j)
             d1(i)%parts(h)%dists(j) = sqrt(sum((coords1(:, atomidx_j) - coords1(:, i))**2))
          end do
@@ -107,13 +107,13 @@ subroutine prune_rd( eltypes0, eltypes1, coords0, coords1, prunemat)
       end do
    end do
 
-   do h = 1, size(eltypes0%parts)
-      do i = 1, size(eltypes0%parts(h)%indices)
+   do h = 1, eltypes0%size
+      do i = 1, eltypes0%parts(h)%size
          atomidx_i = eltypes0%parts(h)%indices(i)
-         do j = 1, size(eltypes1%parts(h)%indices)
+         do j = 1, eltypes1%parts(h)%size
             atomidx_j = eltypes1%parts(h)%indices(j)
             pruned = .false.
-            do k = 1, size(eltypes0%parts)
+            do k = 1, eltypes0%size
                if (any(abs(d1(atomidx_j)%parts(k)%dists - d0(atomidx_i)%parts(k)%dists) > prune_tol)) then
                   pruned = .true.
                   exit

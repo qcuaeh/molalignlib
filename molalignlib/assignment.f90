@@ -61,13 +61,13 @@ subroutine assign_atoms_nearest( eltypes0, eltypes1, coords0, coords1, prunemat,
    integer, allocatable, dimension(:) :: atomidcs0, atomidcs1
    real(rk) :: dummy
 
-   allocate (auxmap(eltypes0%max_size))
+   allocate (auxmap(eltypes0%maxpart_size))
 
    ! Fill distance matrix for each block
 
-   do h = 1, size(eltypes0%parts)
-      atomidcs0 = eltypes0%parts(h)%indices 
-      atomidcs1 = eltypes1%parts(h)%indices 
+   do h = 1, eltypes0%size
+      atomidcs0 = eltypes0%parts(h)%indices
+      atomidcs1 = eltypes1%parts(h)%indices
       call minperm_nearest(size(atomidcs0), coords0(:, atomidcs0), coords1(:, atomidcs1), auxmap, dummy)
       mapping(atomidcs0) = atomidcs1(auxmap(:size(atomidcs0)))
    end do
@@ -87,13 +87,13 @@ subroutine assign_atoms_pruned( eltypes0, eltypes1, coords0, coords1, prunemat, 
    integer, allocatable, dimension(:) :: atomidcs0, atomidcs1
    real(rk) :: dummy
 
-   allocate (auxmap(eltypes0%max_size))
+   allocate (auxmap(eltypes0%maxpart_size))
 
    ! Fill distance matrix for each block
 
-   do h = 1, size(eltypes0%parts)
-      atomidcs0 = eltypes0%parts(h)%indices 
-      atomidcs1 = eltypes1%parts(h)%indices 
+   do h = 1, eltypes0%size
+      atomidcs0 = eltypes0%parts(h)%indices
+      atomidcs1 = eltypes1%parts(h)%indices
       call minperm_pruned(size(atomidcs0), coords0(:, atomidcs0), coords1(:, atomidcs1), &
            prunemat(atomidcs1, atomidcs0), auxmap, dummy)
       mapping(atomidcs0) = atomidcs1(auxmap(:size(atomidcs0)))
@@ -113,13 +113,13 @@ subroutine assign_atoms_biased( eltypes0, eltypes1, coords0, coords1, prunemat, 
    integer, allocatable :: auxmap(:)
    integer, allocatable, dimension(:) :: atomidcs0, atomidcs1
 
-   allocate (auxmap(eltypes0%max_size))
+   allocate (auxmap(eltypes0%maxpart_size))
 
    ! Fill distance matrix for each block
 
-   do h = 1, size(eltypes0%parts)
-      atomidcs0 = eltypes0%parts(h)%indices 
-      atomidcs1 = eltypes1%parts(h)%indices 
+   do h = 1, eltypes0%size
+      atomidcs0 = eltypes0%parts(h)%indices
+      atomidcs1 = eltypes1%parts(h)%indices
       call minperm_biased(coords0(:, atomidcs0), coords1(:, atomidcs1), biasmat(atomidcs1, atomidcs0), auxmap)
       mapping(atomidcs0) = atomidcs1(auxmap(:size(atomidcs0)))
    end do

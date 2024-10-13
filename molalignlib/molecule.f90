@@ -249,7 +249,7 @@ function get_molfragroots(self) result(fragroots)
 
    allocate (fragroots(size(self%molfrags%parts)))
 
-   atomeltypes = self%eltypes%get_item_types()
+   atomeltypes = self%eltypes%idxmap
    do h = 1, size(self%molfrags%parts)
       eltypepop_min = huge(eltypepop_min)
       do i = 1, size(self%molfrags%parts(h)%indices)

@@ -3,151 +3,195 @@ use stdio
 
 implicit none
 
-type, public :: countlist_type
-   integer, allocatable :: counts(:)
-end type
-
 type, public :: indexlist_type
    integer, allocatable :: indices(:)
 end type
 
-type, public :: partitionlist_type
-   integer, pointer :: indices(:) => null()
-   integer, pointer :: indices_allocation(:)
+type, public :: pointer_to_part_type
+   integer, allocatable :: signature(:)
+   type(part_type), pointer :: ptr
+end type
+
+type, public :: part_type
+   integer :: size
+   integer :: index
+   integer, pointer :: total_size
+   integer, pointer :: maxpart_size
+   integer, pointer :: idxmap(:)
+   integer, pointer :: indices(:)
+   integer, pointer :: allocation(:)
 contains
-   procedure :: append
-   procedure :: allocate => allocate_part
+   procedure :: append => part_append
 end type
 
 type, public :: partition_type
-   integer :: max_size
-   integer :: tot_size
+   integer :: size
    integer :: allocation_size
-   type(partitionlist_type), pointer :: parts(:) => null()
-   type(partitionlist_type), pointer :: parts_allocation(:)
+   integer, pointer :: total_size
+   integer, pointer :: maxpart_size
+   integer, pointer :: idxmap(:)
+   type(part_type), pointer :: parts(:)
 contains
-   procedure :: new_part
-   procedure :: add_part
-   procedure :: get_item_types
-   procedure :: append_to_part
-   procedure :: allocate => allocate_partition
+   procedure :: print_partition
+   procedure :: init => partition_init
+   procedure :: new_part => partition_new_part
+   procedure :: add_part => partition_add_part
+end type
+
+type, public :: subpartition_type
+   integer :: size
+   type(pointer_to_part_type), allocatable :: parts(:)
+contains
+   procedure :: init => subpartition_init
+   procedure :: reset => subpartition_reset
+   procedure :: add_part => subpartition_add_part
 end type
 
 interface operator (==)
-   module procedure is_equal
+   module procedure test_equality
 end interface
 
 contains
 
-subroutine allocate_part(self, allocation_size)
-   class(partitionlist_type), intent(inout) :: self
-   integer, intent(in) :: allocation_size
-
-   allocate (self%indices_allocation(allocation_size))
-   self%indices => self%indices_allocation(:0)
-
-end subroutine
-
-subroutine allocate_partition(self, allocation_size)
+subroutine partition_init(self, allocation_size)
    class(partition_type), intent(inout) :: self
    integer, intent(in) :: allocation_size
 
+   allocate (self%total_size)
+   allocate (self%maxpart_size)
+   allocate (self%parts(allocation_size))
+   allocate (self%idxmap(allocation_size))
+
+   self%size = 0
+   self%total_size = 0
+   self%maxpart_size = 0
    self%allocation_size = allocation_size
-   allocate (self%parts_allocation(allocation_size))
-   self%parts => self%parts_allocation(:0)
 
 end subroutine
 
-subroutine append(self, element)
-   class(partitionlist_type), intent(inout) :: self
-   integer, intent(in) :: element
-   integer :: new_size
+subroutine subpartition_init(self, allocation_size)
+   class(subpartition_type), intent(inout) :: self
+   integer, intent(in) :: allocation_size
 
-   new_size = size(self%indices) + 1
-   self%indices_allocation(new_size) = element
-   self%indices => self%indices_allocation(:new_size)
+   allocate (self%parts(allocation_size))
 
-end subroutine
-
-subroutine append_to_part(self, index, element)
-   class(partition_type), intent(inout) :: self
-   integer, intent(in) :: index, element
-   integer :: new_size
-
-   call self%parts(index)%append(element)
-
-   self%tot_size = self%tot_size + 1
-
-   new_size = size(self%parts(index)%indices)
-   if (new_size > self%max_size) then
-      self%max_size = new_size
-   end if
+   self%size = 0
 
 end subroutine
 
-function new_part(self) result(index)
-   class(partition_type), intent(inout) :: self
-   integer :: index
+subroutine subpartition_reset(self)
+   class(subpartition_type), intent(inout) :: self
+   integer :: h
 
-   index = size(self%parts) + 1
-
-   call self%parts_allocation(index)%allocate(self%allocation_size)
-   self%parts => self%parts_allocation(:index)
-
-end function
-
-subroutine add_part(self, index)
-   class(partition_type), intent(inout) :: self
-   integer, intent(in) :: index
-
-   if (index /= size(self%parts) + 1) then
-      write (stderr, '(a)') 'Error: index does not match part size'
-   end if
-
-   call self%parts_allocation(index)%allocate(self%allocation_size)
-   self%parts => self%parts_allocation(:index)
-
-end subroutine
-
-function get_item_types(self) result(types)
-   class(partition_type), intent(in) :: self
-   ! Result variable
-   integer, allocatable :: types(:)
-   ! Local variables
-   integer :: h, i
-   integer :: index
-
-   allocate (types(self%tot_size))
-
-   do h = 1, size(self%parts)
-      do i = 1, size(self%parts(h)%indices)
-         index = self%parts(h)%indices(i)
-         types(index) = h
-      end do
+   do h = 1, self%size
+      nullify (self%parts(h)%ptr)
    end do
 
+   self%size = 0
+
+end subroutine
+
+subroutine part_append(self, element)
+   class(part_type), intent(inout) :: self
+   integer, intent(in) :: element
+
+   self%size = self%size + 1
+   self%indices(self%size) = element
+   self%idxmap(element) = self%index
+   self%indices => self%allocation(:self%size)
+
+   self%total_size = self%total_size + 1
+   if (self%size > self%maxpart_size) then
+      self%maxpart_size = self%size
+   end if
+
+end subroutine
+
+function partition_new_part(self) result(part)
+   class(partition_type), intent(inout) :: self
+   ! Result variable
+   type(part_type), pointer :: part
+
+   self%size = self%size + 1
+
+   self%parts(self%size)%size = 0
+   allocate (self%parts(self%size)%allocation(self%allocation_size))
+   self%parts(self%size)%indices => self%parts(self%size)%allocation(:0)
+
+   self%parts(self%size)%index = self%size
+   self%parts(self%size)%idxmap => self%idxmap
+   self%parts(self%size)%total_size => self%total_size
+   self%parts(self%size)%maxpart_size => self%maxpart_size
+
+   part => self%parts(self%size)
+
 end function
 
-function is_equal(self, other)
+subroutine partition_add_part(self, part)
+   class(partition_type), intent(inout) :: self
+   type(part_type), intent(in) :: part
+
+   self%size = self%size + 1
+
+   if (part%index /= self%size) then
+      write (stderr, '(a,1x,i0,1x,a,1x,i0)') &
+            'Error: part index', part%index, 'does not match partition size', self%size
+      error stop
+   end if
+
+   self%parts(self%size)%size = 0
+   allocate (self%parts(self%size)%allocation(self%allocation_size))
+   self%parts(self%size)%indices => self%parts(self%size)%allocation(:0)
+
+   self%parts(self%size)%index = part%index
+   self%parts(self%size)%idxmap => self%idxmap
+   self%parts(self%size)%total_size => self%total_size
+   self%parts(self%size)%maxpart_size => self%maxpart_size
+
+end subroutine
+
+subroutine subpartition_add_part(self, part, signature)
+   class(subpartition_type), intent(inout) :: self
+   type(part_type), pointer, intent(in) :: part
+   integer, intent(in) :: signature(:)
+
+   self%size = self%size + 1
+   self%parts(self%size)%ptr => part
+   self%parts(self%size)%signature = signature
+
+end subroutine
+
+subroutine print_partition(self)
+   class(partition_type), intent(in) :: self
+   integer :: h
+
+   write (stderr, *)
+   do h = 1, self%size
+      write (stderr, *) self%parts(h)%indices
+   end do
+
+end subroutine
+
+function test_equality(self, other) result(equality)
    type(partition_type), intent(in) :: self, other
    ! Result variable
-   logical :: is_equal
+   logical :: equality
    ! Local variables
    integer :: h
 
-   if (size(self%parts) /= size(other%parts)) then
-      is_equal = .false.
+   if (self%size /= other%size) then
+      equality = .false.
       return
    end if
 
-   do h = 1, size(self%parts)
-      if (size(self%parts(h)%indices) /= size(other%parts(h)%indices)) then
-         is_equal = .false.
+   do h = 1, self%size
+      if (self%parts(h)%size /= other%parts(h)%size) then
+         equality = .false.
          return
       end if
    end do
 
-   is_equal = .true.
+   equality = .true.
 
 end function
 

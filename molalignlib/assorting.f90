@@ -33,12 +33,13 @@ contains
 subroutine compute_crosseltypes(mol0, mol1)
    type(molecule_type), intent(inout) :: mol0, mol1
    ! Local variables
-   integer :: i, elnum, typeidx
+   integer :: i, elnum
    integer, allocatable :: typedict(:)
    type(partition_type) :: eltypes0, eltypes1
+   type(part_type), pointer :: newtype
 
-   call eltypes0%allocate(size(mol0%atoms))
-   call eltypes1%allocate(size(mol1%atoms))
+   call eltypes0%init(size(mol0%atoms))
+   call eltypes1%init(size(mol1%atoms))
 
    allocate (typedict(nelem))
    typedict(:) = 0
@@ -46,21 +47,25 @@ subroutine compute_crosseltypes(mol0, mol1)
    do i = 1, size(mol0%atoms)
       elnum = mol0%atoms(i)%elnum
       if (typedict(elnum) == 0) then
-         typeidx = eltypes0%new_part()
-         call eltypes1%add_part(typeidx)
-         typedict(elnum) = typeidx
+         newtype => eltypes0%new_part()
+         call eltypes1%add_part(newtype)
+         typedict(elnum) = newtype%index
+      else
+         newtype => eltypes0%parts(typedict(elnum))
       end if
-      call eltypes0%append_to_part(typedict(elnum), i)
+      call newtype%append(i)
    end do
 
    do i = 1, size(mol1%atoms)
       elnum = mol1%atoms(i)%elnum
       if (typedict(elnum) == 0) then
-         typeidx = eltypes1%new_part()
-         call eltypes0%add_part(typeidx)
-         typedict(elnum) = typeidx
+         newtype => eltypes1%new_part()
+         call eltypes0%add_part(newtype)
+         typedict(elnum) = newtype%index
+      else
+         newtype => eltypes1%parts(typedict(elnum))
       end if
-      call eltypes1%append_to_part(typedict(elnum), i)
+      call newtype%append(i)
    end do
 
    call mol0%set_eltypes(eltypes0)
@@ -68,17 +73,16 @@ subroutine compute_crosseltypes(mol0, mol1)
 
 end subroutine
 
-! Iteratively compute MNA types at all levels
+! Iteratively compute all levels MNA types
 subroutine compute_mnatypes(mol)
    type(molecule_type), intent(inout) :: mol
    ! Local variables
    type(partition_type) :: intypes, types
-!   integer h
 
    intypes = mol%eltypes
 
    do
-      ! Compute MNA types at next level
+      ! Compute next level MNA types
       call compute_nextmnatypes(mol%atoms, intypes, types)
       ! Exit the loop if types are unchanged
       if (types == intypes) exit
@@ -86,68 +90,87 @@ subroutine compute_mnatypes(mol)
    end do
 
    call mol%set_mnatypes(types)
-!   do h = 1 , size(types%parts)
-!      print *, types%parts(h)%indices
-!   end do
+!   call types%print_partition()
 
 end subroutine
 
-! Assort atoms by MNA type at next level
+! Compute next level MNA types
 subroutine compute_nextmnatypes(atoms, intypes, types)
    type(atom_type), dimension(:), intent(in) :: atoms
    type(partition_type), intent(in) :: intypes
    type(partition_type), intent(out) :: types
    ! Local variables
    integer :: h, k, i
-   integer :: atomidx, typeidx
-   integer, allocatable :: adjlist(:)
-   integer, allocatable :: atomintypes(:)
-   integer, allocatable :: adjtypecounts(:)
-   type(partitionlist_type) :: subtypelist
-   type(countlist_type), allocatable :: adjtypeaccounting(:)
+   integer :: natom, atomidx
+   integer, allocatable :: signature(:)
+   type(subpartition_type) :: subtypes
+   type(part_type), pointer :: newtype
 
-   call types%allocate(size(atoms))
-   allocate (adjtypeaccounting(size(atoms)))
-   atomintypes = intypes%get_item_types()
+   natom = size(atoms)
+   call types%init(natom)
+   call subtypes%init(natom)
 
-   do h = 1, size(intypes%parts)
-      call subtypelist%allocate(size(atoms))
-      outer: do i = 1, size(intypes%parts(h)%indices)
+   do h = 1, intypes%size
+      outer: do i = 1, intypes%parts(h)%size
          atomidx = intypes%parts(h)%indices(i)
-         adjlist = atoms(atomidx)%adjlist
-         adjtypecounts = typecounts(atomintypes, adjlist)
-         do k = 1, size(subtypelist%indices)
-            if (all(adjtypecounts == adjtypeaccounting(subtypelist%indices(k))%counts)) then
-               call types%append_to_part(subtypelist%indices(k), atomidx)
+         signature = adjtypecount(intypes, atoms(atomidx)%adjlist)
+         do k = 1, subtypes%size
+            if (all(signature == subtypes%parts(k)%signature)) then
+               call subtypes%parts(k)%ptr%append(atomidx)
                cycle outer
             end if
          end do
-         typeidx = types%new_part()
-         call subtypelist%append(typeidx)
-         call types%append_to_part(typeidx, atomidx)
-         adjtypeaccounting(typeidx)%counts = typecounts(atomintypes, adjlist)
+         newtype => types%new_part()
+         call subtypes%add_part(newtype, signature)
+         call newtype%append(atomidx)
       end do outer
+      call subtypes%reset()
    end do
 
 end subroutine
 
-function typecounts(atomtypes, adjlist)
-   integer, intent(in) :: atomtypes(:)
+!! Iteratively compute all levels MNA types
+!subroutine compute_allcrossmnatypes(mol0, mol1)
+!   type(molecule_type), intent(inout) :: mol0, mol1
+!   ! Local variables
+!   type(partition_type) :: types0, types1
+!   type(partition_type) :: intypes0, intypes1
+!   integer h
+!
+!   intypes0 = mol0%eltypes
+!   intypes1 = mol1%eltypes
+!
+!   do
+!      ! Compute next level MNA types
+!      call compute_nextcrossmnatypes(mol0%atoms, mol1%atoms, intypes0, intypes1, types0, types1)
+!      ! Exit the loop if types are unchanged
+!      if (types0 == intypes0 .and. types1 == intypes1) exit
+!      intypes0 = types0
+!      intypes1 = types1
+!   end do
+!
+!   call mol0%set_mnatypes(types0)
+!   call mol1%set_mnatypes(types1)
+!
+!end subroutine
+
+function adjtypecount(types, adjlist)
+   type(partition_type) :: types
    integer, intent(in) :: adjlist(:)
-   integer, allocatable :: typecounts(:)
+   integer, allocatable :: adjtypecount(:)
    ! Local variables
    integer :: i
 
-   allocate(typecounts(size(atomtypes)))
-   typecounts(:) = 0
+   allocate (adjtypecount(types%size))
+   adjtypecount(:) = 0
 
    do i = 1, size(adjlist)
-      typecounts(atomtypes(adjlist(i))) = typecounts(atomtypes(adjlist(i))) + 1
+      adjtypecount(types%idxmap(adjlist(i))) = adjtypecount(types%idxmap(adjlist(i))) + 1
    end do
 
 end function
 
-! Find next level cross MNA types between mol0 and mol1
+! Compute next level cross MNA types between mol0 and mol1
 subroutine compute_crossmnatypes(adjlists0, adjlists1, nintype, intypes0, intypes1, &
       ntype, types0, types1)
    type(indexlist_type), dimension(:), intent(in) :: adjlists0, adjlists1

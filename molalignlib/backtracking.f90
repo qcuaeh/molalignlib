@@ -25,11 +25,11 @@ subroutine minadjdiff (mol0, mol1, mapping)
 
    ! Local variables
 
-   integer :: atomeltypes0(mol0%natom)
+   integer :: eltypemap0(mol0%natom)
    integer :: h, i, moldiff
    integer :: ntrack, track(mol0%natom)
    integer :: unmapping(mol0%natom)
-   integer, dimension(mol0%natom) :: atommnatypes0, atommnatypes1
+   integer, dimension(mol0%natom) :: mnatypemap0, mnatypemap1
    logical :: tracked(mol0%natom)
    real(rk) moldist
 
@@ -40,8 +40,8 @@ subroutine minadjdiff (mol0, mol1, mapping)
    type(partition_type) :: eltypes0
    type(partition_type) :: mnatypes0, mnatypes1
 
-   integer, allocatable, dimension(:) :: eltypepops0
-   integer, allocatable, dimension(:) :: mnatypepops0, mnatypepops1
+   integer, allocatable, dimension(:) :: eltypepartsizes0
+   integer, allocatable, dimension(:) :: mnatypepartsizes0, mnatypepartsizes1
    integer, allocatable, dimension(:) :: fragroots0, fragroots1
 
    logical, dimension(:, :), allocatable :: adjmat0, adjmat1
@@ -60,28 +60,28 @@ subroutine minadjdiff (mol0, mol1, mapping)
    natom = mol0%get_natom()
 
    eltypes0 = mol0%gather_eltypes()
-   atomeltypes0 = eltypes0%get_item_types()
+   eltypemap0 = eltypes0%idxmap
 
-   neltype0 = size(eltypes0%parts)
-   allocate (eltypepops0(neltype0))
+   neltype0 = eltypes0%size
+   allocate (eltypepartsizes0(neltype0))
    do h = 1, neltype0
-      eltypepops0(h) = size(eltypes0%parts(h)%indices)
+      eltypepartsizes0(h) = eltypes0%parts(h)%size
    end do
 
    mnatypes0 = mol0%gather_mnatypes()
    mnatypes1 = mol1%gather_mnatypes()
-   atommnatypes0 = mnatypes0%get_item_types()
-   atommnatypes1 = mnatypes1%get_item_types()
+   mnatypemap0 = mnatypes0%idxmap
+   mnatypemap1 = mnatypes1%idxmap
 
    nmnatype0 = size(mnatypes0%parts)
    nmnatype1 = size(mnatypes1%parts)
-   allocate (mnatypepops0(nmnatype0))
-   allocate (mnatypepops1(nmnatype1))
+   allocate (mnatypepartsizes0(nmnatype0))
+   allocate (mnatypepartsizes1(nmnatype1))
    do h = 1, nmnatype0
-      mnatypepops0(h) = size(mnatypes0%parts(h)%indices)
+      mnatypepartsizes0(h) = mnatypes0%parts(h)%size
    end do
    do h = 1, nmnatype1
-      mnatypepops1(h) = size(mnatypes1%parts(h)%indices)
+      mnatypepartsizes1(h) = mnatypes1%parts(h)%size
    end do
 
 !   adjlists0 = mol0%gather_adjlists()
@@ -225,7 +225,7 @@ subroutine minadjdiff (mol0, mol1, mapping)
          if (.not. tracked(mismatches0(i))) then
             do j = 1, nmismatch1
                if (.not. matched1(j)) then
-                  if (atomeltypes0(mismatches0(i)) == atomeltypes0(mismatches1(j))) then
+                  if (eltypemap0(mismatches0(i)) == eltypemap0(mismatches1(j))) then
 
                      ntrack_branch = ntrack
                      track_branch(:) = track(:)
@@ -259,8 +259,8 @@ subroutine minadjdiff (mol0, mol1, mapping)
                      if ( &
                         moldiff_branch < moldiff &
                         .and. ( &
-                           atommnatypes0(mismatches0(i)) == atommnatypes0(unmapping(mismatches1(j))) &
-                           .and. atommnatypes1(mapping(mismatches0(i))) == atommnatypes1(mismatches1(j)) &
+                           mnatypemap0(mismatches0(i)) == mnatypemap0(unmapping(mismatches1(j))) &
+                           .and. mnatypemap1(mapping(mismatches0(i))) == mnatypemap1(mismatches1(j)) &
                         ) &
                      ) then
                         ntrack = ntrack_branch
@@ -315,8 +315,8 @@ subroutine eqvatomperm (mol0, mol1, workcoords1, mapping)
    type(partition_type) :: eltypes0
    type(partition_type) :: mnatypes0, mnatypes1
 
-   integer, allocatable, dimension(:) :: eltypepops0
-   integer, allocatable, dimension(:) :: mnatypepops0, mnatypepops1
+   integer, allocatable, dimension(:) :: eltypepartsizes0
+   integer, allocatable, dimension(:) :: mnatypepartsizes0, mnatypepartsizes1
    integer, allocatable, dimension(:) :: fragroots0, fragroots1
 
    logical, dimension(:, :), allocatable :: adjmat0, adjmat1
@@ -336,10 +336,10 @@ subroutine eqvatomperm (mol0, mol1, workcoords1, mapping)
 
    eltypes0 = mol0%gather_eltypes()
 
-   neltype0 = size(eltypes0%parts)
-   allocate (eltypepops0(neltype0))
+   neltype0 = eltypes0%size
+   allocate (eltypepartsizes0(neltype0))
    do h = 1, neltype0
-      eltypepops0(h) = size(eltypes0%parts(h)%indices)
+      eltypepartsizes0(h) = eltypes0%parts(h)%size
    end do
 
    mnatypes0 = mol0%gather_mnatypes()
@@ -347,13 +347,13 @@ subroutine eqvatomperm (mol0, mol1, workcoords1, mapping)
 
    nmnatype0 = size(mnatypes0%parts)
    nmnatype1 = size(mnatypes1%parts)
-   allocate (mnatypepops0(nmnatype0))
-   allocate (mnatypepops1(nmnatype1))
+   allocate (mnatypepartsizes0(nmnatype0))
+   allocate (mnatypepartsizes1(nmnatype1))
    do h = 1, nmnatype0
-      mnatypepops0(h) = size(mnatypes0%parts(h)%indices)
+      mnatypepartsizes0(h) = mnatypes0%parts(h)%size
    end do
    do h = 1, nmnatype1
-      mnatypepops1(h) = size(mnatypes1%parts(h)%indices)
+      mnatypepartsizes1(h) = mnatypes1%parts(h)%size
    end do
 
 !   adjlists0 = mol0%gather_adjlists()
@@ -382,13 +382,13 @@ subroutine eqvatomperm (mol0, mol1, workcoords1, mapping)
 
    eqvos(1) = 0
    do h = 1, nmnatype0 - 1
-      eqvos(h+1) = eqvos(h) + mnatypepops0(h)
+      eqvos(h+1) = eqvos(h) + mnatypepartsizes0(h)
    end do
 
    ! set atoms equivalence indices
 
    do h = 1, nmnatype0
-      eqvidx(eqvos(h)+1:eqvos(h)+mnatypepops0(h)) = h
+      eqvidx(eqvos(h)+1:eqvos(h)+mnatypepartsizes0(h)) = h
    end do
 
    ! initialization
@@ -431,7 +431,7 @@ subroutine eqvatomperm (mol0, mol1, workcoords1, mapping)
       integer :: h, i, offset, first, last
 
       first = eqvos(eqvidx(nodea)) + 1
-      last = eqvos(eqvidx(nodea)) + mnatypepops0(eqvidx(nodea))
+      last = eqvos(eqvidx(nodea)) + mnatypepartsizes0(eqvidx(nodea))
       held(first:last) = .true.
       offset = 0
       do h = 1, nadjmnatypes0(nodea)
@@ -484,7 +484,7 @@ subroutine eqvatomperm (mol0, mol1, workcoords1, mapping)
 
       ! reserves atoms with the same type as n
       first = eqvos(eqvidx(node)) + 1
-      last = eqvos(eqvidx(node)) + mnatypepops0(eqvidx(node))
+      last = eqvos(eqvidx(node)) + mnatypepartsizes0(eqvidx(node))
       held(first:last) = .true.
 
       offset = 0
