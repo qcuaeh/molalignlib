@@ -30,6 +30,30 @@ implicit none
 contains
 
 ! Partition atoms by atomic number
+subroutine compute_eltypes(mol)
+   type(molecule_type), intent(inout) :: mol
+   ! Local variables
+   integer :: i, elnum
+   type(partition_type) :: eltypes
+   type(pointer_to_part_type), allocatable :: typedict(:)
+
+   allocate (typedict(nelem))
+   call eltypes%init(size(mol%atoms))
+
+   do i = 1, size(mol%atoms)
+      elnum = mol%atoms(i)%elnum
+      if (.not. associated(typedict(elnum)%ptr)) then
+         typedict(elnum)%ptr => eltypes%new_part()
+      end if
+      call typedict(elnum)%ptr%append(i)
+   end do
+
+!   call mol%set_eltypes(eltypes)
+!   call eltypes%print_partition()
+
+end subroutine
+
+! Partition atoms by atomic number
 subroutine compute_crosseltypes(mol0, mol1)
    type(molecule_type), intent(inout) :: mol0, mol1
    ! Local variables
@@ -102,7 +126,7 @@ subroutine compute_nextmnatypes(atoms, intypes, types)
    ! Local variables
    integer :: h, k, i
    integer :: natom, atomidx
-   integer, allocatable :: signature(:)
+   integer, allocatable :: neighborhood(:)
    type(subpartition_type) :: subtypes
    type(part_type), pointer :: newtype
 
@@ -113,15 +137,15 @@ subroutine compute_nextmnatypes(atoms, intypes, types)
    do h = 1, intypes%size
       outer: do i = 1, intypes%parts(h)%size
          atomidx = intypes%parts(h)%indices(i)
-         signature = adjtypecount(intypes, atoms(atomidx)%adjlist)
+         neighborhood = intypes%typecount(atoms(atomidx)%adjlist)
          do k = 1, subtypes%size
-            if (all(signature == subtypes%parts(k)%signature)) then
+            if (all(neighborhood == subtypes%parts(k)%neighborhood)) then
                call subtypes%parts(k)%ptr%append(atomidx)
                cycle outer
             end if
          end do
          newtype => types%new_part()
-         call subtypes%add_part(newtype, signature)
+         call subtypes%add_part(newtype, neighborhood)
          call newtype%append(atomidx)
       end do outer
       call subtypes%reset()
@@ -153,22 +177,6 @@ end subroutine
 !   call mol1%set_mnatypes(types1)
 !
 !end subroutine
-
-function adjtypecount(types, adjlist)
-   type(partition_type) :: types
-   integer, intent(in) :: adjlist(:)
-   integer, allocatable :: adjtypecount(:)
-   ! Local variables
-   integer :: i
-
-   allocate (adjtypecount(types%size))
-   adjtypecount(:) = 0
-
-   do i = 1, size(adjlist)
-      adjtypecount(types%idxmap(adjlist(i))) = adjtypecount(types%idxmap(adjlist(i))) + 1
-   end do
-
-end function
 
 ! Compute next level cross MNA types between mol0 and mol1
 subroutine compute_crossmnatypes(adjlists0, adjlists1, nintype, intypes0, intypes1, &

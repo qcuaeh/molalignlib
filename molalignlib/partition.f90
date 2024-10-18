@@ -8,8 +8,8 @@ type, public :: indexlist_type
 end type
 
 type, public :: pointer_to_part_type
-   integer, allocatable :: signature(:)
-   type(part_type), pointer :: ptr
+   type(part_type), pointer :: ptr => null()
+   integer, allocatable :: neighborhood(:)
 end type
 
 type, public :: part_type
@@ -32,6 +32,7 @@ type, public :: partition_type
    integer, pointer :: idxmap(:)
    type(part_type), pointer :: parts(:)
 contains
+   procedure :: typecount
    procedure :: print_partition
    procedure :: init => partition_init
    procedure :: new_part => partition_new_part
@@ -52,6 +53,22 @@ interface operator (==)
 end interface
 
 contains
+
+function typecount(self, indices)
+   class(partition_type) :: self
+   integer, intent(in) :: indices(:)
+   integer, allocatable :: typecount(:)
+   ! Local variables
+   integer :: i
+
+   allocate (typecount(self%size))
+   typecount(:) = 0
+
+   do i = 1, size(indices)
+      typecount(self%idxmap(indices(i))) = typecount(self%idxmap(indices(i))) + 1
+   end do
+
+end function
 
 subroutine partition_init(self, allocation_size)
    class(partition_type), intent(inout) :: self
@@ -96,9 +113,9 @@ subroutine part_append(self, element)
    integer, intent(in) :: element
 
    self%size = self%size + 1
+   self%indices => self%allocation(:self%size)
    self%indices(self%size) = element
    self%idxmap(element) = self%index
-   self%indices => self%allocation(:self%size)
 
    self%total_size = self%total_size + 1
    if (self%size > self%maxpart_size) then
@@ -150,14 +167,14 @@ subroutine partition_add_part(self, part)
 
 end subroutine
 
-subroutine subpartition_add_part(self, part, signature)
+subroutine subpartition_add_part(self, part, neighborhood)
    class(subpartition_type), intent(inout) :: self
    type(part_type), pointer, intent(in) :: part
-   integer, intent(in) :: signature(:)
+   integer, intent(in) :: neighborhood(:)
 
    self%size = self%size + 1
    self%parts(self%size)%ptr => part
-   self%parts(self%size)%signature = signature
+   self%parts(self%size)%neighborhood = neighborhood
 
 end subroutine
 
