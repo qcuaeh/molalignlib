@@ -17,6 +17,7 @@
 module assorting
 use stdio
 use kinds
+use hashtable
 use partition
 use permutation
 use molecule
@@ -30,153 +31,167 @@ implicit none
 contains
 
 ! Partition atoms by atomic number
-subroutine compute_eltypes(mol)
-   type(molecule_type), intent(inout) :: mol
-   ! Local variables
-   integer :: i, elnum
-   type(partition_type) :: eltypes
-   type(pointer_to_part_type), allocatable :: typedict(:)
-
-   allocate (typedict(nelem))
-   call eltypes%init(size(mol%atoms))
-
-   do i = 1, size(mol%atoms)
-      elnum = mol%atoms(i)%elnum
-      if (.not. associated(typedict(elnum)%ptr)) then
-         typedict(elnum)%ptr => eltypes%new_part()
-      end if
-      call typedict(elnum)%ptr%append(i)
-   end do
-
-!   call mol%set_eltypes(eltypes)
-!   call eltypes%print_partition()
-
-end subroutine
-
-! Partition atoms by atomic number
 subroutine compute_crosseltypes(mol0, mol1)
    type(molecule_type), intent(inout) :: mol0, mol1
    ! Local variables
    integer :: i, elnum
-   integer, allocatable :: typedict(:)
    type(partition_type) :: eltypes0, eltypes1
-   type(part_type), pointer :: newtype
+   type(pointertopart_type), dimension(:), allocatable :: typelist0, typelist1
+
+   allocate (typelist0(nelem))
+   allocate (typelist1(nelem))
 
    call eltypes0%init(size(mol0%atoms))
    call eltypes1%init(size(mol1%atoms))
 
-   allocate (typedict(nelem))
-   typedict(:) = 0
-
    do i = 1, size(mol0%atoms)
       elnum = mol0%atoms(i)%elnum
-      if (typedict(elnum) == 0) then
-         newtype => eltypes0%new_part()
-         call eltypes1%add_part(newtype)
-         typedict(elnum) = newtype%index
-      else
-         newtype => eltypes0%parts(typedict(elnum))
+      if (.not. associated(typelist0(elnum)%ptr)) then
+         typelist0(elnum)%ptr => eltypes0%get_new_part()
+         typelist1(elnum)%ptr => eltypes1%get_new_part()
       end if
-      call newtype%append(i)
+      call typelist0(elnum)%ptr%add(i)
    end do
 
    do i = 1, size(mol1%atoms)
       elnum = mol1%atoms(i)%elnum
-      if (typedict(elnum) == 0) then
-         newtype => eltypes1%new_part()
-         call eltypes0%add_part(newtype)
-         typedict(elnum) = newtype%index
-      else
-         newtype => eltypes1%parts(typedict(elnum))
+      if (.not. associated(typelist1(elnum)%ptr)) then
+         typelist1(elnum)%ptr => eltypes1%get_new_part()
+         typelist0(elnum)%ptr => eltypes0%get_new_part()
       end if
-      call newtype%append(i)
+      call typelist1(elnum)%ptr%add(i)
    end do
+
+!   call eltypes0%print_parts()
+!   call eltypes1%print_parts()
 
    call mol0%set_eltypes(eltypes0)
    call mol1%set_eltypes(eltypes1)
 
 end subroutine
 
-! Iteratively compute all levels MNA types
-subroutine compute_mnatypes(mol)
-   type(molecule_type), intent(inout) :: mol
+! Level up cross MNA types
+subroutine levelup_crossmnatypes(atoms0, atoms1, types0, types1, subtypes0, subtypes1)
+   type(atom_type), dimension(:), intent(in) :: atoms0, atoms1
+   type(partition_type), intent(in) :: types0, types1
+   type(partition_type), intent(out) :: subtypes0, subtypes1
    ! Local variables
-   type(partition_type) :: intypes, types
+   integer :: h, i, index_i
+   integer :: total_atoms, max_part_size
+   type(hashtable_type) :: subtypedict
+   type(pointertopart_type), dimension(:), allocatable :: subtypelist0, subtypelist1
+   integer, allocatable :: neighborhood(:)
 
-   intypes = mol%eltypes
+   total_atoms = size(atoms0) + size(atoms1)
+   max_part_size = max(types0%max_part_size, types1%max_part_size)
+
+   call subtypes0%init(total_atoms)
+   call subtypes1%init(total_atoms)
+   call subtypedict%init(max_part_size)
+
+   allocate (subtypelist0(subtypedict%size))
+   allocate (subtypelist1(subtypedict%size))
+
+   do h = 1, types0%size
+      do i = 1, types0%parts(h)%size
+         index_i = types0%parts(h)%indices(i)
+         neighborhood = types0%index_part_map(atoms0(index_i)%adjlist)
+         if (.not. subtypedict%has_index(neighborhood)) then
+            subtypelist0(subtypedict%get_new_index(neighborhood))%ptr => subtypes0%get_new_part()
+            subtypelist1(subtypedict%get_new_index(neighborhood))%ptr => subtypes1%get_new_part()
+         end if
+         call subtypelist0(subtypedict%get_index(neighborhood))%ptr%add(index_i)
+      end do
+      do i = 1, types1%parts(h)%size
+         index_i = types1%parts(h)%indices(i)
+         neighborhood = types1%index_part_map(atoms1(index_i)%adjlist)
+         if (.not. subtypedict%has_index(neighborhood)) then
+            subtypelist1(subtypedict%get_new_index(neighborhood))%ptr => subtypes1%get_new_part()
+            subtypelist0(subtypedict%get_new_index(neighborhood))%ptr => subtypes0%get_new_part()
+         end if
+         call subtypelist1(subtypedict%get_index(neighborhood))%ptr%add(index_i)
+      end do
+      call subtypedict%reset()
+   end do
+
+end subroutine
+
+! Iteratively level up cross MNA types
+subroutine compute_crossmnatypes2(mol0, mol1)
+   type(molecule_type), intent(inout) :: mol0, mol1
+   ! Local variables
+   type(partition_type) :: mnatypes0, mnatypes1
+   type(partition_type) :: mnasubtypes0, mnasubtypes1
+
+   mnatypes0 = mol0%eltypes
+   mnatypes1 = mol1%eltypes
 
    do
       ! Compute next level MNA types
-      call compute_nextmnatypes(mol%atoms, intypes, types)
+      call levelup_crossmnatypes(mol0%atoms, mol1%atoms, mnatypes0, mnatypes1, mnasubtypes0, mnasubtypes1)
       ! Exit the loop if types are unchanged
-      if (types == intypes) exit
-      intypes = types
+      if (mnasubtypes0 == mnatypes0 .and. mnasubtypes1 == mnatypes1) exit
+      mnatypes0 = mnasubtypes0
+      mnatypes1 = mnasubtypes1
    end do
 
-   call mol%set_mnatypes(types)
-!   call types%print_partition()
+   call mnatypes0%print_parts()
+   call mnatypes1%print_parts()
+
+!   call mol0%set_mnatypes(mnatypes0)
+!   call mol1%set_mnatypes(mnatypes1)
 
 end subroutine
 
-! Compute next level MNA types
-subroutine compute_nextmnatypes(atoms, intypes, types)
+! Level up MNA types
+subroutine levelup_mnatypes(atoms, types, subtypes)
    type(atom_type), dimension(:), intent(in) :: atoms
-   type(partition_type), intent(in) :: intypes
-   type(partition_type), intent(out) :: types
+   type(partition_type), intent(in) :: types
+   type(partition_type), intent(out) :: subtypes
    ! Local variables
-   integer :: h, k, i
-   integer :: natom, atomidx
+   integer :: h, i, index_i
+   type(hashtable_type) :: subtypedict
+   type(pointertopart_type), allocatable :: subtypelist(:)
    integer, allocatable :: neighborhood(:)
-   type(subpartition_type) :: subtypes
-   type(part_type), pointer :: newtype
 
-   natom = size(atoms)
-   call types%init(natom)
-   call subtypes%init(natom)
+   call subtypes%init(size(atoms))
+   call subtypedict%init(types%max_part_size)
+   allocate (subtypelist(subtypedict%size))
 
-   do h = 1, intypes%size
-      outer: do i = 1, intypes%parts(h)%size
-         atomidx = intypes%parts(h)%indices(i)
-         neighborhood = intypes%typecount(atoms(atomidx)%adjlist)
-         do k = 1, subtypes%size
-            if (all(neighborhood == subtypes%parts(k)%neighborhood)) then
-               call subtypes%parts(k)%ptr%append(atomidx)
-               cycle outer
-            end if
-         end do
-         newtype => types%new_part()
-         call subtypes%add_part(newtype, neighborhood)
-         call newtype%append(atomidx)
-      end do outer
-      call subtypes%reset()
+   do h = 1, types%size
+      do i = 1, types%parts(h)%size
+         index_i = types%parts(h)%indices(i)
+         neighborhood = types%index_part_map(atoms(index_i)%adjlist)
+         if (.not. subtypedict%has_index(neighborhood)) then
+            subtypelist(subtypedict%get_new_index(neighborhood))%ptr => subtypes%get_new_part()
+         end if
+         call subtypelist(subtypedict%get_index(neighborhood))%ptr%add(index_i)
+      end do
+      call subtypedict%reset()
    end do
 
 end subroutine
 
-!! Iteratively compute all levels MNA types
-!subroutine compute_allcrossmnatypes(mol0, mol1)
-!   type(molecule_type), intent(inout) :: mol0, mol1
-!   ! Local variables
-!   type(partition_type) :: types0, types1
-!   type(partition_type) :: intypes0, intypes1
-!   integer h
-!
-!   intypes0 = mol0%eltypes
-!   intypes1 = mol1%eltypes
-!
-!   do
-!      ! Compute next level MNA types
-!      call compute_nextcrossmnatypes(mol0%atoms, mol1%atoms, intypes0, intypes1, types0, types1)
-!      ! Exit the loop if types are unchanged
-!      if (types0 == intypes0 .and. types1 == intypes1) exit
-!      intypes0 = types0
-!      intypes1 = types1
-!   end do
-!
-!   call mol0%set_mnatypes(types0)
-!   call mol1%set_mnatypes(types1)
-!
-!end subroutine
+! Iteratively level up MNA types
+subroutine compute_mnatypes(mol)
+   type(molecule_type), intent(inout) :: mol
+   ! Local variables
+   type(partition_type) :: mnatypes, mnasubtypes
+
+   mnatypes = mol%eltypes
+
+   do
+      ! Compute next level MNA mnasubtypes
+      call levelup_mnatypes(mol%atoms, mnatypes, mnasubtypes)
+      ! Exit the loop if mnasubtypes are unchanged
+      if (mnasubtypes == mnatypes) exit
+      mnatypes = mnasubtypes
+   end do
+
+   call mnatypes%print_parts()
+!   call mol%set_mnatypes(mnatypes)
+
+end subroutine
 
 ! Compute next level cross MNA types between mol0 and mol1
 subroutine compute_crossmnatypes(adjlists0, adjlists1, nintype, intypes0, intypes1, &

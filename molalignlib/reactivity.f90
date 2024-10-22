@@ -64,8 +64,8 @@ subroutine remove_reactive_bonds(mol0, mol1, mapping)
    adjlists1 = mol1%get_adjlists()
    mnatypes0 = mol0%mnatypes
    mnatypes1 = mol1%mnatypes
-   mnatypemap0 = mol0%mnatypes%idxmap
-   mnatypemap1 = mol1%mnatypes%idxmap
+   mnatypemap0 = mol0%mnatypes%index_part_map
+   mnatypemap1 = mol1%mnatypes%index_part_map
    molfragparts0 = mol0%get_molfrags()
    molfragparts1 = mol1%get_molfrags()
    unmapping = inverse_permutation(mapping)

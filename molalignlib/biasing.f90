@@ -112,8 +112,8 @@ subroutine compute_equivmat( eltypes0, eltypes1, adjlists0, adjlists1, equivmat)
 
    level = 1
    nintype = eltypes0%size
-   intypes0 = eltypes0%idxmap
-   intypes1 = eltypes1%idxmap
+   intypes0 = eltypes0%index_part_map
+   intypes1 = eltypes1%index_part_map
 
    do
 

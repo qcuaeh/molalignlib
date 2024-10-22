@@ -219,10 +219,7 @@ end if
 ! Compute types
 
 call compute_crosseltypes(mol0, mol1)
-!call compute_eltypes(mol0)
-!call compute_mnatypes(mol0)
-!call compute_mnatypes(mol1)
-!call compute_allcrossmnatypes(mol0, mol1)
+call compute_crossmnatypes2(mol0, mol1)
 
 if (remap_flag) then
 

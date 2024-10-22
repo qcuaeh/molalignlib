@@ -4,6 +4,7 @@ flags.f90
 bounds.f90
 pointers.f90
 strutils.f90
+hashtable.f90
 partition.f90
 permutation.f90
 setutils.f90

@@ -60,7 +60,7 @@ subroutine minadjdiff (mol0, mol1, mapping)
    natom = mol0%get_natom()
 
    eltypes0 = mol0%gather_eltypes()
-   eltypemap0 = eltypes0%idxmap
+   eltypemap0 = eltypes0%index_part_map
 
    neltype0 = eltypes0%size
    allocate (eltypepartsizes0(neltype0))
@@ -70,8 +70,8 @@ subroutine minadjdiff (mol0, mol1, mapping)
 
    mnatypes0 = mol0%gather_mnatypes()
    mnatypes1 = mol1%gather_mnatypes()
-   mnatypemap0 = mnatypes0%idxmap
-   mnatypemap1 = mnatypes1%idxmap
+   mnatypemap0 = mnatypes0%index_part_map
+   mnatypemap1 = mnatypes1%index_part_map
 
    nmnatype0 = size(mnatypes0%parts)
    nmnatype1 = size(mnatypes1%parts)
