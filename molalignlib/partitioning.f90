@@ -276,15 +276,7 @@ subroutine nextlevel_mnatypes(mol1, mol2, mnatypes)
    ! Local variables
    type(tree_node), pointer :: subtree
    type(treenode_ptr), allocatable :: typehood(:)
-   type(typehood_table) :: typehoodtable
 
-!   block
-!   type(treenode_ptr), allocatable :: itemdir1(:)
-!   itemdir1 = mnatypes%itemdir1
-!   end block
-
-   subtree => new_tree()
-   allocate (typehoodtable%items(size(mol1%atoms) + size(mol2%atoms)))
    call traverse_tree(mnatypes%tree)
    call delete_tree(subtree)
 
@@ -293,7 +285,6 @@ subroutine nextlevel_mnatypes(mol1, mol2, mnatypes)
    recursive subroutine traverse_tree(inode)
       type(tree_node), intent(inout) :: inode
       type(tree_node), pointer :: child
-      type(item_node), pointer :: item, next_item
 
       ! Internal node, process its children
       if (associated(inode%first_child)) then
@@ -310,61 +301,64 @@ subroutine nextlevel_mnatypes(mol1, mol2, mnatypes)
          return
       end if
 
-      typehoodtable%num_items = 0
+      call next_level_leaf(mol1%atoms, mol2%atoms, mnatypes%itemdir1, mnatypes%itemdir2, inode)
 
-!      item => inode%first_item1
-!      do while (associated(item))
-!         typehood = itemdir1(mol%atoms(item%idx)%adjlist)
-!         child => find_node(typehoodtable, typehood)
-!         if (.not. associated(child)) then
-!            child => new_child(inode)
-!            call add_node(typehoodtable, typehood, child)
-!         end if
-!         call add_new_item1(child, item%idx)
-!         mnatypes%itemdir1(item%idx)%ptr => child
-!         item => item%next_item
-!      end do
+end subroutine
 
-      ! First molecule
-      item => inode%first_item1
-      do while (associated(item))
-         next_item => item%next_item
-         typehood = mnatypes%itemdir1(mol1%atoms(item%idx)%adjlist)
-         child => find_node(typehoodtable, typehood)
-         if (.not. associated(child)) then
-            child => new_child(subtree)
-            call add_node(typehoodtable, typehood, child)
-         end if
-         call add_item1(child, item)
-         item => next_item
-      end do
+subroutine next_level_leaf(atoms1, atoms2, itemdir1, itemdir2, inode)
+   type(atom_type), dimension(:), intent(in) :: atoms1, atoms2
+   type(treenode_ptr), dimension(:), intent(inout) :: itemdir1, itemdir2
+   type(tree_node), intent(inout) :: inode
+   ! Local variables
+   type(tree_node), pointer :: child
+   type(item_node), pointer :: item, next_item
+   type(typehood_table) :: typehoodtable
 
-      ! Second molecule
-      item => inode%first_item2
-      do while (associated(item))
-         next_item => item%next_item
-         typehood = mnatypes%itemdir2(mol2%atoms(item%idx)%adjlist)
-         child => find_node(typehoodtable, typehood)
-         if (.not. associated(child)) then
-            child => new_child(subtree)
-            call add_node(typehoodtable, typehood, child)
-         end if
-         call add_item2(child, item)
-         item => next_item
-      end do
+   subtree => new_tree()
+   allocate (typehoodtable%items(inode%item_count1 + inode%item_count2))
+   typehoodtable%num_items = 0
 
-      ! Attach subtree to tree if leaf is branched
-      if (associated(subtree%first_child%next_sibling)) then
-         call update_itemdir(mnatypes%itemdir1, mnatypes%itemdir2, subtree)
-         inode%first_item1 => null()
-         inode%first_item2 => null()
-         inode%first_child => subtree%first_child
-         subtree%first_child => null()
-      else
-         subtree%first_child%first_item1 => null()
-         subtree%first_child%first_item2 => null()
-         call delete_tree(subtree%first_child)
+   ! First molecule
+   item => inode%first_item1
+   do while (associated(item))
+      next_item => item%next_item
+      typehood = itemdir1(atoms1(item%idx)%adjlist)
+      child => find_node(typehoodtable, typehood)
+      if (.not. associated(child)) then
+         child => new_child(subtree)
+         call add_node(typehoodtable, typehood, child)
       end if
+      call add_item1(child, item)
+      item => next_item
+   end do
+
+   ! Second molecule
+   item => inode%first_item2
+   do while (associated(item))
+      next_item => item%next_item
+      typehood = itemdir2(atoms2(item%idx)%adjlist)
+      child => find_node(typehoodtable, typehood)
+      if (.not. associated(child)) then
+         child => new_child(subtree)
+         call add_node(typehoodtable, typehood, child)
+      end if
+      call add_item2(child, item)
+      item => next_item
+   end do
+
+   ! Attach subtree to tree if leaf is branched
+   if (associated(subtree%first_child%next_sibling)) then
+      call update_itemdir(itemdir1, itemdir2, subtree)
+      inode%first_item1 => null()
+      inode%first_item2 => null()
+      inode%first_child => subtree%first_child
+      subtree%first_child => null()
+   else
+      subtree%first_child%first_item1 => null()
+      subtree%first_child%first_item2 => null()
+   end if
+
+   call delete_tree(subtree)
 
    end subroutine
 
