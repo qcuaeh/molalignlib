@@ -23,6 +23,8 @@ use strutils
 use bipartition
 use bipartitioning
 use molecule
+use lcrs_tree
+use partitioning
 
 implicit none
 
@@ -48,8 +50,8 @@ subroutine bias_none( mol1, mol2, eltypes, mnadiffs)
    type(bipartition_type), intent(in) :: eltypes
    type(intmatrix_type), dimension(:), allocatable, intent(out) :: mnadiffs
    ! Local variables
-   integer :: h, i, j
    integer :: part_size1, part_size2
+   integer :: h, i, j
 
    allocate (mnadiffs(eltypes%num_parts))
    do h = 1, eltypes%num_parts
@@ -71,52 +73,58 @@ subroutine bias_mna( mol1, mol2, eltypes, mnadiffs)
    type(bipartition_type), intent(in) :: eltypes
    type(intmatrix_type), dimension(:), allocatable, intent(out) :: mnadiffs
    ! Local variables
-   integer :: h, i, j, level
-   integer :: iatom, jatom
-   integer :: part_size1, part_size2
-   type(bipartition_type) :: mnatypes, subtypes
+   type(type_tree) :: mnatypes
+   type(tree_node), pointer :: tree_root
+   type(tree_node_ptr), dimension(:), allocatable :: itemdir1, itemdir2
+   integer :: h, i, j, iatom, jatom, level
 
    allocate (mnadiffs(eltypes%num_parts))
+
    do h = 1, eltypes%num_parts
-      part_size1 = eltypes%parts(h)%part_size1
-      part_size2 = eltypes%parts(h)%part_size2
-      allocate (mnadiffs(h)%n(part_size1, part_size2))
+      allocate (mnadiffs(h)%n(eltypes%parts(h)%part_size1, eltypes%parts(h)%part_size2))
       mnadiffs(h)%n = 0
    end do
 
-   ! eltypes are our initial mnatypes
-   mnatypes = eltypes
-
+   call compute_eltypes(mol1, mol2, mnatypes)
+   tree_root => mnatypes%tree_root
    level = 0
+
    do
 
 !      write (stderr, *)
 !      write (stderr, '(a)') repeat('-- level '//str(level)//' --', 6)
-!      call mnatypes%print_parts()
-      level = level + 1
+!      call print_tree(mnatypes%tree_root)
+
+      itemdir1 = mnatypes%itemdir1
+      itemdir2 = mnatypes%itemdir2
+      ! Compute next level MNA types
+      call compute_nextlevelmnatypes(mol1, mol2, itemdir1, itemdir2, tree_root)
+      ! Exit loop if types did not change
+      if (all(mnatypes%itemdir1 == itemdir1) .and. &
+          all(mnatypes%itemdir2 == itemdir2)) exit
 
       do h = 1, eltypes%num_parts
          do j = 1, eltypes%parts(h)%part_size2
             jatom = eltypes%parts(h)%items2(j)
             do i = 1, eltypes%parts(h)%part_size1
                iatom = eltypes%parts(h)%items1(i)
-               if (mnatypes%idcs1(iatom) /= mnatypes%idcs2(jatom)) then
+               if (.not. associated(mnatypes%itemdir1(iatom)%ptr, mnatypes%itemdir2(jatom)%ptr)) then
                   mnadiffs(h)%n(i, j) = mnadiffs(h)%n(i, j) + 1
                end if
             end do
          end do
       end do
 
-      ! Compute next level MNA types
-      call levelup_crossmnatypes(mol1, mol2, mnatypes, subtypes)
-
-      ! Exit the loop if types did not change
-      if (subtypes == mnatypes) exit
-
-      ! Update mnatypes
-      mnatypes = subtypes
+      level = level + 1
 
    end do
+
+!   do h = 1, eltypes%num_parts
+!      write (stderr, *)
+!      do j = 1, eltypes%parts(h)%part_size2
+!         write (stderr, '(*(i2))') mnadiffs(h)%n(:eltypes%parts(h)%part_size1, j)
+!      end do
+!   end do
 
 end subroutine
 

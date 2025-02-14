@@ -4,213 +4,225 @@ implicit none
 private
 
 type, public :: item_node
-   integer :: idx
-   type(item_node), pointer :: next_item => null()
+   integer :: index
+   type(item_node), pointer :: next_item
+   type(tree_node_ptr), pointer :: dirloc
 end type
 
 type, public :: tree_node
-   ! First item list
-   type(item_node), pointer :: first_item1 => null()
-   type(item_node), pointer :: last_item1 => null()
-   integer :: item_count1 = 0
-
-   ! Second item list
-   type(item_node), pointer :: first_item2 => null()
-   type(item_node), pointer :: last_item2 => null()
-   integer :: item_count2 = 0
-
-   ! Tree structure pointers
-   type(tree_node), pointer :: first_child => null()
-   type(tree_node), pointer :: last_child => null()
-   type(tree_node), pointer :: next_sibling => null()
+   type(tree_node), pointer :: first_child
+   type(tree_node), pointer :: last_child
+   type(tree_node), pointer :: next_sibling
+   type(tree_node), pointer :: prev_sibling
+   type(item_node), pointer :: first_item1
+   type(item_node), pointer :: first_item2
+   integer :: child_count
+   integer :: item_count
 end type
 
-type, public :: treenode_ptr
-   type(tree_node), pointer :: ptr => null()
+type, public :: tree_node_ptr
+   type(tree_node), pointer :: ptr
 end type
 
-type, public :: tree_type
-   type(tree_node), pointer :: tree
-   type(treenode_ptr), allocatable :: itemdir1(:)
-   type(treenode_ptr), allocatable :: itemdir2(:)
+type, public :: type_tree
+   type(tree_node), pointer :: tree_root
+   type(tree_node_ptr), pointer :: itemdir1(:)
+   type(tree_node_ptr), pointer :: itemdir2(:)
 end type
+
+interface operator (==)
+   module procedure treenodeptr_equality
+end interface
 
 ! Make types and procedures public
-public :: new_tree
-public :: new_child
-public :: delete_tree
-public :: print_tree
-public :: print_items
-public :: prune_node
-public :: flatten_tree
-public :: update_itemdir
-public :: add_item1
-public :: add_new_item1
-public :: add_item2
-public :: add_new_item2
+public make_new_root
+public add_new_child
+public prune_branch
+public delete_tree
+public flatten_tree
+public add_new_item1
+public add_new_item2
+public move_item1
+public move_item2
+public move_node_items
+public print_tree
+public print_items
+public operator (==)
 
 contains
 
-! First list procedures
-subroutine add_new_item1(node, val)
-   type(tree_node), intent(inout) :: node
-   integer, intent(in) :: val
-   type(item_node), pointer :: new_item
-
-   allocate(new_item)
-   new_item%idx = val
-   new_item%next_item => null()
-
-   if (associated(node%first_item1)) then
-      node%last_item1%next_item => new_item
-   else
-      node%first_item1 => new_item
-   end if
-
-   node%last_item1 => new_item
-   node%item_count1 = node%item_count1 + 1
-end subroutine
-
-subroutine add_item1(node, item)
-   type(tree_node), intent(inout) :: node
-   type(item_node), pointer, intent(in) :: item
-
-   item%next_item => null()
-
-   if (associated(node%first_item1)) then
-      node%last_item1%next_item => item
-   else
-      node%first_item1 => item
-   end if
-
-   node%last_item1 => item
-   node%item_count1 = node%item_count1 + 1
-end subroutine
-
-! Second list procedures
-subroutine add_new_item2(node, val)
-   type(tree_node), intent(inout) :: node
-   integer, intent(in) :: val
-   type(item_node), pointer :: new_item
-
-   allocate(new_item)
-   new_item%idx = val
-   new_item%next_item => null()
-
-   if (associated(node%first_item2)) then
-      node%last_item2%next_item => new_item
-   else
-      node%first_item2 => new_item
-   end if
-
-   node%last_item2 => new_item
-   node%item_count2 = node%item_count2 + 1
-end subroutine
-
-subroutine add_item2(node, item)
-   type(tree_node), intent(inout) :: node
-   type(item_node), pointer, intent(in) :: item
-
-   item%next_item => null()
-
-   if (associated(node%first_item2)) then
-      node%last_item2%next_item => item
-   else
-      node%first_item2 => item
-   end if
-
-   node%last_item2 => item
-   node%item_count2 = node%item_count2 + 1
-end subroutine
-
-function new_tree() result(root)
-   type(tree_node), pointer :: root
-   allocate(root)
-   root%first_item1 => null()
-   root%last_item1 => null()
-   root%first_item2 => null()
-   root%last_item2 => null()
-   root%first_child => null()
-   root%last_child => null()
-   root%next_sibling => null()
-   root%item_count1 = 0
-   root%item_count2 = 0
+elemental function treenodeptr_equality(left, right) result(equality)
+   type(tree_node_ptr), intent(in) :: left, right
+   logical :: equality
+   equality = associated(left%ptr, right%ptr)
 end function
 
-function new_child(parent) result(child)
+function make_new_root() result(new_root)
+   type(tree_node), pointer :: new_root
+   allocate(new_root)
+   ! Initialize all pointers and counters
+   new_root%first_child => null()
+   new_root%last_child => null()
+   new_root%next_sibling => null()
+   new_root%prev_sibling => null()
+   new_root%first_item1 => null()
+   new_root%first_item2 => null()
+   new_root%child_count = 0
+   new_root%item_count = 0
+end function
+
+function add_new_child(parent) result(new_child)
    type(tree_node), target, intent(inout) :: parent
-   type(tree_node), pointer :: child
+   type(tree_node), pointer :: new_child
 
-   allocate(child)
-   child%first_item1 => null()
-   child%last_item1 => null()
-   child%first_item2 => null()
-   child%last_item2 => null()
-   child%first_child => null()
-   child%last_child => null()
-   child%next_sibling => null()
-   child%item_count1 = 0
-   child%item_count2 = 0
+   allocate(new_child)
+   ! Initialize common elements
+   new_child%first_child => null()
+   new_child%last_child => null()
+   new_child%first_item1 => null()
+   new_child%first_item2 => null()
+   new_child%child_count = 0
+   new_child%item_count = 0
 
-   if (associated(parent%first_child)) then
-      parent%last_child%next_sibling => child
+   ! If parent has no children, make this the first child
+   if (.not. associated(parent%first_child)) then
+      ! First child initialization
+      new_child%next_sibling => null()
+      new_child%prev_sibling => null()
+      parent%first_child => new_child
+      parent%last_child => new_child
    else
-      parent%first_child => child
+      ! Sibling initialization
+      new_child%next_sibling => null()
+      new_child%prev_sibling => parent%last_child
+      parent%last_child%next_sibling => new_child
+      parent%last_child => new_child
    end if
 
-   parent%last_child => child
+   parent%child_count = parent%child_count + 1
 end function
+
+subroutine add_new_item1(node, index, itemdir)
+   type(tree_node), target, intent(inout) :: node
+   type(tree_node_ptr), target, intent(inout) :: itemdir(:)
+   integer, intent(in) :: index
+   type(item_node), pointer :: new_item
+
+   allocate(new_item)
+   new_item%index = index
+   itemdir(index)%ptr => node
+   new_item%dirloc => itemdir(index)
+   new_item%next_item => node%first_item1
+   node%first_item1 => new_item
+   node%item_count = node%item_count + 1
+end subroutine
+
+subroutine add_new_item2(node, index, itemdir)
+   type(tree_node), target, intent(inout) :: node
+   type(tree_node_ptr), target, intent(inout) :: itemdir(:)
+   integer, intent(in) :: index
+   type(item_node), pointer :: new_item
+
+   allocate(new_item)
+   new_item%index = index
+   itemdir(index)%ptr => node
+   new_item%dirloc => itemdir(index)
+   new_item%next_item => node%first_item2
+   node%first_item2 => new_item
+   node%item_count = node%item_count + 1
+end subroutine
+
+subroutine move_item1(node, item)
+   type(tree_node), target, intent(inout) :: node
+   type(item_node), pointer, intent(inout) :: item
+   type(item_node), pointer :: next_item
+
+   next_item => item%next_item
+   item%dirloc%ptr => node
+   item%next_item => node%first_item1
+   node%first_item1 => item
+   node%item_count = node%item_count + 1
+   item => next_item
+end subroutine
+
+subroutine move_item2(node, item)
+   type(tree_node), target, intent(inout) :: node
+   type(item_node), pointer, intent(inout) :: item
+   type(item_node), pointer :: next_item
+
+   next_item => item%next_item
+   item%dirloc%ptr => node
+   item%next_item => node%first_item2
+   node%first_item2 => item
+   node%item_count = node%item_count + 1
+   item => next_item
+end subroutine
+
+subroutine move_node_items(from, dest)
+   type(tree_node), intent(inout) :: from, dest
+   type(item_node), pointer :: item
+
+   item => from%first_item1
+   from%first_item1 => null()
+   do while (associated(item))
+      call move_item1(dest, item)
+   end do
+
+   item => from%first_item2
+   from%first_item2 => null()
+   do while (associated(item))
+      call move_item2(dest, item)
+   end do
+end subroutine
 
 recursive subroutine delete_tree(node)
    type(tree_node), pointer :: node
-   type(item_node), pointer :: curr_item, next_item
-   type(tree_node), pointer :: curr_child, next_child
+   type(item_node), pointer :: item, next_item
+   type(tree_node), pointer :: child, next_child
 
    if (.not. associated(node)) return
 
    ! Delete first list items
-   curr_item => node%first_item1
-   do while (associated(curr_item))
-      next_item => curr_item%next_item
-      deallocate(curr_item)
-      curr_item => next_item
+   item => node%first_item1
+   do while (associated(item))
+      next_item => item%next_item
+      deallocate(item)
+      item => next_item
    end do
 
    ! Delete second list items
-   curr_item => node%first_item2
-   do while (associated(curr_item))
-      next_item => curr_item%next_item
-      deallocate(curr_item)
-      curr_item => next_item
+   item => node%first_item2
+   do while (associated(item))
+      next_item => item%next_item
+      deallocate(item)
+      item => next_item
    end do
 
    ! Delete children
-   curr_child => node%first_child
-   do while (associated(curr_child))
-      next_child => curr_child%next_sibling
-      call delete_tree(curr_child)
-      curr_child => next_child
+   child => node%first_child
+   do while (associated(child))
+      next_child => child%next_sibling
+      call delete_tree(child)
+      child => next_child
    end do
 
    deallocate(node)
    node => null()
 end subroutine
 
-subroutine prune_node(node)
-   type(tree_node), pointer :: node
-   type(tree_node), pointer :: curr_child, next_child
+subroutine prune_branch(node)
+   type(tree_node) :: node
+   type(tree_node), pointer :: child, next_child
 
-   if (.not. associated(node)) return
-
-   curr_child => node%first_child
-   do while (associated(curr_child))
-      next_child => curr_child%next_sibling
-      call delete_tree(curr_child)
-      curr_child => next_child
+   child => node%first_child
+   do while (associated(child))
+      next_child => child%next_sibling
+      call delete_tree(child)
+      child => next_child
    end do
 
    node%first_child => null()
-   node%last_child => null()
+   node%child_count = 0
 end subroutine
 
 subroutine print_items(node)
@@ -228,7 +240,7 @@ subroutine print_items(node)
    ! Print first list
    item => node%first_item1
    do while (associated(item))
-      write(stdout, '(1X,I0)', advance='no') item%idx
+      write(stdout, '(1X,I0)', advance='no') item%index
       item => item%next_item
    end do
 
@@ -237,7 +249,7 @@ subroutine print_items(node)
    ! Print second list
    item => node%first_item2
    do while (associated(item))
-      write(stdout, '(1X,I0)', advance='no') item%idx
+      write(stdout, '(1X,I0)', advance='no') item%index
       item => item%next_item
    end do
 
@@ -277,132 +289,81 @@ contains
 end subroutine
 
 subroutine flatten_tree(tree)
-   type(tree_type), target, intent(inout) :: tree
-   type(tree_node), pointer :: flat_root, curr_node, key_node
-   type(item_node), pointer :: curr_item
+   type(type_tree), target, intent(inout) :: tree
+   type(tree_node), pointer :: new_root
+   integer :: total_comparisons
 
    ! Create temporary root for flattened tree
-   flat_root => new_tree()
+   new_root => make_new_root()
+   total_comparisons = 0
 
    ! Collect leaves and sort them by total item count
-   call collect_and_sort_leaves(tree%tree, flat_root)
+   call collect_and_sort_leaves(tree%tree_root, new_root, total_comparisons)
+!   write(stdout,*) "Total comparisons performed:", total_comparisons
 
-   ! Update the original tree with the flattened and sorted structure
-   tree%tree%first_child => flat_root%first_child
-   tree%tree%last_child => flat_root%last_child
-   flat_root%first_child => null()
-   flat_root%last_child => null()
-
-   ! Clean up temporary root
-   deallocate(flat_root)
-
-   ! Update itemdir to point to new structure
-   call update_itemdir(tree%itemdir1, tree%itemdir2, tree%tree)
+   ! Clean up original tree and update root
+   call delete_tree(tree%tree_root)
+   tree%tree_root => new_root
 
 contains
-   recursive subroutine collect_and_sort_leaves(node, flat_parent)
-      type(tree_node), target, intent(in) :: node
+   recursive subroutine collect_and_sort_leaves(node, flat_parent, comparisons)
+      type(tree_node), target, intent(inout) :: node
       type(tree_node), target, intent(inout) :: flat_parent
-      type(tree_node), pointer :: child, new_leaf
-      type(tree_node), pointer :: curr, prev
-      type(item_node), pointer :: src_item
+      integer, intent(inout) :: comparisons
+      type(tree_node), pointer :: child, next_child, new_leaf
+      type(tree_node), pointer :: curr
 
       if (.not. associated(node%first_child)) then
          ! Leaf node - create new leaf
-         new_leaf => new_tree()
+         new_leaf => make_new_root()
+         call move_node_items(node, new_leaf)
 
-         ! Copy items from first list in original order
-         src_item => node%first_item1
-         do while (associated(src_item))
-            call add_new_item1(new_leaf, src_item%idx)
-            src_item => src_item%next_item
-         end do
-
-         ! Copy items from second list in original order
-         src_item => node%first_item2
-         do while (associated(src_item))
-            call add_new_item2(new_leaf, src_item%idx)
-            src_item => src_item%next_item
-         end do
-
-         ! Insert into sorted position using insertion sort based on total items
+         ! First element case
          if (.not. associated(flat_parent%first_child)) then
-            ! First child
             flat_parent%first_child => new_leaf
             flat_parent%last_child => new_leaf
+            new_leaf%prev_sibling => null()
          else
-            ! Find insertion point
-            prev => null()
-            curr => flat_parent%first_child
-
-            ! Traverse until we find the right position - sort only by first list count
-            do while (associated(curr))
-               if (new_leaf%item_count1 < curr%item_count1) exit
-               prev => curr
-               curr => curr%next_sibling
-            end do
-
-            ! Insert node
-            if (.not. associated(prev)) then
-               ! Insert at beginning
-               new_leaf%next_sibling => flat_parent%first_child
-               flat_parent%first_child => new_leaf
-            else if (.not. associated(curr)) then
+            ! Compare with last element first
+            comparisons = comparisons + 1
+            curr => flat_parent%last_child
+            if (curr%item_count <= new_leaf%item_count) then
                ! Insert at end
-               prev%next_sibling => new_leaf
+               curr%next_sibling => new_leaf
+               new_leaf%prev_sibling => curr
                flat_parent%last_child => new_leaf
             else
-               ! Insert in middle
-               new_leaf%next_sibling => prev%next_sibling
-               prev%next_sibling => new_leaf
+               ! Scan backwards for insertion point
+               do while (associated(curr))
+                  if (.not. associated(curr%prev_sibling) .or. &
+                      curr%prev_sibling%item_count <= new_leaf%item_count) exit
+                  comparisons = comparisons + 1
+                  curr => curr%prev_sibling
+               end do
+
+               ! Insert before curr
+               new_leaf%next_sibling => curr
+               new_leaf%prev_sibling => curr%prev_sibling
+               if (associated(curr%prev_sibling)) then
+                  curr%prev_sibling%next_sibling => new_leaf
+               else
+                  flat_parent%first_child => new_leaf
+               end if
+               curr%prev_sibling => new_leaf
             end if
          end if
+         flat_parent%child_count = flat_parent%child_count + 1
       else
-         ! Non-leaf node - process children
+         ! Process children
          child => node%first_child
          do while (associated(child))
-            call collect_and_sort_leaves(child, flat_parent)
-            child => child%next_sibling
+            next_child => child%next_sibling
+            call collect_and_sort_leaves(child, flat_parent, comparisons)
+            child => next_child
          end do
+         node%first_child => null()
+         node%last_child => null()
       end if
-   end subroutine
-end subroutine
-
-subroutine update_itemdir(itemdir1, itemdir2, root)
-   type(treenode_ptr), intent(inout) :: itemdir1(:)
-   type(treenode_ptr), intent(inout) :: itemdir2(:)
-   type(tree_node), target, intent(in) :: root
-
-   call traverse_leaves(root)
-
-contains
-   recursive subroutine traverse_leaves(node)
-      type(tree_node), target, intent(in) :: node
-      type(tree_node), pointer :: child
-      type(item_node), pointer :: curr_item
-
-      if (associated(node%first_child)) then
-         child => node%first_child
-         do
-            call traverse_leaves(child)
-            if (.not. associated(child%next_sibling)) return
-            child => child%next_sibling
-         end do
-      end if
-
-      ! Process first list items
-      curr_item => node%first_item1
-      do while (associated(curr_item))
-         itemdir1(curr_item%idx)%ptr => node
-         curr_item => curr_item%next_item
-      end do
-
-      ! Process second list items
-      curr_item => node%first_item2
-      do while (associated(curr_item))
-         itemdir2(curr_item%idx)%ptr => node
-         curr_item => curr_item%next_item
-      end do
    end subroutine
 end subroutine
 

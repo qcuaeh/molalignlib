@@ -49,7 +49,7 @@ subroutine molecule_remap( mol1, mol2, results)
 
    ! Local variables
    type(bipartition_type) :: eltypes, mnatypes
-   type(tree_type) :: tree1
+   type(type_tree) :: tree1
 
    ! Abort if molecules have different number of atoms
    if (size(mol1%atoms) /= size(mol2%atoms)) then
@@ -84,22 +84,24 @@ subroutine molecule_remap( mol1, mol2, results)
    call writemol2(stdout, mol1)
    call writemol2(stdout, mol2)
 
-   call compute_eltypes_tree(mol1, mol2, tree1)
-   call print_tree(tree1%tree)
-   call compute_mnatypes_tree(mol1, mol2, tree1)
-   call print_tree(tree1%tree)
+   call compute_eltypes(mol1, mol2, tree1)
+   call print_tree(tree1%tree_root)
+   call compute_consistent_mnatypes(mol1, mol2, tree1)
+   call print_tree(tree1%tree_root)
    call flatten_tree(tree1)
-   call print_tree(tree1%tree)
+   call print_tree(tree1%tree_root)
    call unfold_leaves(tree1)
-   call print_tree(tree1%tree)
-   call compute_mnatypes_tree(mol1, mol2, tree1)
-   call print_tree(tree1%tree)
+   call print_tree(tree1%tree_root)
+   call compute_consistent_mnatypes(mol1, mol2, tree1)
+   call print_tree(tree1%tree_root)
    call flatten_tree(tree1)
-   call print_tree(tree1%tree)
+   call print_tree(tree1%tree_root)
    call unfold_leaves(tree1)
-   call print_tree(tree1%tree)
-   call compute_mnatypes_tree(mol1, mol2, tree1)
-   call print_tree(tree1%tree)
+   call print_tree(tree1%tree_root)
+   call compute_consistent_mnatypes(mol1, mol2, tree1)
+   call print_tree(tree1%tree_root)
+   call flatten_tree(tree1)
+   call print_tree(tree1%tree_root)
    stop
 
    ! Update MNA types
