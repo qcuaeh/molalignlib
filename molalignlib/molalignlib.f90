@@ -48,8 +48,9 @@ subroutine molecule_remap( mol1, mol2, results)
    type(registry_type), intent(out) :: results
 
    ! Local variables
+   type(tree_node), pointer :: eltypes_tree, mnatypes_tree
+   type(partition_container) :: eltypes_partition
    type(bipartition_type) :: eltypes, mnatypes
-   type(type_tree) :: tree1
 
    ! Abort if molecules have different number of atoms
    if (size(mol1%atoms) /= size(mol2%atoms)) then
@@ -66,6 +67,14 @@ subroutine molecule_remap( mol1, mol2, results)
    ! Compute atomic types
    call compute_crosseltypes(mol1, mol2, eltypes)
 !   call eltypes%print_parts()
+
+   call compute_eltypes(mol1, mol2, eltypes_tree)
+   call print_tree(eltypes_tree)
+   call partition_from_tree(eltypes_tree, eltypes_partition)
+   call print_partition(eltypes_partition)
+   mnatypes_tree = eltypes_tree
+   call compute_consistent_mnatypes(mol1, mol2, mnatypes_tree)
+   call print_tree(mnatypes_tree)
 
    ! Abort if there are conflicting atomic types
    if (any(sorted(eltypes%idcs1) /= sorted(eltypes%idcs2))) then
@@ -84,25 +93,22 @@ subroutine molecule_remap( mol1, mol2, results)
    call writemol2(stdout, mol1)
    call writemol2(stdout, mol2)
 
+   block
+   type(tree_node), pointer :: tree1
+   logical :: remaining
+   write (stderr, *)
+   write (stderr, '(A)') repeat('tree1  ', 8)
    call compute_eltypes(mol1, mol2, tree1)
-   call print_tree(tree1%tree_root)
    call compute_consistent_mnatypes(mol1, mol2, tree1)
-   call print_tree(tree1%tree_root)
-   call flatten_tree(tree1)
-   call print_tree(tree1%tree_root)
-   call unfold_leaves(tree1)
-   call print_tree(tree1%tree_root)
-   call compute_consistent_mnatypes(mol1, mol2, tree1)
-   call print_tree(tree1%tree_root)
-   call flatten_tree(tree1)
-   call print_tree(tree1%tree_root)
-   call unfold_leaves(tree1)
-   call print_tree(tree1%tree_root)
-   call compute_consistent_mnatypes(mol1, mol2, tree1)
-   call print_tree(tree1%tree_root)
-   call flatten_tree(tree1)
-   call print_tree(tree1%tree_root)
+   call print_tree(tree1)
+   do
+      call assign_remaining_items(tree1, remaining)
+      call compute_consistent_mnatypes(mol1, mol2, tree1)
+      call print_tree(tree1)
+      if (.not. remaining) exit
+   end do
    stop
+   end block
 
    ! Update MNA types
    mnatypes = eltypes

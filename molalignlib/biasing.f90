@@ -73,8 +73,7 @@ subroutine bias_mna( mol1, mol2, eltypes, mnadiffs)
    type(bipartition_type), intent(in) :: eltypes
    type(intmatrix_type), dimension(:), allocatable, intent(out) :: mnadiffs
    ! Local variables
-   type(type_tree) :: mnatypes
-   type(tree_node), pointer :: tree_root
+   type(tree_node), pointer :: mnatypes
    type(tree_node_ptr), dimension(:), allocatable :: itemdir1, itemdir2
    integer :: h, i, j, iatom, jatom, level
 
@@ -86,19 +85,19 @@ subroutine bias_mna( mol1, mol2, eltypes, mnadiffs)
    end do
 
    call compute_eltypes(mol1, mol2, mnatypes)
-   tree_root => mnatypes%tree_root
+!   call tree_from_partition(eltypes, mnatypes)
    level = 0
 
    do
 
 !      write (stderr, *)
 !      write (stderr, '(a)') repeat('-- level '//str(level)//' --', 6)
-!      call print_tree(mnatypes%tree_root)
+!      call print_tree(mnatypes)
 
       itemdir1 = mnatypes%itemdir1
       itemdir2 = mnatypes%itemdir2
       ! Compute next level MNA types
-      call compute_nextlevelmnatypes(mol1, mol2, itemdir1, itemdir2, tree_root)
+      call compute_nextlevelmnatypes(mol1, mol2, itemdir1, itemdir2, mnatypes)
       ! Exit loop if types did not change
       if (all(mnatypes%itemdir1 == itemdir1) .and. &
           all(mnatypes%itemdir2 == itemdir2)) exit
