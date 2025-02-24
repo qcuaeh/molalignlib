@@ -1,12 +1,6 @@
 module molecule
 use parameters
-use setutils
-use permutation
-use adjacency
-use alignment
-use strutils
 use chemdata
-use common_types
 
 implicit none
 private
@@ -28,21 +22,17 @@ type, public :: mol_type
    character(:), allocatable :: title
    type(atom_type), allocatable :: atoms(:)
    logical, allocatable :: adjmat(:, :)
-!   type(bipartition_type) :: molfrags
 contains
    procedure :: set_adjlists
-   procedure :: get_adjlists
    procedure :: set_coords
    procedure :: get_coords
-   procedure :: set_weighted_coords
-   procedure :: get_weighted_coords
+   procedure :: set_weightcoords
+   procedure :: get_weightcoords
    procedure :: get_bonds
    procedure :: add_bond
    procedure :: remove_bond
    procedure :: print_atoms
    procedure :: print_bonds
-!   procedure :: set_molfrags
-!   procedure :: get_molfrags
 end type
 
 contains
@@ -73,7 +63,7 @@ function get_coords(self) result(coords)
 
 end function
 
-subroutine set_weighted_coords(self, coords)
+subroutine set_weightcoords(self, coords)
    class(mol_type), intent(inout) :: self
    real(rk), intent(in) :: coords(:, :)
    ! Local variables
@@ -88,7 +78,7 @@ subroutine set_weighted_coords(self, coords)
 
 end subroutine
 
-function get_weighted_coords(self) result(coords)
+function get_weightcoords(self) result(coords)
    class(mol_type), intent(in) :: self
    ! Local variables
    real(rk), allocatable :: coords(:, :)
@@ -127,20 +117,6 @@ subroutine set_adjlists(self, nadjs, adjlists)
    end do
 
 end subroutine
-
-function get_adjlists(self) result(adjlists)
-   class(mol_type), intent(in) :: self
-   ! Local variables
-   integer :: i
-   type(atomlist_type), allocatable :: adjlists(:)
-
-   allocate (adjlists(size(self%atoms)))
-
-   do i = 1, size(self%atoms)
-      adjlists(i)%atomidcs = self%atoms(i)%adjlist
-   end do
-
-end function
 
 function get_bonds(self) result(bonds)
    class(mol_type), intent(in) :: self

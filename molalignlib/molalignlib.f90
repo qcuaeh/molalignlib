@@ -177,8 +177,8 @@ subroutine molecule_align( &
    end if
 
    num_atoms1 = size(mol1%atoms)
-   coords1 = mol1%get_weighted_coords()
-   coords2 = mol2%get_weighted_coords()
+   coords1 = mol1%get_weightcoords()
+   coords2 = mol2%get_weightcoords()
 
    ! Calculate centroids
 

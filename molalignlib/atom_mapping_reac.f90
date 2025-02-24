@@ -54,8 +54,8 @@ subroutine remap_reactive_bonds( mol1, mol2, eltypes, mnatypes, results)
    integer :: adjd
 
    num_atoms1 = size(mol1%atoms)
-   coords1 = mol1%get_weighted_coords()
-   coords2 = mol2%get_weighted_coords()
+   coords1 = mol1%get_weightcoords()
+   coords2 = mol2%get_weightcoords()
    call results%initialize(max_records)
 
    allocate (atomperm(num_atoms1))

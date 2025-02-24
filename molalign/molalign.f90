@@ -220,8 +220,8 @@ if (remap_flag) then
    end if
 
    num_atoms1 = size(mol1%atoms)
-   coords1 = mol1%get_weighted_coords()
-   coords2 = mol2%get_weighted_coords()
+   coords1 = mol1%get_weightcoords()
+   coords2 = mol2%get_weightcoords()
 
    ! Calculate centroids
    travec1 = -centroid( coords1)
@@ -233,7 +233,7 @@ if (remap_flag) then
    do i = 1, results%num_records
 
       atomperm = results%records(i)%atomperm
-      coords2 = mol2%get_weighted_coords()
+      coords2 = mol2%get_weightcoords()
 
       ! Calculate optimal rotation matrix
       rotquat = leasteigquat( &
@@ -242,7 +242,7 @@ if (remap_flag) then
          translated_coords( coords2, travec2) &
       )
 
-      coords2 = mol2%get_weighted_coords()
+      coords2 = mol2%get_weightcoords()
       call translate_coords( coords2, travec2)
       call rotate_coords( coords2, rotquat)
       call translate_coords( coords2, -travec1)
@@ -261,7 +261,7 @@ if (remap_flag) then
       auxmol%atoms%label = mol2%atoms(atomperm)%label
       auxmol%atoms%weight = mol2%atoms(atomperm)%weight
       auxmol%adjmat = mol2%adjmat(atomperm, atomperm)
-      call auxmol%set_weighted_coords(coords2(:, atomperm))
+      call auxmol%set_weightcoords(coords2(:, atomperm))
 !      call writefile( write_unit, fmtout, auxmol)
 
    end do
@@ -276,7 +276,7 @@ else
       travec2, &
       rotquat)
 
-   coords2 = mol2%get_weighted_coords()
+   coords2 = mol2%get_weightcoords()
    call translate_coords( coords2, travec2)
    call rotate_coords( coords2, rotquat)
    call translate_coords( coords2, -travec1)
@@ -295,7 +295,7 @@ else
    auxmol%atoms%label = mol2%atoms%label
    auxmol%atoms%weight = mol2%atoms%weight
    auxmol%adjmat = mol2%adjmat
-   call auxmol%set_weighted_coords(coords2)
+   call auxmol%set_weightcoords(coords2)
    call writefile( write_unit, fmtout, mol2)
 
 end if

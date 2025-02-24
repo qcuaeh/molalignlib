@@ -58,8 +58,8 @@ subroutine remap_conformations(mol1, mol2, eltypes, mnatypes, results)
    real(rk) :: rmsd, dist
 
    num_atoms1 = size(mol1%atoms)
-   coords1 = mol1%get_weighted_coords()
-   coords2 = mol2%get_weighted_coords()
+   coords1 = mol1%get_weightcoords()
+   coords2 = mol2%get_weightcoords()
    call results%initialize(max_records)
 
    allocate (atomperm(num_atoms1))
