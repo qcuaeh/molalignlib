@@ -6,7 +6,7 @@ use sorting
 use permutation
 use adjacency
 use alignment
-use bipartition
+use lcrs_tree
 use molecule
 use common_types
 
@@ -23,7 +23,7 @@ subroutine minadjdiff( eltypes, mnatypes, molfrags, mol1, mol2, coords1, &
 !
 
    ! Arguments
-   type(bipartition_type), intent(in) :: eltypes, mnatypes
+   type(bipartition_container), intent(in) :: eltypes, mnatypes
    type(intlist_type), intent(in) :: molfrags(:)
    type(mol_type), intent(in) :: mol1, mol2
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
@@ -70,13 +70,13 @@ subroutine minadjdiff( eltypes, mnatypes, molfrags, mol1, mol2, coords1, &
 
    ! set atoms block indices
 
-   blkidx1 = eltypes%idcs1
-   blkidx2 = eltypes%idcs2
+   blkidx1 = eltypes%itemdir1
+   blkidx2 = eltypes%itemdir2
 
    ! set atoms equivalence indices
 
-   eqvidx1 = mnatypes%idcs1
-   eqvidx2 = mnatypes%idcs2
+   eqvidx1 = mnatypes%itemdir1
+   eqvidx2 = mnatypes%itemdir2
 
    !  initialization
 

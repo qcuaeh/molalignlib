@@ -19,11 +19,10 @@ use parameters
 use sorting
 use permutation
 use alignment
-use partition
 use molecule
 use tracking
 use common_types
-use bipartition
+use lcrs_tree
 
 implicit none
 
@@ -37,7 +36,7 @@ subroutine remove_reactive_bonds(mol1, mol2, molfrags1, molfrags2, mnatypes, ato
    ! Arguments
    type(mol_type), intent(inout) :: mol1, mol2
    type(intlist_type), dimension(:) :: molfrags1, molfrags2
-   type(bipartition_type), intent(in) :: mnatypes
+   type(bipartition_container), intent(in) :: mnatypes
    integer, dimension(:), intent(in) :: atomperm
 
    ! Local variables
@@ -65,7 +64,7 @@ subroutine remove_reactive_bonds(mol1, mol2, molfrags1, molfrags2, mnatypes, ato
          if (.not. adjmat2(atomperm(iatom), atomperm(jatom))) then
 !            write (stderr, *) 'remove mol1 bond:', iatom, jatom
             call mol1%remove_bond(iatom, jatom)
-!            adjidcs1 = mnatypes%parts(mnatypes%idcs1(jatom))%items1
+!            adjidcs1 = mnatypes%parts(mnatypes%itemdir1(jatom))%indices1
 !            do k = 1, size(adjidcs1)
 !               katom = adjidcs1(k)
 !               call mol1%remove_bond(iatom, katom)
@@ -81,7 +80,7 @@ subroutine remove_reactive_bonds(mol1, mol2, molfrags1, molfrags2, mnatypes, ato
          if (.not. adjmat1(invatomperm(iatom), invatomperm(jatom))) then
 !            write (stderr, *) 'remove mol2 bond:', iatom, jatom
             call mol2%remove_bond(iatom, jatom)
-!            adjidcs2 = mnatypes%parts(mnatypes%idcs2(jatom))%items2
+!            adjidcs2 = mnatypes%parts(mnatypes%itemdir2(jatom))%indices2
 !            do k = 1, size(adjidcs2)
 !               katom = adjidcs2(k)
 !               call mol2%remove_bond(iatom, katom)

@@ -4,15 +4,26 @@ implicit none
 private
 
 type, public :: partition_part
-   integer :: num_items1
-   integer :: num_items2
-   integer, allocatable :: items1(:)
-   integer, allocatable :: items2(:)
+   integer :: num_items
+   integer, allocatable :: items(:)
 end type
 
 type, public :: partition_container
    integer :: num_parts
    type(partition_part), allocatable :: parts(:)
+   integer, allocatable :: itemdir(:)
+end type
+
+type, public :: bipartition_part
+   integer :: num_items1
+   integer :: num_items2
+   integer, allocatable :: indices1(:)
+   integer, allocatable :: indices2(:)
+end type
+
+type, public :: bipartition_container
+   integer :: num_parts
+   type(bipartition_part), allocatable :: parts(:)
    integer, allocatable :: itemdir1(:)
    integer, allocatable :: itemdir2(:)
 end type
@@ -57,12 +68,14 @@ public add_new_item2
 public add_linked_item1
 public add_linked_item2
 public move_node_items
-public print_tree
-public print_subtree
-public print_items
-public print_itemdir
 public partition_from_tree
 public tree_from_partition
+public first_partition
+public second_partition
+public print_items
+public print_itemdirs
+public print_subtree
+public print_tree
 public print_partition
 public operator(==)
 public assignment(=)
@@ -259,45 +272,52 @@ end subroutine
 subroutine flat_tree_assign(flat_root, root)
    type(tree_node), pointer, intent(out) :: flat_root
    type(tree_node), target, intent(in) :: root
+   type(tree_node), pointer :: new_child
 
    ! Create root node with same directory sizes as original
    flat_root => make_new_root(size(root%itemdir1), size(root%itemdir2))
-
-   ! Collect all items from the original tree into the root
-   call collect_all_items(root, flat_root)
+   
+   ! Find all leaves in the original tree and add them as direct children to the flat tree
+   call collect_leaf_nodes(root, flat_root)
 
 contains   
-   recursive subroutine collect_all_items(src_node, dest_node)
+   recursive subroutine collect_leaf_nodes(src_node, dest_root)
       type(tree_node), intent(in) :: src_node
-      type(tree_node), intent(inout) :: dest_node
-      type(tree_node), pointer :: child
+      type(tree_node), intent(inout) :: dest_root
+      type(tree_node), pointer :: child, next_child
       type(item_node), pointer :: item
-
-      ! Add items from current node
-      item => src_node%first_item1
-      do while (associated(item))
-         call add_new_item1(dest_node, item%index)
-         item => item%next_item
-      end do
-
-      item => src_node%first_item2
-      do while (associated(item))
-         call add_new_item2(dest_node, item%index)
-         item => item%next_item
-      end do
-
-      ! Recursively collect items from children
-      child => src_node%first_child
-      do while (associated(child))
-         call collect_all_items(child, dest_node)
-         child => child%next_sibling
-      end do
+      type(tree_node), pointer :: new_child
+      
+      if (.not. associated(src_node%first_child)) then
+         ! This is a leaf node - create a new child in the flat tree
+         new_child => add_new_child(dest_root)
+         
+         ! Copy items from original leaf to new child
+         item => src_node%first_item1
+         do while (associated(item))
+            call add_new_item1(new_child, item%index)
+            item => item%next_item
+         end do
+         
+         item => src_node%first_item2
+         do while (associated(item))
+            call add_new_item2(new_child, item%index)
+            item => item%next_item
+         end do
+      else
+         ! Process children recursively
+         child => src_node%first_child
+         do while (associated(child))
+            call collect_leaf_nodes(child, dest_root)
+            child => child%next_sibling
+         end do
+      end if
    end subroutine
 end subroutine
 
 subroutine partition_from_tree(root, partition)
    type(tree_node), intent(in) :: root
-   type(partition_container), intent(out) :: partition
+   type(bipartition_container), intent(out) :: partition
    integer :: leaf_index
 
    ! Set number of parts equal to number of leaves
@@ -317,7 +337,7 @@ subroutine partition_from_tree(root, partition)
 contains
    recursive subroutine collect_items(node, partition, leaf_idx)
       type(tree_node), intent(in) :: node
-      type(partition_container), intent(inout) :: partition
+      type(bipartition_container), intent(inout) :: partition
       integer, intent(inout) :: leaf_idx
       type(tree_node), pointer :: child
       type(item_node), pointer :: item
@@ -328,24 +348,24 @@ contains
          partition%parts(leaf_idx)%num_items1 = node%num_items1
          partition%parts(leaf_idx)%num_items2 = node%num_items2
 
-         allocate(partition%parts(leaf_idx)%items1(node%num_items1))
-         allocate(partition%parts(leaf_idx)%items2(node%num_items2))
+         allocate(partition%parts(leaf_idx)%indices1(node%num_items1))
+         allocate(partition%parts(leaf_idx)%indices2(node%num_items2))
 
-         ! Collect items1 and update directory
+         ! Collect indices1 and update directory
          i = 1
          item => node%first_item1
          do while (associated(item))
-            partition%parts(leaf_idx)%items1(i) = item%index
+            partition%parts(leaf_idx)%indices1(i) = item%index
             partition%itemdir1(item%index) = leaf_idx
             i = i + 1
             item => item%next_item
          end do
 
-         ! Collect items2 and update directory
+         ! Collect indices2 and update directory
          i = 1
          item => node%first_item2
          do while (associated(item))
-            partition%parts(leaf_idx)%items2(i) = item%index
+            partition%parts(leaf_idx)%indices2(i) = item%index
             partition%itemdir2(item%index) = leaf_idx
             i = i + 1
             item => item%next_item
@@ -364,7 +384,7 @@ contains
 end subroutine
 
 subroutine tree_from_partition(partition, root)
-   type(partition_container), intent(in) :: partition
+   type(bipartition_container), intent(in) :: partition
    type(tree_node), pointer, intent(out) :: root
    integer :: i, j
    type(tree_node), pointer :: curr_node
@@ -376,17 +396,67 @@ subroutine tree_from_partition(partition, root)
    do i = 1, partition%num_parts
       curr_node => add_new_child(root)
 
-      ! Add items1
+      ! Add indices1
       do j = 1, partition%parts(i)%num_items1
-         call add_new_item1(curr_node, partition%parts(i)%items1(j))
+         call add_new_item1(curr_node, partition%parts(i)%indices1(j))
       end do
 
-      ! Add items2
+      ! Add indices2
       do j = 1, partition%parts(i)%num_items2
-         call add_new_item2(curr_node, partition%parts(i)%items2(j))
+         call add_new_item2(curr_node, partition%parts(i)%indices2(j))
       end do
    end do
 end subroutine
+
+function first_partition(bipartition) result(partition)
+   type(bipartition_container), intent(in) :: bipartition
+   type(partition_container) :: partition
+   integer :: i
+
+   ! Set number of parts equal to bipartition's number of parts
+   partition%num_parts = bipartition%num_parts
+   allocate(partition%parts(partition%num_parts))
+
+   ! Allocate item directory same size as bipartition's first directory
+   allocate(partition%itemdir(size(bipartition%itemdir1)))
+   
+   ! Copy item directory
+   partition%itemdir = bipartition%itemdir1
+
+   ! Copy parts - only first items
+   do i = 1, partition%num_parts
+      partition%parts(i)%num_items = bipartition%parts(i)%num_items1
+      
+      ! Allocate and copy items array
+      allocate(partition%parts(i)%items(partition%parts(i)%num_items))
+      partition%parts(i)%items = bipartition%parts(i)%indices1
+   end do
+end function
+
+function second_partition(bipartition) result(partition)
+   type(bipartition_container), intent(in) :: bipartition
+   type(partition_container) :: partition
+   integer :: i
+
+   ! Set number of parts equal to bipartition's number of parts
+   partition%num_parts = bipartition%num_parts
+   allocate(partition%parts(partition%num_parts))
+
+   ! Allocate item directory same size as bipartition's second directory
+   allocate(partition%itemdir(size(bipartition%itemdir2)))
+   
+   ! Copy item directory
+   partition%itemdir = bipartition%itemdir2
+
+   ! Copy parts - only second items
+   do i = 1, partition%num_parts
+      partition%parts(i)%num_items = bipartition%parts(i)%num_items2
+      
+      ! Allocate and copy items array
+      allocate(partition%parts(i)%items(partition%parts(i)%num_items))
+      partition%parts(i)%items = bipartition%parts(i)%indices2
+   end do
+end function
 
 subroutine print_items(node)
    type(tree_node), intent(in) :: node
@@ -419,6 +489,37 @@ subroutine print_items(node)
    write(stdout, '(A)', advance='no') ' )'
 end subroutine
 
+subroutine print_itemdirs(node)
+   type(tree_node), intent(in) :: node
+   integer :: i
+
+   ! Print first item directory
+   write(stdout,*)
+   write(stdout,'(A)') "Item Directory 1:"
+   do i = 1, size(node%itemdir1)
+      if (associated(node%itemdir1(i)%ptr)) then
+         write(stdout,'(A,I0,A)') "  Item ", i, " -> Node ("
+         call print_items(node%itemdir1(i)%ptr)
+         write(stdout,'(A)') ")"
+      else
+         write(stdout,'(A,I0,A)') "  Item ", i, " -> Not associated"
+      end if
+   end do
+
+   ! Print second item directory
+   write(stdout,*)
+   write(stdout,'(A)') "Item Directory 2:"
+   do i = 1, size(node%itemdir2)
+      if (associated(node%itemdir2(i)%ptr)) then
+         write(stdout,'(A,I0,A)') "  Item ", i, " -> Node ("
+         call print_items(node%itemdir2(i)%ptr)
+         write(stdout,'(A)') ")"
+      else
+         write(stdout,'(A,I0,A)') "  Item ", i, " -> Not associated"
+      end if
+   end do
+end subroutine
+
 recursive subroutine print_subtree(node, indent)
    type(tree_node), intent(in) :: node
    integer, intent(in) :: indent
@@ -444,22 +545,6 @@ recursive subroutine print_subtree(node, indent)
    write (stdout, *)
 end subroutine
 
-subroutine print_itemdir(itemdir)
-   type(tree_node_ptr), intent(in) :: itemdir(:)
-   integer :: i
-
-   write(stdout,*)
-   do i = 1, size(itemdir)
-      if (associated(itemdir(i)%ptr)) then
-         write(stdout,'(A,I0,A)') "  Item ", i, " -> Node ("
-         call print_items(itemdir(i)%ptr)
-         write(stdout,'(A)') ")"
-      else
-         write(stdout,'(A,I0,A)') "  Item ", i, " -> Not associated"
-      end if
-   end do
-end subroutine
-
 subroutine print_tree(root)
    type(tree_node), intent(in) :: root
 
@@ -469,14 +554,11 @@ subroutine print_tree(root)
    call print_subtree(root, 1)
 
    ! Print item directories
-!   write(stdout,'(A)') "Item Directory 1:"
-!   call print_itemdir(root%itemdir1)
-!   write(stdout,'(A)') "Item Directory 2:"
-!   call print_itemdir(root%itemdir2)
+!   call print_itemdirs(root)
 end subroutine
 
 subroutine print_partition(partition)
-   type(partition_container), intent(in) :: partition
+   type(bipartition_container), intent(in) :: partition
    integer :: i, j
 
    write(stdout,*)
@@ -484,16 +566,16 @@ subroutine print_partition(partition)
    do i = 1, partition%num_parts
       write(stdout,'(A,I0,A)',advance='no') "Part ", i, ": ("
 
-      ! Print items1
+      ! Print indices1
       do j = 1, partition%parts(i)%num_items1
-         write(stdout,'(1X,I0)',advance='no') partition%parts(i)%items1(j)
+         write(stdout,'(1X,I0)',advance='no') partition%parts(i)%indices1(j)
       end do
 
       write(stdout,'(A)',advance='no') " |"
 
-      ! Print items2
+      ! Print indices2
       do j = 1, partition%parts(i)%num_items2
-         write(stdout,'(1X,I0)',advance='no') partition%parts(i)%items2(j)
+         write(stdout,'(1X,I0)',advance='no') partition%parts(i)%indices2(j)
       end do
 
       write(stdout,'(A)') " )"

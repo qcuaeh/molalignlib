@@ -1,7 +1,7 @@
 module lap_solvers
 use parameters
 use permutation
-use bipartition
+use lcrs_tree
 implicit none
 private
 public minperm
@@ -34,7 +34,7 @@ subroutine minperm_debug(n, bias, perm, dist)
 end subroutine
 
 subroutine minperm(part, x1, x2, perm, dist)
-   type(bipart_type), intent(in) :: part
+   type(bipartition_part), intent(in) :: part
    real(rk), intent(in) :: x1(:, :), x2(:, :)
    integer, intent(out) :: perm(:)
    real(rk), intent(out) :: dist
@@ -42,20 +42,20 @@ subroutine minperm(part, x1, x2, perm, dist)
    integer :: i, j
    real(rk), allocatable :: costs(:, :)
 
-   allocate (costs(part%part_size1, part%part_size2))
+   allocate (costs(part%num_items1, part%num_items2))
 
-   do j = 1, part%part_size2
-      do i = 1, part%part_size1
-         costs(i, j) = sum((x1(:, part%items1(i)) - x2(:, part%items2(j)))**2)
+   do j = 1, part%num_items2
+      do i = 1, part%num_items1
+         costs(i, j) = sum((x1(:, part%indices1(i)) - x2(:, part%indices2(j)))**2)
       end do
    end do
 
-   call assndx(1, costs, part%part_size1, part%part_size2, perm, dist)
+   call assndx(1, costs, part%num_items1, part%num_items2, perm, dist)
 
 end subroutine
 
 subroutine minperm_biased(part, x1, x2, diffs, perm, dist)
-   type(bipart_type), intent(in) :: part
+   type(bipartition_part), intent(in) :: part
    real(rk), intent(in) :: x1(:, :), x2(:, :)
    integer, intent(in) :: diffs(:, :)
    integer, intent(out) :: perm(:)
@@ -64,15 +64,15 @@ subroutine minperm_biased(part, x1, x2, diffs, perm, dist)
    integer :: i, j
    real(rk), allocatable :: costs(:, :)
 
-   allocate (costs(part%part_size1, part%part_size2))
+   allocate (costs(part%num_items1, part%num_items2))
 
-   do j = 1, part%part_size2
-      do i = 1, part%part_size1
-         costs(i, j) = diffs(i, j) + 0.001*sum((x1(:, part%items1(i)) - x2(:, part%items2(j)))**2)
+   do j = 1, part%num_items2
+      do i = 1, part%num_items1
+         costs(i, j) = diffs(i, j) + 0.001*sum((x1(:, part%indices1(i)) - x2(:, part%indices2(j)))**2)
       end do
    end do
 
-   call assndx(1, costs, part%part_size1, part%part_size2, perm, dist)
+   call assndx(1, costs, part%num_items1, part%num_items2, perm, dist)
 
 end subroutine
 

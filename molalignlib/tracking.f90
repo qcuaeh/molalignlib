@@ -4,8 +4,8 @@ module tracking
 use parameters
 use sorting
 use molecule
-use partition
 use common_types
+use lcrs_tree
 
 implicit none
 private
@@ -17,7 +17,7 @@ contains
 
 subroutine find_molfrags( mol, eltypes, molfrags)
    type(mol_type), intent(in) :: mol
-   type(partition_type), intent(in) :: eltypes
+   type(partition_container), intent(in) :: eltypes
    type(intlist_type), allocatable, intent(out) :: molfrags(:)
    ! Local variables
    integer :: i, nfrag
@@ -50,7 +50,7 @@ subroutine find_molfrags( mol, eltypes, molfrags)
 
    ! Order molecular fragments
    do i = 1, nfrag
-      order = sorted_order(eltypes%parts(eltypes%idcs(fragidcs(:fragszs(i), i)))%part_size)
+      order = sorted_order(eltypes%parts(eltypes%itemdir(fragidcs(:fragszs(i), i)))%num_items)
       fragidcs(:fragszs(i), i) = fragidcs(order, i)
 !      write (stderr, *) fragidcs1(:fragszs1(i), i)
 !      write (stderr, *)
@@ -83,56 +83,5 @@ recursive subroutine recrun( tracked, iatom, nfrag, fragszs, fragidcs)
    end do
 
 end subroutine
-
-!subroutine set_molfrags(self, nfrag, fragidcs)
-!   class(mol_type), intent(inout) :: self
-!   integer, intent(in) :: nfrag
-!   integer, intent(in) :: fragidcs(:)
-!
-!   self%molfrags = atompartition(nfrag, fragidcs)
-!
-!end subroutine
-!
-!function get_molfrags(self) result(molfrags)
-!   class(mol_type), intent(in) :: self
-!   ! Local variables
-!   integer :: i
-!   type(atomlist_type), allocatable :: molfrags(:)
-!
-!   allocate (molfrags(size(self%molfrags)))
-!
-!   do i = 1, size(self%molfrags)
-!      molfrags(i)%atomidcs = self%molfrags(i)%atomidcs
-!   end do
-!
-!end function
-!
-!function get_molfragroots(self) result(fragroots)
-!   class(mol_type), intent(in) :: self
-!   ! Result variable
-!   integer, allocatable :: fragroots(:)
-!   ! Local variables
-!   integer :: h, i
-!   integer :: iatom, root_atom
-!   integer :: eltypepop_i, eltypepop_min
-!   integer, allocatable :: atomeltypes(:)
-!
-!   allocate (fragroots(size(self%molfrags)))
-!
-!   atomeltypes = self%eltypes%idcs
-!   do h = 1, size(self%molfrags)
-!      eltypepop_min = huge(eltypepop_min)
-!      do i = 1, size(self%molfrags(h)%atomidcs)
-!         iatom = self%molfrags(h)%atomidcs(i)
-!         eltypepop_i = size(self%eltypes%parts(atomeltypes(iatom))%items)
-!         if (eltypepop_i < eltypepop_min) then
-!            root_atom = iatom
-!            eltypepop_min = eltypepop_i
-!         end if
-!         fragroots(h) = root_atom
-!      end do
-!   end do
-!
-!end function
 
 end module

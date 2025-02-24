@@ -19,7 +19,7 @@ use parameters
 use common_types
 use globals
 use sorting
-use bipartition
+use lcrs_tree
 
 implicit none
 
@@ -30,8 +30,8 @@ abstract interface
    subroutine prune_proc( eltypes, coords1, coords2, pruned)
       use parameters
       use common_types
-      use bipartition
-      type(bipartition_type), intent(in) :: eltypes
+      use lcrs_tree
+      type(bipartition_container), intent(in) :: eltypes
       real(rk), dimension(:, :), intent(in) :: coords1, coords2
       type(boolmatrix_type), dimension(:), allocatable, intent(out) :: pruned
    end subroutine
@@ -40,20 +40,20 @@ end interface
 contains
 
 subroutine prune_none( eltypes, coords1, coords2, pruned)
-   type(bipartition_type), intent(in) :: eltypes
+   type(bipartition_container), intent(in) :: eltypes
    real(rk), dimension(:, :), intent(in) :: coords1, coords2
    type(boolmatrix_type), dimension(:), allocatable, intent(out) :: pruned
    ! Local variables
    integer :: h, i, j
-   integer :: part_size1, part_size2
+   integer :: num_items1, num_items2
 
    allocate (pruned(eltypes%num_parts))
    do h = 1, eltypes%num_parts
-      part_size1 = eltypes%parts(h)%part_size1
-      part_size2 = eltypes%parts(h)%part_size2
-      allocate (pruned(h)%b(part_size1, part_size2))
-      do i = 1, part_size1
-         do j = 1, part_size2
+      num_items1 = eltypes%parts(h)%num_items1
+      num_items2 = eltypes%parts(h)%num_items2
+      allocate (pruned(h)%b(num_items1, num_items2))
+      do i = 1, num_items1
+         do j = 1, num_items2
             pruned(h)%b(j, i) = .true.
          end do
       end do
@@ -62,13 +62,13 @@ subroutine prune_none( eltypes, coords1, coords2, pruned)
 end subroutine
 
 subroutine prune_rd( eltypes, coords1, coords2, pruned)
-   type(bipartition_type), intent(in) :: eltypes
+   type(bipartition_container), intent(in) :: eltypes
    real(rk), dimension(:, :), intent(in) :: coords1, coords2
    type(boolmatrix_type), dimension(:), allocatable, intent(out) :: pruned
    ! Local variables
    integer :: h, i, j, k
    integer :: iatom, jatom
-   integer :: part_size1, part_size2
+   integer :: num_items1, num_items2
    type(nested_reallist_type), allocatable, dimension(:) :: dists1, dists2
 
    allocate (dists1(size(coords1, dim=2)))
@@ -77,15 +77,15 @@ subroutine prune_rd( eltypes, coords1, coords2, pruned)
       allocate (dists1(i)%s(eltypes%num_parts))
       allocate (dists2(i)%s(eltypes%num_parts))
       do h = 1, eltypes%num_parts
-         allocate (dists1(i)%s(h)%x(eltypes%parts(h)%part_size1))
-         allocate (dists2(i)%s(h)%x(eltypes%parts(h)%part_size2))
+         allocate (dists1(i)%s(h)%x(eltypes%parts(h)%num_items1))
+         allocate (dists2(i)%s(h)%x(eltypes%parts(h)%num_items2))
       end do
    end do
 
    do i = 1, size(coords1, dim=2)
       do h = 1, eltypes%num_parts
-         do j = 1, eltypes%parts(h)%part_size1
-            jatom = eltypes%parts(h)%items1(j)
+         do j = 1, eltypes%parts(h)%num_items1
+            jatom = eltypes%parts(h)%indices1(j)
             dists1(i)%s(h)%x(j) = sqrt(sum((coords1(:, jatom) - coords1(:, i))**2))
          end do
          call sort(dists1(i)%s(h)%x)
@@ -94,8 +94,8 @@ subroutine prune_rd( eltypes, coords1, coords2, pruned)
 
    do i = 1, size(coords2, dim=2)
       do h = 1, eltypes%num_parts
-         do j = 1, eltypes%parts(h)%part_size2
-            jatom = eltypes%parts(h)%items2(j)
+         do j = 1, eltypes%parts(h)%num_items2
+            jatom = eltypes%parts(h)%indices2(j)
             dists2(i)%s(h)%x(j) = sqrt(sum((coords2(:, jatom) - coords2(:, i))**2))
          end do
          call sort(dists2(i)%s(h)%x)
@@ -104,14 +104,14 @@ subroutine prune_rd( eltypes, coords1, coords2, pruned)
 
    allocate (pruned(eltypes%num_parts))
    do h = 1, eltypes%num_parts
-      part_size1 = eltypes%parts(h)%part_size1
-      part_size2 = eltypes%parts(h)%part_size2
-      allocate (pruned(h)%b(part_size1, part_size2))
+      num_items1 = eltypes%parts(h)%num_items1
+      num_items2 = eltypes%parts(h)%num_items2
+      allocate (pruned(h)%b(num_items1, num_items2))
       pruned(h)%b = .false.
-      do i = 1, part_size1
-         iatom = eltypes%parts(h)%items1(i)
-         do j = 1, part_size2
-            jatom = eltypes%parts(h)%items2(j)
+      do i = 1, num_items1
+         iatom = eltypes%parts(h)%indices1(i)
+         do j = 1, num_items2
+            jatom = eltypes%parts(h)%indices2(j)
             do k = 1, eltypes%num_parts
                if (any(abs(dists2(jatom)%s(k)%x - dists1(iatom)%s(k)%x) > prune_tol)) then
                   pruned(h)%b(j, i) = .true.

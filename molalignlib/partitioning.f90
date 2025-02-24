@@ -19,12 +19,7 @@ use parameters
 use sorting
 use chemdata
 use molecule
-use tupledict
-use partition
 use lcrs_tree
-use metapartition
-use partitiondict
-use permutation
 
 implicit none
 
@@ -361,67 +356,6 @@ subroutine compute_consistent_mnatypes(mol1, mol2, mnatypes)
       ! Exit loop if types did not change
       if (all(mnatypes%itemdir1 == itemdir1) .and. &
           all(mnatypes%itemdir2 == itemdir2)) exit
-
-   end do
-
-end subroutine
-
-! Level up MNA types
-subroutine levelup_mnatypes(mol, mnatypes, subtypes)
-   type(mol_type), intent(in) :: mol
-   type(partition_type), intent(in) :: mnatypes
-   type(partition_type), intent(out) :: subtypes
-   ! Local variables
-   integer :: h, i, iatom
-   type(tupledict_type) :: typedict
-   type(partpointer_type), allocatable :: typelist(:)
-   integer, allocatable :: typehood(:)
-
-   call subtypes%initialize(mnatypes%num_items)
-   call typedict%initialize(mnatypes%largest_part_size, 'unordered')
-   allocate (typelist(typedict%num_slots))
-
-   do h = 1, mnatypes%num_parts
-
-      do i = 1, mnatypes%parts(h)%part_size
-         iatom = mnatypes%parts(h)%items(i)
-         typehood = mnatypes%idcs(mol%atoms(iatom)%adjlist)
-         if (.not. (typehood .in. typedict)) then
-            typelist(typedict%new_index(typehood))%ptr => &
-               subtypes%new_part(mnatypes%parts(h)%part_size)
-         end if
-         call typelist(typedict%get_index(typehood))%ptr%add(iatom)
-      end do
-
-      call typedict%reset()
-
-   end do
-
-end subroutine
-
-! Iteratively compute MNA types
-subroutine compute_mnatypes(mol, mnatypes)
-   type(mol_type), intent(in) :: mol
-   type(partition_type), intent(inout) :: mnatypes
-   ! Local variables
-   type(partition_type) :: subtypes
-
-   do
-
-!      write (stderr, *)
-!      call mnatypes%print_parts()
-
-      ! Compute MNA upper level types
-      call levelup_mnatypes(mol, mnatypes, subtypes)
-
-      ! Exit loop if types did not change
-      if (subtypes == mnatypes) then
-         mnatypes = subtypes
-         exit
-      end if
-
-      ! Update mnatypes
-      mnatypes = subtypes
 
    end do
 

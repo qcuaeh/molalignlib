@@ -20,8 +20,6 @@ use globals
 use common_types
 use sorting
 use strutils
-use bipartition
-use bipartitioning
 use molecule
 use lcrs_tree
 use partitioning
@@ -32,10 +30,10 @@ abstract interface
    subroutine bias_proc( mol1, mol2, eltypes, mnadiffs)
       use parameters
       use common_types
-      use bipartition
+      use lcrs_tree
       use molecule
       type(mol_type), intent(in) :: mol1, mol2
-      type(bipartition_type), intent(in) :: eltypes
+      type(bipartition_container), intent(in) :: eltypes
       type(intmatrix_type), dimension(:), allocatable, intent(out) :: mnadiffs
    end subroutine
 end interface
@@ -47,19 +45,19 @@ contains
 
 subroutine bias_none( mol1, mol2, eltypes, mnadiffs)
    type(mol_type), intent(in) :: mol1, mol2
-   type(bipartition_type), intent(in) :: eltypes
+   type(bipartition_container), intent(in) :: eltypes
    type(intmatrix_type), dimension(:), allocatable, intent(out) :: mnadiffs
    ! Local variables
-   integer :: part_size1, part_size2
+   integer :: num_items1, num_items2
    integer :: h, i, j
 
    allocate (mnadiffs(eltypes%num_parts))
    do h = 1, eltypes%num_parts
-      part_size1 = eltypes%parts(h)%part_size1
-      part_size2 = eltypes%parts(h)%part_size2
-      allocate (mnadiffs(h)%n(part_size1, part_size2))
-      do i = 1, part_size1
-         do j = 1, part_size2
+      num_items1 = eltypes%parts(h)%num_items1
+      num_items2 = eltypes%parts(h)%num_items2
+      allocate (mnadiffs(h)%n(num_items1, num_items2))
+      do i = 1, num_items1
+         do j = 1, num_items2
             mnadiffs(h)%n(j, i) = 0
          end do
       end do
@@ -70,7 +68,7 @@ end subroutine
 ! Iteratively compute MNA types
 subroutine bias_mna( mol1, mol2, eltypes, mnadiffs)
    type(mol_type), intent(in) :: mol1, mol2
-   type(bipartition_type), intent(in) :: eltypes
+   type(bipartition_container), intent(in) :: eltypes
    type(intmatrix_type), dimension(:), allocatable, intent(out) :: mnadiffs
    ! Local variables
    type(tree_node), pointer :: mnatypes
@@ -80,12 +78,11 @@ subroutine bias_mna( mol1, mol2, eltypes, mnadiffs)
    allocate (mnadiffs(eltypes%num_parts))
 
    do h = 1, eltypes%num_parts
-      allocate (mnadiffs(h)%n(eltypes%parts(h)%part_size1, eltypes%parts(h)%part_size2))
+      allocate (mnadiffs(h)%n(eltypes%parts(h)%num_items1, eltypes%parts(h)%num_items2))
       mnadiffs(h)%n = 0
    end do
 
-   call compute_eltypes(mol1, mol2, mnatypes)
-!   call tree_from_partition(eltypes, mnatypes)
+   call tree_from_partition(eltypes, mnatypes)
    level = 0
 
    do
@@ -103,10 +100,10 @@ subroutine bias_mna( mol1, mol2, eltypes, mnadiffs)
           all(mnatypes%itemdir2 == itemdir2)) exit
 
       do h = 1, eltypes%num_parts
-         do j = 1, eltypes%parts(h)%part_size2
-            jatom = eltypes%parts(h)%items2(j)
-            do i = 1, eltypes%parts(h)%part_size1
-               iatom = eltypes%parts(h)%items1(i)
+         do j = 1, eltypes%parts(h)%num_items2
+            jatom = eltypes%parts(h)%indices2(j)
+            do i = 1, eltypes%parts(h)%num_items1
+               iatom = eltypes%parts(h)%indices1(i)
                if (.not. associated(mnatypes%itemdir1(iatom)%ptr, mnatypes%itemdir2(jatom)%ptr)) then
                   mnadiffs(h)%n(i, j) = mnadiffs(h)%n(i, j) + 1
                end if
@@ -120,8 +117,8 @@ subroutine bias_mna( mol1, mol2, eltypes, mnadiffs)
 
 !   do h = 1, eltypes%num_parts
 !      write (stderr, *)
-!      do j = 1, eltypes%parts(h)%part_size2
-!         write (stderr, '(*(i2))') mnadiffs(h)%n(:eltypes%parts(h)%part_size1, j)
+!      do j = 1, eltypes%parts(h)%num_items2
+!         write (stderr, '(*(i2))') mnadiffs(h)%n(:eltypes%parts(h)%num_items1, j)
 !      end do
 !   end do
 

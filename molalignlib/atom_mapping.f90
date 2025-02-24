@@ -24,7 +24,7 @@ use rotation
 use rigid_body
 use alignment
 use lap_driver
-use bipartition
+use lcrs_tree
 use pruning
 use printing
 use registry
@@ -35,7 +35,7 @@ contains
 
 subroutine remap_atoms(mol1, mol2, eltypes, results)
    type(mol_type), intent(in) :: mol1, mol2
-   type(bipartition_type), intent(in) :: eltypes
+   type(bipartition_container), intent(in) :: eltypes
    type(registry_type), target, intent(out) :: results
 
    ! Local variables

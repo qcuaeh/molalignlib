@@ -3,13 +3,6 @@ globals.f90
 common_types.f90
 strutils.f90
 sorting.f90
-tupledict.f90
-partition.f90
-lcrs_tree.f90
-bipartition.f90
-metapartition.f90
-#metapartition_tree.f90
-partitiondict.f90
 permutation.f90
 setutils.f90
 linalg.f90
@@ -18,7 +11,6 @@ eigen-jacobi.f90
 randlib.f90
 random-randlib.f90
 #random-builtin.f90
-lap_solvers.f90
 chemdata.f90
 chemutils.f90
 rotation.f90
@@ -26,11 +18,11 @@ rigid_body.f90
 adjacency.f90
 alignment.f90
 molecule.f90
+lcrs_tree.f90
+partitioning.f90
+lap_solvers.f90
 registry.f90
 printing.f90
-partitioning.f90
-bipartitioning.f90
-metapartitioning.f90
 biasing.f90
 pruning.f90
 lap_driver.f90

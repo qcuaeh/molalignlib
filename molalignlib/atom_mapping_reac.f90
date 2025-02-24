@@ -25,7 +25,7 @@ use rigid_body
 use adjacency
 use alignment
 use lap_driver
-use bipartition
+use lcrs_tree
 use biasing
 use printing
 use registry
@@ -37,21 +37,21 @@ implicit none
 
 contains
 
-subroutine remap_reactive_bonds( mol1, mol2, eltypes, mnatypes, results)
+subroutine remap_reactive_bonds( mol1, mol2, eltypes, results)
    type(mol_type), intent(inout) :: mol1, mol2
-   type(bipartition_type), intent(in) :: eltypes, mnatypes
+   type(bipartition_container), intent(in) :: eltypes
    type(registry_type), target, intent(out) :: results
 
    ! Local variables
-   integer :: num_atoms1
-   integer :: num_trials, num_steps
-   integer, pointer :: lead_count
-   real(rk) :: eigquat(4), totquat(4)
+   type(bipartition_container) :: mnatypes
+   type(tree_node), pointer :: mnatypes_tree
    integer, dimension(:), allocatable :: atomperm, auxperm
-   real(rk), dimension(:,:), allocatable :: coords1, coords2
    type(intlist_type), dimension(:), allocatable :: molfrags1, molfrags2
+   real(rk), dimension(:,:), allocatable :: coords1, coords2
    type(intmatrix_type), allocatable :: mnadiffs(:)
-   integer :: adjd
+   real(rk) :: eigquat(4), totquat(4)
+   integer :: adjd, num_atoms1, num_trials, num_steps
+   integer, pointer :: lead_count
 
    num_atoms1 = size(mol1%atoms)
    coords1 = mol1%get_weightcoords()
@@ -61,9 +61,14 @@ subroutine remap_reactive_bonds( mol1, mol2, eltypes, mnatypes, results)
    allocate (atomperm(num_atoms1))
    allocate (auxperm(num_atoms1))
 
+   ! Compute MNA types
+   call tree_from_partition(eltypes, mnatypes_tree)
+   call compute_consistent_mnatypes(mol1, mol2, mnatypes_tree)
+   call partition_from_tree(mnatypes_tree, mnatypes)
+
    ! Find molecular fragments
-   call find_molfrags( mol1, eltypes%partition1(), molfrags1)
-   call find_molfrags( mol2, eltypes%partition2(), molfrags2)
+   call find_molfrags( mol1, first_partition(eltypes), molfrags1)
+   call find_molfrags( mol2, second_partition(eltypes), molfrags2)
 
    ! Reflect atoms
    if (mirror_flag) then

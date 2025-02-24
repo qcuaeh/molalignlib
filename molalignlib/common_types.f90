@@ -31,8 +31,4 @@ type :: realmatrix_type
    real(rk), allocatable :: x(:, :)
 end type
 
-type, public :: atomlist_type
-   integer, allocatable :: atomidcs(:)
-end type
-
 end module
