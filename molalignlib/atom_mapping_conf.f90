@@ -63,6 +63,7 @@ subroutine remap_conformations(mol1, mol2, eltypes, results)
    ! Compute MNA types
    call tree_from_partition(eltypes, mnatypes_tree)
    call compute_consistent_mnatypes(mol1, mol2, mnatypes_tree)
+   call print_tree(mnatypes_tree)
 
    ! Reflect atoms
    if (mirror_flag) then

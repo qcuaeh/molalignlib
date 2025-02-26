@@ -332,7 +332,8 @@ subroutine refine_mnatype(mol1, mol2, itemdir1, itemdir2, inode)
    ! Revert changes if only child
    if (inode%num_childs == 1) then
       call move_node_items(inode%first_child, inode)
-      call delete_descendants(inode)
+      deallocate (inode%first_child)
+      inode%num_childs = 0
    end if
 
 end subroutine
