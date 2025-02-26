@@ -24,7 +24,7 @@ use rotation
 use rigid_body
 use adjacency
 use alignment
-use lap_driver
+use assignment
 use lcrs_tree
 use biasing
 use printing
@@ -48,7 +48,7 @@ subroutine remap_reactive_bonds( mol1, mol2, eltypes, results)
    integer, dimension(:), allocatable :: atomperm, auxperm
    type(intlist_type), dimension(:), allocatable :: molfrags1, molfrags2
    real(rk), dimension(:,:), allocatable :: coords1, coords2
-   type(intmatrix_type), allocatable :: mnadiffs(:)
+   type(intmatrix_type), allocatable :: biases(:)
    real(rk) :: eigquat(4), totquat(4)
    integer :: adjd, num_atoms1, num_trials, num_steps
    integer, pointer :: lead_count
@@ -80,7 +80,7 @@ subroutine remap_reactive_bonds( mol1, mol2, eltypes, results)
    call translate_coords( coords2, -centroid(coords2))
 
    ! Find unfeasible assignments
-   call bias_procedure( mol1, mol2, eltypes, mnadiffs)
+   call bias_procedure( mol1, mol2, eltypes, biases)
 
    ! Initialize random number generator
    call random_initialize()
@@ -98,13 +98,13 @@ subroutine remap_reactive_bonds( mol1, mol2, eltypes, results)
       call rotate_coords(coords2, randrotquat())
 
       ! Assign atoms with current orientation
-      call assign_atoms_biased(eltypes, coords1, coords2, mnadiffs, atomperm)
+      call assign_atoms_biased(eltypes, coords1, coords2, biases, atomperm)
       totquat = leasteigquat(atomperm, coords1, coords2)
       call rotate_coords(coords2, totquat)
       num_steps = 1
 
       do while (iter_flag)
-         call assign_atoms_biased(eltypes, coords1, coords2, mnadiffs, auxperm)
+         call assign_atoms_biased(eltypes, coords1, coords2, biases, auxperm)
          if (all(auxperm == atomperm)) exit
          atomperm = auxperm
          eigquat = leasteigquat(atomperm, coords1, coords2)

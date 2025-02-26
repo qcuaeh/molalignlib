@@ -3,6 +3,8 @@ globals.f90
 common_types.f90
 strutils.f90
 sorting.f90
+hungarian.f90
+jv.f90
 permutation.f90
 setutils.f90
 linalg.f90
@@ -20,12 +22,11 @@ alignment.f90
 molecule.f90
 lcrs_tree.f90
 partitioning.f90
-lap_solvers.f90
 registry.f90
 printing.f90
 biasing.f90
 pruning.f90
-lap_driver.f90
+assignment.f90
 tracking.f90
 backtracking.f90
 reactivity.f90

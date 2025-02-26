@@ -25,8 +25,7 @@ use permutation
 use rigid_body
 use rotation
 use alignment
-use lap_driver
-use lap_solvers
+use assignment
 use adjacency
 use biasing
 use pruning
@@ -172,7 +171,7 @@ end subroutine
 !   do i = 1, metatypes%num_parts
 !!      write (stderr, *) 'loop:', i
 !      h = random_element(metatypes%parts(i)%items)
-!      call minperm(submnatypes%parts(h), coords1, coords2, atomperm, dist)
+!      call solve_lap(submnatypes%parts(h), coords1, coords2, atomperm, dist)
 !      call split_crossmnatypes(h, atomperm, submnatypes)
 !      call compute_crossmnatypes(mol1, mol2, submnatypes)
 !      call assign_atoms_conf_rec(submnatypes, mol1, mol2, coords1, coords2, atomperm, dist)
@@ -209,7 +208,7 @@ end subroutine
 !               end if
 !            end do
 !         end do
-!         call minperm(submnatypes%parts(h), coords1, coords2, atomperm, dist)
+!         call solve_lap(submnatypes%parts(h), coords1, coords2, atomperm, dist)
 !         call split_crossmnatypes(h, atomperm, submnatypes)
 !         write (stderr, *)
 !         write (stderr, *) repeat(str(h)//'   ', 8)

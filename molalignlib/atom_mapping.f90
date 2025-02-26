@@ -23,7 +23,7 @@ use chemdata
 use rotation
 use rigid_body
 use alignment
-use lap_driver
+use assignment
 use lcrs_tree
 use pruning
 use printing
@@ -46,7 +46,7 @@ subroutine remap_atoms(mol1, mol2, eltypes, results)
    real(rk) :: eigquat(4), totquat(4)
    integer, dimension(:), allocatable :: atomperm, auxperm
    real(rk), dimension(:,:), allocatable :: coords1, coords2
-   type(boolmatrix_type), allocatable :: pruned(:)
+   type(boolmatrix_type), allocatable :: prunes(:)
    real(rk) :: rmsd
 
    num_atoms1 = size(mol1%atoms)
@@ -67,7 +67,7 @@ subroutine remap_atoms(mol1, mol2, eltypes, results)
    call translate_coords(coords2, -centroid(coords2))
 
    ! Find unfeasible assignments
-   call prune_procedure(eltypes, mol1%get_coords(), mol2%get_coords(), pruned)
+   call prune_procedure(eltypes, mol1%get_coords(), mol2%get_coords(), prunes)
 
    ! Initialize random number generator
    call random_initialize()
@@ -85,13 +85,13 @@ subroutine remap_atoms(mol1, mol2, eltypes, results)
       call rotate_coords(coords2, randrotquat())
 
       ! Assign atoms with current orientation
-      call assign_atoms_pruned(eltypes, coords1, coords2, pruned, atomperm)
+      call assign_atoms_pruned(eltypes, coords1, coords2, prunes, atomperm)
       totquat = leasteigquat(atomperm, coords1, coords2)
       call rotate_coords(coords2, totquat)
       num_steps = 1
 
       do while (iter_flag)
-         call assign_atoms_pruned(eltypes, coords1, coords2, pruned, auxperm)
+         call assign_atoms_pruned(eltypes, coords1, coords2, prunes, auxperm)
          if (all(auxperm == atomperm)) exit
          atomperm = auxperm
          eigquat = leasteigquat(atomperm, coords1, coords2)

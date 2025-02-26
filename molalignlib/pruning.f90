@@ -27,44 +27,44 @@ real(rk) :: prune_tol
 procedure(prune_proc), pointer :: prune_procedure
 
 abstract interface
-   subroutine prune_proc( eltypes, coords1, coords2, pruned)
+   subroutine prune_proc( eltypes, coords1, coords2, prunes)
       use parameters
       use common_types
       use lcrs_tree
       type(bipartition_container), intent(in) :: eltypes
       real(rk), dimension(:, :), intent(in) :: coords1, coords2
-      type(boolmatrix_type), dimension(:), allocatable, intent(out) :: pruned
+      type(boolmatrix_type), dimension(:), allocatable, intent(out) :: prunes
    end subroutine
 end interface
 
 contains
 
-subroutine prune_none( eltypes, coords1, coords2, pruned)
+subroutine prune_none( eltypes, coords1, coords2, prunes)
    type(bipartition_container), intent(in) :: eltypes
    real(rk), dimension(:, :), intent(in) :: coords1, coords2
-   type(boolmatrix_type), dimension(:), allocatable, intent(out) :: pruned
+   type(boolmatrix_type), dimension(:), allocatable, intent(out) :: prunes
    ! Local variables
    integer :: h, i, j
    integer :: num_items1, num_items2
 
-   allocate (pruned(eltypes%num_parts))
+   allocate (prunes(eltypes%num_parts))
    do h = 1, eltypes%num_parts
       num_items1 = eltypes%parts(h)%num_items1
       num_items2 = eltypes%parts(h)%num_items2
-      allocate (pruned(h)%b(num_items1, num_items2))
+      allocate (prunes(h)%b(num_items1, num_items2))
       do i = 1, num_items1
          do j = 1, num_items2
-            pruned(h)%b(j, i) = .true.
+            prunes(h)%b(j, i) = .true.
          end do
       end do
    end do
 
 end subroutine
 
-subroutine prune_rd( eltypes, coords1, coords2, pruned)
+subroutine prune_rd( eltypes, coords1, coords2, prunes)
    type(bipartition_container), intent(in) :: eltypes
    real(rk), dimension(:, :), intent(in) :: coords1, coords2
-   type(boolmatrix_type), dimension(:), allocatable, intent(out) :: pruned
+   type(boolmatrix_type), dimension(:), allocatable, intent(out) :: prunes
    ! Local variables
    integer :: h, i, j, k
    integer :: iatom, jatom
@@ -102,19 +102,19 @@ subroutine prune_rd( eltypes, coords1, coords2, pruned)
       end do
    end do
 
-   allocate (pruned(eltypes%num_parts))
+   allocate (prunes(eltypes%num_parts))
    do h = 1, eltypes%num_parts
       num_items1 = eltypes%parts(h)%num_items1
       num_items2 = eltypes%parts(h)%num_items2
-      allocate (pruned(h)%b(num_items1, num_items2))
-      pruned(h)%b = .false.
+      allocate (prunes(h)%b(num_items1, num_items2))
+      prunes(h)%b = .false.
       do i = 1, num_items1
          iatom = eltypes%parts(h)%indices1(i)
          do j = 1, num_items2
             jatom = eltypes%parts(h)%indices2(j)
             do k = 1, eltypes%num_parts
                if (any(abs(dists2(jatom)%s(k)%x - dists1(iatom)%s(k)%x) > prune_tol)) then
-                  pruned(h)%b(j, i) = .true.
+                  prunes(h)%b(j, i) = .true.
                   exit
                end if
             end do
