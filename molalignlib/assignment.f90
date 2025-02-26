@@ -202,7 +202,7 @@ subroutine solve_lap_pruned(n, s1, s2, p, q, prun, perm, dist)
 !   We have
    integer, intent(out) :: perm(n)
    real(rk), intent(out) :: dist
-   
+
 !   Internal variables
 !   cc, kk, first:
 !     Sparse matrix of distances
@@ -308,7 +308,7 @@ subroutine solve_lap_nearest(n, s1, s2, p, q, perm, dist)
 !   We have
    integer, intent(out) :: perm(n)
    real(rk), intent(out) :: dist
-   
+
 !   Internal variables
 !   cc, kk, first:
 !     Sparse matrix of distances

@@ -53,11 +53,11 @@ logical function is_perm(arr)
    integer, intent(in) :: arr(:)
    integer :: i, N
    logical :: seen(size(arr))
-   
+
    N = size(arr)
    seen = .false.
    is_perm = .true.
-   
+
    do i = 1, N
       if (arr(i) < 1 .or. arr(i) > N .or. seen(arr(i))) then
          is_perm = .false.

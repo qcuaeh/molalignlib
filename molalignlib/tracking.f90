@@ -77,7 +77,7 @@ recursive subroutine recrun( tracked, iatom, nfrag, fragszs, fragidcs)
    tracked(iatom) = .true.
    fragszs(nfrag) = fragszs(nfrag) + 1
    fragidcs(fragszs(nfrag), nfrag) = iatom
-   
+
    do i = 1, size(atoms(iatom)%adjlist)
       call recrun( tracked, atoms(iatom)%adjlist(i), nfrag, fragszs, fragidcs)
    end do

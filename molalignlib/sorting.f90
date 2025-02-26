@@ -179,9 +179,9 @@ subroutine intmerge(x, a, na, b, nb, c, nc)
    integer, intent(in) :: x(:)
    integer, intent(in) :: b(nb)
    integer, intent(inout) :: a(na), c(nc)
-    
+
    integer :: i, j, k
-    
+
    i = 1; j = 1; k = 1;
    do while(i <= na .and. j <= nb)
       if (x(a(i)) <= x(b(j))) then
@@ -199,15 +199,15 @@ subroutine intmerge(x, a, na, b, nb, c, nc)
       k = k + 1
    end do
 end subroutine
- 
+
 subroutine realmerge(x, a, na, b, nb, c, nc)
    integer, intent(in) :: na, nb, nc
    real(rk), intent(in) :: x(:)
    integer, intent(in) :: b(nb)
    integer, intent(inout) :: a(na), c(nc)
-    
+
    integer :: i, j, k
-    
+
    i = 1; j = 1; k = 1;
    do while(i <= na .and. j <= nb)
       if (x(a(i)) <= x(b(j))) then
@@ -225,15 +225,15 @@ subroutine realmerge(x, a, na, b, nb, c, nc)
       k = k + 1
    end do
 end subroutine
- 
+
 recursive subroutine realmergesort(x, o, n, t)
    integer, intent(in) :: n
    real(rk), intent(in) :: x(:)
    integer, intent(inout) :: o(n)
    integer, intent(out) :: t((n+1)/2)
-    
+
    integer :: i, o1
-    
+
    if (n < 2) return
    if (n == 2) then
       if (x(o(1)) > x(o(2))) then
@@ -242,10 +242,10 @@ recursive subroutine realmergesort(x, o, n, t)
       return
    end if      
    i = (n+1)/2
-    
+
    call realmergesort(x, o, i, t)
    call realmergesort(x, o(i+1), n-i, t)
-    
+
    if (x(o(i)) > x(o(i+1))) then
       t(1:i) = o(1:i)
       call realmerge(x, t, i, o(i+1), n-i, o, n)
@@ -257,9 +257,9 @@ recursive subroutine intmergesort(x, o, n, t)
    integer, intent(in) :: x(:)
    integer, intent(inout) :: o(n)
    integer, intent(out) :: t((n+1)/2)
-    
+
    integer :: i, o1
-    
+
    if (n < 2) return
    if (n == 2) then
       if (x(o(1)) > x(o(2))) then
@@ -268,10 +268,10 @@ recursive subroutine intmergesort(x, o, n, t)
       return
    end if      
    i = (n+1)/2
-    
+
    call intmergesort(x, o, i, t)
    call intmergesort(x, o(i+1), n-i, t)
-    
+
    if (x(o(i)) > x(o(i+1))) then
       t(1:i) = o(1:i)
       call intmerge(x, t, i, o(i+1), n-i, o, n)
@@ -283,9 +283,9 @@ subroutine charmerge(x, a, na, b, nb, c, nc)
    character(*), intent(in) :: x(:)
    integer, intent(in) :: b(nb)
    integer, intent(inout) :: a(na), c(nc)
-    
+
    integer :: i, j, k
-    
+
    i = 1; j = 1; k = 1;
    do while(i <= na .and. j <= nb)
       if (x(a(i)) <= x(b(j))) then
@@ -303,15 +303,15 @@ subroutine charmerge(x, a, na, b, nb, c, nc)
       k = k + 1
    end do
 end subroutine
- 
+
 recursive subroutine charmergesort(x, o, n, t)
    integer, intent(in) :: n
    character(*), intent(in) :: x(:)
    integer, intent(inout) :: o(n)
    integer, intent(out) :: t((n+1)/2)
-    
+
    integer :: i, o1
-    
+
    if (n < 2) return
    if (n == 2) then
       if (x(o(1)) > x(o(2))) then
@@ -320,10 +320,10 @@ recursive subroutine charmergesort(x, o, n, t)
       return
    end if      
    i = (n+1)/2
-    
+
    call charmergesort(x, o, i, t)
    call charmergesort(x, o(i+1), n-i, t)
-    
+
    if (x(o(i)) > x(o(i+1))) then
       t(1:i) = o(1:i)
       call charmerge(x, t, i, o(i+1), n-i, o, n)

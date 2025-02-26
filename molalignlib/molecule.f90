@@ -261,7 +261,7 @@ subroutine add_bond(self, idx1, idx2)
          pos1 = pos1 - 1
       end do
       adjlist1(pos1+1) = idx2
-      
+
       nadj2 = nadj2 + 1
 ! find position to insert idx1 and shift indices greater than idx1
       do while ((pos2 >= 1) .and. (idx1 < adjlist2(pos2)))
