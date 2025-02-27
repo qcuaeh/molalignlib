@@ -61,19 +61,20 @@ end interface
 ! Make types and procedures public
 public make_new_root
 public add_new_child
+public flatten_tree
 public delete_tree
 public delete_subtree
 public add_new_item1
 public add_new_item2
-public add_linked_item1
-public add_linked_item2
+public add_item1
+public add_item2
 public move_node_items
 public partition_from_tree
 public tree_from_partition
 public first_partition
 public second_partition
 public print_items
-public print_itemdirs
+public print_itemdir
 public print_subtree
 public print_tree
 public print_partition
@@ -172,44 +173,42 @@ subroutine add_new_item2(node, index)
    node%num_items2 = node%num_items2 + 1
 end subroutine
 
-subroutine add_linked_item1(node, item)
+subroutine add_item1(node, item)
    type(tree_node), target, intent(inout) :: node
    type(item_node), pointer, intent(inout) :: item
-   type(item_node), pointer :: next_item
 
-   next_item => item%next
    node%itemdir1(item%index)%ptr => node
    item%next => node%first_item1
    node%first_item1 => item
    node%num_items1 = node%num_items1 + 1
-   item => next_item
 end subroutine
 
-subroutine add_linked_item2(node, item)
+subroutine add_item2(node, item)
    type(tree_node), target, intent(inout) :: node
    type(item_node), pointer, intent(inout) :: item
-   type(item_node), pointer :: next_item
 
-   next_item => item%next
    node%itemdir2(item%index)%ptr => node
    item%next => node%first_item2
    node%first_item2 => item
    node%num_items2 = node%num_items2 + 1
-   item => next_item
 end subroutine
 
 subroutine move_node_items(from, dest)
    type(tree_node), intent(inout) :: from, dest
-   type(item_node), pointer :: item
+   type(item_node), pointer :: item, next_item
 
    item => from%first_item1
    do while (associated(item))
-      call add_linked_item1(dest, item)
+      next_item => item%next
+      call add_item1(dest, item)
+      item => next_item
    end do
 
    item => from%first_item2
    do while (associated(item))
-      call add_linked_item2(dest, item)
+      next_item => item%next
+      call add_item2(dest, item)
+      item => next_item
    end do
 
    from%num_items1 = 0
@@ -218,10 +217,25 @@ subroutine move_node_items(from, dest)
    from%first_item2 => null()
 end subroutine
 
+subroutine deallocate_items(first_item)
+   type(item_node), pointer, intent(inout) :: first_item
+   type(item_node), pointer :: item, next_item
+
+   ! Traverse the list and deallocate each item
+   item => first_item
+   do while (associated(item))
+      next_item => item%next
+      deallocate(item)
+      item => next_item
+   end do
+
+   ! Set the head pointer to null
+   first_item => null()
+end subroutine deallocate_items
+
 recursive subroutine delete_subtree(node)
    type(tree_node), pointer, intent(inout) :: node
    type(tree_node), pointer :: child, next_child
-   type(item_node), pointer :: item, next_item
 
    if (.not. associated(node)) error stop 'Node not associated'
 
@@ -237,25 +251,14 @@ recursive subroutine delete_subtree(node)
       end do
    end if
 
-   ! Delete all items of the node
-   item => node%first_item1
-   do while (associated(item))
-      next_item => item%next
-      deallocate(item)
-      item => next_item
-   end do
-
-   item => node%first_item2
-   do while (associated(item))
-      next_item => item%next
-      deallocate(item)
-      item => next_item
-   end do
+   ! Delete all items of the node using the reusable procedure
+   call deallocate_items(node%first_item1)
+   call deallocate_items(node%first_item2)
 
    ! Finally, deallocate the node itself
    deallocate(node)
    node => null()
-end subroutine
+end subroutine delete_subtree
 
 subroutine delete_tree(root)
    type(tree_node), pointer, intent(inout) :: root
@@ -271,6 +274,53 @@ subroutine delete_tree(root)
    call delete_subtree(root)
 
 end subroutine
+
+subroutine flatten_tree(root)
+   type(tree_node), pointer, intent(inout) :: root
+   type(tree_node), pointer :: temp_root
+
+   if (.not. associated(root)) error stop 'Root not associated'
+
+   allocate(temp_root)
+   temp_root%first_child => root%first_child
+   root%first_child => null()
+
+   ! Process the temporary root subtree and collect leaf nodes
+   call traverse_subtree(temp_root, root)
+
+   root%num_childs = root%num_leaves
+   deallocate(temp_root)
+
+contains
+   recursive subroutine traverse_subtree(node, root)
+      type(tree_node), pointer, intent(inout) :: node, root
+      type(tree_node), pointer :: child, next_child
+
+      ! Process all children of this node
+      child => node%first_child
+      do while (associated(child))
+         next_child => child%next_sibling
+
+         if (associated(child%first_child)) then
+            ! Internal node - process its children recursively
+            call traverse_subtree(child, root)
+
+            ! After processing, deallocate this internal node's items
+            call deallocate_items(child%first_item1)
+            call deallocate_items(child%first_item2)
+
+            ! Deallocate the internal node
+            deallocate(child)
+         else
+            ! Leaf node - add to the beginning of the leaf list
+            child%next_sibling => root%first_child
+            root%first_child => child
+         end if
+
+         child => next_child
+      end do
+   end subroutine traverse_subtree
+end subroutine flatten_tree
 
 subroutine flat_tree_assign(flat_root, root)
    type(tree_node), pointer, intent(out) :: flat_root
@@ -290,28 +340,27 @@ contains
       type(item_node), pointer :: item
       type(tree_node), pointer :: new_child
 
-      if (.not. associated(src_node%first_child)) then
-         ! This is a leaf node - create a new child in the flat tree
+      if (associated(src_node%first_child)) then
+         ! Internal node - process children
+         child => src_node%first_child
+         do
+            call collect_leaf_nodes(child, dest_root)
+            if (.not. associated(child%next_sibling)) exit
+            child => child%next_sibling
+         end do
+      else
+         ! Leaf node - create a new child in the flat tree
          new_child => add_new_child(dest_root)
-
          ! Copy items from original leaf to new child
          item => src_node%first_item1
          do while (associated(item))
             call add_new_item1(new_child, item%index)
             item => item%next
          end do
-
          item => src_node%first_item2
          do while (associated(item))
             call add_new_item2(new_child, item%index)
             item => item%next
-         end do
-      else
-         ! Process children recursively
-         child => src_node%first_child
-         do while (associated(child))
-            call collect_leaf_nodes(child, dest_root)
-            child => child%next_sibling
          end do
       end if
    end subroutine
@@ -510,30 +559,14 @@ recursive subroutine print_subtree(node, indent)
    write (stdout, *)
 end subroutine
 
-subroutine print_itemdirs(node)
+subroutine print_itemdir(node)
    type(tree_node), intent(in) :: node
    integer :: i
 
-   ! Print first item directory
-   write(stdout,*)
-   write(stdout,'(A)') "Item Directory 1:"
    do i = 1, size(node%itemdir1)
       if (associated(node%itemdir1(i)%ptr)) then
          write(stdout,'(A,I0,A)') "  Item ", i, " -> Node ("
          call print_items(node%itemdir1(i)%ptr)
-         write(stdout,'(A)') ")"
-      else
-         write(stdout,'(A,I0,A)') "  Item ", i, " -> Not associated"
-      end if
-   end do
-
-   ! Print second item directory
-   write(stdout,*)
-   write(stdout,'(A)') "Item Directory 2:"
-   do i = 1, size(node%itemdir2)
-      if (associated(node%itemdir2(i)%ptr)) then
-         write(stdout,'(A,I0,A)') "  Item ", i, " -> Node ("
-         call print_items(node%itemdir2(i)%ptr)
          write(stdout,'(A)') ")"
       else
          write(stdout,'(A,I0,A)') "  Item ", i, " -> Not associated"
@@ -550,7 +583,10 @@ subroutine print_tree(root)
    call print_subtree(root, 1)
 
    ! Print item directories
-!   call print_itemdirs(root)
+!   write(stdout,'(A)') "Item Directory 1:"
+!   call print_itemdir(root%itemdir1)
+!   write(stdout,'(A)') "Item Directory 2:"
+!   call print_itemdir(root%itemdir2)
 end subroutine
 
 subroutine print_partition(partition)

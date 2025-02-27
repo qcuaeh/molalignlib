@@ -128,18 +128,20 @@ subroutine assign_atoms_conf( mnatree, mol1, mol2, coords1, coords2, atomperm, d
    real(rk), intent(out) :: dist
    ! Local variables
    type(tree_node), pointer :: submnatree
-   logical :: remaining
+   logical :: assigned
 
    write (stderr, *)
-   write (stderr, *) repeat('   assign atoms conf', 3)
+   write (stderr, *) repeat('assign atoms conf   ', 3)
 
    submnatree = mnatree
    call print_tree(submnatree)
    do
-      call assign_remaining_items(submnatree, remaining)
+      assigned = .false.
+      call reduce_partial_matches(submnatree, assigned)
+      if (.not. assigned) exit
       call compute_consistent_mnatypes(mol1, mol2, submnatree)
+      call flatten_tree(submnatree)
       call print_tree(submnatree)
-      if (.not. remaining) exit
    end do
    stop
 

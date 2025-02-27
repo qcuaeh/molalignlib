@@ -139,18 +139,28 @@ function find_typehood(typehoodtable, typehood) result(node)
 
 end function
 
-subroutine assign_leaf_items(leaf)
-   type(tree_node), pointer, intent(inout) :: leaf
-   type(item_node), pointer :: curr_item1, curr_item2
-   type(tree_node), pointer :: child_node
+subroutine assign_single_item(leaf)
+   type(tree_node), intent(inout) :: leaf
+   type(tree_node), pointer :: child
+   type(item_node), pointer :: item1, item2, next_item1, next_item2
 
-   curr_item1 => leaf%first_item1
-   curr_item2 => leaf%first_item2
-
-   do while (associated(curr_item1))
-      child_node => add_new_child(leaf)
-      call add_linked_item1(child_node, curr_item1)
-      call add_linked_item2(child_node, curr_item2)
+   item1 => leaf%first_item1
+   item2 => leaf%first_item2
+   child => add_new_child(leaf)
+   next_item1 => item1%next
+   next_item2 => item2%next
+   call add_item1(child, item1)
+   call add_item2(child, item2)
+   item1 => next_item1
+   item2 => next_item2
+   child => add_new_child(leaf)
+   do while (associated(item1))
+      next_item1 => item1%next
+      next_item2 => item2%next
+      call add_item1(child, item1)
+      call add_item2(child, item2)
+      item1 => next_item1
+      item2 => next_item2
    end do
 
    leaf%num_items1 = 0
@@ -159,63 +169,28 @@ subroutine assign_leaf_items(leaf)
    leaf%first_item2 => null()
 end subroutine
 
-subroutine assign_remaining_items(old_root, remaining)
-   type(tree_node), pointer, intent(inout) :: old_root
-   logical, intent(out) :: remaining
-   type(tree_node), pointer :: min_leaf, new_root
+recursive subroutine reduce_partial_matches(node, assigned)
+   type(tree_node), intent(inout) :: node
+   logical, intent(inout) :: assigned
+   type(tree_node), pointer :: child
 
-   ! Initialize
-   remaining = .false.
-   min_leaf => null()
-
-   ! Create single new root that will hold all leaves
-   new_root => make_new_root(size(old_root%itemdir1), size(old_root%itemdir2))
-
-   ! Collect leaves and find minimum leaf
-   call collect_leaves(old_root, new_root, min_leaf)
-
-   ! If we found a suitable leaf, extend it
-   if (associated(min_leaf)) then
-      call assign_leaf_items(min_leaf)
-      remaining = .true.
-   end if
-
-   ! Clean up original tree and update root
-   call delete_tree(old_root)
-   old_root => new_root
-
-contains
-   recursive subroutine collect_leaves(node, new_parent, min_node)
-      type(tree_node), target, intent(inout) :: node
-      type(tree_node), target, intent(inout) :: new_parent
-      type(tree_node), pointer, intent(inout) :: min_node
-      type(tree_node), pointer :: child, next_child, new_leaf
-
-      if (.not. associated(node%first_child)) then
-         ! Leaf node - create new child under new_parent
-         new_leaf => add_new_child(new_parent)
-         call move_node_items(node, new_leaf)
-
-         ! Update min_node if this node has equal numbers and at least 2 items
-         if (new_leaf%num_items1 == new_leaf%num_items2 .and. &
-             new_leaf%num_items1 >= 2) then
-            if (.not. associated(min_node)) then
-               min_node => new_leaf
-            else if (new_leaf%num_items1 < min_node%num_items1) then
-               min_node => new_leaf
-            end if
-         end if
-      else
-         ! Process children
-         child => node%first_child
-         do while (associated(child))
-            next_child => child%next_sibling
-            call collect_leaves(child, new_parent, min_node)
-            child => next_child
-         end do
-         node%first_child => null()
+   if (associated(node%first_child)) then
+      ! Internal node - process children
+      child => node%first_child
+      do
+         call reduce_partial_matches(child, assigned)
+         if (assigned) return
+         if (.not. associated(child%next_sibling)) exit
+         child => child%next_sibling
+      end do
+   else
+      ! Leaf node - assign single item
+      if (node%num_items1 == node%num_items2 .and. &
+          node%num_items1 > 1) then
+         call assign_single_item(node)
+         assigned = .true.
       end if
-   end subroutine
+   end if
 end subroutine
 
 ! Partition atoms by atomic number and label
@@ -268,32 +243,31 @@ recursive subroutine compute_nextlevelmnatypes(mol1, mol2, itemdir1, itemdir2, i
    ! Local variables
    type(tree_node), pointer :: child
 
-   ! Internal node, process its children
    if (associated(inode%first_child)) then
+      ! Internal node - process children
       child => inode%first_child
       do
          call compute_nextlevelmnatypes(mol1, mol2, itemdir1, itemdir2, child)
          if (.not. associated(child%next_sibling)) return
          child => child%next_sibling
       end do
+   else
+      ! Leaf node
+      if (inode%num_items1 + inode%num_items2 > 1) then
+         ! Multiple items - update MNA type
+         call compute_mnatype(mol1, mol2, itemdir1, itemdir2, inode)
+      end if
    end if
-
-   ! Single occupied or empty leaf node, do nothing
-   if (inode%num_items1 + inode%num_items2 <= 1) then
-      return
-   end if
-
-   call refine_mnatype(mol1, mol2, itemdir1, itemdir2, inode)
 
 end subroutine
 
-subroutine refine_mnatype(mol1, mol2, itemdir1, itemdir2, inode)
+subroutine compute_mnatype(mol1, mol2, itemdir1, itemdir2, inode)
    type(mol_type), intent(in) :: mol1, mol2
    type(tree_node_ptr), dimension(:), intent(in) :: itemdir1, itemdir2
    type(tree_node), intent(inout) :: inode
    ! Local variables
-   type(item_node), pointer :: item
    type(tree_node), pointer :: child
+   type(item_node), pointer :: item, next_item
    type(tree_node_ptr), allocatable :: typehood(:)
    type(typehood_table) :: typehoodtable
 
@@ -309,7 +283,9 @@ subroutine refine_mnatype(mol1, mol2, itemdir1, itemdir2, inode)
          child => add_new_child(inode)
          call add_typehood(typehoodtable, typehood, child)
       end if
-      call add_linked_item1(child, item)
+      next_item => item%next
+      call add_item1(child, item)
+      item => next_item
    end do
 
    ! Second molecule
@@ -321,7 +297,9 @@ subroutine refine_mnatype(mol1, mol2, itemdir1, itemdir2, inode)
          child => add_new_child(inode)
          call add_typehood(typehoodtable, typehood, child)
       end if
-      call add_linked_item2(child, item)
+      next_item => item%next
+      call add_item2(child, item)
+      item => next_item
    end do
 
    inode%num_items1 = 0

@@ -123,8 +123,8 @@ subroutine remove_reactive_bonds( mol1, mol2, eltypes, atomperm)
 
    end do
 
-   write (stderr, *) 'before', adjacencydiff( identity_perm(num_atoms1), mol1%adjmat, mol2%adjmat)
-   write (stderr, *) 'after', adjacencydiff( results%records(1)%atomperm, mol1%adjmat, mol2%adjmat)
+   write (stderr, *) 'adjd before', adjacencydiff( identity_perm(num_atoms1), mol1%adjmat, mol2%adjmat)
+   write (stderr, *) 'adjd after', adjacencydiff( results%records(1)%atomperm, mol1%adjmat, mol2%adjmat)
 
    ! Remove reactive bonds
 
