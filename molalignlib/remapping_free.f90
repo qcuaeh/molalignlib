@@ -14,7 +14,7 @@
 ! You should have received a copy of the GNU General Public License
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-module atom_mapping_reac
+module atom_mapping_free
 use parameters
 use globals
 use random
@@ -22,65 +22,52 @@ use molecule
 use chemdata
 use rotation
 use rigid_body
-use adjacency
 use alignment
 use assignment
 use lcrs_tree
-use biasing
+use pruning
 use printing
 use registry
-use tracking
-use backtracking
-use reactivity
 
 implicit none
 
 contains
 
-subroutine remap_reactive_bonds( mol1, mol2, eltypes, results)
-   type(mol_type), intent(inout) :: mol1, mol2
+subroutine remap_free_atoms(mol1, mol2, eltypes, results)
+   type(mol_type), intent(in) :: mol1, mol2
    type(bipartition_container), intent(in) :: eltypes
    type(registry_type), target, intent(out) :: results
 
    ! Local variables
-   type(bipartition_container) :: mnatypes
-   type(tree_node), pointer :: mnatypes_tree
-   integer, dimension(:), allocatable :: atomperm, auxperm
-   type(intlist_type), dimension(:), allocatable :: molfrags1, molfrags2
-   real(rk), dimension(:,:), allocatable :: coords1, coords2
-   type(intmatrix_type), allocatable :: biases(:)
-   real(rk) :: eigquat(4), totquat(4)
-   integer :: adjd, num_atoms1, num_trials, num_steps
+
+   integer :: num_atoms1
+   integer :: num_trials, num_steps
    integer, pointer :: lead_count
+   real(rk) :: eigquat(4), totquat(4)
+   integer, dimension(:), allocatable :: atomperm, auxperm
+   real(rk), dimension(:,:), allocatable :: coords1, coords2
+   type(boolmatrix_type), allocatable :: prunes(:)
+   real(rk) :: rmsd
 
    num_atoms1 = size(mol1%atoms)
-   coords1 = mol1%get_weightcoords()
-   coords2 = mol2%get_weightcoords()
+   coords1 = mol1%get_weighted_coords()
+   coords2 = mol2%get_weighted_coords()
    call results%initialize(max_records)
 
    allocate (atomperm(num_atoms1))
    allocate (auxperm(num_atoms1))
 
-   ! Compute MNA types
-   call tree_from_partition(eltypes, mnatypes_tree)
-   call compute_consistent_mnatypes(mol1, mol2, mnatypes_tree)
-   call partition_from_tree(mnatypes_tree, mnatypes)
-
-   ! Find molecular fragments
-   call find_molfrags( mol1, first_partition(eltypes), molfrags1)
-   call find_molfrags( mol2, second_partition(eltypes), molfrags2)
-
-   ! Reflect atoms
+   ! Mirror coordinates
    if (mirror_flag) then
-      call reflect_coords( coords2)
+      call mirror_coords(coords2)
    end if
 
    ! Translate atoms to their centroids
-   call translate_coords( coords1, -centroid(coords1))
-   call translate_coords( coords2, -centroid(coords2))
+   call translate_coords(coords1, -centroid(coords1))
+   call translate_coords(coords2, -centroid(coords2))
 
    ! Find unfeasible assignments
-   call bias_procedure( mol1, mol2, eltypes, biases)
+   call prune_procedure(eltypes, mol1%get_coords(), mol2%get_coords(), prunes)
 
    ! Initialize random number generator
    call random_initialize()
@@ -98,13 +85,13 @@ subroutine remap_reactive_bonds( mol1, mol2, eltypes, results)
       call rotate_coords(coords2, randrotquat())
 
       ! Assign atoms with current orientation
-      call assign_atoms_biased(eltypes, coords1, coords2, biases, atomperm)
+      call assign_atoms_pruned(eltypes, coords1, coords2, prunes, atomperm)
       totquat = leasteigquat(atomperm, coords1, coords2)
       call rotate_coords(coords2, totquat)
       num_steps = 1
 
       do while (iter_flag)
-         call assign_atoms_biased(eltypes, coords1, coords2, biases, auxperm)
+         call assign_atoms_pruned(eltypes, coords1, coords2, prunes, auxperm)
          if (all(auxperm == atomperm)) exit
          atomperm = auxperm
          eigquat = leasteigquat(atomperm, coords1, coords2)
@@ -113,21 +100,13 @@ subroutine remap_reactive_bonds( mol1, mol2, eltypes, results)
          num_steps = num_steps + 1
       end do
 
-      call minadjdiff( eltypes, mnatypes, molfrags1, mol1, mol2, coords1, coords2, atomperm)
-
       ! Update results
-      adjd = adjacencydiff(atomperm, mol1%adjmat, mol2%adjmat)
-      call results%push_adjd(atomperm, num_steps, angle(totquat), adjd)
+      rmsd = sqrt(sqdistsum(atomperm, coords1, coords2))
+      call results%push_rmsd(atomperm, num_steps, angle(totquat), rmsd)
 
    end do
 
    results%num_trials = num_trials
-
-   ! Remove bonds from reactive sites and reoptimize assignment
-   atomperm = results%records(1)%atomperm
-!   write (stderr, '(i0)') adjacencydiff( atomperm, mol1%adjmat, mol2%adjmat)
-   call remove_reactive_bonds( mol1, mol2, molfrags1, molfrags2, mnatypes, atomperm)
-!   write (stderr, '(i0)') adjacencydiff( atomperm, mol1%adjmat, mol2%adjmat)
 
 end subroutine
 

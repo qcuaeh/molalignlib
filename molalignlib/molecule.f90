@@ -26,8 +26,8 @@ contains
    procedure :: set_adjlists
    procedure :: set_coords
    procedure :: get_coords
-   procedure :: set_weightcoords
-   procedure :: get_weightcoords
+   procedure :: set_unweighted_coords
+   procedure :: get_weighted_coords
    procedure :: get_bonds
    procedure :: add_bond
    procedure :: remove_bond
@@ -63,7 +63,7 @@ function get_coords(self) result(coords)
 
 end function
 
-subroutine set_weightcoords(self, coords)
+subroutine set_unweighted_coords(self, coords)
    class(mol_type), intent(inout) :: self
    real(rk), intent(in) :: coords(:, :)
    ! Local variables
@@ -78,7 +78,7 @@ subroutine set_weightcoords(self, coords)
 
 end subroutine
 
-function get_weightcoords(self) result(coords)
+function get_weighted_coords(self) result(coords)
    class(mol_type), intent(in) :: self
    ! Local variables
    real(rk), allocatable :: coords(:, :)

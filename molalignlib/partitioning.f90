@@ -219,9 +219,9 @@ contains
 end subroutine
 
 ! Partition atoms by atomic number and label
-subroutine compute_eltypes(mol1, mol2, eltypes)
+subroutine compute_eltypes(mol1, mol2, eltree)
    type(mol_type), intent(in) :: mol1, mol2
-   type(tree_node), pointer, intent(out) :: eltypes
+   type(tree_node), pointer, intent(out) :: eltree
    ! Local variables
    type(tree_node), pointer :: inode
    type(atomtype_table) :: atomtypetable
@@ -230,7 +230,7 @@ subroutine compute_eltypes(mol1, mol2, eltypes)
    num_atoms1 = size(mol1%atoms) 
    num_atoms2 = size(mol2%atoms) 
 
-   eltypes => make_new_root(num_atoms1, num_atoms2)
+   eltree => make_new_root(num_atoms1, num_atoms2)
    allocate (atomtypetable%items(num_atoms1 + num_atoms2))
    atomtypetable%num_items = 0
 
@@ -240,7 +240,7 @@ subroutine compute_eltypes(mol1, mol2, eltypes)
       label = mol1%atoms(i)%label
       inode => find_atomtype(atomtypetable, elnum, label)
       if (.not. associated(inode)) then
-         inode => add_new_child(eltypes)
+         inode => add_new_child(eltree)
          call add_atomtype(atomtypetable, elnum, label, inode)
       end if
       call add_new_item1(inode, i)
@@ -252,7 +252,7 @@ subroutine compute_eltypes(mol1, mol2, eltypes)
       label = mol2%atoms(i)%label
       inode => find_atomtype(atomtypetable, elnum, label)
       if (.not. associated(inode)) then
-         inode => add_new_child(eltypes)
+         inode => add_new_child(eltree)
          call add_atomtype(atomtypetable, elnum, label, inode)
       end if
       call add_new_item2(inode, i)
@@ -339,24 +339,24 @@ subroutine refine_mnatype(mol1, mol2, itemdir1, itemdir2, inode)
 end subroutine
 
 ! Iteratively compute MNA types
-subroutine compute_consistent_mnatypes(mol1, mol2, mnatypes)
+subroutine compute_consistent_mnatypes(mol1, mol2, mnatree)
    type(mol_type), intent(in) :: mol1, mol2
-   type(tree_node), intent(inout) :: mnatypes
+   type(tree_node), intent(inout) :: mnatree
    ! Local variables
    type(tree_node_ptr), dimension(:), allocatable :: itemdir1, itemdir2
 
    do
 
-      itemdir1 = mnatypes%itemdir1
-      itemdir2 = mnatypes%itemdir2
+      itemdir1 = mnatree%itemdir1
+      itemdir2 = mnatree%itemdir2
 
       ! Compute MNA upper level types
-      call compute_nextlevelmnatypes(mol1, mol2, itemdir1, itemdir2, mnatypes)
-!      call print_tree(mnatypes)
+      call compute_nextlevelmnatypes(mol1, mol2, itemdir1, itemdir2, mnatree)
+!      call print_tree(mnatree)
 
       ! Exit loop if types did not change
-      if (all(mnatypes%itemdir1 == itemdir1) .and. &
-          all(mnatypes%itemdir2 == itemdir2)) exit
+      if (all(mnatree%itemdir1 == itemdir1) .and. &
+          all(mnatree%itemdir2 == itemdir2)) exit
 
    end do
 

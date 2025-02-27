@@ -30,8 +30,6 @@ assignment.f90
 tracking.f90
 backtracking.f90
 reactivity.f90
-atom_mapping.f90
-atom_mapping_reac.f90
-atom_mapping_conf.f90
-writemol.f90
+remapping_free.f90
+remapping_bonded.f90
 molalignlib.f90

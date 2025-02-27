@@ -23,7 +23,7 @@ implicit none
 private
 public rotate_coords
 public rotated_coords
-public reflect_coords
+public mirror_coords
 public reflected_coords
 public translate_coords
 public translated_coords
@@ -82,7 +82,7 @@ function rotated_coords(coords, q)
 
 end function
 
-subroutine reflect_coords(coords)
+subroutine mirror_coords(coords)
    real(rk), dimension(:, :), intent(inout) :: coords
 
    coords(1, :) = -coords(1, :)

@@ -1,2 +1,2 @@
 #!/bin/sh
-./build/molalign -bond -remap -bond -bias mna -pipe < "$1" > log
+./build/molalign -remap -reac -pipe < "$1" > log

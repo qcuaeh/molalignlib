@@ -37,7 +37,7 @@ implicit none
 integer :: i
 integer :: read_unit1, read_unit2, write_unit
 integer, allocatable :: atomperm(:)
-character(:), allocatable :: arg, optarg
+character(:), allocatable :: arg
 character(:), allocatable :: fmtin1, fmtin2, fmtout
 character(:), allocatable :: optfmtin, optfmtout
 character(:), allocatable :: pathout
@@ -55,9 +55,7 @@ real(rk), dimension(:, :), allocatable :: coords1, coords2
 
 ! Set default options
 
-iter_flag = .false.
-bond_flag = .false.
-back_flag = .false.
+iter_flag = .true.
 test_flag = .false.
 reac_flag = .false.
 stats_flag = .false.
@@ -72,13 +70,11 @@ max_records = 1
 max_count = 10
 max_trials = huge(max_trials)
 
-prune_tol = 0.5
-bias_scale = 1.e3
-
 atomic_weights => ones
-bias_procedure => bias_none
-prune_procedure => prune_none
 pathout = 'aligned.xyz'
+
+!prune_tol = 0.5
+!prune_procedure => prune_none
 
 ! Get user options
 
@@ -93,34 +89,12 @@ do while (get_arg(arg))
       test_flag = .true.
    case ('-remap')
       remap_flag = .true.
-   case ('-near')
-      iter_flag = .false.
-      bias_procedure => bias_none
-      prune_procedure => prune_none
-   case ('-bias')
-      iter_flag = .true.
-      call read_optarg(arg, optarg)
-      select case (optarg)
-      case ('mna')
-         bias_procedure => bias_mna
-      case default
-         write (stderr, '(a,1x,a)') 'Error: Unknown -bias option:', optarg
-         stop
-      end select
-   case ('-prune')
-      iter_flag = .true.
-      call read_optarg(arg, optarg)
-      select case (optarg)
-      case ('rd')
-         prune_procedure => prune_rd
-      case default
-         write (stderr, '(a,1x,a)') 'Error: Unknown -prune option:', optarg
-         stop
-      end select
-   case ('-bond')
-      bond_flag = .true.
-   case ('-back')
-      back_flag = .true.
+!   case ('-near')
+!      iter_flag = .false.
+!      prune_procedure => prune_none
+!   case ('-prune')
+!      iter_flag = .true.
+!      prune_procedure => prune_rd
    case ('-reac')
       reac_flag = .true.
    case ('-mass')
@@ -133,8 +107,6 @@ do while (get_arg(arg))
       call read_optarg(arg, max_trials)
    case ('-tol')
       call read_optarg(arg, prune_tol)
-!      case ('-scale')
-!         call read_optarg(arg, bias_scale)
    case ('-N')
       nrec_flag = .true.
       call read_optarg(arg, max_records)
@@ -207,11 +179,8 @@ if (remap_flag) then
 
    ! Print optimization stats
    if (stats_flag) then
-      if (bond_flag) then
-         call print_stats_adjd( results)
-      else
-         call print_stats_rmsd( results)
-      end if
+      call print_stats_adjd( results)
+!      call print_stats_rmsd( results)
       call print_final_stats( results)
    end if
 
@@ -220,8 +189,8 @@ if (remap_flag) then
    end if
 
    num_atoms1 = size(mol1%atoms)
-   coords1 = mol1%get_weightcoords()
-   coords2 = mol2%get_weightcoords()
+   coords1 = mol1%get_weighted_coords()
+   coords2 = mol2%get_weighted_coords()
 
    ! Calculate centroids
    travec1 = -centroid( coords1)
@@ -233,7 +202,7 @@ if (remap_flag) then
    do i = 1, results%num_records
 
       atomperm = results%records(i)%atomperm
-      coords2 = mol2%get_weightcoords()
+      coords2 = mol2%get_weighted_coords()
 
       ! Calculate optimal rotation matrix
       rotquat = leasteigquat( &
@@ -242,7 +211,7 @@ if (remap_flag) then
          translated_coords( coords2, travec2) &
       )
 
-      coords2 = mol2%get_weightcoords()
+      coords2 = mol2%get_weighted_coords()
       call translate_coords( coords2, travec2)
       call rotate_coords( coords2, rotquat)
       call translate_coords( coords2, -travec1)
@@ -250,18 +219,15 @@ if (remap_flag) then
       adjd = adjacencydiff( atomperm, mol1%adjmat, mol2%adjmat)
       rmsd = sqrt(sqdistsum( atomperm, coords1, coords2))
 
-      if (bond_flag) then
-         write (stderr, "(a,',',a)") str(adjd), str(rmsd, 4)
-      else
-         write (stderr, "(a)") str(rmsd, 4)
-      end if
+      write (stderr, "(a,',',a)") str(adjd), str(rmsd, 4)
+!      write (stderr, "(a)") str(rmsd, 4)
 
       auxmol%title = 'RMSD='//str(rmsd, 4)
       auxmol%atoms%elnum = mol2%atoms(atomperm)%elnum
       auxmol%atoms%label = mol2%atoms(atomperm)%label
       auxmol%atoms%weight = mol2%atoms(atomperm)%weight
       auxmol%adjmat = mol2%adjmat(atomperm, atomperm)
-      call auxmol%set_weightcoords(coords2(:, atomperm))
+      call auxmol%set_unweighted_coords(coords2(:, atomperm))
 !      call writefile( write_unit, fmtout, auxmol)
 
    end do
@@ -276,7 +242,7 @@ else
       travec2, &
       rotquat)
 
-   coords2 = mol2%get_weightcoords()
+   coords2 = mol2%get_weighted_coords()
    call translate_coords( coords2, travec2)
    call rotate_coords( coords2, rotquat)
    call translate_coords( coords2, -travec1)
@@ -284,18 +250,15 @@ else
    adjd = adjacencydiff( identity_perm(num_atoms1), mol1%adjmat, mol2%adjmat)
    rmsd = sqrt( sqdistsum( identity_perm(num_atoms1), coords1, coords2))
 
-   if (bond_flag) then
-      write (stderr, "(a,',',a)") str(adjd), str(rmsd, 4)
-   else
-      write (stderr, "(a)") str(rmsd, 4)
-   end if
+   write (stderr, "(a,',',a)") str(adjd), str(rmsd, 4)
+!   write (stderr, "(a)") str(rmsd, 4)
 
    mol2%title = 'RMSD='//str(rmsd, 4)
    auxmol%atoms%elnum = mol2%atoms%elnum
    auxmol%atoms%label = mol2%atoms%label
    auxmol%atoms%weight = mol2%atoms%weight
    auxmol%adjmat = mol2%adjmat
-   call auxmol%set_weightcoords(coords2)
+   call auxmol%set_unweighted_coords(coords2)
    call writefile( write_unit, fmtout, mol2)
 
 end if

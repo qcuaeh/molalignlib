@@ -1,2 +1,0 @@
-#!/bin/sh
-./build/molalign -pipe -test -remap -prune rd -tol 0.17 -stats -N 5 < "$1" > log

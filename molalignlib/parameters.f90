@@ -11,6 +11,7 @@ integer, parameter :: rk = real64 ! Selected real kind
 
 ! Convergence tolerance for numerical methods
 real(rk), parameter :: eps_tol = max(100*epsilon(1.0_rk), 1.0e-10_rk)
+real(rk), parameter :: bias_scale = 0.001
 
 ! Fixed character string lengths
 integer, parameter :: wl = 32 ! Word length

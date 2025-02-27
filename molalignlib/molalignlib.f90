@@ -25,28 +25,20 @@ use rigid_body
 use permutation
 use adjacency
 use alignment
-use atom_mapping_reac
-use atom_mapping_conf
-use writemol
 use lcrs_tree
 use partitioning
+use remapping_bonded
+!use writemol
 
 implicit none
 
 contains
 
-! Assign atoms0 and atoms1
 subroutine molecule_remap( mol1, mol2, results)
-!
-! Find best atom mapping
-!
-
-   ! Arguments
    type(mol_type), intent(inout) :: mol1, mol2
    type(registry_type), intent(out) :: results
-
    ! Local variables
-   type(tree_node), pointer :: eltypes_tree
+   type(tree_node), pointer :: eltree
    type(bipartition_container) :: eltypes
 
    ! Abort if molecules have different number of atoms
@@ -62,8 +54,8 @@ subroutine molecule_remap( mol1, mol2, results)
    end if
 
    ! Compute atomic types
-   call compute_eltypes(mol1, mol2, eltypes_tree)
-   call partition_from_tree(eltypes_tree, eltypes)
+   call compute_eltypes(mol1, mol2, eltree)
+   call partition_from_tree(eltree, eltypes)
 
    ! Abort if there are conflicting atomic types
    if (any(sorted(eltypes%itemdir1) /= sorted(eltypes%itemdir2))) then
@@ -71,19 +63,12 @@ subroutine molecule_remap( mol1, mol2, results)
       stop
    end if
 
-   ! Optimize assignment to minimize the AdjD and RMSD
-   call remap_reactive_bonds( mol1, mol2, eltypes, results)
-
-   call writemol2(stdout, mol1)
-   call writemol2(stdout, mol2)
-
-   ! Optimize assignment to minimize the AdjD and RMSD
-   call remap_conformations( mol1, mol2, eltypes, results)
+   ! Optimize assignment to minimize AdjD and RMSD
+   call remap_bonded_atoms( mol1, mol2, eltypes, results)
 
 end subroutine
 
 subroutine molecule_align( &
-! Purpose: Align atoms0 and atoms1
    mol1, &
    mol2, &
    travec1, &
@@ -92,7 +77,7 @@ subroutine molecule_align( &
 
    type(mol_type), intent(in) :: mol1, mol2
    real(rk), intent(out) :: travec1(3), travec2(3), rotquat(4)
-   type(tree_node), pointer :: eltypes_tree
+   type(tree_node), pointer :: eltree
    type(bipartition_container) :: eltypes
    ! Local variables
    integer :: num_atoms1
@@ -111,9 +96,8 @@ subroutine molecule_align( &
    end if
 
    ! Compute atomic types
-   call compute_eltypes(mol1, mol2, eltypes_tree)
-   call partition_from_tree(eltypes_tree, eltypes)
-   call print_partition(eltypes)
+   call compute_eltypes(mol1, mol2, eltree)
+   call partition_from_tree(eltree, eltypes)
 
    ! Abort if there are conflicting atomic types
    if (any(sorted(eltypes%itemdir1) /= sorted(eltypes%itemdir2))) then
@@ -134,8 +118,8 @@ subroutine molecule_align( &
    end if
 
    num_atoms1 = size(mol1%atoms)
-   coords1 = mol1%get_weightcoords()
-   coords2 = mol2%get_weightcoords()
+   coords1 = mol1%get_weighted_coords()
+   coords2 = mol2%get_weighted_coords()
 
    ! Calculate centroids
    travec1 = -centroid(coords1)

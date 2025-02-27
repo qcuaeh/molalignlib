@@ -14,7 +14,7 @@
 ! You should have received a copy of the GNU General Public License
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-module atom_mapping_conf
+module remapping_bonded
 use parameters
 use globals
 use random
@@ -32,19 +32,20 @@ use pruning
 use printing
 use lcrs_tree
 use partitioning
+use reactivity
 !use backtracking
 
 implicit none
 
 contains
 
-subroutine remap_conformations(mol1, mol2, eltypes, results)
-   type(mol_type), intent(in) :: mol1, mol2
+subroutine remap_bonded_atoms(mol1, mol2, eltypes, results)
+   type(mol_type), intent(inout) :: mol1, mol2
    type(bipartition_container), intent(in) :: eltypes
    type(registry_type), target, intent(out) :: results
 
    ! Local variables
-   type(tree_node), pointer :: mnatypes_tree
+   type(tree_node), pointer :: mnatree
    integer, dimension(:), allocatable :: atomperm, auxperm
    real(rk), dimension(:,:), allocatable :: coords1, coords2
    real(rk) :: rmsd, dist
@@ -53,26 +54,30 @@ subroutine remap_conformations(mol1, mol2, eltypes, results)
    integer, pointer :: lead_count
 
    num_atoms1 = size(mol1%atoms)
-   coords1 = mol1%get_weightcoords()
-   coords2 = mol2%get_weightcoords()
+   coords1 = mol1%get_weighted_coords()
+   coords2 = mol2%get_weighted_coords()
    call results%initialize(max_records)
 
    allocate (atomperm(num_atoms1))
    allocate (auxperm(num_atoms1))
 
-   ! Compute MNA types
-   call tree_from_partition(eltypes, mnatypes_tree)
-   call compute_consistent_mnatypes(mol1, mol2, mnatypes_tree)
-   call print_tree(mnatypes_tree)
+   if (reac_flag) then
+      call remove_reactive_bonds( mol1, mol2, eltypes, atomperm)
+   end if
 
-   ! Reflect atoms
+   ! Recompute MNA types
+   call tree_from_partition( eltypes, mnatree)
+   call compute_consistent_mnatypes( mol1, mol2, mnatree)
+!   call print_tree( mnatree)
+
+   ! Mirror coordinates
    if (mirror_flag) then
-      call reflect_coords(coords2)
+      call mirror_coords( coords2)
    end if
 
    ! Translate atoms to their centroids
-   call translate_coords(coords1, -centroid(coords1))
-   call translate_coords(coords2, -centroid(coords2))
+   call translate_coords( coords1, -centroid(coords1))
+   call translate_coords( coords2, -centroid(coords2))
 
    ! Initialize random number generator
    call random_initialize()
@@ -90,13 +95,13 @@ subroutine remap_conformations(mol1, mol2, eltypes, results)
       call rotate_coords(coords2, randrotquat())
 
       ! Assign atoms with current orientation
-      call assign_atoms_conf(mnatypes_tree, mol1, mol2, coords1, coords2, atomperm, dist)
+      call assign_atoms_conf(mnatree, mol1, mol2, coords1, coords2, atomperm, dist)
       totquat = leasteigquat(atomperm, coords1, coords2)
       call rotate_coords(coords2, totquat)
       num_steps = 1
 
       do while (iter_flag)
-         call assign_atoms_conf(mnatypes_tree, mol1, mol2, coords1, coords2, auxperm, dist)
+         call assign_atoms_conf(mnatree, mol1, mol2, coords1, coords2, auxperm, dist)
          if (all(auxperm == atomperm)) exit
          atomperm = auxperm
          eigquat = leasteigquat(atomperm, coords1, coords2)
@@ -115,25 +120,25 @@ subroutine remap_conformations(mol1, mol2, eltypes, results)
 
 end subroutine
 
-subroutine assign_atoms_conf( mnatypes, mol1, mol2, coords1, coords2, atomperm, dist)
+subroutine assign_atoms_conf( mnatree, mol1, mol2, coords1, coords2, atomperm, dist)
    type(mol_type), intent(in) :: mol1, mol2
-   type(tree_node), intent(in) :: mnatypes
+   type(tree_node), intent(in) :: mnatree
    real(rk), dimension(:, :), intent(in) :: coords1, coords2
    integer, dimension(:), intent(out) :: atomperm
    real(rk), intent(out) :: dist
    ! Local variables
-   type(tree_node), pointer :: submnatypes
+   type(tree_node), pointer :: submnatree
    logical :: remaining
 
    write (stderr, *)
-   write (stderr, '(A)') repeat('submnatypes ', 8)
-   submnatypes = mnatypes
-   call print_tree(submnatypes)
+   write (stderr, *) repeat('   assign atoms conf', 3)
 
+   submnatree = mnatree
+   call print_tree(submnatree)
    do
-      call assign_remaining_items(submnatypes, remaining)
-      call compute_consistent_mnatypes(mol1, mol2, submnatypes)
-      call print_tree(submnatypes)
+      call assign_remaining_items(submnatree, remaining)
+      call compute_consistent_mnatypes(mol1, mol2, submnatree)
+      call print_tree(submnatree)
       if (.not. remaining) exit
    end do
    stop

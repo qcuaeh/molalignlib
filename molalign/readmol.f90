@@ -103,12 +103,6 @@ subroutine readmol2(unit, mol)
    nadjs(:) = 0
    adjlists(:, :) = 0
 
-   ! Return if bonds are not requested
-   if (.not. bond_flag) then
-      call mol%set_adjlists(nadjs, adjlists)
-      return
-   end if
-
    do i = 1, nbond
       read (unit, *, end=99) id, atom1, atom2, bondorder
       nadjs(atom1) = nadjs(atom1) + 1
@@ -143,12 +137,6 @@ subroutine set_bonds(mol)
 
    ! Bond initialization
    nadjs(:) = 0
-
-   ! Return if bonds are not requested
-   if (.not. bond_flag) then
-      call mol%set_adjlists(nadjs, adjlists)
-      return
-   end if
 
    ! Set adjacency radii
    adjrads = 0.75*covalent_radii(atoms%elnum) + 0.25*vdw_radii(atoms%elnum)

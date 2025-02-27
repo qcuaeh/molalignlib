@@ -1,11 +1,9 @@
 module globals
 
 ! Flags
-logical :: test_flag
-logical :: bond_flag
-logical :: iter_flag
-logical :: back_flag
 logical :: reac_flag
+logical :: iter_flag
+logical :: test_flag
 logical :: stats_flag
 logical :: mirror_flag
 

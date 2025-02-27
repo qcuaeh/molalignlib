@@ -158,7 +158,7 @@ subroutine solve_lap_biased(part, p, q, biases, perm, dist)
 
    do j = 1, part%num_items2
       do i = 1, part%num_items1
-         costs(i, j) = biases(i, j) + 0.001*sum((p(:, part%indices1(i)) - q(:, part%indices2(j)))**2)
+         costs(i, j) = biases(i, j) + bias_scale*sum((p(:, part%indices1(i)) - q(:, part%indices2(j)))**2)
       end do
    end do
 

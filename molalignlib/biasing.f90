@@ -23,50 +23,11 @@ use strutils
 use molecule
 use lcrs_tree
 use partitioning
-
 implicit none
-
-abstract interface
-   subroutine bias_proc( mol1, mol2, eltypes, biases)
-      use parameters
-      use common_types
-      use lcrs_tree
-      use molecule
-      type(mol_type), intent(in) :: mol1, mol2
-      type(bipartition_container), intent(in) :: eltypes
-      type(intmatrix_type), dimension(:), allocatable, intent(out) :: biases
-   end subroutine
-end interface
-
-real(rk) :: bias_scale
-procedure(bias_proc), pointer :: bias_procedure
-
 contains
 
-subroutine bias_none( mol1, mol2, eltypes, biases)
-   type(mol_type), intent(in) :: mol1, mol2
-   type(bipartition_container), intent(in) :: eltypes
-   type(intmatrix_type), dimension(:), allocatable, intent(out) :: biases
-   ! Local variables
-   integer :: num_items1, num_items2
-   integer :: h, i, j
-
-   allocate (biases(eltypes%num_parts))
-   do h = 1, eltypes%num_parts
-      num_items1 = eltypes%parts(h)%num_items1
-      num_items2 = eltypes%parts(h)%num_items2
-      allocate (biases(h)%n(num_items1, num_items2))
-      do i = 1, num_items1
-         do j = 1, num_items2
-            biases(h)%n(j, i) = 0
-         end do
-      end do
-   end do
-
-end subroutine
-
 ! Iteratively compute MNA types
-subroutine bias_mna( mol1, mol2, eltypes, biases)
+subroutine compute_mna_biases( mol1, mol2, eltypes, biases)
    type(mol_type), intent(in) :: mol1, mol2
    type(bipartition_container), intent(in) :: eltypes
    type(intmatrix_type), dimension(:), allocatable, intent(out) :: biases
