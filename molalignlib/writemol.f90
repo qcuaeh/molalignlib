@@ -52,8 +52,8 @@ subroutine writemol2(unit, mol)
    integer :: i
 
    atoms = mol%atoms
-   bonds = mol%get_bonds()
-   coords = mol%get_coords()
+   bonds = get_bonds(mol)
+   coords = get_coords(mol)
 
    write (unit, '(a)') '@<TRIPOS>MOLECULE'
    if (mol%title /= '') then

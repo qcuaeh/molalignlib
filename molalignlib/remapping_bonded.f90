@@ -22,47 +22,75 @@ use molecule
 use strutils
 use chemdata
 use permutation
-use rigid_body
-use rotation
-use alignment
+use spatial
 use assignment
 use adjacency
 use biasing
 use pruning
-use printing
 use lcrs_tree
 use partitioning
 use reactivity
+use registry
 !use backtracking
 
 implicit none
 
 contains
 
-subroutine remap_bonded_atoms(mol1, mol2, eltypes, results)
+subroutine remap_bonded_atoms(mol1, mol2, results)
    type(mol_type), intent(inout) :: mol1, mol2
-   type(bipartition_container), intent(in) :: eltypes
-   type(registry_type), target, intent(out) :: results
+   type(adjd_registry), target, intent(out) :: results
 
    ! Local variables
-   type(tree_node), pointer :: mnatree
+   type(tree_node), pointer :: eltree, mnatree
+   type(bipartition_container) :: eltypes
    integer, dimension(:), allocatable :: atomperm, auxperm
+   integer :: num_trials, num_steps
+   integer, dimension(:), allocatable :: elnums1, elnums2
    real(rk), dimension(:,:), allocatable :: coords1, coords2
-   real(rk) :: rmsd, dist
-   real(rk) :: eigquat(4), totquat(4)
-   integer :: num_atoms1, num_trials, num_steps
-   integer, pointer :: lead_count
+   logical, dimension(:, :), allocatable :: adjmat1, adjmat2
+   real(rk) :: step_rotation(4), total_rotation(4)
+   real(rk) :: dist
 
-   num_atoms1 = size(mol1%atoms)
-   coords1 = mol1%get_weighted_coords()
-   coords2 = mol2%get_weighted_coords()
-   call results%initialize(max_records)
+   ! Abort if molecules have different number of atoms
+   if (size(mol1%atoms) /= size(mol2%atoms)) then
+      write (stderr, '(a)') 'Error: These molecules are not isomers'
+      stop
+   end if
 
-   allocate (atomperm(num_atoms1))
-   allocate (auxperm(num_atoms1))
+   ! Abort if molecules are not isomers
+   if (any(sorted(mol1%atoms%elnum) /= sorted(mol2%atoms%elnum))) then
+      write (stderr, '(a)') 'Error: These molecules are not isomers'
+      stop
+   end if
+
+   ! Compute atomic types
+   call compute_eltypes(mol1, mol2, eltree)
+   call partition_from_tree(eltree, eltypes)
+
+   ! Abort if there are conflicting atomic types
+!   if (any(sorted(eltypes%itemdir1) /= sorted(eltypes%itemdir2))) then
+   if (any(eltypes%parts%num_items1 /= eltypes%parts%num_items2)) then
+      write (stderr, '(a)') 'Error: There are conflicting atomic types'
+      stop
+   end if
+
+   allocate (atomperm(size(mol1%atoms)))
+   allocate (auxperm(size(mol1%atoms)))
+
+   elnums1 = mol1%atoms%elnum
+   elnums2 = mol2%atoms%elnum
+   coords1 = get_coords(mol1)
+   coords2 = get_coords(mol2)
+   adjmat1 = get_adjmat(mol1)
+   adjmat2 = get_adjmat(mol2)
 
    if (reac_flag) then
+      write (stderr, *) 'adjd before', adjacencydiff( adjmat1, adjmat2)
       call remove_reactive_bonds( mol1, mol2, eltypes, atomperm)
+      adjmat1 = get_adjmat(mol1)
+      adjmat2 = get_adjmat(mol2)
+      write (stderr, *) 'adjd after', adjacencydiff( atomperm, adjmat1, adjmat2)
    end if
 
    ! Recompute MNA types
@@ -75,6 +103,10 @@ subroutine remap_bonded_atoms(mol1, mol2, eltypes, results)
       call mirror_coords( coords2)
    end if
 
+   ! Mass weight coordinates
+   call weight_coords(coords1, atomic_weights(elnums1))
+   call weight_coords(coords2, atomic_weights(elnums2))
+
    ! Translate atoms to their centroids
    call translate_coords( coords1, -centroid(coords1))
    call translate_coords( coords2, -centroid(coords2))
@@ -82,12 +114,11 @@ subroutine remap_bonded_atoms(mol1, mol2, eltypes, results)
    ! Initialize random number generator
    call random_initialize()
 
+   ! Initialize local minima registry
+   call registry_init(results, max_records, coords1, adjmat1)
+
    ! Optimize atom permutation
-
-   num_trials = 0
-   lead_count => results%records(1)%count
-
-   do while (lead_count < max_count .and. num_trials < max_trials)
+   do while (results%records(1)%count < max_count .and. results%num_trials < max_trials)
 
       num_trials = num_trials + 1
 
@@ -96,27 +127,24 @@ subroutine remap_bonded_atoms(mol1, mol2, eltypes, results)
 
       ! Assign atoms with current orientation
       call assign_atoms_conf(mnatree, mol1, mol2, coords1, coords2, atomperm, dist)
-      totquat = leasteigquat(atomperm, coords1, coords2)
-      call rotate_coords(coords2, totquat)
+      total_rotation = optimal_rotation(atomperm, coords1, coords2)
+      call rotate_coords(coords2, total_rotation)
       num_steps = 1
 
       do while (iter_flag)
          call assign_atoms_conf(mnatree, mol1, mol2, coords1, coords2, auxperm, dist)
          if (all(auxperm == atomperm)) exit
          atomperm = auxperm
-         eigquat = leasteigquat(atomperm, coords1, coords2)
-         call rotate_coords(coords2, eigquat)
-         totquat = quatmul(eigquat, totquat)
+         step_rotation = optimal_rotation(atomperm, coords1, coords2)
+         call rotate_coords(coords2, step_rotation)
+         total_rotation = quatmul(step_rotation, total_rotation)
          num_steps = num_steps + 1
       end do
 
       ! Update results
-      rmsd = sqrt(sqdistsum(atomperm, coords1, coords2))
-      call results%push_rmsd(atomperm, num_steps, angle(totquat), rmsd)
+      call registry_push(results, coords2, adjmat2, atomperm, num_steps, total_rotation)
 
    end do
-
-   results%num_trials = num_trials
 
 end subroutine
 
@@ -131,7 +159,7 @@ subroutine assign_atoms_conf( mnatree, mol1, mol2, coords1, coords2, atomperm, d
    logical :: assigned
 
    write (stderr, *)
-   write (stderr, *) repeat('assign atoms conf   ', 3)
+   write (stderr, *) repeat('assign atoms   ', 3)
 
    submnatree = mnatree
    call print_tree(submnatree)

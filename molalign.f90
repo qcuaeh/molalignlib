@@ -14,23 +14,22 @@
 ! You should have received a copy of the GNU General Public License
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-program molalign
+program atomalign
 use parameters
 use globals
 use molecule
-use printing
-use rotation
-use rigid_body
+use spatial
 use strutils
 use chemutils
-use alignment
 use adjacency
 use permutation
 use fileio
 use argparse
-use molalignlib
 use biasing
 use pruning
+use remapping_bonded
+use molalignlib
+use registry
 
 implicit none
 
@@ -43,15 +42,15 @@ character(:), allocatable :: optfmtin, optfmtout
 character(:), allocatable :: pathout
 logical :: fmtin_flag, fmtout_flag
 logical :: remap_flag, pipe_flag, nrec_flag
-real(rk) :: travec1(3), travec2(3), rotquat(4)
+real(rk) :: center1(3)
 integer :: adjd
 real(rk) :: rmsd
 type(strlist_type) :: posargs(2)
 type(mol_type) :: mol1, mol2, auxmol
-type(registry_type) :: results
-
-integer :: num_atoms1
+type(adjd_registry) :: results
+real(rk), dimension(:), allocatable :: weights1, weights2
 real(rk), dimension(:, :), allocatable :: coords1, coords2
+logical, dimension(:, :), allocatable :: adjmat1, adjmat2
 
 ! Set default options
 
@@ -73,9 +72,6 @@ max_trials = huge(max_trials)
 atomic_weights => ones
 pathout = 'aligned.xyz'
 
-!prune_tol = 0.5
-!prune_procedure => prune_none
-
 ! Get user options
 
 call init_args()
@@ -89,12 +85,6 @@ do while (get_arg(arg))
       test_flag = .true.
    case ('-remap')
       remap_flag = .true.
-!   case ('-near')
-!      iter_flag = .false.
-!      prune_procedure => prune_none
-!   case ('-prune')
-!      iter_flag = .true.
-!      prune_procedure => prune_rd
    case ('-reac')
       reac_flag = .true.
    case ('-mass')
@@ -105,8 +95,6 @@ do while (get_arg(arg))
       call read_optarg(arg, max_count)
    case ('-trials')
       call read_optarg(arg, max_trials)
-   case ('-tol')
-      call read_optarg(arg, prune_tol)
    case ('-N')
       nrec_flag = .true.
       call read_optarg(arg, max_records)
@@ -157,6 +145,9 @@ end if
 call readfile( read_unit1, fmtin1, mol1)
 call readfile( read_unit2, fmtin2, mol2)
 
+call set_bonds( mol1)
+call set_bonds( mol2)
+
 ! Allocate arrays
 if (pipe_flag) then
    write_unit = stdout
@@ -169,96 +160,62 @@ if (fmtout_flag) then
    fmtout = optfmtout
 end if
 
+adjmat1 = get_adjmat(mol1)
+coords1 = get_coords(mol1)
+weights1 = atomic_weights(mol1%atoms%elnum)
+weights2 = atomic_weights(mol2%atoms%elnum)
+call weight_coords( coords1, weights1)
+center1 = centroid(coords1)
+
+allocate (auxmol%atoms(size(mol2%atoms)))
+
 if (remap_flag) then
 
    ! Remap atoms to minimize the MSD
-   call molecule_remap( &
-      mol1, &
-      mol2, &
-      results)
+   call remap_bonded_atoms( mol1, mol2, results)
 
    ! Print optimization stats
    if (stats_flag) then
-      call print_stats_adjd( results)
-!      call print_stats_rmsd( results)
-      call print_final_stats( results)
+      call print_stats( results)
    end if
 
    if (.not. nrec_flag) then
-!      call writefile( write_unit, fmtout, mol1)
+      call writefile( write_unit, fmtout, mol1)
    end if
-
-   num_atoms1 = size(mol1%atoms)
-   coords1 = mol1%get_weighted_coords()
-   coords2 = mol2%get_weighted_coords()
-
-   ! Calculate centroids
-   travec1 = -centroid( coords1)
-   travec2 = -centroid( coords2)
-
-   allocate (auxmol%atoms(size(mol2%atoms)))
-   allocate (auxmol%adjmat(size(mol2%adjmat, 1), size(mol2%adjmat, 2)))
 
    do i = 1, results%num_records
 
       atomperm = results%records(i)%atomperm
-      coords2 = mol2%get_weighted_coords()
-
-      ! Calculate optimal rotation matrix
-      rotquat = leasteigquat( &
-         atomperm, &
-         translated_coords( coords1, travec1), &
-         translated_coords( coords2, travec2) &
-      )
-
-      coords2 = mol2%get_weighted_coords()
-      call translate_coords( coords2, travec2)
-      call rotate_coords( coords2, rotquat)
-      call translate_coords( coords2, -travec1)
-
-      adjd = adjacencydiff( atomperm, mol1%adjmat, mol2%adjmat)
-      rmsd = sqrt(sqdistsum( atomperm, coords1, coords2))
+      adjmat2 = results%records(i)%adjmat2
+      adjd = adjacencydiff( atomperm, adjmat1, adjmat2)
+      coords2 = results%records(i)%coords2
+      call translate_coords( coords2, center1)
+      rmsd = sqrt( totsqdist( atomperm, coords1, coords2))
+      call unweight_coords( coords2, weights2)
 
       write (stderr, "(a,',',a)") str(adjd), str(rmsd, 4)
-!      write (stderr, "(a)") str(rmsd, 4)
-
       auxmol%title = 'RMSD='//str(rmsd, 4)
       auxmol%atoms%elnum = mol2%atoms(atomperm)%elnum
       auxmol%atoms%label = mol2%atoms(atomperm)%label
-      auxmol%atoms%weight = mol2%atoms(atomperm)%weight
-      auxmol%adjmat = mol2%adjmat(atomperm, atomperm)
-      call auxmol%set_unweighted_coords(coords2(:, atomperm))
-!      call writefile( write_unit, fmtout, auxmol)
+      call set_coords(auxmol, coords2(:, atomperm))
+      call writefile( write_unit, fmtout, auxmol)
 
    end do
 
 else
 
-   ! Align atoms to minimize RMSD
-   call molecule_align( &
-      mol1, &
-      mol2, &
-      travec1, &
-      travec2, &
-      rotquat)
-
-   coords2 = mol2%get_weighted_coords()
-   call translate_coords( coords2, travec2)
-   call rotate_coords( coords2, rotquat)
-   call translate_coords( coords2, -travec1)
-
-   adjd = adjacencydiff( identity_perm(num_atoms1), mol1%adjmat, mol2%adjmat)
-   rmsd = sqrt( sqdistsum( identity_perm(num_atoms1), coords1, coords2))
+   adjmat2 = get_adjmat(mol2)
+   adjd = adjacencydiff( atomperm, adjmat1, adjmat2)
+   call molecule_align( mol1, mol2, coords2)
+   call unweight_coords( coords2, weights2)
+   call translate_coords( coords2, center1)
+   rmsd = sqrt( totsqdist( atomperm, coords1, coords2))
 
    write (stderr, "(a,',',a)") str(adjd), str(rmsd, 4)
-!   write (stderr, "(a)") str(rmsd, 4)
-
-   mol2%title = 'RMSD='//str(rmsd, 4)
+   auxmol%title = 'RMSD='//str(rmsd, 4)
    auxmol%atoms%elnum = mol2%atoms%elnum
    auxmol%atoms%label = mol2%atoms%label
-   auxmol%atoms%weight = mol2%atoms%weight
-   auxmol%adjmat = mol2%adjmat
-   call auxmol%set_unweighted_coords(coords2)
+   call set_coords(auxmol, coords2)
    call writefile( write_unit, fmtout, mol2)
 
 end if

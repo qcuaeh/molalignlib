@@ -54,7 +54,7 @@ subroutine prune_none( eltypes, coords1, coords2, prunes)
       allocate (prunes(h)%b(num_items1, num_items2))
       do i = 1, num_items1
          do j = 1, num_items2
-            prunes(h)%b(j, i) = .true.
+            prunes(h)%b(j, i) = .false.
          end do
       end do
    end do
@@ -73,6 +73,8 @@ subroutine prune_rd( eltypes, coords1, coords2, prunes)
 
    allocate (dists1(size(coords1, dim=2)))
    allocate (dists2(size(coords2, dim=2)))
+   allocate (prunes(eltypes%num_parts))
+
    do i = 1, size(coords1, dim=2)
       allocate (dists1(i)%s(eltypes%num_parts))
       allocate (dists2(i)%s(eltypes%num_parts))
@@ -102,7 +104,6 @@ subroutine prune_rd( eltypes, coords1, coords2, prunes)
       end do
    end do
 
-   allocate (prunes(eltypes%num_parts))
    do h = 1, eltypes%num_parts
       num_items1 = eltypes%parts(h)%num_items1
       num_items2 = eltypes%parts(h)%num_items2

@@ -14,96 +14,92 @@
 ! You should have received a copy of the GNU General Public License
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-module alignment
+module molalignlib
 use parameters
-use eigen
-use rotation
+use globals
+use sorting
+use molecule
+use spatial
+use permutation
+use adjacency
+use lcrs_tree
+use partitioning
+!use remapping_bonded
+!use writemol
 
 implicit none
 
-private
-public sqdistsum
-public leastsqdistsum
-public leasteigquat
-
 contains
 
-real(rk) function sqdistsum(atomperm, coords1, coords2)
-   integer, dimension(:), intent(in) :: atomperm
-   real(rk), dimension(:,:), intent(in) :: coords1, coords2
+subroutine molecule_align( mol1, mol2, coords2)
 
-   sqdistsum = sum(sum((coords1 - coords2(:, atomperm))**2, dim=1))
-
-end function
-
-real(rk) function leastsqdistsum(atomperm, coords1, coords2)
-! Purpose: Calculate least square distance from eigenvalues
-   integer, dimension(:), intent(in) :: atomperm
-   real(rk), dimension(:,:), intent(in) :: coords1, coords2
-   real(rk) :: residuals(4, 4)
-
-   call kearsley(atomperm, coords1, coords2, residuals)
-   ! eigenvalue can be negative due to numerical errors
-   leastsqdistsum = max(leasteigval(residuals), 0._rk)
-
-end function
-
-function leasteigquat(atomperm, coords1, coords2)
-! Purpose: Calculate rotation quaternion which minimzes the square distance
-   integer, dimension(:), intent(in) :: atomperm
-   real(rk), dimension(:,:), intent(in) :: coords1, coords2
-   real(rk) :: leasteigquat(4), residuals(4, 4)
-
-   call kearsley(atomperm, coords1, coords2, residuals)
-   leasteigquat = leasteigvec(residuals)
-
-end function
-
-subroutine kearsley(atomperm, coords1, coords2, residuals)
-! Purpose: Find the best orientation by least squares minimization
-! Reference: Acta Cryst. (1989). A45, 208-210
-   integer, dimension(:), intent(in) :: atomperm
-   real(rk), dimension(:,:), intent(in) :: coords1, coords2
+   type(mol_type), intent(in) :: mol1, mol2
+   real(rk), allocatable, intent(out) :: coords2(:,:)
    ! Local variables
-   integer :: i, num_atoms
-   real(rk) :: residuals(4, 4)
-   real(rk), dimension(:,:), allocatable :: p, q
+   type(tree_node), pointer :: eltree
+   type(bipartition_container) :: eltypes
+   real(rk) :: center1(3), center2(3), rotquat(4)
+   real(rk), dimension(:,:), allocatable :: coords1
+   real(rk), dimension(:), allocatable :: weights1, weights2
+   integer :: num_atoms1
 
-   num_atoms = size(atomperm)
+   ! Abort if molecules have different number of atoms
+   if (size(mol1%atoms) /= size(mol2%atoms)) then
+      write (stderr, '(a)') 'Error: These molecules are not isomers'
+      stop
+   end if
 
-   allocate (p(3, num_atoms))
-   allocate (q(3, num_atoms))
+   ! Abort if molecules are not isomers
+   if (any(sorted(mol1%atoms%elnum) /= sorted(mol2%atoms%elnum))) then
+      write (stderr, '(a)') 'Error: These molecules are not isomers'
+      stop
+   end if
 
-   do i = 1, num_atoms
-      p(:, i) = coords1(:, i) + coords2(:, atomperm(i))
-      q(:, i) = coords1(:, i) - coords2(:, atomperm(i))
-   end do
+   ! Compute atomic types
+   call compute_eltypes(mol1, mol2, eltree)
+   call partition_from_tree(eltree, eltypes)
 
-   ! Calculate upper matrix elements
+   ! Abort if there are conflicting atomic types
+   if (any(sorted(eltypes%itemdir1) /= sorted(eltypes%itemdir2))) then
+      write (stderr, '(a)') 'Error: There are conflicting atomic types'
+      stop
+   end if
 
-   residuals = 0
+   ! Abort if atoms are not ordered
+   if (any(mol1%atoms%elnum /= mol2%atoms%elnum)) then
+      write (stderr, '(a)') 'Error: The atoms are not in the same order'
+      stop
+   end if
 
-   do i = 1, num_atoms
-      residuals(1, 1) = residuals(1, 1) + (q(1, i)**2 + q(2, i)**2 + q(3, i)**2)
-      residuals(1, 2) = residuals(1, 2) + (p(2, i)*q(3, i) - q(2, i)*p(3, i))
-      residuals(1, 3) = residuals(1, 3) + (q(1, i)*p(3, i) - p(1, i)*q(3, i))
-      residuals(1, 4) = residuals(1, 4) + (p(1, i)*q(2, i) - q(1, i)*p(2, i))
-      residuals(2, 2) = residuals(2, 2) + (p(2, i)**2 + p(3, i)**2 + q(1, i)**2)
-      residuals(2, 3) = residuals(2, 3) + (q(1, i)*q(2, i) - p(1, i)*p(2, i))
-      residuals(2, 4) = residuals(2, 4) + (q(1, i)*q(3, i) - p(1, i)*p(3, i))
-      residuals(3, 3) = residuals(3, 3) + (p(1, i)**2 + p(3, i)**2 + q(2, i)**2)
-      residuals(3, 4) = residuals(3, 4) + (q(2, i)*q(3, i) - p(2, i)*p(3, i))
-      residuals(4, 4) = residuals(4, 4) + (p(1, i)**2 + p(2, i)**2 + q(3, i)**2)
-   end do
+   ! Abort if atomic types are not ordered
+   if (any(eltypes%itemdir1 /= eltypes%itemdir2)) then
+      write (stderr, '(a)') 'Error: Atomic types are not in the same order'
+      stop
+   end if
 
-   ! Symmetrize matrix
+   num_atoms1 = size(mol1%atoms)
+   coords1 = get_coords(mol1)
+   weights1 = atomic_weights(mol1%atoms%elnum)
+   call weight_coords( coords1, weights1)
+   coords2 = get_coords(mol2)
+   weights2 = atomic_weights(mol2%atoms%elnum)
+   call weight_coords( coords2, weights2)
 
-   residuals(2, 1) = residuals(1, 2)
-   residuals(3, 1) = residuals(1, 3)
-   residuals(4, 1) = residuals(1, 4)
-   residuals(3, 2) = residuals(2, 3)
-   residuals(4, 2) = residuals(2, 4)
-   residuals(4, 3) = residuals(3, 4)
+   ! Calculate centroids
+   center1 = centroid(coords1)
+   center2 = centroid(coords2)
+
+   call translate_coords( coords1, -center1)
+   call translate_coords( coords2, -center2)
+
+   ! Calculate optimal rotation matrix
+   rotquat = optimal_rotation( &
+      identity_perm(num_atoms1), &
+      coords1, &
+      coords2 &
+   )
+
+   call rotate_coords( coords2, rotquat)
 
 end subroutine
 

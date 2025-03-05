@@ -14,99 +14,116 @@
 ! You should have received a copy of the GNU General Public License
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-module atom_mapping_free
+module remapping_free
 use parameters
 use globals
 use random
 use molecule
 use chemdata
-use rotation
-use rigid_body
-use alignment
+use spatial
 use assignment
 use lcrs_tree
+use partitioning
 use pruning
-use printing
 use registry
 
 implicit none
 
 contains
 
-subroutine remap_free_atoms(mol1, mol2, eltypes, results)
+subroutine remap_free_atoms(mol1, mol2, results)
    type(mol_type), intent(in) :: mol1, mol2
-   type(bipartition_container), intent(in) :: eltypes
-   type(registry_type), target, intent(out) :: results
+   type(rmsd_registry), intent(out) :: results
 
    ! Local variables
-
-   integer :: num_atoms1
-   integer :: num_trials, num_steps
-   integer, pointer :: lead_count
-   real(rk) :: eigquat(4), totquat(4)
-   integer, dimension(:), allocatable :: atomperm, auxperm
-   real(rk), dimension(:,:), allocatable :: coords1, coords2
+   type(tree_node), pointer :: eltree
+   type(bipartition_container) :: eltypes
    type(boolmatrix_type), allocatable :: prunes(:)
-   real(rk) :: rmsd
+   integer :: num_steps
+   integer, dimension(:), allocatable :: atomperm, auxperm
+   integer, dimension(:), allocatable :: elnums1, elnums2
+   real(rk), dimension(:,:), allocatable :: coords1, coords2
+   real(rk) :: step_rotation(4), total_rotation(4)
 
-   num_atoms1 = size(mol1%atoms)
-   coords1 = mol1%get_weighted_coords()
-   coords2 = mol2%get_weighted_coords()
-   call results%initialize(max_records)
+   ! Abort if molecules have different number of atoms
+   if (size(mol1%atoms) /= size(mol2%atoms)) then
+      write (stderr, '(a)') 'Error: These molecules are not isomers'
+      stop
+   end if
 
-   allocate (atomperm(num_atoms1))
-   allocate (auxperm(num_atoms1))
+   ! Abort if molecules are not isomers
+   if (any(sorted(mol1%atoms%elnum) /= sorted(mol2%atoms%elnum))) then
+      write (stderr, '(a)') 'Error: These molecules are not isomers'
+      stop
+   end if
+
+   ! Compute atomic types
+   call compute_eltypes(mol1, mol2, eltree)
+   call partition_from_tree(eltree, eltypes)
+
+   ! Abort if there are conflicting atomic types
+!   if (any(sorted(eltypes%itemdir1) /= sorted(eltypes%itemdir2))) then
+   if (any(eltypes%parts%num_items1 /= eltypes%parts%num_items2)) then
+      write (stderr, '(a)') 'Error: There are conflicting atomic types'
+      stop
+   end if
+
+   allocate (atomperm(size(mol1%atoms)))
+   allocate (auxperm(size(mol1%atoms)))
+
+   elnums1 = mol1%atoms%elnum
+   elnums2 = mol2%atoms%elnum
+   coords1 = get_coords(mol1)
+   coords2 = get_coords(mol2)
 
    ! Mirror coordinates
    if (mirror_flag) then
       call mirror_coords(coords2)
    end if
 
+   ! Find unfeasible assignments
+   call prune_procedure(eltypes, coords1, coords2, prunes)
+
+   ! Mass weight coordinates
+   call weight_coords(coords1, atomic_weights(elnums1))
+   call weight_coords(coords2, atomic_weights(elnums2))
+
    ! Translate atoms to their centroids
    call translate_coords(coords1, -centroid(coords1))
    call translate_coords(coords2, -centroid(coords2))
 
-   ! Find unfeasible assignments
-   call prune_procedure(eltypes, mol1%get_coords(), mol2%get_coords(), prunes)
-
    ! Initialize random number generator
    call random_initialize()
 
+   ! Initialize local minima registry
+   call registry_init(results, max_records, coords1)
+
    ! Optimize atom permutation
-
-   num_trials = 0
-   lead_count => results%records(1)%count
-
-   do while (lead_count < max_count .and. num_trials < max_trials)
-
-      num_trials = num_trials + 1
+   do while (results%records(1)%count < max_count .and. results%num_trials < max_trials)
 
       ! Aply a random rotation to coords2
       call rotate_coords(coords2, randrotquat())
 
       ! Assign atoms with current orientation
       call assign_atoms_pruned(eltypes, coords1, coords2, prunes, atomperm)
-      totquat = leasteigquat(atomperm, coords1, coords2)
-      call rotate_coords(coords2, totquat)
+      total_rotation = optimal_rotation(atomperm, coords1, coords2)
+      call rotate_coords(coords2, total_rotation)
       num_steps = 1
 
       do while (iter_flag)
          call assign_atoms_pruned(eltypes, coords1, coords2, prunes, auxperm)
          if (all(auxperm == atomperm)) exit
          atomperm = auxperm
-         eigquat = leasteigquat(atomperm, coords1, coords2)
-         call rotate_coords(coords2, eigquat)
-         totquat = quatmul(eigquat, totquat)
+         step_rotation = optimal_rotation(atomperm, coords1, coords2)
+         call rotate_coords(coords2, step_rotation)
+         total_rotation = quatmul(step_rotation, total_rotation)
          num_steps = num_steps + 1
       end do
 
-      ! Update results
-      rmsd = sqrt(sqdistsum(atomperm, coords1, coords2))
-      call results%push_rmsd(atomperm, num_steps, angle(totquat), rmsd)
+      ! Push local minimum to registry
+      call registry_push(results, coords2, atomperm, num_steps, total_rotation)
 
    end do
-
-   results%num_trials = num_trials
 
 end subroutine
 

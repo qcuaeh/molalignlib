@@ -6,8 +6,7 @@ to_array() {
    IFS=\  read -r -a "$1" <<< "${!1}"
 }
 
-compile() {
-   srcdir=$rootdir/$1
+build_library() {
    if $full_build; then
       full_build=false
       if test -d build; then
@@ -16,11 +15,10 @@ compile() {
          done
       fi
    fi
-   if test ! -d "$srcdir"; then
-      echo Error: $srcdir does not exist
+   if test ! -d "$libdir"; then
+      echo Error: $libdir does not exist
       exit 1
    fi
-   pushd "$buildir" >/dev/null
    comp_flags=("${std_flag[@]}")
    comp_flags+=("${extra_flags[@]}")
    if $pic_build; then
@@ -32,71 +30,43 @@ compile() {
       comp_flags+=("${optim_flags[@]}")
    fi
    while IFS= read -r srcfile; do
-      prefix=${srcfile%.*}
-      objfile=$prefix.o
-      if ! test -e "$objfile" \
-      || ! test -e "$srcfile" \
-      || ! diff -q "$srcfile" "$srcdir/$srcfile" >/dev/null
+      objfile=${srcfile%.*}.o
+      if ! test -e "$buildir/$objfile" \
+      || ! test -e "$buildir/$srcfile" \
+      || ! diff -q "$buildir/$srcfile" "$libdir/$srcfile" >/dev/null
       then
-         echo Compiling $prefix...
-         if test "$srcdir" != "$PWD"; then
-            cp -f "$srcdir/$srcfile" "$srcfile"
-         fi
-         "$F90" "${comp_flags[@]}" -c "$srcfile" -o "$objfile"
+#         echo $srcfile added to compile list
+         cp -f "$libdir/$srcfile" "$buildir/$srcfile"
+         compile_list+=("$srcfile")
       fi
-      obj_files+=("$objfile")
-   done < <(grep -v ^# "$srcdir/source_files")
+      object_files+=("$objfile")
+   done < <(grep -v ^# "$libdir/source_files")
+   pushd "$buildir" >/dev/null
+   for srcfile in "${compile_list[@]}"; do
+      echo Recompiling $srcfile...
+      "$F90" "${comp_flags[@]}" -c "$srcfile"
+   done
+   ar r molalignlib.a "${object_files[@]}"
    popd >/dev/null
-   if test -f "$srcdir/f2py_files"; then
-      while IFS= read -r f2pyfile; do
-         f2py_files+=("$f2pyfile")
-      done < <(grep -v ^# "$srcdir/f2py_files")
-   fi
 }
 
-make_prog() {
+build_program() {
    if test -z "$1"; then
       echo Error: name is empty
       exit 1
    fi
-   echo Linking program...
+   echo Building program ${1%.*}...
+   cp "$rootdir/$1" "$buildir"
    pushd "$buildir" > /dev/null
-   "$F90" "${link_flags[@]}" "${obj_files[@]}" -o "$1"
+   "$F90" "${comp_flags[@]}" "${link_flags[@]}" "$1" molalignlib.a -o "${1%.*}"
    popd > /dev/null
-}
-
-make_lib() {
-   if test -z "$1"; then
-      echo Error: name is empty
-      exit 1
-   fi
-   echo Linking dynamic library...
-   pushd "$buildir" >/dev/null
-   "$F90" -shared "${link_flags[@]}" "${obj_files[@]}" -o "$1.so"
-   popd >/dev/null
-}
-
-make_pyext() {
-   if test -z "$1"; then
-      echo Error: name is empty
-      exit 1
-   fi
-   if ! type "$F2PY" &>/dev/null; then
-      echo Error: F2PY executable not found 
-      exit 1
-   fi
-   pushd "$buildir" >/dev/null
-   echo Linking extension module...
-   "$F2PY" -h "$1.pyf" -m "$1" --overwrite-signature "${f2py_files[@]}" --quiet
-   "$F2PY" -c "$1.pyf" "${f2py_flags[@]}" "${obj_files[@]}" --quiet
-   popd >/dev/null
 }
 
 run_tests() {
    suffix=$1
    subdir=$2
    shift 2
-   executable=$buildir/molalign
+   executable=$buildir/atomalign
    for file in "$testdir/$subdir"/*.xyz; do
       name=$(basename "$file" .xyz)_$suffix
       echo -n "Running test $subdir/$name... "
@@ -125,6 +95,7 @@ fi
 
 buildir=$rootdir/build
 testdir=$rootdir/tests
+libdir=$rootdir/molalignlib
 
 if test ! -e "$buildir"; then
    mkdir "$buildir"
@@ -152,10 +123,11 @@ to_array f2py_flags
 # Read arguments and set options
 
 build_flag=true
-full_build=true
 test_flag=true
 write_test=false
+full_build=true
 debug_build=false
+pic_build=false
 
 while getopts ":bdqtw" opt; do
   case $opt in
@@ -185,36 +157,11 @@ done
 
 shift $((OPTIND-1))
 
-if test $# -gt 0; then
-   target=$1
-else
-   target=prog
-fi
-
 if $build_flag; then
-   case $target in
-   prog)
-      # Build program
-      pic_build=false
-      compile molalignlib
-      compile molalign
-      make_prog molalign
-      ;;
-   lib)
-      # Build dynamic library
-      pic_build=true
-      compile molalignlib
-      make_lib molalignlib
-      ;;
-   pyext)
-      # Build python extension module
-      pic_build=true
-      compile molalignlib
-      make_pyext molalignlibext
-      ;;
-   *)
-      echo Unknown target $target
-   esac
+   # Build program
+   build_library
+   build_program atomalign.f90
+   build_program molalign.f90
 fi
 
 if $test_flag; then

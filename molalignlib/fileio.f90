@@ -72,8 +72,6 @@ subroutine readfile(unit, fmtin, mol)
       stop
    end select
 
-   call set_bonds(mol)
-
 end subroutine
 
 subroutine writefile(unit, fmtout, mol)

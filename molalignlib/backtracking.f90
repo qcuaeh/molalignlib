@@ -5,7 +5,7 @@ use random
 use sorting
 use permutation
 use adjacency
-use alignment
+use spatial
 use lcrs_tree
 use molecule
 use common_types
@@ -65,8 +65,8 @@ subroutine minadjdiff( eltypes, mnatypes, molfrags, mol1, mol2, coords1, &
       adjlists2(:nadjs2(i), i) = mol2%atoms(i)%adjlist
    end do
 
-   adjmat1 = mol1%adjmat
-   adjmat2 = mol2%adjmat
+   adjmat1 = get_adjmat(mol1)
+   adjmat2 = get_adjmat(mol2)
 
    ! set atoms block indices
 
@@ -84,7 +84,7 @@ subroutine minadjdiff( eltypes, mnatypes, molfrags, mol1, mol2, coords1, &
    tracked(:) = .false.
    invatomperm = inverse_perm( atomperm)
    moldiff = adjacencydiff( atomperm, adjmat1, adjmat2)
-   moldist = sqdistsum( atomperm, coords1, coords2)
+   moldist = totsqdist( atomperm, coords1, coords2)
 
    if ( print_info ) then
       print '(a,1x,i0)', "moldiff:", moldiff
@@ -100,7 +100,7 @@ subroutine minadjdiff( eltypes, mnatypes, molfrags, mol1, mol2, coords1, &
    if ( print_info ) then
       print '(a,1x,i0)', "Fragments:", size(molfrags)
       print '(a,1x,i0,1x,i0)', "moldiff:", adjacencydiff( atomperm, adjmat1, adjmat2), moldiff
-      print '(a,1x,f0.4,1x,f0.4)', "moldist:", sqdistsum( atomperm, coords1, coords2), moldist
+      print '(a,1x,f0.4,1x,f0.4)', "moldist:", totsqdist( atomperm, coords1, coords2), moldist
    end if
 
 !    if (adjacencydiff( atomperm, adjmat1, adjmat2) /= moldiff) then

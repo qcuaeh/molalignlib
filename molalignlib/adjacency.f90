@@ -2,36 +2,33 @@ module adjacency
 use parameters
 use sorting
 use chemdata
-
 implicit none
+
+interface adjacencydiff
+   module procedure adjacencydiff_ord
+   module procedure adjacencydiff_perm
+end interface
 
 contains
 
-function adjacencydiff(atomperm, adjmat1, adjmat2) result(diff)
+function adjacencydiff_ord( adjmat1, adjmat2) result(diff)
+! Purpose: Check if two graphs are equal.
+! Return the number of differences between graphs.
+   logical, dimension(:, :), intent(in) :: adjmat1, adjmat2
+   integer :: diff
+   diff = count(adjmat1 .neqv. adjmat2)
+end function
+
+function adjacencydiff_perm( atomperm, adjmat1, adjmat2) result(diff)
 ! Purpose: Check if two graphs are equal.
 ! Return the number of differences between graphs.
    integer, dimension(:), intent(in) :: atomperm
    logical, dimension(:, :), intent(in) :: adjmat1, adjmat2
    integer :: diff
-
-   integer :: i, j
-
-   diff = 0
-
-! Check differences element by element
-
-   do i = 1, size(atomperm)
-      do j = i + 1, size(atomperm)
-         if (adjmat1(i, j) .neqv. adjmat2(atomperm(i), atomperm(j))) then
-!            print *, i, j, adjmat1(i, j), adjmat2(atomperm(i), atomperm(j))
-            diff = diff + 1
-         end if
-      end do
-   end do
-
+   diff = count(adjmat1 .neqv. adjmat2(atomperm, atomperm))
 end function
 
-function adjacencydelta(nadjs1, adjlists1, adjmat2, atomperm, k, l) result(delta)
+function adjacencydelta( nadjs1, adjlists1, adjmat2, atomperm, k, l) result(delta)
    integer, intent(in) :: k, l
    integer, dimension(:), intent(in) :: atomperm, nadjs1
    integer, dimension(:, :), intent(in) :: adjlists1

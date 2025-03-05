@@ -19,11 +19,9 @@ use parameters
 use common_types
 use globals
 use random
-use rigid_body
-use rotation
+use spatial
 use adjacency
 use permutation
-use alignment
 use assignment
 use backtracking
 use biasing
@@ -43,25 +41,42 @@ subroutine remove_reactive_bonds( mol1, mol2, eltypes, atomperm)
    integer, dimension(:), intent(out) :: atomperm
 
    ! Local variables
-   type(registry_type), target :: results
+   type(adjd_registry), target :: results
    type(tree_node), pointer :: mnatree
    type(bipartition_container) :: mnatypes
    type(intlist_type), dimension(:), allocatable :: molfrags1, molfrags2
    type(intmatrix_type), allocatable :: biases(:)
    integer, dimension(:), allocatable :: auxperm, invatomperm
+   integer, dimension(:), allocatable :: elnums1, elnums2
+   logical, dimension(:,:), allocatable :: adjmat1, adjmat2
    real(rk), dimension(:,:), allocatable :: coords1, coords2
-   real(rk) :: eigquat(4), totquat(4)
-   integer :: adjd, num_atoms1, num_trials, num_steps
+   real(rk) :: step_rotation(4), total_rotation(4)
+   integer :: num_steps
    integer :: j, iatom, jatom
-   integer, pointer :: lead_count
 !   integer, dimension(:), allocatable :: indices1, indices2
 !   integer :: k, katom
 
-   num_atoms1 = size(mol1%atoms)
-   coords1 = mol1%get_weighted_coords()
-   coords2 = mol2%get_weighted_coords()
-   call results%initialize(max_records)
-   allocate (auxperm(num_atoms1))
+   allocate (auxperm, mold=atomperm)
+
+   elnums1 = mol1%atoms%elnum
+   elnums2 = mol2%atoms%elnum
+   coords1 = get_coords(mol1)
+   coords2 = get_coords(mol2)
+   adjmat1 = get_adjmat(mol1)
+   adjmat2 = get_adjmat(mol2)
+
+   ! Mirror coordinates
+   if (mirror_flag) then
+      call mirror_coords( coords2)
+   end if
+
+   ! Mass weight coordinates
+   call weight_coords(coords1, atomic_weights(elnums1))
+   call weight_coords(coords2, atomic_weights(elnums2))
+
+   ! Translate atoms to their centroids
+   call translate_coords( coords1, -centroid(coords1))
+   call translate_coords( coords2, -centroid(coords2))
 
    ! Compute MNA types
    call tree_from_partition( eltypes, mnatree)
@@ -72,59 +87,43 @@ subroutine remove_reactive_bonds( mol1, mol2, eltypes, atomperm)
    call find_molfrags( mol1, first_partition(eltypes), molfrags1)
    call find_molfrags( mol2, second_partition(eltypes), molfrags2)
 
-   ! Mirror coordinates
-   if (mirror_flag) then
-      call mirror_coords( coords2)
-   end if
-
-   ! Translate atoms to their centroids
-   call translate_coords( coords1, -centroid(coords1))
-   call translate_coords( coords2, -centroid(coords2))
-
    ! Find unfeasible assignments
    call compute_mna_biases( mol1, mol2, eltypes, biases)
 
    ! Initialize random number generator
    call random_initialize()
 
-   ! Find reactive bonds
+   ! Initialize local minima registry
+   call registry_init(results, max_records, coords1, adjmat1)
 
-   num_trials = 0
-   lead_count => results%records(1)%count
-
-   do while (lead_count < max_count .and. num_trials < max_trials)
-
-      num_trials = num_trials + 1
+   ! Optimize atom permutation
+   do while (results%records(1)%count < max_count .and. results%num_trials < max_trials)
 
       ! Aply a random rotation to coords2
       call rotate_coords(coords2, randrotquat())
 
       ! Assign atoms with current orientation
       call assign_atoms_biased(eltypes, coords1, coords2, biases, atomperm)
-      totquat = leasteigquat(atomperm, coords1, coords2)
-      call rotate_coords(coords2, totquat)
+      total_rotation = optimal_rotation(atomperm, coords1, coords2)
+      call rotate_coords(coords2, total_rotation)
       num_steps = 1
 
       do while (iter_flag)
          call assign_atoms_biased(eltypes, coords1, coords2, biases, auxperm)
          if (all(auxperm == atomperm)) exit
          atomperm = auxperm
-         eigquat = leasteigquat(atomperm, coords1, coords2)
-         call rotate_coords(coords2, eigquat)
-         totquat = quatmul(eigquat, totquat)
+         step_rotation = optimal_rotation(atomperm, coords1, coords2)
+         call rotate_coords(coords2, step_rotation)
+         total_rotation = quatmul(step_rotation, total_rotation)
          num_steps = num_steps + 1
       end do
 
       call minadjdiff( eltypes, mnatypes, molfrags1, mol1, mol2, coords1, coords2, atomperm)
 
       ! Update results
-      adjd = adjacencydiff(atomperm, mol1%adjmat, mol2%adjmat)
-      call results%push_adjd(atomperm, num_steps, angle(totquat), adjd)
+      call registry_push( results, coords2, adjmat2, atomperm, num_steps, total_rotation)
 
    end do
-
-   write (stderr, *) 'adjd before', adjacencydiff( identity_perm(num_atoms1), mol1%adjmat, mol2%adjmat)
-   write (stderr, *) 'adjd after', adjacencydiff( results%records(1)%atomperm, mol1%adjmat, mol2%adjmat)
 
    ! Remove reactive bonds
 
@@ -135,14 +134,14 @@ subroutine remove_reactive_bonds( mol1, mol2, eltypes, atomperm)
    do iatom = 1, size(mol1%atoms)
       do j = 1, size(mol1%atoms(iatom)%adjlist)
          jatom = mol1%atoms(iatom)%adjlist(j)
-         if (.not. mol2%adjmat(atomperm(iatom), atomperm(jatom))) then
+         if (.not. adjmat2(atomperm(iatom), atomperm(jatom))) then
 !            write (stderr, *) 'remove mol1 bond:', iatom, jatom
-            call mol1%remove_bond(iatom, jatom)
+            call remove_bond(mol1, iatom, jatom)
 !            indices1 = mnatypes%parts(mnatypes%itemdir1(jatom))%indices1
 !            do k = 1, size(indices1)
 !               katom = indices1(k)
-!               call mol1%remove_bond(iatom, katom)
-!               call mol2%remove_bond(atomperm(iatom), atomperm(katom))
+!               call remove_bond(mol1, iatom, katom)
+!               call remove_bond(mol2, atomperm(iatom), atomperm(katom))
 !            end do
          end if
       end do
@@ -151,14 +150,14 @@ subroutine remove_reactive_bonds( mol1, mol2, eltypes, atomperm)
    do iatom = 1, size(mol2%atoms)
       do j = 1, size(mol2%atoms(iatom)%adjlist)
          jatom = mol2%atoms(iatom)%adjlist(j)
-         if (.not. mol1%adjmat(invatomperm(iatom), invatomperm(jatom))) then
+         if (.not. adjmat1(invatomperm(iatom), invatomperm(jatom))) then
 !            write (stderr, *) 'remove mol2 bond:', iatom, jatom
-            call mol2%remove_bond(iatom, jatom)
+            call remove_bond(mol2, iatom, jatom)
 !            indices2 = mnatypes%parts(mnatypes%itemdir2(jatom))%indices2
 !            do k = 1, size(indices2)
 !               katom = indices2(k)
-!               call mol2%remove_bond(iatom, katom)
-!               call mol1%remove_bond(invatomperm(iatom), invatomperm(katom))
+!               call remove_bond(mol1, invatomperm(iatom), invatomperm(katom))
+!               call remove_bond(mol2, iatom, katom)
 !            end do
          end if
       end do
@@ -172,7 +171,7 @@ subroutine remove_reactive_bonds( mol1, mol2, eltypes, atomperm)
 !            jatom = molfrags1(iatom)%n(j)
 !            do k = 1, size(mol1%atoms(jatom)%adjlist)
 !               katom = mol1%atoms(jatom)%adjlist(k)
-!               call mol1%remove_bond(jatom, katom)
+!               call remove_bond(mol1, jatom, katom)
 !            end do
 !         end do
 !      end if
@@ -184,7 +183,7 @@ subroutine remove_reactive_bonds( mol1, mol2, eltypes, atomperm)
 !            jatom = molfrags2(iatom)%n(j)
 !            do k = 1, size(mol2%atoms(jatom)%adjlist)
 !               katom = mol2%atoms(jatom)%adjlist(k)
-!               call mol2%remove_bond(jatom, katom)
+!               call remove_bond(mol2, jatom, katom)
 !            end do
 !         end do
 !      end if

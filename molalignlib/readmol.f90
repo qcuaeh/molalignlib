@@ -111,7 +111,7 @@ subroutine readmol2(unit, mol)
       adjlists(nadjs(atom2), atom2) = atom1
    end do
 
-   call mol%set_adjlists(nadjs, adjlists)
+   call set_adjlists(mol, nadjs, adjlists)
 
    return
 
@@ -159,7 +159,7 @@ subroutine set_bonds(mol)
       end do
    end do
 
-   call mol%set_adjlists(nadjs, adjlists)
+   call set_adjlists(mol, nadjs, adjlists)
 
 end subroutine
 
