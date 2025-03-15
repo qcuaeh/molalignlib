@@ -48,7 +48,6 @@ function angle(q)
    real(rk) :: angle
 
    angle = (180./asin(1.))*abs(atan(sqrt(sum(q(2:4)**2))/q(1)))
-
 end function
 
 function quatmul(p, q) result(pq)
@@ -60,7 +59,6 @@ function quatmul(p, q) result(pq)
    pq(2) = p(1)*q(2) + p(2)*q(1) + p(3)*q(4) - p(4)*q(3)
    pq(3) = p(1)*q(3) - p(2)*q(4) + p(3)*q(1) + p(4)*q(2)
    pq(4) = p(1)*q(4) + p(2)*q(3) - p(3)*q(2) + p(4)*q(1)
-
 end function
 
 function quatrotmat(q) result(rotmat)
@@ -80,7 +78,6 @@ function quatrotmat(q) result(rotmat)
    rotmat(1, 3) = 2*(q(2)*q(4) - q(1)*q(3))
    rotmat(2, 3) = 2*(q(3)*q(4) + q(1)*q(2))
    rotmat(3, 3) = 1.0_rk - 2*(q(2)**2 + q(3)**2)
-
 end function
 
 function randrotquat() result(rotquat)
@@ -112,7 +109,6 @@ function randrotquat() result(rotquat)
 
    ! Unit quaternion (w, x, y, z)
    rotquat = [ c2*r2, s1*r1, c1*r1, s2*r2 ]
-
 end function
 
 subroutine weight_coords(coords, weights)
@@ -147,7 +143,6 @@ subroutine translate_coords(coords, travec)
    do i = 1, size(coords, dim=2)
       coords(:, i) = coords(:, i) + travec(:)
    end do
-
 end subroutine
 
 function translated_coords(coords, travec)
@@ -162,12 +157,12 @@ function translated_coords(coords, travec)
    do i = 1, size(coords, dim=2)
       translated_coords(:, i) = coords(:, i) + travec(:)
    end do
-
 end function
 
-subroutine rotate_coords(coords, rotquat)
+subroutine rotate_coords(coords, rotquat, center)
    real(rk), dimension(:, :), intent(inout) :: coords
    real(rk), dimension(4), intent(in) :: rotquat
+   real(rk), intent(in) :: center(3)
    ! Local variables
    real(rk) :: rotmat(3, 3), auxvec(3)
    integer :: i, j
@@ -179,18 +174,16 @@ subroutine rotate_coords(coords, rotquat)
    do i = 1, size(coords, dim=2)
       auxvec(:) = 0.0
       do j = 1, 3
-         auxvec(:) = auxvec(:) + rotmat(:, j)*coords(j, i)
+         auxvec(:) = auxvec(:) + rotmat(:, j)*(coords(j, i) - center(j))
       end do
-      coords(:, i) = auxvec
+      coords(:, i) = auxvec(:) + center(:)
    end do
-
 end subroutine
 
 subroutine mirror_coords(coords)
    real(rk), dimension(:, :), intent(inout) :: coords
 
    coords(1, :) = -coords(1, :)
-
 end subroutine
 
 function centroid(coords)
@@ -208,14 +201,12 @@ function centroid(coords)
    end do
 
    centroid(:) = centroid(:) / size(coords, dim=2)
-
 end function
 
 real(rk) function sqdistsum_ord(coords1, coords2) result(totsqdist)
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
 
    totsqdist = sum(sum((coords1 - coords2)**2, dim=1))
-
 end function
 
 real(rk) function sqdistsum_perm(atomperm, coords1, coords2) result(totsqdist)
@@ -223,27 +214,16 @@ real(rk) function sqdistsum_perm(atomperm, coords1, coords2) result(totsqdist)
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
 
    totsqdist = sum(sum((coords1 - coords2(:, atomperm))**2, dim=1))
-
 end function
 
-function optimal_rotation(atomperm, coords1, coords2)
-! Purpose: Calculate rotation quaternion which minimzes the square distance
-   integer, dimension(:), intent(in) :: atomperm
-   real(rk), dimension(:,:), intent(in) :: coords1, coords2
-   real(rk) :: optimal_rotation(4), residuals(4, 4)
-
-   call kearsley(atomperm, coords1, coords2, residuals)
-!   least_totsqdist = leasteigval(residuals)
-   optimal_rotation = leasteigvec(residuals)
-
-end function
-
-subroutine kearsley(atomperm, coords1, coords2, residuals)
-! Purpose: Find the best orientation by least squares minimization
+function optimal_rotation(atomperm, coords1, coords2, center) result(rotquat)
+! Find the optimal rotation in quaternion representation by least squares minimization
 ! Reference: Acta Cryst. (1989). A45, 208-210
    integer, dimension(:), intent(in) :: atomperm
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
+   real(rk), intent(in) :: center(3)
    ! Local variables
+   real(rk) :: rotquat(4)
    integer :: i, num_atoms
    real(rk) :: residuals(4, 4)
    real(rk), dimension(:,:), allocatable :: p, q
@@ -254,7 +234,7 @@ subroutine kearsley(atomperm, coords1, coords2, residuals)
    allocate (q(3, num_atoms))
 
    do i = 1, num_atoms
-      p(:, i) = coords1(:, i) + coords2(:, atomperm(i))
+      p(:, i) = coords1(:, i) + coords2(:, atomperm(i)) - 2*center(:)
       q(:, i) = coords1(:, i) - coords2(:, atomperm(i))
    end do
 
@@ -284,6 +264,8 @@ subroutine kearsley(atomperm, coords1, coords2, residuals)
    residuals(4, 2) = residuals(2, 4)
    residuals(4, 3) = residuals(3, 4)
 
-end subroutine
+!   least_totsqdist = leasteigval(residuals)
+   rotquat = leasteigvec(residuals)
+end function
 
 end module

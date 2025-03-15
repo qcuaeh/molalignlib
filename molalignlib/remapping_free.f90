@@ -44,6 +44,7 @@ subroutine remap_free_atoms(mol1, mol2, results)
    integer, dimension(:), allocatable :: elnums1, elnums2
    real(rk), dimension(:,:), allocatable :: coords1, coords2
    real(rk) :: step_rotation(4), total_rotation(4)
+   real(rk) :: center1(3), center2(3)
 
    ! Abort if molecules have different number of atoms
    if (size(mol1%atoms) /= size(mol2%atoms)) then
@@ -81,16 +82,18 @@ subroutine remap_free_atoms(mol1, mol2, results)
       call mirror_coords(coords2)
    end if
 
-   ! Find unfeasible assignments
-   call prune_procedure(eltypes, coords1, coords2, prunes)
-
    ! Mass weight coordinates
    call weight_coords(coords1, atomic_weights(elnums1))
    call weight_coords(coords2, atomic_weights(elnums2))
 
    ! Translate atoms to their centroids
-   call translate_coords(coords1, -centroid(coords1))
-   call translate_coords(coords2, -centroid(coords2))
+   center1 = centroid(coords1)
+   center2 = centroid(coords2)
+   call translate_coords(coords2, -center2)
+   call translate_coords(coords2, center1)
+
+   ! Find unfeasible assignments
+   call prune_procedure(eltypes, mol1, mol2, prunes)
 
    ! Initialize random number generator
    call random_initialize()
@@ -102,20 +105,20 @@ subroutine remap_free_atoms(mol1, mol2, results)
    do while (results%records(1)%count < max_count .and. results%num_trials < max_trials)
 
       ! Aply a random rotation to coords2
-      call rotate_coords(coords2, randrotquat())
+      call rotate_coords(coords2, randrotquat(), center1)
 
       ! Assign atoms with current orientation
       call assign_atoms_pruned(eltypes, coords1, coords2, prunes, atomperm)
-      total_rotation = optimal_rotation(atomperm, coords1, coords2)
-      call rotate_coords(coords2, total_rotation)
+      total_rotation = optimal_rotation(atomperm, coords1, coords2, center1)
+      call rotate_coords(coords2, total_rotation, center1)
       num_steps = 1
 
       do while (iter_flag)
          call assign_atoms_pruned(eltypes, coords1, coords2, prunes, auxperm)
          if (all(auxperm == atomperm)) exit
          atomperm = auxperm
-         step_rotation = optimal_rotation(atomperm, coords1, coords2)
-         call rotate_coords(coords2, step_rotation)
+         step_rotation = optimal_rotation(atomperm, coords1, coords2, center1)
+         call rotate_coords(coords2, step_rotation, center1)
          total_rotation = quatmul(step_rotation, total_rotation)
          num_steps = num_steps + 1
       end do

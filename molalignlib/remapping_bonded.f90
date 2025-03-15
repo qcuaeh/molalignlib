@@ -50,6 +50,7 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
    real(rk), dimension(:,:), allocatable :: coords1, coords2
    logical, dimension(:, :), allocatable :: adjmat1, adjmat2
    real(rk) :: step_rotation(4), total_rotation(4)
+   real(rk) :: center1(3), center2(3)
    real(rk) :: dist
 
    ! Abort if molecules have different number of atoms
@@ -108,8 +109,10 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
    call weight_coords(coords2, atomic_weights(elnums2))
 
    ! Translate atoms to their centroids
-   call translate_coords( coords1, -centroid(coords1))
-   call translate_coords( coords2, -centroid(coords2))
+   center1 = centroid(coords1)
+   center2 = centroid(coords2)
+   call translate_coords(coords2, -center2)
+   call translate_coords(coords2, center1)
 
    ! Initialize random number generator
    call random_initialize()
@@ -123,20 +126,20 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
       num_trials = num_trials + 1
 
       ! Aply a random rotation to coords2
-      call rotate_coords(coords2, randrotquat())
+      call rotate_coords(coords2, randrotquat(), center1)
 
       ! Assign atoms with current orientation
       call assign_atoms_conf(mnatree, mol1, mol2, coords1, coords2, atomperm, dist)
-      total_rotation = optimal_rotation(atomperm, coords1, coords2)
-      call rotate_coords(coords2, total_rotation)
+      total_rotation = optimal_rotation(atomperm, coords1, coords2, center1)
+      call rotate_coords(coords2, total_rotation, center1)
       num_steps = 1
 
       do while (iter_flag)
          call assign_atoms_conf(mnatree, mol1, mol2, coords1, coords2, auxperm, dist)
          if (all(auxperm == atomperm)) exit
          atomperm = auxperm
-         step_rotation = optimal_rotation(atomperm, coords1, coords2)
-         call rotate_coords(coords2, step_rotation)
+         step_rotation = optimal_rotation(atomperm, coords1, coords2, center1)
+         call rotate_coords(coords2, step_rotation, center1)
          total_rotation = quatmul(step_rotation, total_rotation)
          num_steps = num_steps + 1
       end do

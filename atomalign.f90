@@ -42,7 +42,6 @@ character(:), allocatable :: optfmtin, optfmtout
 character(:), allocatable :: pathout
 logical :: fmtin_flag, fmtout_flag
 logical :: remap_flag, pipe_flag, nrec_flag
-real(rk) :: center1(3)
 real(rk) :: rmsd
 type(strlist_type) :: posargs(2)
 type(mol_type) :: mol1, mol2, auxmol
@@ -167,7 +166,6 @@ coords1 = get_coords(mol1)
 weights1 = atomic_weights(mol1%atoms%elnum)
 weights2 = atomic_weights(mol2%atoms%elnum)
 call weight_coords( coords1, weights1)
-center1 = centroid(coords1)
 
 allocate (auxmol%atoms(size(mol2%atoms)))
 
@@ -189,7 +187,6 @@ if (remap_flag) then
 
       atomperm = results%records(i)%atomperm
       coords2 = results%records(i)%coords2
-      call translate_coords( coords2, center1)
       rmsd = sqrt(totsqdist( atomperm, coords1, coords2))
       call unweight_coords( coords2, weights2)
 
@@ -206,7 +203,6 @@ else
 
    ! Align atoms
    call molecule_align( mol1, mol2, coords2)
-   call translate_coords( coords2, center1)
    rmsd = sqrt(totsqdist( coords1, coords2))
    call unweight_coords( coords2, weights2)
 

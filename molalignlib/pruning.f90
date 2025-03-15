@@ -17,6 +17,7 @@
 module pruning
 use parameters
 use common_types
+use molecule
 use globals
 use sorting
 use lcrs_tree
@@ -27,21 +28,22 @@ real(rk) :: prune_tol
 procedure(prune_proc), pointer :: prune_procedure
 
 abstract interface
-   subroutine prune_proc( eltypes, coords1, coords2, prunes)
+   subroutine prune_proc( eltypes, mol1, mol2, prunes)
       use parameters
       use common_types
+      use molecule
       use lcrs_tree
       type(bipartition_container), intent(in) :: eltypes
-      real(rk), dimension(:, :), intent(in) :: coords1, coords2
+      type(mol_type), intent(in) :: mol1, mol2
       type(boolmatrix_type), dimension(:), allocatable, intent(out) :: prunes
    end subroutine
 end interface
 
 contains
 
-subroutine prune_none( eltypes, coords1, coords2, prunes)
+subroutine prune_none( eltypes, mol1, mol2, prunes)
    type(bipartition_container), intent(in) :: eltypes
-   real(rk), dimension(:, :), intent(in) :: coords1, coords2
+   type(mol_type), intent(in) :: mol1, mol2
    type(boolmatrix_type), dimension(:), allocatable, intent(out) :: prunes
    ! Local variables
    integer :: h, i, j
@@ -61,16 +63,18 @@ subroutine prune_none( eltypes, coords1, coords2, prunes)
 
 end subroutine
 
-subroutine prune_rd( eltypes, coords1, coords2, prunes)
+subroutine prune_rd( eltypes, mol1, mol2, prunes)
    type(bipartition_container), intent(in) :: eltypes
-   real(rk), dimension(:, :), intent(in) :: coords1, coords2
+   type(mol_type), intent(in) :: mol1, mol2
    type(boolmatrix_type), dimension(:), allocatable, intent(out) :: prunes
    ! Local variables
-   integer :: h, i, j, k
-   integer :: iatom, jatom
-   integer :: num_items1, num_items2
    type(nested_reallist_type), allocatable, dimension(:) :: dists1, dists2
+   real(rk), dimension(:,:), allocatable :: coords1, coords2
+   integer :: num_items1, num_items2
+   integer :: h, i, j, k, iatom, jatom
 
+   coords1 = get_coords(mol1)
+   coords2 = get_coords(mol2)
    allocate (dists1(size(coords1, dim=2)))
    allocate (dists2(size(coords2, dim=2)))
    allocate (prunes(eltypes%num_parts))

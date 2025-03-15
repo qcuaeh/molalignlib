@@ -51,8 +51,8 @@ subroutine remove_reactive_bonds( mol1, mol2, eltypes, atomperm)
    logical, dimension(:,:), allocatable :: adjmat1, adjmat2
    real(rk), dimension(:,:), allocatable :: coords1, coords2
    real(rk) :: step_rotation(4), total_rotation(4)
-   integer :: num_steps
-   integer :: j, iatom, jatom
+   real(rk) :: center1(3), center2(3)
+   integer :: j, iatom, jatom, num_steps
 !   integer, dimension(:), allocatable :: indices1, indices2
 !   integer :: k, katom
 
@@ -75,8 +75,10 @@ subroutine remove_reactive_bonds( mol1, mol2, eltypes, atomperm)
    call weight_coords(coords2, atomic_weights(elnums2))
 
    ! Translate atoms to their centroids
-   call translate_coords( coords1, -centroid(coords1))
-   call translate_coords( coords2, -centroid(coords2))
+   center1 = centroid(coords1)
+   center2 = centroid(coords2)
+   call translate_coords(coords2, -center2)
+   call translate_coords(coords2, center1)
 
    ! Compute MNA types
    call tree_from_partition( eltypes, mnatree)
@@ -100,20 +102,20 @@ subroutine remove_reactive_bonds( mol1, mol2, eltypes, atomperm)
    do while (results%records(1)%count < max_count .and. results%num_trials < max_trials)
 
       ! Aply a random rotation to coords2
-      call rotate_coords(coords2, randrotquat())
+      call rotate_coords(coords2, randrotquat(), center1)
 
       ! Assign atoms with current orientation
       call assign_atoms_biased(eltypes, coords1, coords2, biases, atomperm)
-      total_rotation = optimal_rotation(atomperm, coords1, coords2)
-      call rotate_coords(coords2, total_rotation)
+      total_rotation = optimal_rotation(atomperm, coords1, coords2, center1)
+      call rotate_coords(coords2, total_rotation, center1)
       num_steps = 1
 
       do while (iter_flag)
          call assign_atoms_biased(eltypes, coords1, coords2, biases, auxperm)
          if (all(auxperm == atomperm)) exit
          atomperm = auxperm
-         step_rotation = optimal_rotation(atomperm, coords1, coords2)
-         call rotate_coords(coords2, step_rotation)
+         step_rotation = optimal_rotation(atomperm, coords1, coords2, center1)
+         call rotate_coords(coords2, step_rotation, center1)
          total_rotation = quatmul(step_rotation, total_rotation)
          num_steps = num_steps + 1
       end do

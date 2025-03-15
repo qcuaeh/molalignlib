@@ -89,17 +89,18 @@ subroutine molecule_align( mol1, mol2, coords2)
    center1 = centroid(coords1)
    center2 = centroid(coords2)
 
-   call translate_coords( coords1, -center1)
    call translate_coords( coords2, -center2)
+   call translate_coords( coords2, center1)
 
    ! Calculate optimal rotation matrix
    rotquat = optimal_rotation( &
       identity_perm(num_atoms1), &
       coords1, &
-      coords2 &
+      coords2, &
+      center1 &
    )
 
-   call rotate_coords( coords2, rotquat)
+   call rotate_coords( coords2, rotquat, center1)
 
 end subroutine
 
