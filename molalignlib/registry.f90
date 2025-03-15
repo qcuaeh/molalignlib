@@ -26,8 +26,8 @@ type :: rmsd_record
    real(rk) :: rmsd
    real(rk) :: aver_steps
    real(rk) :: aver_rotangle
-   integer, allocatable :: atomperm(:)
-   real(rk), allocatable :: coords2(:,:)
+   integer, dimension(:), allocatable :: atomperm
+   real(rk), dimension(:,:), allocatable :: coords2
 end type
 
 type :: rmsd_registry
@@ -35,8 +35,8 @@ type :: rmsd_registry
    integer :: total_steps
    integer :: num_trials
    integer :: num_records
-   real(rk), allocatable :: coords1(:,:)
-   type(rmsd_record), allocatable :: records(:)
+   real(rk), dimension(:,:), allocatable :: coords1
+   type(rmsd_record), dimension(:), allocatable :: records
 end type
 
 type :: adjd_record
@@ -45,9 +45,9 @@ type :: adjd_record
    real(rk) :: rmsd
    real(rk) :: aver_steps
    real(rk) :: aver_rotangle
-   integer, allocatable :: atomperm(:)
-   real(rk), allocatable :: coords2(:,:)
-   logical, allocatable :: adjmat2(:,:)
+   integer, dimension(:), allocatable :: atomperm
+   real(rk), dimension(:,:), allocatable :: coords2
+   logical, dimension(:,:), allocatable :: adjmat2
 end type
 
 type :: adjd_registry
@@ -55,9 +55,9 @@ type :: adjd_registry
    integer :: total_steps
    integer :: num_trials
    integer :: num_records
-   real(rk), allocatable :: coords1(:,:)
-   logical, allocatable :: adjmat1(:,:)
-   type(adjd_record), allocatable :: records(:)
+   real(rk), dimension(:,:), allocatable :: coords1
+   logical, dimension(:,:), allocatable :: adjmat1
+   type(adjd_record), dimension(:), allocatable :: records
 end type
 
 interface registry_init
@@ -80,7 +80,7 @@ contains
 subroutine rmsd_registry_init(self, max_records, coords1)
    class(rmsd_registry), intent(inout) :: self
    integer, intent(in) :: max_records
-   real(rk), intent(in) :: coords1(:,:)
+   real(rk), dimension(:,:), intent(in) :: coords1
 
    if (max_records < 1) then
       error stop 'max_records < 1'
@@ -100,8 +100,8 @@ end subroutine
 
 subroutine rmsd_registry_push(self, coords2, atomperm, num_steps, rotation)
    class(rmsd_registry), target, intent(inout) :: self
-   real(rk), intent(in) :: coords2(:,:)
-   integer, intent(in) :: atomperm(:)
+   real(rk), dimension(:,:), intent(in) :: coords2
+   integer, dimension(:), intent(in) :: atomperm
    real(rk), intent(in) :: rotation(4)
    integer, intent(in) :: num_steps
    ! Local variables
@@ -154,8 +154,8 @@ end subroutine
 subroutine adjd_registry_init(self, max_records, coords1, adjmat1)
    class(adjd_registry), intent(inout) :: self
    integer, intent(in) :: max_records
-   real(rk), intent(in) :: coords1(:,:)
-   logical, intent(in) :: adjmat1(:,:)
+   real(rk), dimension(:,:), intent(in) :: coords1
+   logical, dimension(:,:), intent(in) :: adjmat1
 
    if (max_records < 1) then
       error stop 'max_records < 1'
@@ -176,9 +176,9 @@ end subroutine
 
 subroutine adjd_registry_push(self, coords2, adjmat2, atomperm, num_steps, rotation)
    class(adjd_registry), target, intent(inout) :: self
-   real(rk), intent(in) :: coords2(:,:)
-   logical, intent(in) :: adjmat2(:,:)
-   integer, intent(in) :: atomperm(:)
+   real(rk), dimension(:,:), intent(in) :: coords2
+   logical, dimension(:,:), intent(in) :: adjmat2
+   integer, dimension(:), intent(in) :: atomperm
    real(rk), intent(in) :: rotation(4)
    integer, intent(in) :: num_steps
    ! Local variables

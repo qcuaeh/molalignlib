@@ -17,7 +17,7 @@
 module assignment
 use parameters
 use globals
-use common_types
+use basetypes
 use lcrs_tree
 use permutation
 use jv
@@ -37,11 +37,11 @@ subroutine assign_atoms_nearest( eltypes, coords1, coords2, atomperm)
 ! Find best correspondence between points sets with fixed orientation
 
    type(bipartition_container), target, intent(in) :: eltypes
-   real(rk), dimension(:, :), intent(in) :: coords1, coords2
+   real(rk), dimension(:,:), intent(in) :: coords1, coords2
    integer, dimension(:), intent(out) :: atomperm
    ! Local variables
    integer :: h, num_items1
-   integer, allocatable :: auxperm(:)
+   integer, dimension(:), allocatable :: auxperm
    integer, dimension(:), pointer :: indices1, indices2
    real(rk) :: dist
 
@@ -62,12 +62,12 @@ subroutine assign_atoms_pruned( eltypes, coords1, coords2, prunes, atomperm)
 ! Find best correspondence between points sets with fixed orientation
 
    type(bipartition_container), target, intent(in) :: eltypes
-   real(rk), dimension(:, :), intent(in) :: coords1, coords2
-   type(boolmatrix_type), dimension(:), intent(in) :: prunes
+   real(rk), dimension(:,:), intent(in) :: coords1, coords2
+   type(bool_matrix), dimension(:), intent(in) :: prunes
    integer, dimension(:), intent(out) :: atomperm
    ! Local variables
    integer :: h, num_items1
-   integer, allocatable :: auxperm(:)
+   integer, dimension(:), allocatable :: auxperm
    integer, dimension(:), pointer :: indices1, indices2
    real(rk) :: dist
 
@@ -78,7 +78,7 @@ subroutine assign_atoms_pruned( eltypes, coords1, coords2, prunes, atomperm)
       num_items1 = eltypes%parts(h)%num_items1
       indices1 => eltypes%parts(h)%indices1
       indices2 => eltypes%parts(h)%indices2
-      call solve_lap_pruned(num_items1, indices1, indices2, coords1, coords2, prunes(h)%b, auxperm, dist)
+      call solve_lap_pruned(num_items1, indices1, indices2, coords1, coords2, prunes(h)%ee, auxperm, dist)
       atomperm(indices1) = indices2(auxperm(:num_items1))
    end do
 end subroutine
@@ -87,12 +87,12 @@ subroutine assign_atoms( eltypes, coords1, coords2, atomperm, dist)
 ! Find best correspondence between points sets with fixed orientation
 
    type(bipartition_container), intent(in) :: eltypes
-   real(rk), dimension(:, :), intent(in) :: coords1, coords2
+   real(rk), dimension(:,:), intent(in) :: coords1, coords2
    integer, dimension(:), intent(out) :: atomperm
    real(rk), intent(out) :: dist
    ! Local variables
    integer :: h
-   integer, allocatable :: auxperm(:)
+   integer, dimension(:), allocatable :: auxperm
 
    allocate (auxperm(maxval(eltypes%parts%num_items1)))
 
@@ -107,31 +107,31 @@ subroutine assign_atoms_biased( eltypes, coords1, coords2, biases, atomperm)
 ! Find best correspondence between points sets with fixed orientation
 
    type(bipartition_container), intent(in) :: eltypes
-   real(rk), dimension(:, :), intent(in) :: coords1, coords2
-   type(intmatrix_type), dimension(:), intent(in) :: biases
+   real(rk), dimension(:,:), intent(in) :: coords1, coords2
+   type(int_matrix), dimension(:), intent(in) :: biases
    integer, dimension(:), intent(out) :: atomperm
    ! Local variables
    integer :: h
-   integer, allocatable :: auxperm(:)
+   integer, dimension(:), allocatable :: auxperm
    real(rk) :: dist
 
    allocate (auxperm(maxval(eltypes%parts%num_items1)))
 
    ! Optimize atomperm for each block
    do h = 1, eltypes%num_parts
-      call solve_lap_biased(eltypes%parts(h), coords1, coords2, biases(h)%n, auxperm, dist)
+      call solve_lap_biased(eltypes%parts(h), coords1, coords2, biases(h)%ee, auxperm, dist)
       atomperm(eltypes%parts(h)%indices1) = eltypes%parts(h)%indices2(auxperm(:eltypes%parts(h)%num_items1))
    end do
 end subroutine
 
 subroutine solve_lap(part, p, q, perm, dist)
    type(bipartition_part), intent(in) :: part
-   real(rk), intent(in) :: p(:, :), q(:, :)
-   integer, intent(out) :: perm(:)
+   real(rk), dimension(:,:), intent(in) :: p, q
+   integer, dimension(:), intent(out) :: perm
    real(rk), intent(out) :: dist
    ! Local variables
    integer :: i, j
-   real(rk), allocatable :: costs(:, :)
+   real(rk), dimension(:,:), allocatable :: costs
 
    allocate (costs(part%num_items1, part%num_items2))
 
@@ -146,13 +146,13 @@ end subroutine
 
 subroutine solve_lap_biased(part, p, q, biases, perm, dist)
    type(bipartition_part), intent(in) :: part
-   real(rk), intent(in) :: p(:, :), q(:, :)
-   integer, intent(in) :: biases(:, :)
-   integer, intent(out) :: perm(:)
+   real(rk), dimension(:,:), intent(in) :: p, q
+   integer, dimension(:,:), intent(in) :: biases
+   integer, dimension(:), intent(out) :: perm
    real(rk), intent(out) :: dist
    ! Local variables
    integer :: i, j
-   real(rk), allocatable :: costs(:, :)
+   real(rk), dimension(:,:), allocatable :: costs
 
    allocate (costs(part%num_items1, part%num_items2))
 

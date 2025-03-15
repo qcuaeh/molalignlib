@@ -48,7 +48,7 @@ end subroutine
 
 subroutine read_posarg(arg, posargs)
    character(*), intent(in) :: arg
-   type(strlist_type), intent(inout) :: posargs(:)
+   type(strlist_type), dimension(:), intent(inout) :: posargs
 
    if (arg(1:1) == '-') then
       write (stderr, '(a,1x,a)') 'Unknown option:', arg

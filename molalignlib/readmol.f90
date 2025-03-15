@@ -65,7 +65,8 @@ subroutine readmol2(unit, mol)
    integer :: nbond, atom1, atom2, bondorder
    character(wl) :: tag
    real(rk) :: coords(3)
-   integer, allocatable :: nadjs(:), adjlists(:, :)
+   integer, dimension(:), allocatable :: nadjs
+   integer, dimension(:,:), allocatable :: adjlists
 
    do
       read (unit, '(a)', end=99) buffer
@@ -125,9 +126,10 @@ subroutine set_bonds(mol)
    type(mol_type), target, intent(inout) :: mol
    ! Local variables
    integer :: i, j, num_atoms
-   integer, allocatable :: nadjs(:), adjlists(:, :)
-   type(atom_type), pointer :: atoms(:)
-   real(rk), allocatable :: adjrads(:)
+   integer, dimension(:), allocatable :: nadjs
+   integer, dimension(:,:), allocatable :: adjlists
+   type(atom_type), dimension(:), pointer :: atoms
+   real(rk), dimension(:), allocatable :: adjrads
    real(rk) :: atomdist
 
    atoms => mol%atoms

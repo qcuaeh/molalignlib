@@ -25,12 +25,12 @@ implicit none
 
 type :: typehood_item
    type(tree_node), pointer :: node
-   type(tree_node_ptr), allocatable :: typehood(:)
+   type(tree_node_ptr), dimension(:), allocatable :: typehood
 end type
 
 type :: typehood_table
    integer :: num_items
-   type(typehood_item), allocatable :: items(:)
+   type(typehood_item), dimension(:), allocatable :: items
 end type
 
 type :: atomtype_item
@@ -41,7 +41,7 @@ end type
 
 type :: atomtype_table
    integer :: num_items
-   type(atomtype_item), allocatable :: items(:)
+   type(atomtype_item), dimension(:), allocatable :: items
 end type
 
 interface operator (.equiv.)
@@ -113,7 +113,7 @@ end function
 
 subroutine add_typehood(typehoodtable, typehood, node)
    type(typehood_table), intent(inout) :: typehoodtable
-   type(tree_node_ptr), intent(in) :: typehood(:)
+   type(tree_node_ptr), dimension(:), intent(in) :: typehood
    type(tree_node), pointer, intent(in) :: node
 
    typehoodtable%num_items = typehoodtable%num_items + 1
@@ -124,7 +124,7 @@ end subroutine
 
 function find_typehood(typehoodtable, typehood) result(node)
    type(typehood_table), intent(in) :: typehoodtable
-   type(tree_node_ptr), intent(in) :: typehood(:)
+   type(tree_node_ptr), dimension(:), intent(in) :: typehood
    type(tree_node), pointer :: node
    integer :: i
 
@@ -268,7 +268,7 @@ subroutine compute_mnatype(mol1, mol2, itemdir1, itemdir2, inode)
    ! Local variables
    type(tree_node), pointer :: child
    type(item_node), pointer :: item, next_item
-   type(tree_node_ptr), allocatable :: typehood(:)
+   type(tree_node_ptr), dimension(:), allocatable :: typehood
    type(typehood_table) :: typehoodtable
 
    allocate (typehoodtable%items(inode%num_items1 + inode%num_items2))

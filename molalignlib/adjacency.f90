@@ -14,7 +14,7 @@ contains
 function adjacencydiff_ord( adjmat1, adjmat2) result(diff)
 ! Purpose: Check if two graphs are equal.
 ! Return the number of differences between graphs.
-   logical, dimension(:, :), intent(in) :: adjmat1, adjmat2
+   logical, dimension(:,:), intent(in) :: adjmat1, adjmat2
    integer :: diff
    diff = count(adjmat1 .neqv. adjmat2)
 end function
@@ -23,7 +23,7 @@ function adjacencydiff_perm( atomperm, adjmat1, adjmat2) result(diff)
 ! Purpose: Check if two graphs are equal.
 ! Return the number of differences between graphs.
    integer, dimension(:), intent(in) :: atomperm
-   logical, dimension(:, :), intent(in) :: adjmat1, adjmat2
+   logical, dimension(:,:), intent(in) :: adjmat1, adjmat2
    integer :: diff
    diff = count(adjmat1 .neqv. adjmat2(atomperm, atomperm))
 end function
@@ -31,8 +31,8 @@ end function
 function adjacencydelta( nadjs1, adjlists1, adjmat2, atomperm, k, l) result(delta)
    integer, intent(in) :: k, l
    integer, dimension(:), intent(in) :: atomperm, nadjs1
-   integer, dimension(:, :), intent(in) :: adjlists1
-   logical, dimension(:, :), intent(in) :: adjmat2
+   integer, dimension(:,:), intent(in) :: adjlists1
+   logical, dimension(:,:), intent(in) :: adjmat2
    integer :: i, nkk, nkl, nll, nlk, delta
 
    nkk = 0

@@ -16,14 +16,13 @@
 
 module reactivity
 use parameters
-use common_types
+use basetypes
 use globals
 use random
 use spatial
 use adjacency
 use permutation
 use assignment
-use backtracking
 use biasing
 use molecule
 use tracking
@@ -44,8 +43,8 @@ subroutine remove_reactive_bonds( mol1, mol2, eltypes, atomperm)
    type(adjd_registry), target :: results
    type(tree_node), pointer :: mnatree
    type(bipartition_container) :: mnatypes
-   type(intlist_type), dimension(:), allocatable :: molfrags1, molfrags2
-   type(intmatrix_type), allocatable :: biases(:)
+   type(int_list), dimension(:), allocatable :: molfrags1, molfrags2
+   type(int_matrix), dimension(:), allocatable :: biases
    integer, dimension(:), allocatable :: auxperm, invatomperm
    integer, dimension(:), allocatable :: elnums1, elnums2
    logical, dimension(:,:), allocatable :: adjmat1, adjmat2
@@ -168,9 +167,9 @@ subroutine remove_reactive_bonds( mol1, mol2, eltypes, atomperm)
    ! Dissociate water molecules
 !
 !   do iatom = 1, size(molfrags1)
-!      if (all(sorted(mol1%atoms(molfrags1(iatom)%n)%elnum) == [1, 1, 8])) then
-!         do j = 1, size(molfrags1(iatom)%n)
-!            jatom = molfrags1(iatom)%n(j)
+!      if (all(sorted(mol1%atoms(molfrags1(iatom)%e)%elnum) == [1, 1, 8])) then
+!         do j = 1, size(molfrags1(iatom)%e)
+!            jatom = molfrags1(iatom)%e(j)
 !            do k = 1, size(mol1%atoms(jatom)%adjlist)
 !               katom = mol1%atoms(jatom)%adjlist(k)
 !               call remove_bond(mol1, jatom, katom)
@@ -180,9 +179,9 @@ subroutine remove_reactive_bonds( mol1, mol2, eltypes, atomperm)
 !   end do
 !
 !   do iatom = 1, size(molfrags2)
-!      if (all(sorted(mol2%atoms(molfrags2(iatom)%n)%elnum) == [1, 1, 8])) then
-!         do j = 1, size(molfrags2(iatom)%n)
-!            jatom = molfrags2(iatom)%n(j)
+!      if (all(sorted(mol2%atoms(molfrags2(iatom)%e)%elnum) == [1, 1, 8])) then
+!         do j = 1, size(molfrags2(iatom)%e)
+!            jatom = molfrags2(iatom)%e(j)
 !            do k = 1, size(mol2%atoms(jatom)%adjlist)
 !               katom = mol2%atoms(jatom)%adjlist(k)
 !               call remove_bond(mol2, jatom, katom)

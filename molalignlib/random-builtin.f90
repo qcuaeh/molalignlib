@@ -38,7 +38,7 @@ end function
 
 subroutine shuffle(a)
 ! Fisher-Yates shuffle
-   integer, intent(inout) :: a(:)
+   integer, dimension(:), intent(inout) :: a
    integer :: i, j, temp
    real(rk) :: r
    do i = size(a), 2, -1

@@ -1,12 +1,11 @@
 parameters.f90
 globals.f90
-common_types.f90
+basetypes.f90
 strutils.f90
 sorting.f90
 hungarian.f90
 jv.f90
 permutation.f90
-setutils.f90
 eigen-jacobi.f90
 #eigen-lapack.f90
 randlib.f90
@@ -25,7 +24,6 @@ pruning.f90
 alignment.f90
 assignment.f90
 tracking.f90
-backtracking.f90
 remapping_free.f90
 reactivity.f90
 remapping_bonded.f90

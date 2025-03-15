@@ -47,7 +47,7 @@ type(strlist_type) :: posargs(2)
 type(mol_type) :: mol1, mol2, auxmol
 type(rmsd_registry) :: results
 real(rk), dimension(:), allocatable :: weights1, weights2
-real(rk), dimension(:, :), allocatable :: coords1, coords2
+real(rk), dimension(:,:), allocatable :: coords1, coords2
 
 ! Set default options
 
@@ -194,7 +194,7 @@ if (remap_flag) then
       auxmol%title = 'RMSD='//str(rmsd, 4)
       auxmol%atoms%elnum = mol2%atoms(atomperm)%elnum
       auxmol%atoms%label = mol2%atoms(atomperm)%label
-      call set_coords(auxmol, coords2(:, atomperm))
+      call set_coords( auxmol, coords2(:, atomperm))
       call writefile( write_unit, fmtout, auxmol)
 
    end do
@@ -210,7 +210,7 @@ else
    auxmol%title = 'RMSD='//str(rmsd, 4)
    auxmol%atoms%elnum = mol2%atoms%elnum
    auxmol%atoms%label = mol2%atoms%label
-   call set_coords(auxmol, coords2)
+   call set_coords( auxmol, coords2)
    call writefile( write_unit, fmtout, mol2)
 
 end if

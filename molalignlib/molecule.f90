@@ -10,7 +10,7 @@ type, public :: atom_type
    integer :: label
    integer :: weight
    real(rk) :: coords(3)
-   integer, allocatable :: adjlist(:)
+   integer, dimension(:), allocatable :: adjlist
 end type
 
 type, public :: bond_type
@@ -20,7 +20,7 @@ end type
 
 type, public :: mol_type
    character(:), allocatable :: title
-   type(atom_type), allocatable :: atoms(:)
+   type(atom_type), dimension(:), allocatable :: atoms
 end type
 
 public set_coords
@@ -37,7 +37,7 @@ contains
 
 subroutine set_coords(self, coords)
    class(mol_type), intent(inout) :: self
-   real(rk), intent(in) :: coords(:, :)
+   real(rk), dimension(:,:), intent(in) :: coords
    ! Local variables
    integer :: i
 
@@ -48,8 +48,8 @@ end subroutine
 
 subroutine set_adjlists(self, nadjs, adjlists)
    class(mol_type), intent(inout) :: self
-   integer, intent(in) :: nadjs(:)
-   integer, intent(in) :: adjlists(:, :)
+   integer, dimension(:), intent(in) :: nadjs
+   integer, dimension(:,:), intent(in) :: adjlists
    ! Local variables
    integer :: i, num_atoms
 
@@ -63,7 +63,7 @@ end subroutine
 function get_coords(self) result(coords)
    class(mol_type), intent(in) :: self
    ! Local variables
-   real(rk), allocatable :: coords(:, :)
+   real(rk), dimension(:,:), allocatable :: coords
    integer :: i
 
    allocate (coords(3, size(self%atoms)))
@@ -76,7 +76,7 @@ end function
 function get_adjmat(self) result(adjmat)
    class(mol_type), intent(in) :: self
    ! Local variables
-   logical, allocatable :: adjmat(:,:)
+   logical, dimension(:,:), allocatable :: adjmat
    integer :: i, k, num_atoms
 
    num_atoms = size(self%atoms)
@@ -93,8 +93,8 @@ end function
 function get_bonds(self) result(bonds)
    class(mol_type), intent(in) :: self
    ! Local variables
-   logical, allocatable :: adjmat(:,:)
-   type(bond_type), allocatable :: bonds(:)
+   logical, dimension(:,:), allocatable :: adjmat
+   type(bond_type), dimension(:), allocatable :: bonds
    integer :: i, j, nbond
 
    adjmat = get_adjmat(self)
@@ -117,7 +117,7 @@ subroutine remove_bond(self, idx1, idx2)
    integer, intent(in) :: idx1, idx2
    ! Local variables
    integer :: i, pos1, pos2, nadj1, nadj2
-   integer, allocatable :: adjlist1(:), adjlist2(:)
+   integer, dimension(:), allocatable :: adjlist1, adjlist2
 
    allocate (adjlist1(max_coord), adjlist2(max_coord))
 
@@ -168,7 +168,7 @@ subroutine add_bond(self, idx1, idx2)
    integer, intent(in) :: idx1, idx2
    ! Local variables
    integer :: pos1, pos2, nadj1, nadj2
-   integer, allocatable :: adjlist1(:), adjlist2(:)
+   integer, dimension(:), allocatable :: adjlist1, adjlist2
 
    allocate (adjlist1(max_coord), adjlist2(max_coord))
 
@@ -232,7 +232,7 @@ subroutine print_bonds(self)
    class(mol_type), intent(in) :: self
    ! Local variables
    integer :: i
-   type(bond_type), allocatable :: bonds(:)
+   type(bond_type), dimension(:), allocatable :: bonds
 
    bonds = get_bonds(self)
 

@@ -16,7 +16,7 @@
 
 module pruning
 use parameters
-use common_types
+use basetypes
 use molecule
 use globals
 use sorting
@@ -30,12 +30,12 @@ procedure(prune_proc), pointer :: prune_procedure
 abstract interface
    subroutine prune_proc( eltypes, mol1, mol2, prunes)
       use parameters
-      use common_types
+      use basetypes
       use molecule
       use lcrs_tree
       type(bipartition_container), intent(in) :: eltypes
       type(mol_type), intent(in) :: mol1, mol2
-      type(boolmatrix_type), dimension(:), allocatable, intent(out) :: prunes
+      type(bool_matrix), dimension(:), allocatable, intent(out) :: prunes
    end subroutine
 end interface
 
@@ -44,7 +44,7 @@ contains
 subroutine prune_none( eltypes, mol1, mol2, prunes)
    type(bipartition_container), intent(in) :: eltypes
    type(mol_type), intent(in) :: mol1, mol2
-   type(boolmatrix_type), dimension(:), allocatable, intent(out) :: prunes
+   type(bool_matrix), dimension(:), allocatable, intent(out) :: prunes
    ! Local variables
    integer :: h, i, j
    integer :: num_items1, num_items2
@@ -53,10 +53,10 @@ subroutine prune_none( eltypes, mol1, mol2, prunes)
    do h = 1, eltypes%num_parts
       num_items1 = eltypes%parts(h)%num_items1
       num_items2 = eltypes%parts(h)%num_items2
-      allocate (prunes(h)%b(num_items1, num_items2))
+      allocate (prunes(h)%ee(num_items1, num_items2))
       do i = 1, num_items1
          do j = 1, num_items2
-            prunes(h)%b(j, i) = .false.
+            prunes(h)%ee(j, i) = .false.
          end do
       end do
    end do
@@ -66,9 +66,9 @@ end subroutine
 subroutine prune_rd( eltypes, mol1, mol2, prunes)
    type(bipartition_container), intent(in) :: eltypes
    type(mol_type), intent(in) :: mol1, mol2
-   type(boolmatrix_type), dimension(:), allocatable, intent(out) :: prunes
+   type(bool_matrix), dimension(:), allocatable, intent(out) :: prunes
    ! Local variables
-   type(nested_reallist_type), allocatable, dimension(:) :: dists1, dists2
+   type(real_listlist), allocatable, dimension(:) :: dists1, dists2
    real(rk), dimension(:,:), allocatable :: coords1, coords2
    integer :: num_items1, num_items2
    integer :: h, i, j, k, iatom, jatom
@@ -80,11 +80,11 @@ subroutine prune_rd( eltypes, mol1, mol2, prunes)
    allocate (prunes(eltypes%num_parts))
 
    do i = 1, size(coords1, dim=2)
-      allocate (dists1(i)%s(eltypes%num_parts))
-      allocate (dists2(i)%s(eltypes%num_parts))
+      allocate (dists1(i)%e(eltypes%num_parts))
+      allocate (dists2(i)%e(eltypes%num_parts))
       do h = 1, eltypes%num_parts
-         allocate (dists1(i)%s(h)%x(eltypes%parts(h)%num_items1))
-         allocate (dists2(i)%s(h)%x(eltypes%parts(h)%num_items2))
+         allocate (dists1(i)%e(h)%e(eltypes%parts(h)%num_items1))
+         allocate (dists2(i)%e(h)%e(eltypes%parts(h)%num_items2))
       end do
    end do
 
@@ -92,9 +92,9 @@ subroutine prune_rd( eltypes, mol1, mol2, prunes)
       do h = 1, eltypes%num_parts
          do j = 1, eltypes%parts(h)%num_items1
             jatom = eltypes%parts(h)%indices1(j)
-            dists1(i)%s(h)%x(j) = sqrt(sum((coords1(:, jatom) - coords1(:, i))**2))
+            dists1(i)%e(h)%e(j) = sqrt(sum((coords1(:, jatom) - coords1(:, i))**2))
          end do
-         call sort(dists1(i)%s(h)%x)
+         call sort(dists1(i)%e(h)%e)
       end do
    end do
 
@@ -102,24 +102,24 @@ subroutine prune_rd( eltypes, mol1, mol2, prunes)
       do h = 1, eltypes%num_parts
          do j = 1, eltypes%parts(h)%num_items2
             jatom = eltypes%parts(h)%indices2(j)
-            dists2(i)%s(h)%x(j) = sqrt(sum((coords2(:, jatom) - coords2(:, i))**2))
+            dists2(i)%e(h)%e(j) = sqrt(sum((coords2(:, jatom) - coords2(:, i))**2))
          end do
-         call sort(dists2(i)%s(h)%x)
+         call sort(dists2(i)%e(h)%e)
       end do
    end do
 
    do h = 1, eltypes%num_parts
       num_items1 = eltypes%parts(h)%num_items1
       num_items2 = eltypes%parts(h)%num_items2
-      allocate (prunes(h)%b(num_items1, num_items2))
-      prunes(h)%b = .false.
+      allocate (prunes(h)%ee(num_items1, num_items2))
+      prunes(h)%ee = .false.
       do i = 1, num_items1
          iatom = eltypes%parts(h)%indices1(i)
          do j = 1, num_items2
             jatom = eltypes%parts(h)%indices2(j)
             do k = 1, eltypes%num_parts
-               if (any(abs(dists2(jatom)%s(k)%x - dists1(iatom)%s(k)%x) > prune_tol)) then
-                  prunes(h)%b(j, i) = .true.
+               if (any(abs(dists2(jatom)%e(k)%e - dists1(iatom)%e(k)%e) > prune_tol)) then
+                  prunes(h)%ee(j, i) = .true.
                   exit
                end if
             end do

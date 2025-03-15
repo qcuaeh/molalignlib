@@ -31,7 +31,6 @@ public unweight_coords
 public rotate_coords
 public mirror_coords
 public translate_coords
-public translated_coords
 public centroid
 public totsqdist
 public optimal_rotation
@@ -112,8 +111,8 @@ function randrotquat() result(rotquat)
 end function
 
 subroutine weight_coords(coords, weights)
-   real(rk), intent(inout) :: coords(:, :)
-   real(rk), intent(in) :: weights(:)
+   real(rk), dimension(:,:), intent(inout) :: coords
+   real(rk), dimension(:), intent(in) :: weights
    ! Local variables
    real(rk) :: total_weight
    integer :: i
@@ -124,8 +123,8 @@ subroutine weight_coords(coords, weights)
 end subroutine
 
 subroutine unweight_coords(coords, weights)
-   real(rk), intent(inout) :: coords(:, :)
-   real(rk), intent(in) :: weights(:)
+   real(rk), dimension(:,:), intent(inout) :: coords
+   real(rk), dimension(:), intent(in) :: weights
    ! Local variables
    real(rk) :: total_weight
    integer :: i
@@ -136,7 +135,7 @@ subroutine unweight_coords(coords, weights)
 end subroutine
 
 subroutine translate_coords(coords, travec)
-   real(rk), dimension(:, :), intent(inout) :: coords
+   real(rk), dimension(:,:), intent(inout) :: coords
    real(rk), dimension(3), intent(in) :: travec
    integer :: i
 
@@ -145,22 +144,8 @@ subroutine translate_coords(coords, travec)
    end do
 end subroutine
 
-function translated_coords(coords, travec)
-   real(rk), dimension(:, :), intent(in) :: coords
-   real(rk), dimension(3), intent(in) :: travec
-   ! Local variables
-   real(rk), allocatable :: translated_coords(:, :)
-   integer :: i
-
-   allocate (translated_coords(3, size(coords, dim=2)))
-
-   do i = 1, size(coords, dim=2)
-      translated_coords(:, i) = coords(:, i) + travec(:)
-   end do
-end function
-
 subroutine rotate_coords(coords, rotquat, center)
-   real(rk), dimension(:, :), intent(inout) :: coords
+   real(rk), dimension(:,:), intent(inout) :: coords
    real(rk), dimension(4), intent(in) :: rotquat
    real(rk), intent(in) :: center(3)
    ! Local variables
@@ -181,13 +166,13 @@ subroutine rotate_coords(coords, rotquat, center)
 end subroutine
 
 subroutine mirror_coords(coords)
-   real(rk), dimension(:, :), intent(inout) :: coords
+   real(rk), dimension(:,:), intent(inout) :: coords
 
    coords(1, :) = -coords(1, :)
 end subroutine
 
 function centroid(coords)
-   real(rk), dimension(:, :), intent(in) :: coords
+   real(rk), dimension(:,:), intent(in) :: coords
    ! Local variables
    integer :: i
    real(rk) :: centroid(3)

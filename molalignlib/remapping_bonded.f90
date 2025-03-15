@@ -31,7 +31,6 @@ use lcrs_tree
 use partitioning
 use reactivity
 use registry
-!use backtracking
 
 implicit none
 
@@ -48,7 +47,7 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
    integer :: num_trials, num_steps
    integer, dimension(:), allocatable :: elnums1, elnums2
    real(rk), dimension(:,:), allocatable :: coords1, coords2
-   logical, dimension(:, :), allocatable :: adjmat1, adjmat2
+   logical, dimension(:,:), allocatable :: adjmat1, adjmat2
    real(rk) :: step_rotation(4), total_rotation(4)
    real(rk) :: center1(3), center2(3)
    real(rk) :: dist
@@ -154,7 +153,7 @@ end subroutine
 subroutine assign_atoms_conf( mnatree, mol1, mol2, coords1, coords2, atomperm, dist)
    type(mol_type), intent(in) :: mol1, mol2
    type(tree_node), intent(in) :: mnatree
-   real(rk), dimension(:, :), intent(in) :: coords1, coords2
+   real(rk), dimension(:,:), intent(in) :: coords1, coords2
    integer, dimension(:), intent(out) :: atomperm
    real(rk), intent(out) :: dist
    ! Local variables
@@ -181,7 +180,7 @@ end subroutine
 !subroutine assign_atoms_conf( mnatypes, mol1, mol2, coords1, coords2, atomperm, dist)
 !   type(mol_type), intent(in) :: mol1, mol2
 !   type(bipartition_container), intent(in) :: mnatypes
-!   real(rk), dimension(:, :), intent(in) :: coords1, coords2
+!   real(rk), dimension(:,:), intent(in) :: coords1, coords2
 !   integer, dimension(:), intent(out) :: atomperm
 !   real(rk), intent(out) :: dist
 !   ! Local variables
@@ -196,7 +195,7 @@ end subroutine
 !recursive subroutine assign_atoms_conf_rec( submnatypes, mol1, mol2, coords1, coords2, atomperm, dist)
 !   type(mol_type), intent(in) :: mol1, mol2
 !   type(bipartition_container), intent(inout) :: submnatypes
-!   real(rk), dimension(:, :), intent(in) :: coords1, coords2
+!   real(rk), dimension(:,:), intent(in) :: coords1, coords2
 !   integer, dimension(:), intent(out) :: atomperm
 !   real(rk), intent(out) :: dist
 !   ! Local variables
@@ -221,7 +220,7 @@ end subroutine
 !subroutine assign_atoms_conf( mnatypes, mol1, mol2, coords1, coords2, atomperm, dist)
 !   type(mol_type), intent(in) :: mol1, mol2
 !   type(bipartition_container), intent(in) :: mnatypes
-!   real(rk), dimension(:, :), intent(in) :: coords1, coords2
+!   real(rk), dimension(:,:), intent(in) :: coords1, coords2
 !   integer, dimension(:), intent(out) :: atomperm
 !   real(rk), intent(out) :: dist
 !   ! Local variables

@@ -42,7 +42,7 @@ end function
 
 subroutine shuffle(a)
 ! Fisher-Yates shuffle
-   integer, intent(inout) :: a(:)
+   integer, dimension(:), intent(inout) :: a
    integer :: i, j, temp
    do i = size(a), 2, -1
 !      j = int(random_standard_uniform() * i) + 1
@@ -54,7 +54,7 @@ subroutine shuffle(a)
 end subroutine
 
 function random_element(a) result(e)
-   integer, intent(in) :: a(:)
+   integer, dimension(:), intent(in) :: a
    integer :: i, e
    i = random_uniform_integer(1, size(a))
    e = a(i)

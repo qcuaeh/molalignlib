@@ -35,10 +35,10 @@ end function
 
 ! Get the inverse perm of perm
 function inverse_perm(perm)
-   integer, intent(in) :: perm(:)
+   integer, dimension(:), intent(in) :: perm
    ! Local variables
    integer :: i
-   integer, allocatable :: inverse_perm(:)
+   integer, dimension(:), allocatable :: inverse_perm
 
    allocate (inverse_perm(size(perm)))
 
@@ -50,7 +50,7 @@ end function
 
 logical function is_perm(arr)
    implicit none
-   integer, intent(in) :: arr(:)
+   integer, dimension(:), intent(in) :: arr
    integer :: i, N
    logical :: seen(size(arr))
 

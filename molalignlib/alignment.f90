@@ -34,7 +34,7 @@ contains
 subroutine molecule_align( mol1, mol2, coords2)
 
    type(mol_type), intent(in) :: mol1, mol2
-   real(rk), allocatable, intent(out) :: coords2(:,:)
+   real(rk), dimension(:,:), allocatable, intent(out) :: coords2
    ! Local variables
    type(tree_node), pointer :: eltree
    type(bipartition_container) :: eltypes

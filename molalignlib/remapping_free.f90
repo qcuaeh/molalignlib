@@ -38,7 +38,7 @@ subroutine remap_free_atoms(mol1, mol2, results)
    ! Local variables
    type(tree_node), pointer :: eltree
    type(bipartition_container) :: eltypes
-   type(boolmatrix_type), allocatable :: prunes(:)
+   type(bool_matrix), dimension(:), allocatable :: prunes
    integer :: num_steps
    integer, dimension(:), allocatable :: atomperm, auxperm
    integer, dimension(:), allocatable :: elnums1, elnums2

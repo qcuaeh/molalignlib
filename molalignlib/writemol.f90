@@ -28,7 +28,7 @@ subroutine writexyz(unit, mol)
    integer, intent(in) :: unit
    type(mol_type) :: mol
    ! Local varibles
-   type(atom_type), allocatable :: atoms(:)
+   type(atom_type), dimension(:), allocatable :: atoms
    integer :: i
 
    atoms = mol%atoms
@@ -46,9 +46,9 @@ subroutine writemol2(unit, mol)
    integer, intent(in) :: unit
    type(mol_type) :: mol
    ! Local variables
-   real(rk), allocatable :: coords(:, :)
-   type(bond_type), allocatable :: bonds(:)
-   type(atom_type), allocatable :: atoms(:)
+   real(rk), dimension(:,:), allocatable :: coords
+   type(bond_type), dimension(:), allocatable :: bonds
+   type(atom_type), dimension(:), allocatable :: atoms
    integer :: i
 
    atoms = mol%atoms

@@ -17,7 +17,7 @@
 module biasing
 use parameters
 use globals
-use common_types
+use basetypes
 use sorting
 use strutils
 use molecule
@@ -30,7 +30,7 @@ contains
 subroutine compute_mna_biases( mol1, mol2, eltypes, biases)
    type(mol_type), intent(in) :: mol1, mol2
    type(bipartition_container), intent(in) :: eltypes
-   type(intmatrix_type), dimension(:), allocatable, intent(out) :: biases
+   type(int_matrix), dimension(:), allocatable, intent(out) :: biases
    ! Local variables
    type(tree_node), pointer :: mnatypes
    type(tree_node_ptr), dimension(:), allocatable :: itemdir1, itemdir2
@@ -39,8 +39,8 @@ subroutine compute_mna_biases( mol1, mol2, eltypes, biases)
    allocate (biases(eltypes%num_parts))
 
    do h = 1, eltypes%num_parts
-      allocate (biases(h)%n(eltypes%parts(h)%num_items1, eltypes%parts(h)%num_items2))
-      biases(h)%n = 0
+      allocate (biases(h)%ee(eltypes%parts(h)%num_items1, eltypes%parts(h)%num_items2))
+      biases(h)%ee = 0
    end do
 
    call tree_from_partition(eltypes, mnatypes)
@@ -66,7 +66,7 @@ subroutine compute_mna_biases( mol1, mol2, eltypes, biases)
             do i = 1, eltypes%parts(h)%num_items1
                iatom = eltypes%parts(h)%indices1(i)
                if (.not. associated(mnatypes%itemdir1(iatom)%ptr, mnatypes%itemdir2(jatom)%ptr)) then
-                  biases(h)%n(i, j) = biases(h)%n(i, j) + 1
+                  biases(h)%ee(i, j) = biases(h)%ee(i, j) + 1
                end if
             end do
          end do
@@ -79,7 +79,7 @@ subroutine compute_mna_biases( mol1, mol2, eltypes, biases)
 !   do h = 1, eltypes%num_parts
 !      write (stderr, *)
 !      do j = 1, eltypes%parts(h)%num_items2
-!         write (stderr, '(*(i2))') biases(h)%n(:eltypes%parts(h)%num_items1, j)
+!         write (stderr, '(*(i2))') biases(h)%ee(:eltypes%parts(h)%num_items1, j)
 !      end do
 !   end do
 

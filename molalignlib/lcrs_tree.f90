@@ -5,27 +5,27 @@ private
 
 type, public :: partition_part
    integer :: num_items
-   integer, allocatable :: items(:)
+   integer, dimension(:), allocatable :: items
 end type
 
 type, public :: partition_container
    integer :: num_parts
-   type(partition_part), allocatable :: parts(:)
-   integer, allocatable :: itemdir(:)
+   type(partition_part), dimension(:), allocatable :: parts
+   integer, dimension(:), allocatable :: itemdir
 end type
 
 type, public :: bipartition_part
    integer :: num_items1
    integer :: num_items2
-   integer, allocatable :: indices1(:)
-   integer, allocatable :: indices2(:)
+   integer, dimension(:), allocatable :: indices1
+   integer, dimension(:), allocatable :: indices2
 end type
 
 type, public :: bipartition_container
    integer :: num_parts
-   type(bipartition_part), allocatable :: parts(:)
-   integer, allocatable :: itemdir1(:)
-   integer, allocatable :: itemdir2(:)
+   type(bipartition_part), dimension(:), allocatable :: parts
+   integer, dimension(:), allocatable :: itemdir1
+   integer, dimension(:), allocatable :: itemdir2
 end type
 
 type, public :: item_node
@@ -42,8 +42,8 @@ type, public :: tree_node
    type(tree_node), pointer :: next_sibling
    type(item_node), pointer :: first_item1
    type(item_node), pointer :: first_item2
-   type(tree_node_ptr), pointer :: itemdir1(:)
-   type(tree_node_ptr), pointer :: itemdir2(:)
+   type(tree_node_ptr), dimension(:), pointer :: itemdir1
+   type(tree_node_ptr), dimension(:), pointer :: itemdir2
 end type
 
 type, public :: tree_node_ptr
