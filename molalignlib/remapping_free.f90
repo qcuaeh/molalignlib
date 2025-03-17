@@ -33,7 +33,7 @@ contains
 
 subroutine remap_free_atoms(mol1, mol2, results)
    type(mol_type), intent(in) :: mol1, mol2
-   type(rmsd_registry), intent(out) :: results
+   type(atomperm_registry), intent(out) :: results
 
    ! Local variables
    type(tree_node), pointer :: eltree

@@ -34,26 +34,22 @@ implicit none
 
 contains
 
-subroutine remove_reactive_bonds( mol1, mol2, eltypes, atomperm)
-   type(mol_type), intent(inout) :: mol1, mol2
+subroutine find_reactive_bonds( mol1, mol2, eltypes, atomperm)
+   type(mol_type), intent(in) :: mol1, mol2
    type(bipartition_container), intent(in) :: eltypes
    integer, dimension(:), intent(out) :: atomperm
 
    ! Local variables
-   type(adjd_registry), target :: results
+   type(topoatomperm_registry), target :: results
    type(tree_node), pointer :: mnatree
    type(bipartition_container) :: mnatypes
    type(int_list), dimension(:), allocatable :: molfrags1, molfrags2
    type(int_matrix), dimension(:), allocatable :: biases
-   integer, dimension(:), allocatable :: auxperm, invatomperm
+   integer, dimension(:), allocatable :: auxperm
    integer, dimension(:), allocatable :: elnums1, elnums2
    logical, dimension(:,:), allocatable :: adjmat1, adjmat2
    real(rk), dimension(:,:), allocatable :: coords1, coords2
-   real(rk) :: step_rotation(4), total_rotation(4)
    real(rk) :: center1(3), center2(3)
-   integer :: j, iatom, jatom, num_steps
-!   integer, dimension(:), allocatable :: indices1, indices2
-!   integer :: k, katom
 
    allocate (auxperm, mold=atomperm)
 
@@ -95,40 +91,37 @@ subroutine remove_reactive_bonds( mol1, mol2, eltypes, atomperm)
    call random_initialize()
 
    ! Initialize local minima registry
-   call registry_init(results, max_records, coords1, adjmat1)
+   call registry_init( results, max_records, adjmat1)
 
    ! Optimize atom permutation
    do while (results%records(1)%count < max_count .and. results%num_trials < max_trials)
 
-      ! Aply a random rotation to coords2
-      call rotate_coords(coords2, randrotquat(), center1)
-
       ! Assign atoms with current orientation
-      call assign_atoms_biased(eltypes, coords1, coords2, biases, atomperm)
-      total_rotation = optimal_rotation(atomperm, coords1, coords2, center1)
-      call rotate_coords(coords2, total_rotation, center1)
-      num_steps = 1
-
-      do while (iter_flag)
-         call assign_atoms_biased(eltypes, coords1, coords2, biases, auxperm)
-         if (all(auxperm == atomperm)) exit
-         atomperm = auxperm
-         step_rotation = optimal_rotation(atomperm, coords1, coords2, center1)
-         call rotate_coords(coords2, step_rotation, center1)
-         total_rotation = quatmul(step_rotation, total_rotation)
-         num_steps = num_steps + 1
-      end do
-
+      call assign_atoms_biased( eltypes, coords1, coords2, biases, atomperm)
+      ! Reassign mismatches
       call minadjdiff( eltypes, mnatypes, molfrags1, mol1, mol2, coords1, coords2, atomperm)
-
       ! Update results
-      call registry_push( results, coords2, adjmat2, atomperm, num_steps, total_rotation)
+      call registry_push( results, adjmat2, atomperm)
 
    end do
 
-   ! Remove reactive bonds
-
    atomperm = results%records(1)%atomperm
+end subroutine
+
+subroutine remove_reactive_bonds( mol1, mol2, eltypes, atomperm)
+   ! Remove reactive bonds
+   type(mol_type), intent(inout) :: mol1, mol2
+   type(bipartition_container), intent(in) :: eltypes
+   integer, dimension(:), intent(in) :: atomperm
+   ! Local variables
+   logical, dimension(:,:), allocatable :: adjmat1, adjmat2
+   integer, dimension(:), allocatable :: invatomperm
+   integer :: j, iatom, jatom
+!   integer, dimension(:), allocatable :: indices1, indices2
+!   integer :: k, katom
+
+   adjmat1 = get_adjmat(mol1)
+   adjmat2 = get_adjmat(mol2)
    invatomperm = inverse_perm(atomperm)
 
    ! Remove mismatched bonds
@@ -189,7 +182,6 @@ subroutine remove_reactive_bonds( mol1, mol2, eltypes, atomperm)
 !         end do
 !      end if
 !   end do
-
 end subroutine
 
 end module

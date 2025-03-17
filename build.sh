@@ -7,6 +7,7 @@ to_array() {
 }
 
 build_library() {
+   local -a compile_list
    if $full_build; then
       full_build=false
       if test -d build; then
@@ -50,16 +51,18 @@ build_library() {
    popd >/dev/null
 }
 
-build_program() {
-   if test -z "$1"; then
-      echo Error: name is empty
-      exit 1
-   fi
-   echo Building program ${1%.*}...
-   cp "$rootdir/$1" "$buildir"
-   pushd "$buildir" > /dev/null
-   "$F90" "${comp_flags[@]}" "${link_flags[@]}" "$1" molalignlib.a -o "${1%.*}"
-   popd > /dev/null
+build_programs() {
+   local -a compile_list
+   while IFS= read -r srcfile; do
+      cp "$libdir/$srcfile" "$buildir"
+      compile_list+=("$srcfile")
+   done < <(grep -v ^# "$libdir/program_files")
+   pushd "$buildir" >/dev/null
+   for srcfile in "${compile_list[@]}"; do
+      echo Building program ${srcfile%.*}...
+      "$F90" "${comp_flags[@]}" "${link_flags[@]}" "$srcfile" molalignlib.a -o "${srcfile%.*}"
+   done
+   popd >/dev/null
 }
 
 run_tests() {
@@ -157,15 +160,14 @@ done
 
 shift $((OPTIND-1))
 
+# Build static library and programs
 if $build_flag; then
-   # Build program
    build_library
-   build_program atomalign.f90
-   build_program molalign.f90
+   build_programs
 fi
 
+# Run tests
 if $test_flag; then
-   # Run tests
    run_tests prune17 jcim.2c01187/0.05 -remap -prune rd -tol 0.17
 #   run_tests bondbiasmna MOBH35-shuffled -remap -bond -bias mna
 #   run_tests bondbiasmnaback MOBH35-shuffled -remap -bond -bias mna -back

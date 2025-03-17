@@ -32,9 +32,10 @@ subroutine compute_mna_biases( mol1, mol2, eltypes, biases)
    type(bipartition_container), intent(in) :: eltypes
    type(int_matrix), dimension(:), allocatable, intent(out) :: biases
    ! Local variables
-   type(tree_node), pointer :: mnatypes
+   type(tree_node), pointer :: mnatree
    type(tree_node_ptr), dimension(:), allocatable :: itemdir1, itemdir2
-   integer :: h, i, j, iatom, jatom, level
+   integer :: level, num_leaves
+   integer :: h, i, j, iatom, jatom
 
    allocate (biases(eltypes%num_parts))
 
@@ -43,36 +44,36 @@ subroutine compute_mna_biases( mol1, mol2, eltypes, biases)
       biases(h)%ee = 0
    end do
 
-   call tree_from_partition(eltypes, mnatypes)
+   call tree_from_partition(eltypes, mnatree)
    level = 0
 
    do
 
 !      write (stderr, *)
 !      write (stderr, '(a)') repeat('-- level '//str(level)//' --', 6)
-!      call print_tree(mnatypes)
+!      call print_tree(mnatree)
 
-      itemdir1 = mnatypes%itemdir1
-      itemdir2 = mnatypes%itemdir2
+      itemdir1 = mnatree%itemdir1
+      itemdir2 = mnatree%itemdir2
+      num_leaves = mnatree%num_leaves
       ! Compute next level MNA types
-      call compute_nextlevelmnatypes(mol1, mol2, itemdir1, itemdir2, mnatypes)
+      call compute_nextlevelmnatypes(mol1, mol2, itemdir1, itemdir2, mnatree)
       ! Exit loop if types did not change
-      if (all(mnatypes%itemdir1 == itemdir1) .and. &
-          all(mnatypes%itemdir2 == itemdir2)) exit
+      if (mnatree%num_leaves == num_leaves) exit
+
+      level = level + 1
 
       do h = 1, eltypes%num_parts
          do j = 1, eltypes%parts(h)%num_items2
             jatom = eltypes%parts(h)%indices2(j)
             do i = 1, eltypes%parts(h)%num_items1
                iatom = eltypes%parts(h)%indices1(i)
-               if (.not. associated(mnatypes%itemdir1(iatom)%ptr, mnatypes%itemdir2(jatom)%ptr)) then
+               if (.not. associated(mnatree%itemdir1(iatom)%ptr, mnatree%itemdir2(jatom)%ptr)) then
                   biases(h)%ee(i, j) = biases(h)%ee(i, j) + 1
                end if
             end do
          end do
       end do
-
-      level = level + 1
 
    end do
 
@@ -82,7 +83,6 @@ subroutine compute_mna_biases( mol1, mol2, eltypes, biases)
 !         write (stderr, '(*(i2))') biases(h)%ee(:eltypes%parts(h)%num_items1, j)
 !      end do
 !   end do
-
 end subroutine
 
 end module

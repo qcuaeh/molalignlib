@@ -38,7 +38,7 @@ contains
 
 subroutine remap_bonded_atoms(mol1, mol2, results)
    type(mol_type), intent(inout) :: mol1, mol2
-   type(adjd_registry), target, intent(out) :: results
+   type(bondatomperm_registry), target, intent(out) :: results
 
    ! Local variables
    type(tree_node), pointer :: eltree, mnatree
@@ -86,11 +86,12 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
    adjmat2 = get_adjmat(mol2)
 
    if (reac_flag) then
-      write (stderr, *) 'adjd before', adjacencydiff( adjmat1, adjmat2)
+      call find_reactive_bonds( mol1, mol2, eltypes, atomperm)
+      write (stderr, *) 'adjd before', adjacencydiff( atomperm, adjmat1, adjmat2)
       call remove_reactive_bonds( mol1, mol2, eltypes, atomperm)
       adjmat1 = get_adjmat(mol1)
       adjmat2 = get_adjmat(mol2)
-      write (stderr, *) 'adjd after', adjacencydiff( atomperm, adjmat1, adjmat2)
+      write (stderr, *) 'adjd after ', adjacencydiff( atomperm, adjmat1, adjmat2)
    end if
 
    ! Recompute MNA types

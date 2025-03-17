@@ -1,5 +1,6 @@
 module lcrs_tree
 use iso_fortran_env, only: stdout => error_unit
+use iso_c_binding, only: c_loc, c_intptr_t
 implicit none
 private
 
@@ -251,7 +252,7 @@ recursive subroutine delete_subtree(node)
       end do
    end if
 
-   ! Delete all items of the node using the reusable procedure
+   ! Delete all items of the node
    call deallocate_items(node%first_item1)
    call deallocate_items(node%first_item2)
 
@@ -272,7 +273,6 @@ subroutine delete_tree(root)
 
    ! Delete the entire tree structure
    call delete_subtree(root)
-
 end subroutine
 
 subroutine flatten_tree(root)
@@ -559,17 +559,15 @@ recursive subroutine print_subtree(node, indent)
    write (stdout, *)
 end subroutine
 
-subroutine print_itemdir(node)
-   type(tree_node), intent(in) :: node
+subroutine print_itemdir(itemdir)
+   type(tree_node_ptr), dimension(:), intent(in) :: itemdir
    integer :: i
 
-   do i = 1, size(node%itemdir1)
-      if (associated(node%itemdir1(i)%ptr)) then
-         write(stdout,'(A,I0,A)') "  Item ", i, " -> Node ("
-         call print_items(node%itemdir1(i)%ptr)
-         write(stdout,'(A)') ")"
+   do i = 1, size(itemdir)
+      if (associated(itemdir(i)%ptr)) then
+         write(stdout,'(A,I2,A,Z8)') "  Item ", i, " -> Node ", transfer(c_loc(itemdir(i)%ptr), c_intptr_t)
       else
-         write(stdout,'(A,I0,A)') "  Item ", i, " -> Not associated"
+         write(stdout,'(A,I2,A)') "  Item ", i, " -> Not associated"
       end if
    end do
 end subroutine
