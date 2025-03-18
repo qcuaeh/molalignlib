@@ -69,6 +69,8 @@ public add_new_item1
 public add_new_item2
 public add_item1
 public add_item2
+public move_next_item1
+public move_next_item2
 public move_node_items
 public partition_from_tree
 public tree_from_partition
@@ -194,28 +196,46 @@ subroutine add_item2(node, item)
    node%num_items2 = node%num_items2 + 1
 end subroutine
 
-subroutine move_node_items(from, dest)
-   type(tree_node), intent(inout) :: from, dest
-   type(item_node), pointer :: item, next_item
+subroutine move_next_item1(srce, dest)
+   type(tree_node), intent(inout) :: srce
+   type(tree_node), target, intent(inout) :: dest
+   type(item_node), pointer :: srce_second_item1, dest_first_item1
 
-   item => from%first_item1
-   do while (associated(item))
-      next_item => item%next
-      call add_item1(dest, item)
-      item => next_item
+   srce_second_item1 => srce%first_item1%next
+   dest_first_item1 => dest%first_item1
+   dest%itemdir1(srce%first_item1%index)%ptr => dest
+   dest%first_item1 => srce%first_item1
+   dest%first_item1%next => dest_first_item1
+   srce%first_item1 => srce_second_item1
+   srce%num_items1 = srce%num_items1 - 1
+   dest%num_items1 = dest%num_items1 + 1
+end subroutine
+
+subroutine move_next_item2(srce, dest)
+   type(tree_node), intent(inout) :: srce
+   type(tree_node), target, intent(inout) :: dest
+   type(item_node), pointer :: srce_second_item2, dest_first_item2
+
+   srce_second_item2 => srce%first_item2%next
+   dest_first_item2 => dest%first_item2
+   dest%itemdir2(srce%first_item2%index)%ptr => dest
+   dest%first_item2 => srce%first_item2
+   dest%first_item2%next => dest_first_item2
+   srce%first_item2 => srce_second_item2
+   srce%num_items2 = srce%num_items2 - 1
+   dest%num_items2 = dest%num_items2 + 1
+end subroutine
+
+subroutine move_node_items(srce, dest)
+   type(tree_node), intent(inout) :: srce, dest
+
+   do while (associated(srce%first_item1))
+      call move_next_item1(srce, dest)
    end do
 
-   item => from%first_item2
-   do while (associated(item))
-      next_item => item%next
-      call add_item2(dest, item)
-      item => next_item
+   do while (associated(srce%first_item2))
+      call move_next_item2(srce, dest)
    end do
-
-   from%num_items1 = 0
-   from%num_items2 = 0
-   from%first_item1 => null()
-   from%first_item2 => null()
 end subroutine
 
 subroutine deallocate_items(first_item)

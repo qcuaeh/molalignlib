@@ -170,7 +170,7 @@ subroutine assign_atoms_conf( mnatree, mol1, mol2, coords1, coords2, atomperm, d
       assigned = .false.
       call reduce_partial_matches(submnatree, assigned)
       if (.not. assigned) exit
-      call compute_consistent_mnatypes(mol1, mol2, submnatree)
+      call recompute_consistent_mnatypes(mol1, mol2, submnatree)
       call flatten_tree(submnatree)
       call print_tree(submnatree)
    end do

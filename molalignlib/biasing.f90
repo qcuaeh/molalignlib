@@ -33,7 +33,6 @@ subroutine compute_mna_biases( mol1, mol2, eltypes, biases)
    type(int_matrix), dimension(:), allocatable, intent(out) :: biases
    ! Local variables
    type(tree_node), pointer :: mnatree
-   type(tree_node_ptr), dimension(:), allocatable :: itemdir1, itemdir2
    integer :: level, num_leaves
    integer :: h, i, j, iatom, jatom
 
@@ -53,11 +52,9 @@ subroutine compute_mna_biases( mol1, mol2, eltypes, biases)
 !      write (stderr, '(a)') repeat('-- level '//str(level)//' --', 6)
 !      call print_tree(mnatree)
 
-      itemdir1 = mnatree%itemdir1
-      itemdir2 = mnatree%itemdir2
       num_leaves = mnatree%num_leaves
       ! Compute next level MNA types
-      call compute_nextlevelmnatypes(mol1, mol2, itemdir1, itemdir2, mnatree)
+      call compute_nextlevelmnatypes(mol1, mol2, mnatree)
       ! Exit loop if types did not change
       if (mnatree%num_leaves == num_leaves) exit
 
