@@ -218,21 +218,18 @@ subroutine compute_nextlevelmnatypes(mol1, mol2, mnatree)
 ! Compute next level MNA types
 
    type(mol_type), intent(in) :: mol1, mol2
-   type(tree_node), pointer, intent(inout) :: mnatree
+   type(polytree_node), pointer, intent(inout) :: mnatree
+
    ! Local variables
    type(tree_node), pointer :: child, new_root, aux_root
 
-   new_root => make_new_root(size(mnatree%itemdir1), size(mnatree%itemdir2))
+   child => mnatree%first_root%first_child
+   new_root => add_new_root(mnatree)
 
-   child => mnatree%first_child
    do while (associated(child))
       call compute_mnatype(mol1, mol2, child, new_root)
       child => child%next_sibling
    end do
-
-   aux_root => mnatree
-   mnatree => new_root
-   mnatree%next_sibling => aux_root
 end subroutine
 
 subroutine compute_consistent_mnatypes(mol1, mol2, mnatree)
@@ -240,21 +237,25 @@ subroutine compute_consistent_mnatypes(mol1, mol2, mnatree)
 
    type(mol_type), intent(in) :: mol1, mol2
    type(tree_node), pointer, intent(inout) :: mnatree
+
    ! Local variables
-   integer :: num_leaves
+   type(polytree_node), pointer :: polytree
+
+   polytree => new_polytree(size(mnatree%itemdir1), size(mnatree%itemdir2))
+   polytree%first_root => mnatree
 
    do
 
-      num_leaves = mnatree%num_leaves
-
       ! Compute MNA upper level types
-      call compute_nextlevelmnatypes(mol1, mol2, mnatree)
-!      call print_tree(mnatree)
+      call compute_nextlevelmnatypes(mol1, mol2, polytree)
+!      call print_tree(mnatree%first_child)
 
       ! Exit loop if types did not change
-      if (mnatree%num_leaves == num_leaves) exit
+      if (polytree%first_root%num_leaves == polytree%first_root%next_sibling%num_leaves) exit
 
    end do
+
+   mnatree => polytree%first_root
 end subroutine
 
 subroutine recompute_mnatype(mol1, mol2, itemdir1, itemdir2, inode)

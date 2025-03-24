@@ -47,6 +47,13 @@ type, public :: tree_node
    type(tree_node_ptr), dimension(:), pointer :: itemdir2
 end type
 
+type, public :: polytree_node
+   integer :: num_roots
+   integer :: size_itemdir1
+   integer :: size_itemdir2
+   type(tree_node), pointer :: first_root
+end type
+
 type, public :: tree_node_ptr
    type(tree_node), pointer :: ptr
 end type
@@ -84,6 +91,12 @@ public print_partition
 public operator(==)
 public assignment(=)
 
+! New public types and procedures
+public :: new_polytree
+public :: add_new_root
+public :: delete_polytree
+public :: partitionlist_from_polytree
+public :: polytree_from_partition
 contains
 
 elemental function treenodeptr_equality(left, right) result(equality)
@@ -345,113 +358,84 @@ end subroutine flatten_tree
 subroutine flat_tree_assign(flat_root, root)
    type(tree_node), pointer, intent(out) :: flat_root
    type(tree_node), target, intent(in) :: root
-
+   type(tree_node), pointer :: child, new_child
+   type(item_node), pointer :: item
+   
    ! Create root node with same directory sizes as original
    flat_root => make_new_root(size(root%itemdir1), size(root%itemdir2))
-
-   ! Find all leaves in the original tree and add them as direct children to the flat tree
-   call collect_leaf_nodes(root, flat_root)
-
-contains   
-   recursive subroutine collect_leaf_nodes(src_node, dest_root)
-      type(tree_node), intent(in) :: src_node
-      type(tree_node), intent(inout) :: dest_root
-      type(tree_node), pointer :: child
-      type(item_node), pointer :: item
-      type(tree_node), pointer :: new_child
-
-      if (associated(src_node%first_child)) then
-         ! Internal node - process children
-         child => src_node%first_child
-         do
-            call collect_leaf_nodes(child, dest_root)
-            if (.not. associated(child%next_sibling)) exit
-            child => child%next_sibling
-         end do
-      else
-         ! Leaf node - create a new child in the flat tree
-         new_child => add_new_child(dest_root)
-         ! Copy items from original leaf to new child
-         item => src_node%first_item1
-         do while (associated(item))
-            call add_new_item1(new_child, item%index)
-            item => item%next
-         end do
-         item => src_node%first_item2
-         do while (associated(item))
-            call add_new_item2(new_child, item%index)
-            item => item%next
-         end do
-      end if
-   end subroutine
+   
+   ! Process each leaf node and create a corresponding child in flat tree
+   child => root%first_child
+   do while (associated(child))
+      ! Create a new child in the flat tree
+      new_child => add_new_child(flat_root)
+      
+      ! Copy items from first list
+      item => child%first_item1
+      do while (associated(item))
+         call add_new_item1(new_child, item%index)
+         item => item%next
+      end do
+      
+      ! Copy items from second list
+      item => child%first_item2
+      do while (associated(item))
+         call add_new_item2(new_child, item%index)
+         item => item%next
+      end do
+      
+      ! Move to next child
+      child => child%next_sibling
+   end do
 end subroutine
 
 subroutine partition_from_tree(root, partition)
    type(tree_node), intent(in) :: root
    type(bipartition_container), intent(out) :: partition
-   integer :: leaf_index
+   integer :: i, j
+   type(tree_node), pointer :: child
+   type(item_node), pointer :: item
 
-   ! Set number of parts equal to number of leaves
-   partition%num_parts = root%num_leaves
+   ! Set number of parts equal to number of leaf nodes (children of root)
+   partition%num_parts = root%num_childs
    allocate(partition%parts(partition%num_parts))
 
    ! Allocate item directories same size as tree's directories
    allocate(partition%itemdir1(size(root%itemdir1)))
    allocate(partition%itemdir2(size(root%itemdir2)))
 
-   ! Initialize leaf index
-   leaf_index = 1
+   ! Process each child (leaf) directly
+   child => root%first_child
+   do i = 1, partition%num_parts
+      if (.not. associated(child)) error stop 'Unexpected null child'
 
-   ! Traverse tree and collect items
-   call collect_items(root, partition, leaf_index)
+      ! Set item counts for this part
+      partition%parts(i)%num_items1 = child%num_items1
+      partition%parts(i)%num_items2 = child%num_items2
 
-contains
-   recursive subroutine collect_items(node, partition, leaf_idx)
-      type(tree_node), intent(in) :: node
-      type(bipartition_container), intent(inout) :: partition
-      integer, intent(inout) :: leaf_idx
-      type(tree_node), pointer :: child
-      type(item_node), pointer :: item
-      integer :: i
+      ! Allocate arrays for indices
+      allocate(partition%parts(i)%indices1(child%num_items1))
+      allocate(partition%parts(i)%indices2(child%num_items2))
 
-      if (.not. associated(node%first_child)) then
-         ! This is a leaf - collect its items
-         partition%parts(leaf_idx)%num_items1 = node%num_items1
-         partition%parts(leaf_idx)%num_items2 = node%num_items2
+      ! Copy indices1 and update directory
+      item => child%first_item1
+      do j = 1, child%num_items1
+         partition%parts(i)%indices1(j) = item%index
+         partition%itemdir1(item%index) = i
+         item => item%next
+      end do
 
-         allocate(partition%parts(leaf_idx)%indices1(node%num_items1))
-         allocate(partition%parts(leaf_idx)%indices2(node%num_items2))
+      ! Copy indices2 and update directory
+      item => child%first_item2
+      do j = 1, child%num_items2
+         partition%parts(i)%indices2(j) = item%index
+         partition%itemdir2(item%index) = i
+         item => item%next
+      end do
 
-         ! Collect indices1 and update directory
-         i = 1
-         item => node%first_item1
-         do while (associated(item))
-            partition%parts(leaf_idx)%indices1(i) = item%index
-            partition%itemdir1(item%index) = leaf_idx
-            i = i + 1
-            item => item%next
-         end do
-
-         ! Collect indices2 and update directory
-         i = 1
-         item => node%first_item2
-         do while (associated(item))
-            partition%parts(leaf_idx)%indices2(i) = item%index
-            partition%itemdir2(item%index) = leaf_idx
-            i = i + 1
-            item => item%next
-         end do
-
-         leaf_idx = leaf_idx + 1
-      else
-         ! Process children
-         child => node%first_child
-         do while (associated(child))
-            call collect_items(child, partition, leaf_idx)
-            child => child%next_sibling
-         end do
-      end if
-   end subroutine
+      ! Move to next child
+      child => child%next_sibling
+   end do
 end subroutine
 
 subroutine tree_from_partition(partition, root)
@@ -643,6 +627,94 @@ subroutine print_partition(partition)
 !   do i = 1, size(partition%itemdir2)
 !      write(stdout,'(A,I0,A,I0)') "  Item ", i, " -> Part ", partition%itemdir2(i)
 !   end do
+end subroutine
+
+! Makes a new polytree root with no trees
+function new_polytree(size_itemdir1, size_itemdir2)
+   integer, intent(in) :: size_itemdir1, size_itemdir2
+   type(polytree_node), pointer :: new_polytree
+   
+   allocate(new_polytree)
+   new_polytree%num_roots = 0
+   new_polytree%size_itemdir1 = size_itemdir1
+   new_polytree%size_itemdir2 = size_itemdir2
+   new_polytree%first_root => null()
+end function
+
+! Adds a new root to a polytree
+function add_new_root(polytree) result(new_root)
+   type(polytree_node), target, intent(inout) :: polytree
+   type(tree_node), pointer :: new_root
+   
+   ! Create new root with itemdir sizes inherited from polytree
+   new_root => make_new_root(polytree%size_itemdir1, polytree%size_itemdir2)
+   
+   ! Add to beginning of root list (linked list of roots)
+   new_root%next_sibling => polytree%first_root
+   polytree%first_root => new_root
+   polytree%num_roots = polytree%num_roots + 1
+end function
+
+! Deletes an entire polytree
+subroutine delete_polytree(polytree)
+   type(polytree_node), pointer, intent(inout) :: polytree
+   type(tree_node), pointer :: root, next_root
+   
+   if (.not. associated(polytree)) error stop 'Polytree not associated'
+   
+   ! Delete all tree roots
+   root => polytree%first_root
+   do while (associated(root))
+      next_root => root%next_sibling
+      call delete_tree(root)
+      root => next_root
+   end do
+   
+   ! Finally, deallocate the polytree itself
+   deallocate(polytree)
+   polytree => null()
+end subroutine
+
+! Creates an array of partition containers from a polytree
+subroutine partitionlist_from_polytree(polytree, partitions)
+   type(polytree_node), intent(in) :: polytree
+   type(bipartition_container), dimension(:), allocatable, intent(out) :: partitions
+   type(tree_node), pointer :: root
+   integer :: i
+   
+   ! Allocate array of bipartitions with size equal to number of roots
+   allocate(partitions(polytree%num_roots))
+   
+   ! Process each root in the polytree
+   root => polytree%first_root
+   i = polytree%num_roots
+   
+   do while (associated(root))
+      ! Convert the current tree to a partition (process in reverse order)
+      call partition_from_tree(root, partitions(i))
+      
+      ! Move to next root
+      root => root%next_sibling
+      i = i - 1
+   end do
+end subroutine
+
+! Creates a polytree with a single tree from a partition container
+subroutine polytree_from_partition(partition, polytree)
+   type(bipartition_container), intent(in) :: partition
+   type(polytree_node), pointer, intent(out) :: polytree
+   type(tree_node), pointer :: root
+   
+   ! Create a polytree with appropriate directory sizes
+   polytree => new_polytree(size(partition%itemdir1), size(partition%itemdir2))
+   
+   ! Create a tree from the partition
+   call tree_from_partition(partition, root)
+   
+   ! Add the tree to the polytree
+   root%next_sibling => polytree%first_root
+   polytree%first_root => root
+   polytree%num_roots = 1
 end subroutine
 
 end module
