@@ -36,8 +36,8 @@ public totsqdist
 public optimal_rotation
 
 interface totsqdist
-   module procedure sqdistsum_ord
-   module procedure sqdistsum_perm
+   module procedure totsqdist_ord
+   module procedure totsqdist_perm
 end interface
 
 contains
@@ -188,13 +188,13 @@ function centroid(coords)
    centroid(:) = centroid(:) / size(coords, dim=2)
 end function
 
-real(rk) function sqdistsum_ord(coords1, coords2) result(totsqdist)
+real(rk) function totsqdist_ord(coords1, coords2) result(totsqdist)
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
 
    totsqdist = sum(sum((coords1 - coords2)**2, dim=1))
 end function
 
-real(rk) function sqdistsum_perm(atomperm, coords1, coords2) result(totsqdist)
+real(rk) function totsqdist_perm(atomperm, coords1, coords2) result(totsqdist)
    integer, dimension(:), intent(in) :: atomperm
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
 

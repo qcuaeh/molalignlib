@@ -84,8 +84,9 @@ public tree_from_partition
 public first_partition
 public second_partition
 public print_items
-public print_itemdir
+public print_itemdirs
 public print_subtree
+public print_subtree1
 public print_tree
 public print_partition
 public operator(==)
@@ -522,7 +523,7 @@ subroutine print_items(node)
    ! Print first list
    item => node%first_item1
    do while (associated(item))
-      write(stdout, '(1X,I2)', advance='no') item%index
+      write(stdout, '(1X,I0)', advance='no') item%index
       item => item%next
    end do
 
@@ -531,7 +532,7 @@ subroutine print_items(node)
    ! Print second list
    item => node%first_item2
    do while (associated(item))
-      write(stdout, '(1X,I2)', advance='no') item%index
+      write(stdout, '(1X,I0)', advance='no') item%index
       item => item%next
    end do
 
@@ -563,15 +564,66 @@ recursive subroutine print_subtree(node, indent)
    write (stdout, *)
 end subroutine
 
-subroutine print_itemdir(itemdir)
-   type(tree_node_ptr), dimension(:), intent(in) :: itemdir
+subroutine print_items1(node)
+   type(tree_node), intent(in) :: node
+   type(item_node), pointer :: item
+
+   write(stdout, '(A)', advance='no') '('
+
+   ! Print first list
+   item => node%first_item1
+   do while (associated(item))
+      write(stdout, '(1X,I0)', advance='no') item%index
+      item => item%next
+   end do
+
+   write(stdout, '(A)', advance='no') '|'
+end subroutine
+
+recursive subroutine print_subtree1(node, indent)
+   type(tree_node), intent(in) :: node
+   integer, intent(in) :: indent
+   type(tree_node), pointer :: child
+
+   if (associated(node%first_child)) then
+      child => node%first_child
+      call print_items1(node)
+      write(stdout, '(A)', advance='no') '---'
+      call print_subtree1(child, indent + 1)
+
+      child => child%next_sibling
+      do
+         if (.not. associated(child)) return
+         write(stdout, '(A,A)', advance='no') repeat('     ', indent)
+         call print_subtree1(child, indent + 1)
+         child => child%next_sibling
+      end do
+   end if
+
+   ! Leaf node
+   call print_items1(node)
+   write (stdout, *)
+end subroutine
+
+subroutine print_itemdirs(node)
+   type(tree_node), intent(in) :: node
    integer :: i
 
-   do i = 1, size(itemdir)
-      if (associated(itemdir(i)%ptr)) then
-         write(stdout,'(A,I2,A,Z8)') "  Item ", i, " -> Node ", transfer(c_loc(itemdir(i)%ptr), c_intptr_t)
+   write(stdout,'(A)') "Item Directory 1:"
+   do i = 1, size(node%itemdir1)
+      if (associated(node%itemdir1(i)%ptr)) then
+         write(stdout,'(A,I0,A,Z8)') "  Item ", i, " -> Node ", transfer(c_loc(node%itemdir1(i)%ptr), c_intptr_t)
       else
-         write(stdout,'(A,I2,A)') "  Item ", i, " -> Not associated"
+         write(stdout,'(A,I0,A)') "  Item ", i, " -> Not associated"
+      end if
+   end do
+
+   write(stdout,'(A)') "Item Directory 2:"
+   do i = 1, size(node%itemdir2)
+      if (associated(node%itemdir2(i)%ptr)) then
+         write(stdout,'(A,I0,A,Z8)') "  Item ", i, " -> Node ", transfer(c_loc(node%itemdir2(i)%ptr), c_intptr_t)
+      else
+         write(stdout,'(A,I0,A)') "  Item ", i, " -> Not associated"
       end if
    end do
 end subroutine
@@ -583,12 +635,7 @@ subroutine print_tree(root)
    write(stdout, *)
    write(stdout,'(A)') "Tree Structure:"
    call print_subtree(root, 1)
-
-   ! Print item directories
-!   write(stdout,'(A)') "Item Directory 1:"
-!   call print_itemdir(root%itemdir1)
-!   write(stdout,'(A)') "Item Directory 2:"
-!   call print_itemdir(root%itemdir2)
+!   call print_itemdirs(root)
 end subroutine
 
 subroutine print_partition(partition)
@@ -602,14 +649,14 @@ subroutine print_partition(partition)
 
       ! Print indices1
       do j = 1, partition%parts(i)%num_items1
-         write(stdout,'(1X,I2)',advance='no') partition%parts(i)%indices1(j)
+         write(stdout,'(1X,I0)',advance='no') partition%parts(i)%indices1(j)
       end do
 
       write(stdout,'(A)',advance='no') "|"
 
       ! Print indices2
       do j = 1, partition%parts(i)%num_items2
-         write(stdout,'(1X,I2)',advance='no') partition%parts(i)%indices2(j)
+         write(stdout,'(1X,I0)',advance='no') partition%parts(i)%indices2(j)
       end do
 
       write(stdout,'(A)') ")"

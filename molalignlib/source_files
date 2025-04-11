@@ -18,6 +18,7 @@ adjacency.f90
 molecule.f90
 lcrs_tree.f90
 partitioning.f90
+metapartitioning.f90
 registry.f90
 biasing.f90
 pruning.f90

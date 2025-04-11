@@ -221,7 +221,7 @@ subroutine compute_nextlevelmnatypes(mol1, mol2, mnatree)
    type(polytree_node), pointer, intent(inout) :: mnatree
 
    ! Local variables
-   type(tree_node), pointer :: child, new_root, aux_root
+   type(tree_node), pointer :: child, new_root
 
    child => mnatree%first_root%first_child
    new_root => add_new_root(mnatree)
@@ -350,42 +350,82 @@ subroutine recompute_consistent_mnatypes(mol1, mol2, mnatree)
    end do
 end subroutine
 
-subroutine assign_single_item(leaf)
-   type(tree_node), intent(inout) :: leaf
-   type(tree_node), pointer :: child
+subroutine recompute_consistent_mnatypes1(mol1, mnatree)
+! Iteratively recompute MNA types
 
-   child => add_new_child(leaf)
-   call move_next_item1(leaf, child)
-   call move_next_item2(leaf, child)
+   type(mol_type), intent(in) :: mol1
+   type(tree_node), intent(inout) :: mnatree
+   ! Local variables
+   type(tree_node_ptr), dimension(:), allocatable :: itemdir1
 
-   child => add_new_child(leaf)
-   do while (associated(leaf%first_item1))
-      call move_next_item1(leaf, child)
-      call move_next_item2(leaf, child)
+   do
+
+      itemdir1 = mnatree%itemdir1
+
+      ! Compute MNA upper level types
+      call recompute_nextlevelmnatypes1(mol1, itemdir1, mnatree)
+!      call print_tree(mnatree)
+
+      ! Exit loop if types did not change
+      if (all(mnatree%itemdir1 == itemdir1)) exit
+
    end do
 end subroutine
 
-recursive subroutine reduce_partial_matches(node, assigned)
-   type(tree_node), intent(inout) :: node
-   logical, intent(inout) :: assigned
+recursive subroutine recompute_nextlevelmnatypes1(mol1, itemdir1, inode)
+! Recompute next level MNA types
+
+   type(mol_type), intent(in) :: mol1
+   type(tree_node_ptr), dimension(:), intent(in) :: itemdir1
+   type(tree_node), intent(inout) :: inode
+   ! Local variables
    type(tree_node), pointer :: child
 
-   if (associated(node%first_child)) then
+   if (associated(inode%first_child)) then
       ! Internal node - process children
-      child => node%first_child
+      child => inode%first_child
       do
-         call reduce_partial_matches(child, assigned)
-         if (assigned) return
-         if (.not. associated(child%next_sibling)) exit
+         call recompute_nextlevelmnatypes1(mol1, itemdir1, child)
+         if (.not. associated(child%next_sibling)) return
          child => child%next_sibling
       end do
    else
-      ! Leaf node - assign single item
-      if (node%num_items1 == node%num_items2 .and. &
-          node%num_items1 > 1) then
-         call assign_single_item(node)
-         assigned = .true.
+      ! Leaf node
+      if (inode%num_items1 + inode%num_items2 > 1) then
+         ! Multiple items - update MNA type
+         call recompute_mnatype1(mol1, itemdir1, inode)
       end if
+   end if
+end subroutine
+
+subroutine recompute_mnatype1(mol1, itemdir1, inode)
+   type(mol_type), intent(in) :: mol1
+   type(tree_node_ptr), dimension(:), intent(in) :: itemdir1
+   type(tree_node), intent(inout) :: inode
+   ! Local variables
+   type(tree_node), pointer :: child
+   type(tree_node_ptr), dimension(:), allocatable :: typehood
+   type(typehood_table) :: typehoodtable
+
+   allocate (typehoodtable%items(inode%num_items1))
+   typehoodtable%num_items = 0
+
+   ! First molecule
+   do while (associated(inode%first_item1))
+      typehood = itemdir1(mol1%atoms(inode%first_item1%index)%adjlist)
+      child => find_typehood(typehoodtable, typehood)
+      if (.not. associated(child)) then
+         child => add_new_child(inode)
+         call add_typehood(typehoodtable, typehood, child)
+      end if
+      call move_next_item1(inode, child)
+   end do
+
+   ! Revert changes if only child
+   if (inode%num_childs == 1) then
+      call move_node_items(inode%first_child, inode)
+      deallocate (inode%first_child)
+      inode%num_childs = 0
    end if
 end subroutine
 

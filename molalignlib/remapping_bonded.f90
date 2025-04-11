@@ -29,6 +29,7 @@ use biasing
 use pruning
 use lcrs_tree
 use partitioning
+use metapartitioning
 use reactivity
 use registry
 
@@ -120,6 +121,8 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
    ! Initialize local minima registry
    call registry_init(results, max_records, coords1, adjmat1)
 
+!   call collect_mnatypes(mol1, mnatree)
+
    ! Optimize atom permutation
    do while (results%records(1)%count < max_count .and. results%num_trials < max_trials)
 
@@ -152,8 +155,8 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
 end subroutine
 
 subroutine assign_atoms_conf( mnatree, mol1, mol2, coords1, coords2, atomperm, dist)
-   type(mol_type), intent(in) :: mol1, mol2
    type(tree_node), intent(in) :: mnatree
+   type(mol_type), intent(in) :: mol1, mol2
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    integer, dimension(:), intent(out) :: atomperm
    real(rk), intent(out) :: dist
@@ -176,6 +179,45 @@ subroutine assign_atoms_conf( mnatree, mol1, mol2, coords1, coords2, atomperm, d
    end do
    stop
 
+end subroutine
+
+recursive subroutine reduce_partial_matches(node, assigned)
+   type(tree_node), intent(inout) :: node
+   logical, intent(inout) :: assigned
+   type(tree_node), pointer :: child
+
+   if (associated(node%first_child)) then
+      ! Internal node - process children
+      child => node%first_child
+      do
+         call reduce_partial_matches(child, assigned)
+         if (assigned) return
+         if (.not. associated(child%next_sibling)) exit
+         child => child%next_sibling
+      end do
+   else
+      ! Leaf node - assign single item
+      if (node%num_items1 == node%num_items2 .and. &
+          node%num_items1 > 1) then
+         call assign_single_item(node)
+         assigned = .true.
+      end if
+   end if
+end subroutine
+
+subroutine assign_single_item(leaf)
+   type(tree_node), intent(inout) :: leaf
+   type(tree_node), pointer :: child
+
+   child => add_new_child(leaf)
+   call move_next_item1(leaf, child)
+   call move_next_item2(leaf, child)
+
+   child => add_new_child(leaf)
+   do while (associated(leaf%first_item1))
+      call move_next_item1(leaf, child)
+      call move_next_item2(leaf, child)
+   end do
 end subroutine
 
 !subroutine assign_atoms_conf( mnatypes, mol1, mol2, coords1, coords2, atomperm, dist)
