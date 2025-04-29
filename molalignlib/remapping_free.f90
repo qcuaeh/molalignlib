@@ -36,8 +36,8 @@ subroutine remap_free_atoms(mol1, mol2, results)
    type(atomperm_registry), intent(out) :: results
 
    ! Local variables
-   type(tree_node), pointer :: eltree
-   type(bipartition_container) :: eltypes
+   type(root_node), pointer :: eltypetree
+   type(item_partition) :: eltypes
    type(bool_matrix), dimension(:), allocatable :: prunes
    integer :: num_steps
    integer, dimension(:), allocatable :: atomperm, auxperm
@@ -59,8 +59,8 @@ subroutine remap_free_atoms(mol1, mol2, results)
    end if
 
    ! Compute atomic types
-   call compute_eltypes(mol1, mol2, eltree)
-   call partition_from_tree(eltree, eltypes)
+   call compute_eltypes( mol1, mol2, eltypetree)
+   eltypes = partition_from_tree(eltypetree)
 
    ! Abort if there are conflicting atomic types
 !   if (any(sorted(eltypes%itemdir1) /= sorted(eltypes%itemdir2))) then
@@ -74,8 +74,8 @@ subroutine remap_free_atoms(mol1, mol2, results)
 
    elnums1 = mol1%atoms%elnum
    elnums2 = mol2%atoms%elnum
-   coords1 = get_coords(mol1)
-   coords2 = get_coords(mol2)
+   coords1 = get_coords( mol1)
+   coords2 = get_coords( mol2)
 
    ! Mirror coordinates
    if (mirror_flag) then
@@ -83,48 +83,48 @@ subroutine remap_free_atoms(mol1, mol2, results)
    end if
 
    ! Mass weight coordinates
-   call weight_coords(coords1, atomic_weights(elnums1))
-   call weight_coords(coords2, atomic_weights(elnums2))
+   call weight_coords( coords1, atomic_weights(elnums1))
+   call weight_coords( coords2, atomic_weights(elnums2))
 
    ! Translate atoms to their centroids
-   center1 = centroid(coords1)
-   center2 = centroid(coords2)
-   call translate_coords(coords2, -center2)
-   call translate_coords(coords2, center1)
+   center1 = centroid( coords1)
+   center2 = centroid( coords2)
+   call translate_coords( coords2, -center2)
+   call translate_coords( coords2, center1)
 
    ! Find unfeasible assignments
-   call prune_procedure(eltypes, mol1, mol2, prunes)
+   call prune_procedure( eltypes, mol1, mol2, prunes)
 
    ! Initialize random number generator
    call random_initialize()
 
    ! Initialize local minima registry
-   call registry_init(results, max_records, coords1)
+   call registry_init( results, max_records, coords1)
 
    ! Optimize atom permutation
    do while (results%records(1)%count < max_count .and. results%num_trials < max_trials)
 
       ! Aply a random rotation to coords2
-      call rotate_coords(coords2, randrotquat(), center1)
+      call rotate_coords( coords2, randrotquat(), center1)
 
       ! Assign atoms with current orientation
-      call assign_atoms_pruned(eltypes, coords1, coords2, prunes, atomperm)
-      total_rotation = optimal_rotation(atomperm, coords1, coords2, center1)
-      call rotate_coords(coords2, total_rotation, center1)
+      call assign_atoms_pruned( eltypes, coords1, coords2, prunes, atomperm)
+      total_rotation = optimal_rotation( atomperm, coords1, coords2, center1)
+      call rotate_coords( coords2, total_rotation, center1)
       num_steps = 1
 
       do while (iter_flag)
-         call assign_atoms_pruned(eltypes, coords1, coords2, prunes, auxperm)
+         call assign_atoms_pruned( eltypes, coords1, coords2, prunes, auxperm)
          if (all(auxperm == atomperm)) exit
          atomperm = auxperm
-         step_rotation = optimal_rotation(atomperm, coords1, coords2, center1)
-         call rotate_coords(coords2, step_rotation, center1)
-         total_rotation = quatmul(step_rotation, total_rotation)
+         step_rotation = optimal_rotation( atomperm, coords1, coords2, center1)
+         call rotate_coords( coords2, step_rotation, center1)
+         total_rotation = quatmul( step_rotation, total_rotation)
          num_steps = num_steps + 1
       end do
 
       ! Push local minimum to registry
-      call registry_push(results, coords2, atomperm, num_steps, total_rotation)
+      call registry_push( results, coords2, atomperm, num_steps, total_rotation)
 
    end do
 

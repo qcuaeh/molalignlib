@@ -26,47 +26,49 @@ use partitioning
 implicit none
 contains
 
+subroutine compute_mna_biases(mol1, mol2, eltypes, biases)
 ! Iteratively compute MNA types
-subroutine compute_mna_biases( mol1, mol2, eltypes, biases)
    type(mol_type), intent(in) :: mol1, mol2
-   type(bipartition_container), intent(in) :: eltypes
+   type(item_partition), intent(in) :: eltypes
    type(int_matrix), dimension(:), allocatable, intent(out) :: biases
    ! Local variables
-   type(polytree_node), pointer :: mnatree
+   type(poly_node), pointer :: mnapolytree
    integer :: level
    integer :: h, i, j, iatom, jatom
 
-   allocate (biases(eltypes%num_parts))
+   allocate(biases(eltypes%num_parts))
 
    do h = 1, eltypes%num_parts
-      allocate (biases(h)%ee(eltypes%parts(h)%num_items1, eltypes%parts(h)%num_items2))
+      allocate(biases(h)%ee(eltypes%parts(h)%num_items1, eltypes%parts(h)%num_items2))
       biases(h)%ee = 0
    end do
 
-   call polytree_from_partition(eltypes, mnatree)
+   ! Initialize mnapolytree with first tree from partition
+   mnapolytree => make_new_poly( size(eltypes%itemdir1), size(eltypes%itemdir2))
+   mnapolytree%first_root => tree_from_partition( eltypes)
    level = 0
 
    do
+!      write(stderr, *)
+!      write(stderr, '(a)') repeat('-- level '//str(level)//' --', 6)
+!      call print_tree(mnapolytree%first_root)
 
-!      write (stderr, *)
-!      write (stderr, '(a)') repeat('-- level '//str(level)//' --', 6)
-!      call print_tree(mnatree)
+      ! Compute MNA upper level types
+      call compute_nextlevel_mnas(mol1, mol2, mnapolytree)
 
-      ! Compute next level MNA types
-      call compute_nextlevelmnatypes(mol1, mol2, mnatree)
       ! Exit loop if types did not change
-      if (mnatree%first_root%num_leaves == mnatree%first_root%next_sibling%num_leaves) exit
+      if (mnapolytree%first_root%num_leaves == mnapolytree%first_root%next_root%num_leaves) exit
 
       level = level + 1
 
       do h = 1, eltypes%num_parts
          do j = 1, eltypes%parts(h)%num_items2
-            jatom = eltypes%parts(h)%indices2(j)
+            jatom = eltypes%parts(h)%items2(j)
             do i = 1, eltypes%parts(h)%num_items1
-               iatom = eltypes%parts(h)%indices1(i)
+               iatom = eltypes%parts(h)%items1(i)
                if (.not. associated( &
-                  mnatree%first_root%itemdir1(iatom)%ptr, &
-                  mnatree%first_root%itemdir2(jatom)%ptr) &
+                  mnapolytree%first_root%itemdir1(iatom)%ptr, &
+                  mnapolytree%first_root%itemdir2(jatom)%ptr) &
                ) then
                   biases(h)%ee(i, j) = biases(h)%ee(i, j) + 1
                end if
@@ -77,11 +79,13 @@ subroutine compute_mna_biases( mol1, mol2, eltypes, biases)
    end do
 
 !   do h = 1, eltypes%num_parts
-!      write (stderr, *)
+!      write(stderr, *)
 !      do j = 1, eltypes%parts(h)%num_items2
-!         write (stderr, '(*(i2))') biases(h)%ee(:eltypes%parts(h)%num_items1, j)
+!         write(stderr, '(*(i2))') biases(h)%ee(:eltypes%parts(h)%num_items1, j)
 !      end do
 !   end do
+
+   call delete_polytree(mnapolytree)  ! Added cleanup
 end subroutine
 
 end module

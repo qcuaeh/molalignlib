@@ -33,7 +33,7 @@ abstract interface
       use basetypes
       use molecule
       use lcrs_tree
-      type(bipartition_container), intent(in) :: eltypes
+      type(item_partition), intent(in) :: eltypes
       type(mol_type), intent(in) :: mol1, mol2
       type(bool_matrix), dimension(:), allocatable, intent(out) :: prunes
    end subroutine
@@ -42,7 +42,7 @@ end interface
 contains
 
 subroutine prune_none( eltypes, mol1, mol2, prunes)
-   type(bipartition_container), intent(in) :: eltypes
+   type(item_partition), intent(in) :: eltypes
    type(mol_type), intent(in) :: mol1, mol2
    type(bool_matrix), dimension(:), allocatable, intent(out) :: prunes
    ! Local variables
@@ -64,7 +64,7 @@ subroutine prune_none( eltypes, mol1, mol2, prunes)
 end subroutine
 
 subroutine prune_rd( eltypes, mol1, mol2, prunes)
-   type(bipartition_container), intent(in) :: eltypes
+   type(item_partition), intent(in) :: eltypes
    type(mol_type), intent(in) :: mol1, mol2
    type(bool_matrix), dimension(:), allocatable, intent(out) :: prunes
    ! Local variables
@@ -91,7 +91,7 @@ subroutine prune_rd( eltypes, mol1, mol2, prunes)
    do i = 1, size(coords1, dim=2)
       do h = 1, eltypes%num_parts
          do j = 1, eltypes%parts(h)%num_items1
-            jatom = eltypes%parts(h)%indices1(j)
+            jatom = eltypes%parts(h)%items1(j)
             dists1(i)%e(h)%e(j) = sqrt(sum((coords1(:, jatom) - coords1(:, i))**2))
          end do
          call sort(dists1(i)%e(h)%e)
@@ -101,7 +101,7 @@ subroutine prune_rd( eltypes, mol1, mol2, prunes)
    do i = 1, size(coords2, dim=2)
       do h = 1, eltypes%num_parts
          do j = 1, eltypes%parts(h)%num_items2
-            jatom = eltypes%parts(h)%indices2(j)
+            jatom = eltypes%parts(h)%items2(j)
             dists2(i)%e(h)%e(j) = sqrt(sum((coords2(:, jatom) - coords2(:, i))**2))
          end do
          call sort(dists2(i)%e(h)%e)
@@ -114,9 +114,9 @@ subroutine prune_rd( eltypes, mol1, mol2, prunes)
       allocate (prunes(h)%ee(num_items1, num_items2))
       prunes(h)%ee = .false.
       do i = 1, num_items1
-         iatom = eltypes%parts(h)%indices1(i)
+         iatom = eltypes%parts(h)%items1(i)
          do j = 1, num_items2
-            jatom = eltypes%parts(h)%indices2(j)
+            jatom = eltypes%parts(h)%items2(j)
             do k = 1, eltypes%num_parts
                if (any(abs(dists2(jatom)%e(k)%e - dists1(iatom)%e(k)%e) > prune_tol)) then
                   prunes(h)%ee(j, i) = .true.

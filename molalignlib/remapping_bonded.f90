@@ -29,7 +29,7 @@ use biasing
 use pruning
 use lcrs_tree
 use partitioning
-use metapartitioning
+!use metapartitioning
 use reactivity
 use registry
 
@@ -42,8 +42,9 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
    type(bondatomperm_registry), target, intent(out) :: results
 
    ! Local variables
-   type(tree_node), pointer :: eltree, mnatree
-   type(bipartition_container) :: eltypes
+   type(root_node), pointer :: eltypetree
+   type(poly_node), pointer :: mnapolytree
+   type(item_partition) :: eltypes, mnatypes
    integer, dimension(:), allocatable :: atomperm, auxperm
    integer :: num_trials, num_steps
    integer, dimension(:), allocatable :: elnums1, elnums2
@@ -66,8 +67,8 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
    end if
 
    ! Compute atomic types
-   call compute_eltypes(mol1, mol2, eltree)
-   call partition_from_tree(eltree, eltypes)
+   call compute_eltypes( mol1, mol2, eltypetree)
+   eltypes = partition_from_tree( eltypetree)
 
    ! Abort if there are conflicting atomic types
 !   if (any(sorted(eltypes%itemdir1) /= sorted(eltypes%itemdir2))) then
@@ -90,15 +91,17 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
       call find_reactive_bonds( mol1, mol2, eltypes, atomperm)
       write (stderr, *) 'adjd before', adjacencydiff( atomperm, adjmat1, adjmat2)
       call remove_reactive_bonds( mol1, mol2, eltypes, atomperm)
-      adjmat1 = get_adjmat(mol1)
-      adjmat2 = get_adjmat(mol2)
+      adjmat1 = get_adjmat( mol1)
+      adjmat2 = get_adjmat( mol2)
       write (stderr, *) 'adjd after ', adjacencydiff( atomperm, adjmat1, adjmat2)
    end if
 
-   ! Recompute MNA types
-   call tree_from_partition( eltypes, mnatree)
-   call compute_consistent_mnatypes( mol1, mol2, mnatree)
-!   call print_tree( mnatree)
+   ! Compute consistent MNA types
+   mnapolytree => make_new_poly(size(eltypetree%itemdir1), size(eltypetree%itemdir2))
+   mnapolytree%first_root = eltypetree
+   call compute_consistent_mnas( mol1, mol2, mnapolytree)
+   mnatypes = partition_from_tree( mnapolytree%first_root)
+!   call print_tree( mnapolytree)
 
    ! Mirror coordinates
    if (mirror_flag) then
@@ -106,22 +109,22 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
    end if
 
    ! Mass weight coordinates
-   call weight_coords(coords1, atomic_weights(elnums1))
-   call weight_coords(coords2, atomic_weights(elnums2))
+   call weight_coords( coords1, atomic_weights(elnums1))
+   call weight_coords( coords2, atomic_weights(elnums2))
 
    ! Translate atoms to their centroids
-   center1 = centroid(coords1)
-   center2 = centroid(coords2)
-   call translate_coords(coords2, -center2)
-   call translate_coords(coords2, center1)
+   center1 = centroid( coords1)
+   center2 = centroid( coords2)
+   call translate_coords( coords2, -center2)
+   call translate_coords( coords2, center1)
 
    ! Initialize random number generator
    call random_initialize()
 
    ! Initialize local minima registry
-   call registry_init(results, max_records, coords1, adjmat1)
+   call registry_init( results, max_records, coords1, adjmat1)
 
-!   call collect_mnatypes(mol1, mnatree)
+!   call collect_mnas(mol1, mnatypetree)
 
    ! Optimize atom permutation
    do while (results%records(1)%count < max_count .and. results%num_trials < max_trials)
@@ -129,182 +132,83 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
       num_trials = num_trials + 1
 
       ! Aply a random rotation to coords2
-      call rotate_coords(coords2, randrotquat(), center1)
+      call rotate_coords( coords2, randrotquat(), center1)
 
       ! Assign atoms with current orientation
-      call assign_atoms_conf(mnatree, mol1, mol2, coords1, coords2, atomperm, dist)
-      total_rotation = optimal_rotation(atomperm, coords1, coords2, center1)
-      call rotate_coords(coords2, total_rotation, center1)
+      call assign_atoms_conf( mnapolytree, mol1, mol2, coords1, coords2, atomperm, dist)
+      total_rotation = optimal_rotation( atomperm, coords1, coords2, center1)
+      call rotate_coords( coords2, total_rotation, center1)
       num_steps = 1
 
       do while (iter_flag)
-         call assign_atoms_conf(mnatree, mol1, mol2, coords1, coords2, auxperm, dist)
+         call assign_atoms_conf( mnapolytree, mol1, mol2, coords1, coords2, auxperm, dist)
          if (all(auxperm == atomperm)) exit
          atomperm = auxperm
-         step_rotation = optimal_rotation(atomperm, coords1, coords2, center1)
-         call rotate_coords(coords2, step_rotation, center1)
-         total_rotation = quatmul(step_rotation, total_rotation)
+         step_rotation = optimal_rotation( atomperm, coords1, coords2, center1)
+         call rotate_coords( coords2, step_rotation, center1)
+         total_rotation = quatmul( step_rotation, total_rotation)
          num_steps = num_steps + 1
       end do
 
       ! Update results
-      call registry_push(results, coords2, adjmat2, atomperm, num_steps, total_rotation)
+      call registry_push( results, coords2, adjmat2, atomperm, num_steps, total_rotation)
 
    end do
 
 end subroutine
 
-subroutine assign_atoms_conf( mnatree, mol1, mol2, coords1, coords2, atomperm, dist)
-   type(tree_node), intent(in) :: mnatree
+subroutine assign_atoms_conf(mnapolytree, mol1, mol2, coords1, coords2, atomperm, dist)
+   type(poly_node), intent(inout) :: mnapolytree
    type(mol_type), intent(in) :: mol1, mol2
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    integer, dimension(:), intent(out) :: atomperm
    real(rk), intent(out) :: dist
    ! Local variables
-   type(tree_node), pointer :: submnatree
    logical :: assigned
 
-   write (stderr, *)
-   write (stderr, *) repeat('assign atoms   ', 3)
+!   write (stderr, *) 'Mol 1'
+!   call print_atoms( mol1)
+!   write (stderr, *) 'Mol 2'
+!   call print_atoms( mol2)
 
-   submnatree = mnatree
-   call print_tree(submnatree)
    do
       assigned = .false.
-      call reduce_partial_matches(submnatree, assigned)
+      call assign_next_item(mnapolytree%first_root, assigned)
       if (.not. assigned) exit
-      call recompute_consistent_mnatypes(mol1, mol2, submnatree)
-      call flatten_tree(submnatree)
-      call print_tree(submnatree)
+!      write (stderr, *)
+!      write (stderr, '(*(A))') repeat('assign next item   ', 3)
+!      call print_tree(mnapolytree%first_root)
+      call compute_consistent_mnas(mol1, mol2, mnapolytree)
    end do
+
+   call reverse_polytree( mnapolytree)
+   call print_polytree( mnapolytree)
+
    stop
-
 end subroutine
 
-recursive subroutine reduce_partial_matches(node, assigned)
-   type(tree_node), intent(inout) :: node
+subroutine assign_next_item(root, assigned)
+   type(root_node), intent(inout) :: root
    logical, intent(inout) :: assigned
-   type(tree_node), pointer :: child
+   type(leaf_node), pointer :: leaf, new_leaf
+   type(leaf_node_ptr) :: typehood(0)
 
-   if (associated(node%first_child)) then
-      ! Internal node - process children
-      child => node%first_child
-      do
-         call reduce_partial_matches(child, assigned)
-         if (assigned) return
-         if (.not. associated(child%next_sibling)) exit
-         child => child%next_sibling
-      end do
-   else
-      ! Leaf node - assign single item
-      if (node%num_items1 == node%num_items2 .and. &
-          node%num_items1 > 1) then
-         call assign_single_item(node)
+   ! Process all leaves of this root
+   leaf => root%first_leaf
+   do while (associated(leaf))
+      ! Check if this leaf needs processing
+      if (leaf%num_items1 == leaf%num_items2 .and. &
+          leaf%num_items1 > 1) then
+         ! Create new leaf and move one item from each list to it
+         new_leaf => add_new_leaf(root, typehood)
+         leaf%next_heir => new_leaf
+         call move_next_item1(leaf, new_leaf)
+         call move_next_item2(leaf, new_leaf)
          assigned = .true.
+         return
       end if
-   end if
-end subroutine
-
-subroutine assign_single_item(leaf)
-   type(tree_node), intent(inout) :: leaf
-   type(tree_node), pointer :: child
-
-   child => add_new_child(leaf)
-   call move_next_item1(leaf, child)
-   call move_next_item2(leaf, child)
-
-   child => add_new_child(leaf)
-   do while (associated(leaf%first_item1))
-      call move_next_item1(leaf, child)
-      call move_next_item2(leaf, child)
+      leaf => leaf%next_leaf
    end do
 end subroutine
-
-!subroutine assign_atoms_conf( mnatypes, mol1, mol2, coords1, coords2, atomperm, dist)
-!   type(mol_type), intent(in) :: mol1, mol2
-!   type(bipartition_container), intent(in) :: mnatypes
-!   real(rk), dimension(:,:), intent(in) :: coords1, coords2
-!   integer, dimension(:), intent(out) :: atomperm
-!   real(rk), intent(out) :: dist
-!   ! Local variables
-!   type(bipartition_container) :: submnatypes
-!
-!   submnatypes = mnatypes
-!   call assign_atoms_conf_rec(submnatypes, mol1, mol2, coords1, coords2, atomperm, dist)
-!   call assign_atoms(submnatypes, coords1, coords2, atomperm, dist)
-!
-!end subroutine
-!
-!recursive subroutine assign_atoms_conf_rec( submnatypes, mol1, mol2, coords1, coords2, atomperm, dist)
-!   type(mol_type), intent(in) :: mol1, mol2
-!   type(bipartition_container), intent(inout) :: submnatypes
-!   real(rk), dimension(:,:), intent(in) :: coords1, coords2
-!   integer, dimension(:), intent(out) :: atomperm
-!   real(rk), intent(out) :: dist
-!   ! Local variables
-!   type(metapartition_type) :: metatypes
-!   integer :: h, i
-!
-!   call collect_mnatypes(mol1, submnatypes%partition1(), metatypes)
-!!   call metatypes%print_parts()
-!!   call submnatypes%print_parts()
-!
-!   do i = 1, metatypes%num_parts
-!!      write (stderr, *) 'loop:', i
-!      h = random_element(metatypes%parts(i)%items)
-!      call solve_lap(submnatypes%parts(h), coords1, coords2, atomperm, dist)
-!      call split_crossmnatypes(h, atomperm, submnatypes)
-!      call compute_crossmnatypes(mol1, mol2, submnatypes)
-!      call assign_atoms_conf_rec(submnatypes, mol1, mol2, coords1, coords2, atomperm, dist)
-!   end do
-!
-!end subroutine
-!
-!subroutine assign_atoms_conf( mnatypes, mol1, mol2, coords1, coords2, atomperm, dist)
-!   type(mol_type), intent(in) :: mol1, mol2
-!   type(bipartition_container), intent(in) :: mnatypes
-!   real(rk), dimension(:,:), intent(in) :: coords1, coords2
-!   integer, dimension(:), intent(out) :: atomperm
-!   real(rk), intent(out) :: dist
-!   ! Local variables
-!   type(bipartition_container) :: submnatypes
-!   type(metapartition_type) :: metatypes
-!   integer :: h, i, j, k
-!
-!   write (stderr, *) repeat('*', 80)
-!   call mnatypes%print_parts()
-!
-!   call collect_mnatypes(mol1, mnatypes%partition1(), metatypes)
-!   call metatypes%print_parts()
-!   submnatypes = mnatypes
-!
-!   do while (metatypes%num_parts > 0)
-!      write (stderr, *) repeat('+', 80)
-!      do i = 1, metatypes%num_parts
-!         h = random_element(metatypes%parts(i)%items)
-!         do j = 1, metatypes%num_parts
-!            do k = 1, metatypes%parts(j)%num_items
-!               if (metatypes%parts(j)%items(k) > h) then
-!                  metatypes%parts(j)%items(k) = metatypes%parts(j)%items(k) + submnatypes%parts(h)%num_items1 - 1
-!               end if
-!            end do
-!         end do
-!         call solve_lap(submnatypes%parts(h), coords1, coords2, atomperm, dist)
-!         call split_crossmnatypes(h, atomperm, submnatypes)
-!         write (stderr, *)
-!         write (stderr, *) repeat(str(h)//'   ', 8)
-!         call submnatypes%print_parts()
-!         call metatypes%print_parts()
-!      end do
-!      write (stderr, *) repeat('-', 80)
-!      call compute_crossmnatypes(mol1, mol2, submnatypes)
-!      call submnatypes%print_parts()
-!      call collect_mnatypes(mol1, submnatypes%partition1(), metatypes)
-!      call metatypes%print_parts()
-!   end do
-!
-!   call assign_atoms(submnatypes, coords1, coords2, atomperm, dist)
-!
-!end subroutine
 
 end module

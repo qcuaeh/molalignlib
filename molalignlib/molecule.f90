@@ -215,14 +215,13 @@ subroutine print_atoms(self)
    character(:), allocatable :: fmtstr
    type(atom_type) :: atom
 
-   write (stderr, '(a,1x,i0)') 'Atoms:', size(self%atoms)
-   write (stderr, '(a,a4,a12,a7,2a14)') "ind:", "elsym", "label", &
-         "{ coords }", "[ adjlist ]"
+   write (stderr, '(A,2X,A,1X,A,4X,A,8X,A,8X,A,4X,A)') "idx", "sym", "label", &
+         "X","Y","Z", "adjlist"
 
    do i = 1, size(self%atoms)
       atom = self%atoms(i)
-      fmtstr = '(i3,": ",a2,1x,i3," {",3(1x,f8.4)," } ["' // &
-            repeat(',1x,i3', size(atom%adjlist)) // '," ]")'
+      fmtstr = '(I3,3X,A2,1X,I3,3(1X,f8.4),2X,"["' // &
+            repeat(',1X,I0', size(atom%adjlist)) // ',1X,"]")'
       write (stderr, fmtstr) i, element_symbols(atom%elnum), atom%label, &
             atom%coords, atom%adjlist
    end do
@@ -236,7 +235,6 @@ subroutine print_bonds(self)
 
    bonds = get_bonds(self)
 
-   write (stderr, '(a,1x,i0)') 'Bonds:', size(bonds)
    write (stderr, '(a)') "idx1 idx2"
 
    do i = 1, size(bonds)

@@ -36,15 +36,15 @@ contains
 
 subroutine find_reactive_bonds( mol1, mol2, eltypes, atomperm)
    type(mol_type), intent(in) :: mol1, mol2
-   type(bipartition_container), intent(in) :: eltypes
+   type(item_partition), intent(in) :: eltypes
    integer, dimension(:), intent(out) :: atomperm
 
    ! Local variables
-   type(topoatomperm_registry), target :: results
-   type(tree_node), pointer :: mnatree
-   type(bipartition_container) :: mnatypes
+   type(poly_node), pointer :: mnapolytree
+   type(item_partition) :: mnatypes
    type(int_list), dimension(:), allocatable :: molfrags1, molfrags2
    type(int_matrix), dimension(:), allocatable :: biases
+   type(topoatomperm_registry), target :: results
    integer, dimension(:), allocatable :: auxperm
    integer, dimension(:), allocatable :: elnums1, elnums2
    logical, dimension(:,:), allocatable :: adjmat1, adjmat2
@@ -55,10 +55,10 @@ subroutine find_reactive_bonds( mol1, mol2, eltypes, atomperm)
 
    elnums1 = mol1%atoms%elnum
    elnums2 = mol2%atoms%elnum
-   coords1 = get_coords(mol1)
-   coords2 = get_coords(mol2)
-   adjmat1 = get_adjmat(mol1)
-   adjmat2 = get_adjmat(mol2)
+   coords1 = get_coords( mol1)
+   coords2 = get_coords( mol2)
+   adjmat1 = get_adjmat( mol1)
+   adjmat2 = get_adjmat( mol2)
 
    ! Mirror coordinates
    if (mirror_flag) then
@@ -66,19 +66,20 @@ subroutine find_reactive_bonds( mol1, mol2, eltypes, atomperm)
    end if
 
    ! Mass weight coordinates
-   call weight_coords(coords1, atomic_weights(elnums1))
-   call weight_coords(coords2, atomic_weights(elnums2))
+   call weight_coords( coords1, atomic_weights(elnums1))
+   call weight_coords( coords2, atomic_weights(elnums2))
 
    ! Translate atoms to their centroids
-   center1 = centroid(coords1)
-   center2 = centroid(coords2)
-   call translate_coords(coords2, -center2)
-   call translate_coords(coords2, center1)
+   center1 = centroid( coords1)
+   center2 = centroid( coords2)
+   call translate_coords( coords2, -center2)
+   call translate_coords( coords2, center1)
 
    ! Compute MNA types
-   call tree_from_partition( eltypes, mnatree)
-   call compute_consistent_mnatypes( mol1, mol2, mnatree)
-   call partition_from_tree( mnatree, mnatypes)
+   mnapolytree => make_new_poly( size(eltypes%itemdir1), size(eltypes%itemdir2))
+   mnapolytree%first_root => tree_from_partition( eltypes)
+   call compute_consistent_mnas( mol1, mol2, mnapolytree)
+   mnatypes = partition_from_tree( mnapolytree%first_root)
 
    ! Find molecular fragments
    call find_molfrags( mol1, first_partition(eltypes), molfrags1)
@@ -111,13 +112,13 @@ end subroutine
 subroutine remove_reactive_bonds( mol1, mol2, eltypes, atomperm)
    ! Remove reactive bonds
    type(mol_type), intent(inout) :: mol1, mol2
-   type(bipartition_container), intent(in) :: eltypes
+   type(item_partition), intent(in) :: eltypes
    integer, dimension(:), intent(in) :: atomperm
    ! Local variables
    logical, dimension(:,:), allocatable :: adjmat1, adjmat2
    integer, dimension(:), allocatable :: invatomperm
    integer :: j, iatom, jatom
-!   integer, dimension(:), allocatable :: indices1, indices2
+!   integer, dimension(:), allocatable :: items1, items2
 !   integer :: k, katom
 
    adjmat1 = get_adjmat(mol1)
@@ -131,9 +132,9 @@ subroutine remove_reactive_bonds( mol1, mol2, eltypes, atomperm)
          if (.not. adjmat2(atomperm(iatom), atomperm(jatom))) then
 !            write (stderr, *) 'remove mol1 bond:', iatom, jatom
             call remove_bond(mol1, iatom, jatom)
-!            indices1 = mnatypes%parts(mnatypes%itemdir1(jatom))%indices1
-!            do k = 1, size(indices1)
-!               katom = indices1(k)
+!            items1 = mnatypes%parts(mnatypes%itemdir1(jatom))%items1
+!            do k = 1, size(items1)
+!               katom = items1(k)
 !               call remove_bond(mol1, iatom, katom)
 !               call remove_bond(mol2, atomperm(iatom), atomperm(katom))
 !            end do
@@ -147,9 +148,9 @@ subroutine remove_reactive_bonds( mol1, mol2, eltypes, atomperm)
          if (.not. adjmat1(invatomperm(iatom), invatomperm(jatom))) then
 !            write (stderr, *) 'remove mol2 bond:', iatom, jatom
             call remove_bond(mol2, iatom, jatom)
-!            indices2 = mnatypes%parts(mnatypes%itemdir2(jatom))%indices2
-!            do k = 1, size(indices2)
-!               katom = indices2(k)
+!            items2 = mnatypes%parts(mnatypes%itemdir2(jatom))%items2
+!            do k = 1, size(items2)
+!               katom = items2(k)
 !               call remove_bond(mol1, invatomperm(iatom), invatomperm(katom))
 !               call remove_bond(mol2, iatom, katom)
 !            end do

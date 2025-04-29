@@ -37,13 +37,13 @@ contains
 subroutine assign_atoms_nearest( eltypes, coords1, coords2, atomperm)
 ! Find best correspondence between points sets with fixed orientation
 
-   type(bipartition_container), target, intent(in) :: eltypes
+   type(item_partition), target, intent(in) :: eltypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    integer, dimension(:), intent(out) :: atomperm
    ! Local variables
    integer :: h, num_items1
    integer, dimension(:), allocatable :: auxperm
-   integer, dimension(:), pointer :: indices1, indices2
+   integer, dimension(:), pointer :: items1, items2
    real(rk) :: dist
 
    allocate (auxperm(maxval(eltypes%parts%num_items1)))
@@ -52,24 +52,24 @@ subroutine assign_atoms_nearest( eltypes, coords1, coords2, atomperm)
 
    do h = 1, eltypes%num_parts
       num_items1 = eltypes%parts(h)%num_items1
-      indices1 => eltypes%parts(h)%indices1
-      indices2 => eltypes%parts(h)%indices2
-      call solve_lap_nearest(num_items1, indices1, indices2, coords1, coords2, auxperm, dist)
-      atomperm(indices1) = indices2(auxperm(:num_items1))
+      items1 => eltypes%parts(h)%items1
+      items2 => eltypes%parts(h)%items2
+      call solve_lap_nearest(num_items1, items1, items2, coords1, coords2, auxperm, dist)
+      atomperm(items1) = items2(auxperm(:num_items1))
    end do
 end subroutine
 
 subroutine assign_atoms_pruned( eltypes, coords1, coords2, prunes, atomperm)
 ! Find best correspondence between points sets with fixed orientation
 
-   type(bipartition_container), target, intent(in) :: eltypes
+   type(item_partition), target, intent(in) :: eltypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    type(bool_matrix), dimension(:), intent(in) :: prunes
    integer, dimension(:), intent(out) :: atomperm
    ! Local variables
    integer :: h, num_items1
    integer, dimension(:), allocatable :: auxperm
-   integer, dimension(:), pointer :: indices1, indices2
+   integer, dimension(:), pointer :: items1, items2
    real(rk) :: dist
 
    allocate (auxperm(maxval(eltypes%parts%num_items1)))
@@ -77,17 +77,17 @@ subroutine assign_atoms_pruned( eltypes, coords1, coords2, prunes, atomperm)
    ! Optimize atomperm for each block
    do h = 1, eltypes%num_parts
       num_items1 = eltypes%parts(h)%num_items1
-      indices1 => eltypes%parts(h)%indices1
-      indices2 => eltypes%parts(h)%indices2
-      call solve_lap_pruned(num_items1, indices1, indices2, coords1, coords2, prunes(h)%ee, auxperm, dist)
-      atomperm(indices1) = indices2(auxperm(:num_items1))
+      items1 => eltypes%parts(h)%items1
+      items2 => eltypes%parts(h)%items2
+      call solve_lap_pruned(num_items1, items1, items2, coords1, coords2, prunes(h)%ee, auxperm, dist)
+      atomperm(items1) = items2(auxperm(:num_items1))
    end do
 end subroutine
 
 subroutine assign_atoms( eltypes, coords1, coords2, atomperm, dist)
 ! Find best correspondence between points sets with fixed orientation
 
-   type(bipartition_container), intent(in) :: eltypes
+   type(item_partition), intent(in) :: eltypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    integer, dimension(:), intent(out) :: atomperm
    real(rk), intent(out) :: dist
@@ -100,14 +100,14 @@ subroutine assign_atoms( eltypes, coords1, coords2, atomperm, dist)
    ! Optimize atomperm for each block
    do h = 1, eltypes%num_parts
       call solve_lap(eltypes%parts(h), coords1, coords2, auxperm, dist)
-      atomperm(eltypes%parts(h)%indices1) = eltypes%parts(h)%indices2(auxperm(:eltypes%parts(h)%num_items1))
+      atomperm(eltypes%parts(h)%items1) = eltypes%parts(h)%items2(auxperm(:eltypes%parts(h)%num_items1))
    end do
 end subroutine
 
 subroutine assign_atoms_biased( eltypes, coords1, coords2, biases, atomperm)
 ! Find best correspondence between points sets with fixed orientation
 
-   type(bipartition_container), intent(in) :: eltypes
+   type(item_partition), intent(in) :: eltypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    type(int_matrix), dimension(:), intent(in) :: biases
    integer, dimension(:), intent(out) :: atomperm
@@ -121,12 +121,12 @@ subroutine assign_atoms_biased( eltypes, coords1, coords2, biases, atomperm)
    ! Optimize atomperm for each block
    do h = 1, eltypes%num_parts
       call solve_lap_biased(eltypes%parts(h), coords1, coords2, biases(h)%ee, auxperm, dist)
-      atomperm(eltypes%parts(h)%indices1) = eltypes%parts(h)%indices2(auxperm(:eltypes%parts(h)%num_items1))
+      atomperm(eltypes%parts(h)%items1) = eltypes%parts(h)%items2(auxperm(:eltypes%parts(h)%num_items1))
    end do
 end subroutine
 
 subroutine solve_lap(part, p, q, perm, dist)
-   type(bipartition_part), intent(in) :: part
+   type(partition_part), intent(in) :: part
    real(rk), dimension(:,:), intent(in) :: p, q
    integer, dimension(:), intent(out) :: perm
    real(rk), intent(out) :: dist
@@ -138,7 +138,7 @@ subroutine solve_lap(part, p, q, perm, dist)
 
    do j = 1, part%num_items2
       do i = 1, part%num_items1
-         costs(i, j) = sum((p(:, part%indices1(i)) - q(:, part%indices2(j)))**2)
+         costs(i, j) = sum((p(:, part%items1(i)) - q(:, part%items2(j)))**2)
       end do
    end do
 
@@ -146,7 +146,7 @@ subroutine solve_lap(part, p, q, perm, dist)
 end subroutine
 
 subroutine solve_lap_biased(part, p, q, biases, perm, dist)
-   type(bipartition_part), intent(in) :: part
+   type(partition_part), intent(in) :: part
    real(rk), dimension(:,:), intent(in) :: p, q
    integer, dimension(:,:), intent(in) :: biases
    integer, dimension(:), intent(out) :: perm
@@ -159,7 +159,7 @@ subroutine solve_lap_biased(part, p, q, biases, perm, dist)
 
    do j = 1, part%num_items2
       do i = 1, part%num_items1
-!         costs(i, j) = biases(i, j) + bias_scale*sum((p(:, part%indices1(i)) - q(:, part%indices2(j)))**2)
+!         costs(i, j) = biases(i, j) + bias_scale*sum((p(:, part%items1(i)) - q(:, part%items2(j)))**2)
          costs(i, j) = biases(i, j) + random_standard_uniform()
       end do
    end do

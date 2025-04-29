@@ -36,8 +36,8 @@ subroutine molecule_align( mol1, mol2, coords2)
    type(mol_type), intent(in) :: mol1, mol2
    real(rk), dimension(:,:), allocatable, intent(out) :: coords2
    ! Local variables
-   type(tree_node), pointer :: eltree
-   type(bipartition_container) :: eltypes
+   type(root_node), pointer :: eltypetree
+   type(item_partition) :: eltypes
    real(rk) :: center1(3), center2(3), rotquat(4)
    real(rk), dimension(:,:), allocatable :: coords1
    real(rk), dimension(:), allocatable :: weights1, weights2
@@ -56,8 +56,8 @@ subroutine molecule_align( mol1, mol2, coords2)
    end if
 
    ! Compute atomic types
-   call compute_eltypes(mol1, mol2, eltree)
-   call partition_from_tree(eltree, eltypes)
+   call compute_eltypes( mol1, mol2, eltypetree)
+   eltypes = partition_from_tree( eltypetree)
 
    ! Abort if there are conflicting atomic types
    if (any(sorted(eltypes%itemdir1) /= sorted(eltypes%itemdir2))) then
@@ -78,16 +78,16 @@ subroutine molecule_align( mol1, mol2, coords2)
    end if
 
    num_atoms1 = size(mol1%atoms)
-   coords1 = get_coords(mol1)
+   coords1 = get_coords( mol1)
    weights1 = atomic_weights(mol1%atoms%elnum)
    call weight_coords( coords1, weights1)
-   coords2 = get_coords(mol2)
+   coords2 = get_coords( mol2)
    weights2 = atomic_weights(mol2%atoms%elnum)
    call weight_coords( coords2, weights2)
 
    ! Calculate centroids
-   center1 = centroid(coords1)
-   center2 = centroid(coords2)
+   center1 = centroid( coords1)
+   center2 = centroid( coords2)
 
    call translate_coords( coords2, -center2)
    call translate_coords( coords2, center1)
