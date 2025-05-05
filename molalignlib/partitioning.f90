@@ -137,7 +137,7 @@ subroutine compute_nextlevel_mnas(mol1, mol2, mnapolytree)
    type(leaf_node), pointer :: leaf
    type(root_node), pointer :: next_root
 
-   leaf => mnapolytree%first_root%first_leaf
+   leaf => mnapolytree%last_root%first_leaf
    next_root => add_new_root(mnapolytree)
 
    do while (associated(leaf))
@@ -150,16 +150,86 @@ subroutine compute_consistent_mnas(mol1, mol2, mnapolytree)
 ! Iteratively compute MNA types
    type(mol_type), intent(in) :: mol1, mol2
    type(poly_node), intent(inout) :: mnapolytree
+   integer :: prev_num_leaves
 
    do
       ! Compute MNA upper level types
+      prev_num_leaves = mnapolytree%last_root%num_leaves
       call compute_nextlevel_mnas(mol1, mol2, mnapolytree)
 
       ! Exit loop if types did not change
-      if (mnapolytree%first_root%num_leaves == mnapolytree%first_root%next_root%num_leaves) exit
+      if (mnapolytree%last_root%num_leaves == prev_num_leaves) exit
 
-!      call print_tree(mnapolytree%first_root)
+!      call print_tree(mnapolytree%last_root)
    end do
+end subroutine
+
+subroutine polytree_to_stack(poly, stack)
+   type(poly_node), intent(in) :: poly
+   type(partition_stack) :: stack
+   type(root_node), pointer :: root
+   type(leaf_node), pointer :: leaf
+   type(leaf_node), pointer :: heir
+   type(item_node), pointer :: item
+   integer :: i, j, k, m, n
+
+   allocate (stack%partitions(poly%num_roots))
+   stack%num_partitions = poly%num_roots
+
+   stack%partitions(1) = partition_from_tree(poly%first_root)
+
+   ! Copy trees
+   root => poly%first_root
+   do i = 2, poly%num_roots
+
+      allocate (stack%partitions(i)%itemdir1(poly%size_itemdir1))
+      allocate (stack%partitions(i)%itemdir2(poly%size_itemdir2))
+      allocate (stack%partitions(i)%parts(root%next_root%num_leaves))
+      stack%partitions(i)%num_parts = root%next_root%num_leaves
+
+      j = 1
+      leaf => root%first_leaf
+      do m = 1, root%num_leaves
+
+         allocate (stack%partitions(i-1)%parts(m)%heirs(leaf%num_heirs))
+         stack%partitions(i-1)%parts(m)%num_heirs = leaf%num_heirs
+
+         ! Copy heirs
+         heir => leaf%first_heir
+         do n = 1, leaf%num_heirs
+
+            stack%partitions(i-1)%parts(m)%heirs(n) = j
+            stack%partitions(i)%parts(j)%num_items1 = heir%num_items1
+            stack%partitions(i)%parts(j)%num_items2 = heir%num_items2
+
+            allocate (stack%partitions(i)%parts(j)%items1(heir%num_items1))
+            allocate (stack%partitions(i)%parts(j)%items2(heir%num_items2))
+
+            item => heir%first_item1
+            do k = 1, heir%num_items1
+               stack%partitions(i)%parts(j)%items1(k) = item%index
+               stack%partitions(i)%itemdir1(item%index) = j
+               item => item%next_item
+            end do
+
+            item => heir%first_item2
+            do k = 1, heir%num_items2
+               stack%partitions(i)%parts(j)%items2(k) = item%index
+               stack%partitions(i)%itemdir2(item%index) = j
+               item => item%next_item
+            end do
+
+            heir => heir%next_heir
+            j = j + 1
+         end do
+
+         leaf => leaf%next_leaf
+      end do
+
+      root => root%next_root
+   end do
+
+   stack%partitions(poly%num_roots)%parts(:)%num_heirs = 0
 end subroutine
 
 end module

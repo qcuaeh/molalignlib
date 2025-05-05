@@ -77,9 +77,9 @@ subroutine find_reactive_bonds( mol1, mol2, eltypes, atomperm)
 
    ! Compute MNA types
    mnapolytree => make_new_poly( size(eltypes%itemdir1), size(eltypes%itemdir2))
-   mnapolytree%first_root => tree_from_partition( eltypes)
+   call add_root( mnapolytree, tree_from_partition( eltypes))
    call compute_consistent_mnas( mol1, mol2, mnapolytree)
-   mnatypes = partition_from_tree( mnapolytree%first_root)
+   mnatypes = partition_from_tree( mnapolytree%last_root)
 
    ! Find molecular fragments
    call find_molfrags( mol1, first_partition(eltypes), molfrags1)

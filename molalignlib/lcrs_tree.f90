@@ -13,6 +13,7 @@ end type
 type, public :: root_node
    integer :: num_leaves
    type(leaf_node), pointer :: first_leaf
+   type(leaf_node), pointer :: last_leaf
    type(leaf_node_ptr), dimension(:), allocatable :: itemdir1
    type(leaf_node_ptr), dimension(:), allocatable :: itemdir2
    type(root_node), pointer :: next_root
@@ -26,9 +27,12 @@ type, public :: leaf_node
    type(root_node), pointer :: tree_root
    type(leaf_node), pointer :: next_leaf
    type(leaf_node), pointer :: first_heir
+   type(leaf_node), pointer :: last_heir
    type(leaf_node), pointer :: next_heir
    type(item_node), pointer :: first_item1
    type(item_node), pointer :: first_item2
+   type(item_node), pointer :: last_item1
+   type(item_node), pointer :: last_item2
    type(leaf_node_ptr), dimension(:), allocatable :: typehood
 end type
 
@@ -43,6 +47,7 @@ type, public :: poly_node
    integer :: size_itemdir1
    integer :: size_itemdir2
    type(root_node), pointer :: first_root
+   type(root_node), pointer :: last_root
 end type
 
 ! Semipartition part
@@ -75,6 +80,12 @@ type, public :: item_partition
    type(partition_part), dimension(:), allocatable :: parts
    integer, dimension(:), allocatable :: itemdir1
    integer, dimension(:), allocatable :: itemdir2
+end type
+
+! Partition stack
+type, public :: partition_stack
+   integer :: num_partitions
+   type(item_partition), dimension(:), allocatable :: partitions
 end type
 
 interface assignment(=)
@@ -111,8 +122,9 @@ public print_polytree
 public print_partition
 public make_new_poly
 public add_new_root
+public add_root
 public delete_polytree
-public reverse_polytree
+public print_partition_stack
 public assignment(=)
 public operator(==)
 public operator(.equiv.)
@@ -208,6 +220,7 @@ function make_new_root(tot_items1, tot_items2) result(new_root)
    allocate(new_root)
    new_root%num_leaves = 0
    new_root%first_leaf => null()
+   new_root%last_leaf => null()
    new_root%next_root => null()
 
    ! Allocate item directories
@@ -235,14 +248,21 @@ function add_new_leaf(root, typehood) result(new_leaf)
    new_leaf%num_items2 = 0
    new_leaf%num_heirs = 0
    new_leaf%first_item1 => null()
+   new_leaf%last_item1 => null()
    new_leaf%first_item2 => null()
+   new_leaf%last_item2 => null()
    new_leaf%first_heir => null()
+   new_leaf%last_heir => null()
    new_leaf%next_heir => null()
    new_leaf%tree_root => root
+   new_leaf%next_leaf => null()
 
-   ! Add as first leaf
-   new_leaf%next_leaf => root%first_leaf
-   root%first_leaf => new_leaf
+   if (.not. associated(root%first_leaf)) then
+      root%first_leaf => new_leaf
+   else
+      root%last_leaf%next_leaf => new_leaf
+   end if
+   root%last_leaf => new_leaf
    root%num_leaves = root%num_leaves + 1
 end function
 
@@ -253,9 +273,15 @@ subroutine add_new_item1(leaf, index)
 
    allocate(new_item)
    new_item%index = index
+   new_item%next_item => null()
    leaf%tree_root%itemdir1(index)%ptr => leaf
-   new_item%next_item => leaf%first_item1
-   leaf%first_item1 => new_item
+
+   if (.not. associated(leaf%first_item1)) then
+      leaf%first_item1 => new_item
+   else
+      leaf%last_item1%next_item => new_item
+   end if
+   leaf%last_item1 => new_item
    leaf%num_items1 = leaf%num_items1 + 1
 end subroutine
 
@@ -266,39 +292,67 @@ subroutine add_new_item2(leaf, index)
 
    allocate(new_item)
    new_item%index = index
+   new_item%next_item => null()
    leaf%tree_root%itemdir2(index)%ptr => leaf
-   new_item%next_item => leaf%first_item2
-   leaf%first_item2 => new_item
+
+   if (.not. associated(leaf%first_item2)) then
+      leaf%first_item2 => new_item
+   else
+      leaf%last_item2%next_item => new_item
+   end if
+   leaf%last_item2 => new_item
    leaf%num_items2 = leaf%num_items2 + 1
 end subroutine
 
 subroutine move_next_item1(src, dest)
    type(leaf_node), intent(inout) :: src
    type(leaf_node), target, intent(inout) :: dest
-   type(item_node), pointer :: src_second_item1, dest_first_item1
+   type(item_node), pointer :: item_to_move
 
-   src_second_item1 => src%first_item1%next_item
-   dest_first_item1 => dest%first_item1
-   dest%tree_root%itemdir1(src%first_item1%index)%ptr => dest
-   dest%first_item1 => src%first_item1
-   dest%first_item1%next_item => dest_first_item1
-   src%first_item1 => src_second_item1
+   item_to_move => src%first_item1
+   if (.not. associated(item_to_move)) return
+
+   src%first_item1 => item_to_move%next_item
+   if (.not. associated(src%first_item1)) then
+      src%last_item1 => null()
+   end if
    src%num_items1 = src%num_items1 - 1
+
+   item_to_move%next_item => null()
+   dest%tree_root%itemdir1(item_to_move%index)%ptr => dest
+
+   if (.not. associated(dest%first_item1)) then
+      dest%first_item1 => item_to_move
+   else
+      dest%last_item1%next_item => item_to_move
+   end if
+   dest%last_item1 => item_to_move
    dest%num_items1 = dest%num_items1 + 1
 end subroutine
 
 subroutine move_next_item2(src, dest)
    type(leaf_node), intent(inout) :: src
    type(leaf_node), target, intent(inout) :: dest
-   type(item_node), pointer :: src_second_item2, dest_first_item2
+   type(item_node), pointer :: item_to_move
 
-   src_second_item2 => src%first_item2%next_item
-   dest_first_item2 => dest%first_item2
-   dest%tree_root%itemdir2(src%first_item2%index)%ptr => dest
-   dest%first_item2 => src%first_item2
-   dest%first_item2%next_item => dest_first_item2
-   src%first_item2 => src_second_item2
+   item_to_move => src%first_item2
+   if (.not. associated(item_to_move)) return
+
+   src%first_item2 => item_to_move%next_item
+   if (.not. associated(src%first_item2)) then
+      src%last_item2 => null()
+   end if
    src%num_items2 = src%num_items2 - 1
+
+   item_to_move%next_item => null()
+   dest%tree_root%itemdir2(item_to_move%index)%ptr => dest
+
+   if (.not. associated(dest%first_item2)) then
+      dest%first_item2 => item_to_move
+   else
+      dest%last_item2%next_item => item_to_move
+   end if
+   dest%last_item2 => item_to_move
    dest%num_items2 = dest%num_items2 + 1
 end subroutine
 
@@ -529,9 +583,9 @@ subroutine print_partition(partition)
    integer :: i, j
 
    write(stderr,*)
-   write(stderr,'(A)') "Partition Parts:"
+   write(stderr,'(A)') "/types/"
    do i = 1, partition%num_parts
-      write(stderr,'(A,I0,A)',advance='no') "Part ", i, ": ("
+      write(stderr,'(I2,A)',advance='no') i, "("
 
       do j = 1, partition%parts(i)%num_items1
          write(stderr,'(1X,I0)',advance='no') partition%parts(i)%items1(j)
@@ -556,6 +610,7 @@ function make_new_poly(size_itemdir1, size_itemdir2)
    make_new_poly%size_itemdir1 = size_itemdir1
    make_new_poly%size_itemdir2 = size_itemdir2
    make_new_poly%first_root => null()
+   make_new_poly%last_root => null()
 end function
 
 function add_new_root(poly) result(new_root)
@@ -563,10 +618,41 @@ function add_new_root(poly) result(new_root)
    type(root_node), pointer :: new_root
 
    new_root => make_new_root(poly%size_itemdir1, poly%size_itemdir2)
-   new_root%next_root => poly%first_root
-   poly%first_root => new_root
+   new_root%next_root => null()  ! Always null since adding at end
+
+   ! Add as last root
+   if (.not. associated(poly%first_root)) then
+      ! First root in empty list
+      poly%first_root => new_root
+   else
+      ! Add to end of existing list
+      poly%last_root%next_root => new_root
+   end if
+   poly%last_root => new_root
    poly%num_roots = poly%num_roots + 1
 end function
+
+subroutine add_root(poly, root)
+   type(poly_node), target, intent(inout) :: poly
+   type(root_node), pointer, intent(in) :: root
+
+   ! Verify dimensions match
+   if (size(root%itemdir1) /= poly%size_itemdir1 .or. &
+       size(root%itemdir2) /= poly%size_itemdir2) then
+      error stop 'Directory size mismatch in add_root'
+   end if
+
+   ! Add as last root
+   if (.not. associated(poly%first_root)) then
+      ! First root in empty list
+      poly%first_root => root
+   else
+      ! Add to end of existing list
+      poly%last_root%next_root => root
+   end if
+   poly%last_root => root
+   poly%num_roots = poly%num_roots + 1
+end subroutine
 
 subroutine delete_polytree(poly)
    type(poly_node), pointer, intent(inout) :: poly
@@ -589,10 +675,14 @@ subroutine add_heir(leaf, heir_leaf)
    type(leaf_node), intent(inout) :: leaf
    type(leaf_node), pointer, intent(in) :: heir_leaf
 
-   if (associated(leaf%first_heir)) then
-      heir_leaf%next_heir => leaf%first_heir
+   heir_leaf%next_heir => null()
+   
+   if (.not. associated(leaf%first_heir)) then
+      leaf%first_heir => heir_leaf
+   else
+      leaf%last_heir%next_heir => heir_leaf
    end if
-   leaf%first_heir => heir_leaf
+   leaf%last_heir => heir_leaf
    leaf%num_heirs = leaf%num_heirs + 1
 end subroutine
 
@@ -643,7 +733,7 @@ subroutine print_polytree(poly)
       leaf => root%first_leaf
       do while (associated(leaf))
          ! Print leaf address
-         write(stderr,'(Z3.3,A)',advance='no') address(leaf), ":"
+         write(stderr,'(Z3.3,A)',advance='no') address(leaf), " ->"
 
          ! Print each heir's connections
          heir => leaf%first_heir
@@ -664,27 +754,41 @@ subroutine print_polytree(poly)
    write(stderr,*)  ! Final newline
 end subroutine
 
-subroutine reverse_polytree(poly)
-    type(poly_node), intent(inout) :: poly
-    type(root_node), pointer :: prev, curr, next
+subroutine print_partition_stack(stack)
+    type(partition_stack), intent(in) :: stack
+    integer :: level_idx, i, j
 
-    ! Initialize pointers for reversal
-    prev => null()
-    curr => poly%first_root
+    write(stderr,*)
+    write(stderr,'(A)') "MNA Stack Structure:"
 
-    ! Reverse the linked list of roots
-    do while (associated(curr))
-        ! Store next root before changing links
-        next => curr%next_root
-        ! Reverse the current root's pointer
-        curr%next_root => prev
-        ! Move pointers one step forward
-        prev => curr
-        curr => next
+    ! Print each level
+    do level_idx = 1, stack%num_partitions
+        write(stderr,*)
+        write(stderr,'(A,I0)') "Level ", level_idx
+        write(stderr,'(A)') "----------------"
+
+        ! Print basic partition structure using print_partition
+        call print_partition(stack%partitions(level_idx))
+
+        ! Print heir information for each part
+        write(stderr,*)
+        write(stderr,'(A)') "/subtypes/"
+
+        ! For each part in current level
+        do i = 1, stack%partitions(level_idx)%num_parts
+            ! Print part index
+            write(stderr,'(I2,A)',advance='no') i, " ->"
+
+            ! Print each heir connection
+            do j = 1, stack%partitions(level_idx)%parts(i)%num_heirs
+                write(stderr,'(1X,I2)',advance='no') &
+                    stack%partitions(level_idx)%parts(i)%heirs(j)
+            end do
+            write(stderr,*)
+        end do
     end do
 
-    ! Update polytree's first root pointer to last root (which is now first)
-    poly%first_root => prev
+    write(stderr,*)  ! Final newline
 end subroutine
 
 end module

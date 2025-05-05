@@ -98,9 +98,9 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
 
    ! Compute consistent MNA types
    mnapolytree => make_new_poly(size(eltypetree%itemdir1), size(eltypetree%itemdir2))
-   mnapolytree%first_root = eltypetree
+   call add_root( mnapolytree, eltypetree)
    call compute_consistent_mnas( mol1, mol2, mnapolytree)
-   mnatypes = partition_from_tree( mnapolytree%first_root)
+   mnatypes = partition_from_tree( mnapolytree%last_root)
 !   call print_tree( mnapolytree)
 
    ! Mirror coordinates
@@ -165,6 +165,7 @@ subroutine assign_atoms_conf(mnapolytree, mol1, mol2, coords1, coords2, atomperm
    real(rk), intent(out) :: dist
    ! Local variables
    logical :: assigned
+   type(partition_stack) :: stack
 
 !   write (stderr, *) 'Mol 1'
 !   call print_atoms( mol1)
@@ -173,40 +174,53 @@ subroutine assign_atoms_conf(mnapolytree, mol1, mol2, coords1, coords2, atomperm
 
    do
       assigned = .false.
-      call assign_next_item(mnapolytree%first_root, assigned)
+      call assign_next_item(mnapolytree, assigned)
       if (.not. assigned) exit
 !      write (stderr, *)
 !      write (stderr, '(*(A))') repeat('assign next item   ', 3)
-!      call print_tree(mnapolytree%first_root)
+!      call print_tree(mnapolytree%last_root)
       call compute_consistent_mnas(mol1, mol2, mnapolytree)
    end do
 
-   call reverse_polytree( mnapolytree)
    call print_polytree( mnapolytree)
-
+   call polytree_to_stack( mnapolytree, stack)
+   call print_partition_stack( stack)
    stop
 end subroutine
 
-subroutine assign_next_item(root, assigned)
-   type(root_node), intent(inout) :: root
+subroutine assign_next_item(mnapolytree, assigned)
+   type(poly_node), intent(inout) :: mnapolytree
    logical, intent(inout) :: assigned
-   type(leaf_node), pointer :: leaf, new_leaf
+   type(root_node), pointer :: next_root
+   type(leaf_node), pointer :: leaf, heir_leaf
+   type(item_node), pointer :: item1, item2
    type(leaf_node_ptr) :: typehood(0)
 
-   ! Process all leaves of this root
-   leaf => root%first_leaf
+   leaf => mnapolytree%last_root%first_leaf
+   next_root => add_new_root(mnapolytree)
+
    do while (associated(leaf))
       ! Check if this leaf needs processing
-      if (leaf%num_items1 == leaf%num_items2 .and. &
-          leaf%num_items1 > 1) then
-         ! Create new leaf and move one item from each list to it
-         new_leaf => add_new_leaf(root, typehood)
-         leaf%next_heir => new_leaf
-         call move_next_item1(leaf, new_leaf)
-         call move_next_item2(leaf, new_leaf)
+      item1 => leaf%first_item1
+      item2 => leaf%first_item2
+      if (.not. assigned .and. leaf%num_items1 > 1) then
          assigned = .true.
-         return
+         ! Create new leaf and move one item from each list to it
+         heir_leaf => add_new_leaf(next_root, typehood)
+         call add_heir(leaf, heir_leaf)
+         call add_new_item1(heir_leaf, item1%index)
+         call add_new_item2(heir_leaf, item2%index)
+         item1 => item1%next_item
+         item2 => item2%next_item
       end if
+      heir_leaf => add_new_leaf(next_root, typehood)
+      call add_heir(leaf, heir_leaf)
+      do while (associated(item1))
+         call add_new_item1(heir_leaf, item1%index)
+         call add_new_item2(heir_leaf, item2%index)
+         item1 => item1%next_item
+         item2 => item2%next_item
+      end do
       leaf => leaf%next_leaf
    end do
 end subroutine
