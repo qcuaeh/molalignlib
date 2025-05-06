@@ -28,8 +28,9 @@ use adjacency
 use biasing
 use pruning
 use lcrs_tree
-use partitioning
-!use metapartitioning
+use eltype_compute
+use mna_compute
+use mna_recompute
 use reactivity
 use registry
 
@@ -42,9 +43,8 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
    type(bondatomperm_registry), target, intent(out) :: results
 
    ! Local variables
-   type(root_node), pointer :: eltypetree
-   type(poly_node), pointer :: mnapolytree
-   type(item_partition) :: eltypes, mnatypes
+   type(tree_node_t), pointer :: mnachain
+   type(partitionarray_t) :: eltypes
    integer, dimension(:), allocatable :: atomperm, auxperm
    integer :: num_trials, num_steps
    integer, dimension(:), allocatable :: elnums1, elnums2
@@ -67,8 +67,7 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
    end if
 
    ! Compute atomic types
-   call compute_eltypes( mol1, mol2, eltypetree)
-   eltypes = partition_from_tree( eltypetree)
+   call compute_eltypes( mol1, mol2, eltypes)
 
    ! Abort if there are conflicting atomic types
 !   if (any(sorted(eltypes%itemdir1) /= sorted(eltypes%itemdir2))) then
@@ -97,11 +96,8 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
    end if
 
    ! Compute consistent MNA types
-   mnapolytree => make_new_poly(size(eltypetree%itemdir1), size(eltypetree%itemdir2))
-   call add_root( mnapolytree, eltypetree)
-   call compute_consistent_mnas( mol1, mol2, mnapolytree)
-   mnatypes = partition_from_tree( mnapolytree%last_root)
-!   call print_tree( mnapolytree)
+   mnachain => tree_from_partitionarray( eltypes)
+   call compute_consistent_mnas( mol1, mol2, mnachain)
 
    ! Mirror coordinates
    if (mirror_flag) then
@@ -124,7 +120,7 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
    ! Initialize local minima registry
    call registry_init( results, max_records, coords1, adjmat1)
 
-!   call collect_mnas(mol1, mnatypetree)
+   call assign_atoms_conf( mnachain, mol1, mol2, coords1, coords2, atomperm, dist)
 
    ! Optimize atom permutation
    do while (results%records(1)%count < max_count .and. results%num_trials < max_trials)
@@ -135,13 +131,13 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
       call rotate_coords( coords2, randrotquat(), center1)
 
       ! Assign atoms with current orientation
-      call assign_atoms_conf( mnapolytree, mol1, mol2, coords1, coords2, atomperm, dist)
+      call assign_atoms_conf( mnachain, mol1, mol2, coords1, coords2, atomperm, dist)
       total_rotation = optimal_rotation( atomperm, coords1, coords2, center1)
       call rotate_coords( coords2, total_rotation, center1)
       num_steps = 1
 
       do while (iter_flag)
-         call assign_atoms_conf( mnapolytree, mol1, mol2, coords1, coords2, auxperm, dist)
+         call assign_atoms_conf( mnachain, mol1, mol2, coords1, coords2, auxperm, dist)
          if (all(auxperm == atomperm)) exit
          atomperm = auxperm
          step_rotation = optimal_rotation( atomperm, coords1, coords2, center1)
@@ -154,75 +150,33 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
       call registry_push( results, coords2, adjmat2, atomperm, num_steps, total_rotation)
 
    end do
-
 end subroutine
 
-subroutine assign_atoms_conf(mnapolytree, mol1, mol2, coords1, coords2, atomperm, dist)
-   type(poly_node), intent(inout) :: mnapolytree
+subroutine assign_atoms_conf( mnachain, mol1, mol2, coords1, coords2, atomperm, dist)
+   type(tree_node_t), pointer, intent(inout) :: mnachain
    type(mol_type), intent(in) :: mol1, mol2
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    integer, dimension(:), intent(out) :: atomperm
    real(rk), intent(out) :: dist
    ! Local variables
-   logical :: assigned
-   type(partition_stack) :: stack
+!   type(chainarray_t) :: mnachainarray
 
 !   write (stderr, *) 'Mol 1'
 !   call print_atoms( mol1)
 !   write (stderr, *) 'Mol 2'
 !   call print_atoms( mol2)
+!   call print_tree( mnachain)
 
-   do
-      assigned = .false.
-      call assign_next_item(mnapolytree, assigned)
-      if (.not. assigned) exit
-!      write (stderr, *)
-!      write (stderr, '(*(A))') repeat('assign next item   ', 3)
-!      call print_tree(mnapolytree%last_root)
-      call compute_consistent_mnas(mol1, mol2, mnapolytree)
-   end do
+!   call chain_to_chainarray( mnachain, mnachainarray)
+!   call print_chainarray( mnachainarray)
+!   mnachainarray%num_links = 1
+!   call recompute_consistent_mnas( mol1, mol2, mnachainarray)
+!   call print_chainarray( mnachainarray)
 
-   call print_polytree( mnapolytree)
-   call polytree_to_stack( mnapolytree, stack)
-   call print_partition_stack( stack)
+   call split_mnas( mol1, mol2, mnachain)
+   call print_tree( mnachain)
+
    stop
-end subroutine
-
-subroutine assign_next_item(mnapolytree, assigned)
-   type(poly_node), intent(inout) :: mnapolytree
-   logical, intent(inout) :: assigned
-   type(root_node), pointer :: next_root
-   type(leaf_node), pointer :: leaf, heir_leaf
-   type(item_node), pointer :: item1, item2
-   type(leaf_node_ptr) :: typehood(0)
-
-   leaf => mnapolytree%last_root%first_leaf
-   next_root => add_new_root(mnapolytree)
-
-   do while (associated(leaf))
-      ! Check if this leaf needs processing
-      item1 => leaf%first_item1
-      item2 => leaf%first_item2
-      if (.not. assigned .and. leaf%num_items1 > 1) then
-         assigned = .true.
-         ! Create new leaf and move one item from each list to it
-         heir_leaf => add_new_leaf(next_root, typehood)
-         call add_heir(leaf, heir_leaf)
-         call add_new_item1(heir_leaf, item1%index)
-         call add_new_item2(heir_leaf, item2%index)
-         item1 => item1%next_item
-         item2 => item2%next_item
-      end if
-      heir_leaf => add_new_leaf(next_root, typehood)
-      call add_heir(leaf, heir_leaf)
-      do while (associated(item1))
-         call add_new_item1(heir_leaf, item1%index)
-         call add_new_item2(heir_leaf, item2%index)
-         item1 => item1%next_item
-         item2 => item2%next_item
-      end do
-      leaf => leaf%next_leaf
-   end do
 end subroutine
 
 end module

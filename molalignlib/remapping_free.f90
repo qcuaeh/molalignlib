@@ -23,7 +23,8 @@ use chemdata
 use spatial
 use assignment
 use lcrs_tree
-use partitioning
+use mna_compute
+use eltype_compute
 use pruning
 use registry
 
@@ -36,8 +37,7 @@ subroutine remap_free_atoms(mol1, mol2, results)
    type(atomperm_registry), intent(out) :: results
 
    ! Local variables
-   type(root_node), pointer :: eltypetree
-   type(item_partition) :: eltypes
+   type(partitionarray_t) :: eltypes
    type(bool_matrix), dimension(:), allocatable :: prunes
    integer :: num_steps
    integer, dimension(:), allocatable :: atomperm, auxperm
@@ -59,8 +59,7 @@ subroutine remap_free_atoms(mol1, mol2, results)
    end if
 
    ! Compute atomic types
-   call compute_eltypes( mol1, mol2, eltypetree)
-   eltypes = partition_from_tree(eltypetree)
+   call compute_eltypes( mol1, mol2, eltypes)
 
    ! Abort if there are conflicting atomic types
 !   if (any(sorted(eltypes%itemdir1) /= sorted(eltypes%itemdir2))) then

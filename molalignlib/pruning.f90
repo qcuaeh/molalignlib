@@ -33,7 +33,7 @@ abstract interface
       use basetypes
       use molecule
       use lcrs_tree
-      type(item_partition), intent(in) :: eltypes
+      type(partitionarray_t), intent(in) :: eltypes
       type(mol_type), intent(in) :: mol1, mol2
       type(bool_matrix), dimension(:), allocatable, intent(out) :: prunes
    end subroutine
@@ -42,7 +42,7 @@ end interface
 contains
 
 subroutine prune_none( eltypes, mol1, mol2, prunes)
-   type(item_partition), intent(in) :: eltypes
+   type(partitionarray_t), intent(in) :: eltypes
    type(mol_type), intent(in) :: mol1, mol2
    type(bool_matrix), dimension(:), allocatable, intent(out) :: prunes
    ! Local variables
@@ -64,7 +64,7 @@ subroutine prune_none( eltypes, mol1, mol2, prunes)
 end subroutine
 
 subroutine prune_rd( eltypes, mol1, mol2, prunes)
-   type(item_partition), intent(in) :: eltypes
+   type(partitionarray_t), intent(in) :: eltypes
    type(mol_type), intent(in) :: mol1, mol2
    type(bool_matrix), dimension(:), allocatable, intent(out) :: prunes
    ! Local variables

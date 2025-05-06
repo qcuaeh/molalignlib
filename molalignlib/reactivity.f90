@@ -27,7 +27,7 @@ use biasing
 use molecule
 use tracking
 use lcrs_tree
-use partitioning
+use mna_compute
 use registry
 
 implicit none
@@ -36,12 +36,12 @@ contains
 
 subroutine find_reactive_bonds( mol1, mol2, eltypes, atomperm)
    type(mol_type), intent(in) :: mol1, mol2
-   type(item_partition), intent(in) :: eltypes
+   type(partitionarray_t), intent(in) :: eltypes
    integer, dimension(:), intent(out) :: atomperm
 
    ! Local variables
-   type(poly_node), pointer :: mnapolytree
-   type(item_partition) :: mnatypes
+   type(tree_node_t), pointer :: mnachain
+   type(partitionarray_t) :: mnatypes
    type(int_list), dimension(:), allocatable :: molfrags1, molfrags2
    type(int_matrix), dimension(:), allocatable :: biases
    type(topoatomperm_registry), target :: results
@@ -76,10 +76,9 @@ subroutine find_reactive_bonds( mol1, mol2, eltypes, atomperm)
    call translate_coords( coords2, center1)
 
    ! Compute MNA types
-   mnapolytree => make_new_poly( size(eltypes%itemdir1), size(eltypes%itemdir2))
-   call add_root( mnapolytree, tree_from_partition( eltypes))
-   call compute_consistent_mnas( mol1, mol2, mnapolytree)
-   mnatypes = partition_from_tree( mnapolytree%last_root)
+   mnachain => tree_from_partitionarray( eltypes)
+   call compute_consistent_mnas( mol1, mol2, mnachain)
+   call partition_to_partitionarray( mnachain%last_link, mnatypes)
 
    ! Find molecular fragments
    call find_molfrags( mol1, first_partition(eltypes), molfrags1)
@@ -112,7 +111,7 @@ end subroutine
 subroutine remove_reactive_bonds( mol1, mol2, eltypes, atomperm)
    ! Remove reactive bonds
    type(mol_type), intent(inout) :: mol1, mol2
-   type(item_partition), intent(in) :: eltypes
+   type(partitionarray_t), intent(in) :: eltypes
    integer, dimension(:), intent(in) :: atomperm
    ! Local variables
    logical, dimension(:,:), allocatable :: adjmat1, adjmat2

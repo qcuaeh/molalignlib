@@ -22,18 +22,18 @@ use sorting
 use strutils
 use molecule
 use lcrs_tree
-use partitioning
+use mna_compute
 implicit none
 contains
 
 subroutine compute_mna_biases(mol1, mol2, eltypes, biases)
 ! Iteratively compute MNA types
    type(mol_type), intent(in) :: mol1, mol2
-   type(item_partition), intent(in) :: eltypes
+   type(partitionarray_t), intent(in) :: eltypes
    type(int_matrix), dimension(:), allocatable, intent(out) :: biases
    ! Local variables
-   type(poly_node), pointer :: mnapolytree
-   integer :: level, prev_num_leaves
+   type(tree_node_t), pointer :: mnachain
+   integer :: link_idx, prev_num_parts
    integer :: h, i, j, iatom, jatom
 
    allocate(biases(eltypes%num_parts))
@@ -43,33 +43,36 @@ subroutine compute_mna_biases(mol1, mol2, eltypes, biases)
       biases(h)%ee = 0
    end do
 
-   ! Initialize mnapolytree with first tree from partition
-   mnapolytree => make_new_poly( size(eltypes%itemdir1), size(eltypes%itemdir2))
-   call add_root( mnapolytree, tree_from_partition( eltypes))
-   level = 0
+   ! Initialize mna chain with element types
+   mnachain => tree_from_partitionarray(eltypes)
 
+   link_idx = 0
    do
+
 !      write(stderr, *)
-!      write(stderr, '(a)') repeat('-- level '//str(level)//' --', 6)
-!      call print_tree(mnapolytree%last_root)
+!      write(stderr, '(a)') repeat('-- link_idx '//str(link_idx)//' --', 6)
+!      call print_link(mnachain%last_link)
 
-      ! Compute MNA upper level types
-      prev_num_leaves = mnapolytree%last_root%num_leaves
-      call compute_nextlevel_mnas(mol1, mol2, mnapolytree)
+      ! Save the current number of parts before computation
+      prev_num_parts = mnachain%last_link%num_parts
 
-      ! Exit loop if types did not change
-      if (mnapolytree%last_root%num_leaves == prev_num_leaves) exit
+      ! Compute next level and update current branch
+      call compute_nextlevel_mnas(mol1, mol2, mnachain)
 
-      level = level + 1
+      ! Exit the loop if no change
+      if (mnachain%last_link%num_parts == prev_num_parts) exit
 
+      link_idx = link_idx + 1
+
+      ! Update biases based on the current branch
       do h = 1, eltypes%num_parts
          do j = 1, eltypes%parts(h)%num_items2
             jatom = eltypes%parts(h)%items2(j)
             do i = 1, eltypes%parts(h)%num_items1
                iatom = eltypes%parts(h)%items1(i)
                if (.not. associated( &
-                  mnapolytree%last_root%itemdir1(iatom)%ptr, &
-                  mnapolytree%last_root%itemdir2(jatom)%ptr) &
+                  mnachain%last_link%itemdir1(iatom)%ptr, &
+                  mnachain%last_link%itemdir2(jatom)%ptr) &
                ) then
                   biases(h)%ee(i, j) = biases(h)%ee(i, j) + 1
                end if
@@ -86,7 +89,7 @@ subroutine compute_mna_biases(mol1, mol2, eltypes, biases)
 !      end do
 !   end do
 
-   call delete_polytree(mnapolytree)  ! Added cleanup
+   call delete_tree(mnachain)  ! Cleanup
 end subroutine
 
 end module

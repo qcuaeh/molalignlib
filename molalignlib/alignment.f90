@@ -23,7 +23,7 @@ use spatial
 use permutation
 use adjacency
 use lcrs_tree
-use partitioning
+use eltype_compute
 !use remapping_bonded
 !use writemol
 
@@ -36,8 +36,7 @@ subroutine molecule_align( mol1, mol2, coords2)
    type(mol_type), intent(in) :: mol1, mol2
    real(rk), dimension(:,:), allocatable, intent(out) :: coords2
    ! Local variables
-   type(root_node), pointer :: eltypetree
-   type(item_partition) :: eltypes
+   type(partitionarray_t) :: eltypes
    real(rk) :: center1(3), center2(3), rotquat(4)
    real(rk), dimension(:,:), allocatable :: coords1
    real(rk), dimension(:), allocatable :: weights1, weights2
@@ -56,8 +55,7 @@ subroutine molecule_align( mol1, mol2, coords2)
    end if
 
    ! Compute atomic types
-   call compute_eltypes( mol1, mol2, eltypetree)
-   eltypes = partition_from_tree( eltypetree)
+   call compute_eltypes( mol1, mol2, eltypes)
 
    ! Abort if there are conflicting atomic types
    if (any(sorted(eltypes%itemdir1) /= sorted(eltypes%itemdir2))) then
