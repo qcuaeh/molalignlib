@@ -14,6 +14,9 @@
 ! You should have received a copy of the GNU General Public License
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+!> @defgroup atomalig AtomAlign
+!> @brief Program to align atomic clusters
+!> @{
 program atomalign
 use parameters
 use globals
@@ -216,3 +219,4 @@ else
 end if
 
 end program
+!> @}

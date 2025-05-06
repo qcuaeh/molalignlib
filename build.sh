@@ -86,8 +86,6 @@ run_tests() {
    done
 }
 
-rootdir=$(dirname "$(readlink -e "$0")")
-
 if test ! -e ./build.env; then
    echo Error: build.env does not exist
    exit 1
@@ -96,9 +94,9 @@ elif test ! -f ./build.env; then
    exit 1
 fi
 
-buildir=$rootdir/build
-testdir=$rootdir/tests
-libdir=$rootdir/molalignlib
+buildir=$PWD/build
+testdir=$PWD/tests
+libdir=$PWD/molalignlib
 
 if test ! -e "$buildir"; then
    mkdir "$buildir"

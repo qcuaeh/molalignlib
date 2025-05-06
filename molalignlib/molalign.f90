@@ -14,6 +14,9 @@
 ! You should have received a copy of the GNU General Public License
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+!> @defgroup molalign MolAlign
+!> @brief Program to align molecules
+!> @{
 program atomalign
 use parameters
 use globals
@@ -221,3 +224,4 @@ else
 end if
 
 end program
+!> @}
