@@ -22,6 +22,7 @@ use sorting
 use strutils
 use molecule
 use lcrs_tree
+use eltype_compute
 use mna_compute
 implicit none
 contains
@@ -32,7 +33,7 @@ subroutine compute_mna_biases(mol1, mol2, eltypes, biases)
    type(partitionarray_t), intent(in) :: eltypes
    type(int_matrix), dimension(:), allocatable, intent(out) :: biases
    ! Local variables
-   type(tree_node_t), pointer :: mnachain
+   type(chain_root_t), pointer :: mnachain
    integer :: link_idx, prev_num_parts
    integer :: h, i, j, iatom, jatom
 
@@ -44,7 +45,7 @@ subroutine compute_mna_biases(mol1, mol2, eltypes, biases)
    end do
 
    ! Initialize mna chain with element types
-   mnachain => tree_from_partitionarray(eltypes)
+   mnachain => eltypetree( mol1, mol2)
 
    link_idx = 0
    do
@@ -53,18 +54,12 @@ subroutine compute_mna_biases(mol1, mol2, eltypes, biases)
 !      write(stderr, '(a)') repeat('-- link_idx '//str(link_idx)//' --', 6)
 !      call print_link(mnachain%last_link)
 
-      ! Save the current number of parts before computation
       prev_num_parts = mnachain%last_link%num_parts
-
-      ! Compute next level and update current branch
       call compute_nextlevel_mnas(mol1, mol2, mnachain)
-
-      ! Exit the loop if no change
       if (mnachain%last_link%num_parts == prev_num_parts) exit
-
       link_idx = link_idx + 1
 
-      ! Update biases based on the current branch
+      ! Update biases with MNAs at current level
       do h = 1, eltypes%num_parts
          do j = 1, eltypes%parts(h)%num_items2
             jatom = eltypes%parts(h)%items2(j)
@@ -89,7 +84,7 @@ subroutine compute_mna_biases(mol1, mol2, eltypes, biases)
 !      end do
 !   end do
 
-   call delete_tree(mnachain)  ! Cleanup
+   call delete_chain(mnachain)  ! Cleanup
 end subroutine
 
 end module

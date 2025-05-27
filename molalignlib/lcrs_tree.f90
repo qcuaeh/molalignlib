@@ -9,25 +9,28 @@ type, public :: item_node_t
    type(item_node_t), pointer :: next_item
 end type
 
-! Tree node
-type, public :: tree_node_t
+! Chain root (simplified from chain_root_t)
+type, public :: chain_root_t
    integer :: num_links
    integer :: tot_items1
    integer :: tot_items2
-   type(tree_node_t), pointer :: first_sub_branch
-   type(tree_node_t), pointer :: last_sub_branch
-   type(tree_node_t), pointer :: next_branch
    type(link_node_t), pointer :: first_link
    type(link_node_t), pointer :: last_link
+end type
+
+! Part reference node - new indirection layer
+type, public :: partref_node_t
+   type(part_node_t), pointer :: part_ptr
+   type(partref_node_t), pointer :: next_partref
 end type
 
 ! Link node
 type, public :: link_node_t
    integer :: num_parts
    type(link_node_t), pointer :: next_link
-   type(tree_node_t), pointer :: chain_root
-   type(part_node_t), pointer :: first_part
-   type(part_node_t), pointer :: last_part
+   type(chain_root_t), pointer :: chain_root
+   type(partref_node_t), pointer :: first_partref
+   type(partref_node_t), pointer :: last_partref
    type(part_nodeptr_t), dimension(:), allocatable :: itemdir1
    type(part_nodeptr_t), dimension(:), allocatable :: itemdir2
 end type
@@ -38,19 +41,17 @@ type, public :: part_node_t
    integer :: num_items1
    integer :: num_items2
    integer :: num_children
-   integer :: num_neighbors
    integer :: num_leaves
    type(item_node_t), pointer :: first_item1
    type(item_node_t), pointer :: first_item2
    type(item_node_t), pointer :: last_item1
    type(item_node_t), pointer :: last_item2
    type(link_node_t), pointer :: partition_root
-   type(part_node_t), pointer :: next_part
    type(part_node_t), pointer :: parent
    type(part_node_t), pointer :: first_child
    type(part_node_t), pointer :: last_child
    type(part_node_t), pointer :: next_sibling
-   type(part_nodeptr_t), dimension(:), allocatable :: neighbors
+   type(part_nodeptr_t), dimension(:), allocatable :: signature
 end type
 
 ! Part node pointer
@@ -74,13 +75,12 @@ end type
 ! Part array
 type, public :: partarray_t
    integer :: num_children
-   integer :: num_neighbors
    integer :: num_items1
    integer :: num_items2
    integer, dimension(:), allocatable :: children
    integer, dimension(:), allocatable :: items1
    integer, dimension(:), allocatable :: items2
-   integer, dimension(:), allocatable :: neighbors
+   integer, dimension(:), allocatable :: signature
 end type
 
 ! Partition array
@@ -104,35 +104,29 @@ interface operator(==)
 end interface
 
 interface operator (.equiv.)
-   module procedure neighbor_nodes_equivalence
-end interface
-
-interface add_new_part
-   module procedure add_new_part_root
-   module procedure add_new_part_root_parent
-   module procedure add_new_part_root_parent_signature
+   module procedure signature_equivalence
 end interface
 
 ! Make types and procedures public
 public address
-public make_new_tree
-public add_new_branch
+public make_chain_root
+public make_new_part
 public add_new_link
+public add_part
 public add_new_part
 public add_new_item1
 public add_new_item2
 public move_first_item1
 public move_first_item2
 public move_node_items
-public delete_tree
-public print_tree
+public delete_chain
 public print_chain
 public print_chainarray
 public print_items
 public print_itemdirs
 public sort_parts_by_size
 public partition_to_partitionarray
-public tree_from_partitionarray
+public chain_from_partitionarray
 public find_child_part_node
 public first_partition
 public second_partition
@@ -153,7 +147,7 @@ elemental function part_nodeptr_equality(left, right) result(equality)
    equality = associated(left%ptr, right%ptr)
 end function
 
-function neighbor_nodes_equivalence(array1, array2) result(equiv)
+function signature_equivalence(array1, array2) result(equiv)
    type(part_nodeptr_t), dimension(:), intent(in) :: array1, array2
    logical :: equiv
    integer :: i, j, matches
@@ -178,38 +172,6 @@ function neighbor_nodes_equivalence(array1, array2) result(equiv)
    equiv = .true.
 end function
 
-function add_new_part_root(partition_root) result(new_part)
-   type(link_node_t), target, intent(inout) :: partition_root
-   type(part_node_t), pointer :: new_part
-
-   allocate (new_part)
-
-   new_part%num_neighbors = 0
-   new_part%num_children = 0
-   new_part%num_items1 = 0
-   new_part%num_items2 = 0
-   new_part%num_leaves = 1
-   new_part%first_item1 => null()
-   new_part%last_item1 => null()
-   new_part%first_item2 => null()
-   new_part%last_item2 => null()
-   new_part%first_child => null()
-   new_part%last_child => null()
-   new_part%next_sibling => null()
-   new_part%partition_root => partition_root
-   new_part%parent => null()
-   new_part%next_part => null()
-
-   if (.not. associated(partition_root%first_part)) then
-      partition_root%first_part => new_part
-   else
-      partition_root%last_part%next_part => new_part
-   end if
-   partition_root%last_part => new_part
-   partition_root%num_parts = partition_root%num_parts + 1
-   new_part%index = partition_root%num_parts
-end function
-
 subroutine update_leaf_counts_on_new_leaf(new_leaf)
    type(part_node_t), pointer, intent(inout) :: new_leaf
    type(part_node_t), pointer :: ancestor
@@ -222,15 +184,84 @@ subroutine update_leaf_counts_on_new_leaf(new_leaf)
    end do
 end subroutine
 
-function add_new_part_root_parent(partition_root, parent_part) result(new_part)
+function make_new_part() result(new_part)
+   type(part_node_t), pointer :: new_part
+
+   allocate (new_part)
+
+   new_part%index = 0
+   new_part%num_children = 0
+   new_part%num_items1 = 0
+   new_part%num_items2 = 0
+   new_part%num_leaves = 1
+   new_part%parent => null()
+   new_part%first_item1 => null()
+   new_part%last_item1 => null()
+   new_part%first_item2 => null()
+   new_part%last_item2 => null()
+   new_part%first_child => null()
+   new_part%last_child => null()
+   new_part%next_sibling => null()
+   new_part%partition_root => null()
+   new_part%signature = [part_nodeptr_t::]
+end function
+
+subroutine add_part(link, part)
+   type(link_node_t), target, intent(inout) :: link
+   type(part_node_t), target, intent(inout) :: part
+   type(partref_node_t), pointer :: new_partref
+   type(item_node_t), pointer :: item
+
+   part%partition_root => link
+
+   allocate(new_partref)
+   new_partref%part_ptr => part
+   new_partref%next_partref => null()
+
+   if (.not. associated(link%first_partref)) then
+      link%first_partref => new_partref
+   else
+      link%last_partref%next_partref => new_partref
+   end if
+   link%last_partref => new_partref
+   link%num_parts = link%num_parts + 1
+
+   if (part%index == 0) then
+      part%index = link%num_parts
+   end if
+
+   ! CRITICAL FIX: Update the itemdir arrays in the new link
+   ! Register all items from molecule 1
+   item => part%first_item1
+   do while (associated(item))
+      link%itemdir1(item%value)%ptr => part
+      item => item%next_item
+   end do
+
+   ! Register all items from molecule 2
+   item => part%first_item2
+   do while (associated(item))
+      link%itemdir2(item%value)%ptr => part
+      item => item%next_item
+   end do
+end subroutine
+
+function add_new_part(partition_root, parent_part) result(new_part)
    type(link_node_t), pointer, intent(inout) :: partition_root
    type(part_node_t), pointer, intent(inout) :: parent_part
    type(part_node_t), pointer :: new_part
 
-   new_part => add_new_part_root(partition_root)
+   ! Create new part but don't add it yet
+   new_part => make_new_part()
+
+   ! Set parent BEFORE calling add_part
    new_part%parent => parent_part
    new_part%next_sibling => null()
 
+   ! Now add to partition
+   call add_part(partition_root, new_part)
+
+   ! Set up parent-child relationships
    if (.not. associated(parent_part%first_child)) then
       parent_part%first_child => new_part
    else
@@ -239,23 +270,10 @@ function add_new_part_root_parent(partition_root, parent_part) result(new_part)
    parent_part%last_child => new_part
    parent_part%num_children = parent_part%num_children + 1
 
-   ! Only update leaf counts starting from the second child
-   ! First child: parent was leaf (1), now has 1 child (1) - no net change needed
-   ! Second+ child: each additional child adds 1 to the leaf count
+   ! Update leaf counts
    if (parent_part%num_children >= 2) then
       call update_leaf_counts_on_new_leaf(new_part)
    end if
-end function
-
-function add_new_part_root_parent_signature(partition_root, parent_part, neighbors) result(new_part)
-   type(link_node_t), pointer, intent(inout) :: partition_root
-   type(part_node_t), pointer, intent(inout) :: parent_part
-   type(part_nodeptr_t), dimension(:), intent(in):: neighbors
-   type(part_node_t), pointer :: new_part
-
-   new_part => add_new_part_root_parent(partition_root, parent_part)
-   new_part%neighbors = neighbors
-   new_part%num_neighbors = size(neighbors)
 end function
 
 subroutine add_new_item1(part, value)
@@ -360,35 +378,8 @@ subroutine move_node_items(src, dest)
    end do
 end subroutine
 
-subroutine delete_tree(tree_root)
-   type(tree_node_t), pointer, intent(inout) :: tree_root
-
-   if ((.not. associated(tree_root))) error stop
-
-   call delete_tree_hierarchy(tree_root)
-   tree_root => null()
-end subroutine
-
-recursive subroutine delete_tree_hierarchy(tree_node)
-   type(tree_node_t), pointer, intent(inout) :: tree_node
-   type(tree_node_t), pointer :: branch, next_branch
-
-   if ((.not. associated(tree_node))) error stop
-
-   ! First delete all branches
-   branch => tree_node%first_sub_branch
-   do while (associated(branch))
-      next_branch => branch%next_branch
-      call delete_tree_hierarchy(branch)
-      branch => next_branch
-   end do
-
-   ! Then delete this node
-   call delete_chain(tree_node)
-end subroutine
-
 subroutine delete_chain(chain_root)
-   type(tree_node_t), pointer, intent(inout) :: chain_root
+   type(chain_root_t), pointer, intent(inout) :: chain_root
    type(link_node_t), pointer :: link, next_link
 
    if ((.not. associated(chain_root))) error stop
@@ -408,19 +399,29 @@ end subroutine
 
 subroutine delete_partition(partition_root)
    type(link_node_t), pointer, intent(inout) :: partition_root
-   type(part_node_t), pointer :: part, next_part
+   type(partref_node_t), pointer :: partref, next_partref
 
    if ((.not. associated(partition_root))) error stop
 
-   ! Delete all parts
-   part => partition_root%first_part
-   do while (associated(part))
-      next_part => part%next_part
-      call delete_part(part)
-      part => next_part
+   ! Delete all part references and only delete parts created by this partition
+   partref => partition_root%first_partref
+   do while (associated(partref))
+      next_partref => partref%next_partref
+      
+      ! Only delete the part if this partition is its original creator
+      if (associated(partref%part_ptr)) then
+         if (associated(partref%part_ptr%partition_root, partition_root)) then
+            ! This partition created this part, so we can safely delete it
+            call delete_part(partref%part_ptr)
+         end if
+      end if
+      
+      ! Always delete the part reference
+      deallocate(partref)
+      partref => next_partref
    end do
 
-   ! Deallocate directories
+   ! Deallocate directories (always allocated)
    deallocate(partition_root%itemdir1)
    deallocate(partition_root%itemdir2)
 
@@ -429,16 +430,21 @@ subroutine delete_partition(partition_root)
    partition_root => null()
 end subroutine
 
-subroutine delete_part(part_root)
-   type(part_node_t), pointer, intent(inout) :: part_root
+subroutine delete_part(part_node)
+   type(part_node_t), pointer, intent(inout) :: part_node
 
-   if ((.not. associated(part_root))) error stop
+   if ((.not. associated(part_node))) error stop
 
-   call deallocate_items(part_root%first_item1)
-   call deallocate_items(part_root%first_item2)
+   ! Deallocate items
+   call deallocate_items(part_node%first_item1)
+   call deallocate_items(part_node%first_item2)
 
-   deallocate(part_root)
-   part_root => null()
+   ! Deallocate signature array if allocated
+   deallocate(part_node%signature)
+
+   ! Deallocate the part itself
+   deallocate(part_node)
+   part_node => null()
 end subroutine
 
 subroutine deallocate_items(first_item)
@@ -458,7 +464,7 @@ end subroutine
 subroutine partition_to_partitionarray(partition_root, partition)
    type(link_node_t), target, intent(in) :: partition_root
    type(partitionarray_t), intent(out) :: partition
-   type(part_node_t), pointer :: part
+   type(partref_node_t), pointer :: partref
    type(item_node_t), pointer :: item
    integer :: i, j
 
@@ -467,32 +473,32 @@ subroutine partition_to_partitionarray(partition_root, partition)
    allocate(partition%itemdir1(size(partition_root%itemdir1)))
    allocate(partition%itemdir2(size(partition_root%itemdir2)))
 
-   part => partition_root%first_part
-   do i = 1, partition%num_parts
-      if (.not. associated(part)) error stop 'Unexpected null part'
-      if (.not. associated(part%partition_root, partition_root)) error stop 'Leaf points to wrong partition root'
+   partref => partition_root%first_partref
+   i = 1
+   do while (associated(partref))
+      if (.not. associated(partref%part_ptr)) error stop 'Unexpected null part'
 
-      partition%parts(i)%num_neighbors = part%num_neighbors
-      partition%parts(i)%num_items1 = part%num_items1
-      partition%parts(i)%num_items2 = part%num_items2
-      allocate(partition%parts(i)%items1(part%num_items1))
-      allocate(partition%parts(i)%items2(part%num_items2))
+      partition%parts(i)%num_items1 = partref%part_ptr%num_items1
+      partition%parts(i)%num_items2 = partref%part_ptr%num_items2
+      allocate(partition%parts(i)%items1(partref%part_ptr%num_items1))
+      allocate(partition%parts(i)%items2(partref%part_ptr%num_items2))
 
-      item => part%first_item1
-      do j = 1, part%num_items1
+      item => partref%part_ptr%first_item1
+      do j = 1, partref%part_ptr%num_items1
          partition%parts(i)%items1(j) = item%value
          partition%itemdir1(item%value) = i
          item => item%next_item
       end do
 
-      item => part%first_item2
-      do j = 1, part%num_items2
+      item => partref%part_ptr%first_item2
+      do j = 1, partref%part_ptr%num_items2
          partition%parts(i)%items2(j) = item%value
          partition%itemdir2(item%value) = i
          item => item%next_item
       end do
 
-      part => part%next_part
+      partref => partref%next_partref
+      i = i + 1
    end do
 end subroutine
 
@@ -544,30 +550,27 @@ subroutine print_itemdirs(partition_root)
    end do
 end subroutine
 
-function make_new_tree(tot_items1, tot_items2) result(tree_root)
+function make_chain_root(tot_items1, tot_items2) result(chain_root)
    integer, intent(in) :: tot_items1, tot_items2
-   type(tree_node_t), pointer :: tree_root
+   type(chain_root_t), pointer :: chain_root
 
-   allocate(tree_root)
-   tree_root%num_links = 0
-   tree_root%tot_items1 = tot_items1
-   tree_root%tot_items2 = tot_items2
-   tree_root%first_link => null()
-   tree_root%last_sub_branch => null()
-   tree_root%next_branch => null()
-   tree_root%first_sub_branch => null()
-   tree_root%last_link => null()
+   allocate(chain_root)
+   chain_root%num_links = 0
+   chain_root%tot_items1 = tot_items1
+   chain_root%tot_items2 = tot_items2
+   chain_root%first_link => null()
+   chain_root%last_link => null()
 end function
 
 function add_new_link(chain_root) result(new_link)
-   type(tree_node_t), target, intent(inout) :: chain_root
+   type(chain_root_t), target, intent(inout) :: chain_root
    type(link_node_t), pointer :: new_link
    integer :: i
 
    allocate(new_link)
    new_link%num_parts = 0
-   new_link%first_part => null()
-   new_link%last_part => null()
+   new_link%first_partref => null()
+   new_link%last_partref => null()
    new_link%next_link => null()
    new_link%chain_root => chain_root
 
@@ -593,40 +596,14 @@ function add_new_link(chain_root) result(new_link)
    chain_root%num_links = chain_root%num_links + 1
 end function
 
-function add_new_branch(tree_node) result(branch)
-   type(tree_node_t), target, intent(inout) :: tree_node
-   type(tree_node_t), pointer :: branch
-
-   allocate(branch)
-   branch%num_links = 0
-   branch%tot_items1 = tree_node%tot_items1
-   branch%tot_items2 = tree_node%tot_items2
-   branch%first_link => null()
-   branch%last_link => null()
-   branch%first_sub_branch => null()
-   branch%last_sub_branch => null()
-   branch%next_branch => null()
-
-   ! Add branch to tree node
-   if (.not. associated(tree_node%first_sub_branch)) then
-      ! First branch
-      tree_node%first_sub_branch => branch
-      tree_node%last_sub_branch => branch
-   else
-      ! Add to end of the linked list
-      tree_node%last_sub_branch%next_branch => branch
-      tree_node%last_sub_branch => branch
-   end if
-end function
-
-function find_child_part_node(parent_part, neighbors) result(child_part)
+function find_child_part_node(parent_part, signature) result(child_part)
    type(part_node_t), intent(in) :: parent_part
-   type(part_nodeptr_t), dimension(:), intent(in) :: neighbors
+   type(part_nodeptr_t), dimension(:), intent(in) :: signature
    type(part_node_t), pointer :: child_part
 
    child_part => parent_part%first_child
    do while (associated(child_part))
-      if (child_part%neighbors .equiv. neighbors) then
+      if (child_part%signature .equiv. signature) then
          return
       end if
       child_part => child_part%next_sibling
@@ -635,74 +612,17 @@ function find_child_part_node(parent_part, neighbors) result(child_part)
    child_part => null()
 end function
 
-subroutine print_tree(tree_root)
-   type(tree_node_t), pointer, intent(in) :: tree_root
-
-   if (.not. associated(tree_root)) error stop
-
-   write(stderr,*)
-   write(stderr,'(A)') repeat("=", 30)
-   write(stderr,'(A)') " Tree hierarchy (depth first)"
-   write(stderr,'(A)') repeat("=", 30)
-
-   ! Start recursive printing from the root branch
-   call print_tree_hierarchy(tree_root, [1])
-
-   write(stderr,*)  ! Final newline
-end subroutine
-
-recursive subroutine print_tree_hierarchy(tree_node, path)
-   type(tree_node_t), pointer, intent(in) :: tree_node
-   integer, dimension(:), intent(in) :: path
-   type(tree_node_t), pointer :: branch
-   integer :: i
-   integer, dimension(:), allocatable :: current_path
-
-   if (.not. associated(tree_node)) error stop
-
-   ! Print this tree node (chain and all its partitions)
-   call print_chain(tree_node, path)
-
-   ! Recursively process branches in depth-first order
-   branch => tree_node%first_sub_branch
-   i = 1
-   do while (associated(branch))
-      ! Create new path array for branch
-      allocate(current_path(size(path) + 1))
-      current_path(1:size(path)) = path
-      current_path(size(path)+1) = i
-
-      ! Recursive call for branch with updated path
-      call print_tree_hierarchy(branch, current_path)
-
-      deallocate(current_path)
-
-      ! Move to next sibling
-      branch => branch%next_branch
-      i = i + 1
-   end do
-end subroutine
-
-subroutine print_chain(chain_root, path)
-   type(tree_node_t), pointer, intent(in) :: chain_root
-   integer, dimension(:), intent(in) :: path
+subroutine print_chain(chain_root)
+   type(chain_root_t), pointer, intent(in) :: chain_root
    type(link_node_t), pointer :: link
-   integer :: i, link_idx
-   character(len=200) :: path_str
+   integer :: link_idx
 
    if (.not. associated(chain_root)) error stop
 
-   ! Create current path string representation
-   path_str = ''
-   do i = 1, size(path)
-      if (i > 1) path_str = trim(path_str) // '.'
-      write(path_str(len_trim(path_str)+1:), '(I0)') path(i)
-   end do
-
    write(stderr,*)
-   write(stderr,'(A)') repeat("-", len_trim(path_str)+7)
-   write(stderr,'(A)') " Node " // trim(path_str)
-   write(stderr,'(A)') repeat("-", len_trim(path_str)+7)
+   write(stderr,'(A)') repeat("=", 17)
+   write(stderr,'(A)') " Partition chain"
+   write(stderr,'(A)') repeat("=", 17)
 
    ! Print all partitions in this chain
    link => chain_root%first_link
@@ -712,6 +632,8 @@ subroutine print_chain(chain_root, path)
       link => link%next_link
       link_idx = link_idx + 1
    end do
+
+   write(stderr,*)  ! Final newline
 end subroutine
 
 subroutine print_partition(partition_root, link_idx)
@@ -723,11 +645,11 @@ subroutine print_partition(partition_root, link_idx)
    write(stderr,*)
    write(stderr,'(A,I0,A)') "( Level ", link_idx, " )"
 
-   ! Print part neighbors
-   call print_partition_neighbors(partition_root)
-
    ! Print part items
    call print_partition_items(partition_root)
+
+   ! Print part signatures
+   call print_partition_signatures(partition_root)
 
    ! Print part children
    call print_partition_children(partition_root)
@@ -735,7 +657,7 @@ end subroutine
 
 subroutine print_partition_items(partition_root)
    type(link_node_t), pointer, intent(in) :: partition_root
-   type(part_node_t), pointer :: part
+   type(partref_node_t), pointer :: partref
 
    if (.not. associated(partition_root)) error stop
 
@@ -743,16 +665,17 @@ subroutine print_partition_items(partition_root)
    write(stderr,'(A)') "Items"
    write(stderr,'(A)') repeat("-", 6)
 
-   part => partition_root%first_part
-   do while (associated(part))
-      call print_items(part)
-      part => part%next_part
+   partref => partition_root%first_partref
+   do while (associated(partref))
+      call print_items(partref%part_ptr)
+      partref => partref%next_partref
    end do
 end subroutine
 
 subroutine print_partition_children(partition_root)
    type(link_node_t), pointer, intent(in) :: partition_root
-   type(part_node_t), pointer :: part, child_part
+   type(partref_node_t), pointer :: partref
+   type(part_node_t), pointer :: child_part
 
    if (.not. associated(partition_root)) error stop
 
@@ -760,13 +683,13 @@ subroutine print_partition_children(partition_root)
    write(stderr,'(A)') "Children"
    write(stderr,'(A)') repeat("-", 9)
 
-   part => partition_root%first_part
-   do while (associated(part))
+   partref => partition_root%first_partref
+   do while (associated(partref))
       ! Print part address
-      write(stderr,'(Z4.4,A)',advance='no') address(part), ":"
+      write(stderr,'(Z4.4,A)',advance='no') address(partref%part_ptr), ":"
 
       ! Print part children
-      child_part => part%first_child
+      child_part => partref%part_ptr%first_child
       do while (associated(child_part))
          ! Print which part in next partition this child_part points to
          write(stderr,'(1X,Z4.4)',advance='no') address(child_part)
@@ -774,33 +697,33 @@ subroutine print_partition_children(partition_root)
       end do
       write(stderr,*)
 
-      part => part%next_part
+      partref => partref%next_partref
    end do
 end subroutine
 
-subroutine print_partition_neighbors(partition_root)
+subroutine print_partition_signatures(partition_root)
    type(link_node_t), pointer, intent(in) :: partition_root
-   type(part_node_t), pointer :: part
+   type(partref_node_t), pointer :: partref
    integer :: i
 
    if (.not. associated(partition_root)) error stop
 
    write(stderr,*)
-   write(stderr,'(A)') "Neighbors"
-   write(stderr,'(A)') repeat("-", 10)
+   write(stderr,'(A)') "Signatures"
+   write(stderr,'(A)') repeat("-", 11)
 
-   part => partition_root%first_part
-   do while (associated(part))
+   partref => partition_root%first_partref
+   do while (associated(partref))
       ! Print part address
-      write(stderr,'(Z4.4,A)',advance='no') address(part), ":"
+      write(stderr,'(Z4.4,A)',advance='no') address(partref%part_ptr), ":"
 
-      ! Print part neighbors
-      do i = 1, part%num_neighbors
-         write(stderr,'(*(1X,Z4.4))',advance='no') address(part%neighbors(i)%ptr)
+      ! Print part signature
+      do i = 1, size(partref%part_ptr%signature)
+         write(stderr,'(*(1X,Z4.4))',advance='no') address(partref%part_ptr%signature(i)%ptr)
       end do
       write(stderr,*)
 
-      part => part%next_part
+      partref => partref%next_partref
    end do
 end subroutine
 
@@ -828,11 +751,11 @@ subroutine print_partitionarray(chainarray, link_idx)
    write(stderr,*)
    write(stderr,'(A,I0,A)') "( Level ", link_idx, " )"
 
-   ! Print part neighbors
-   call print_partitionarray_neighbors(chainarray, link_idx)
-
    ! Print part items
    call print_partitionarray_items(chainarray, link_idx)
+
+   ! Print part signatures
+   call print_partitionarray_signatures(chainarray, link_idx)
 
    ! Print part children
    call print_partitionarray_children(chainarray, link_idx)
@@ -883,40 +806,40 @@ subroutine print_partitionarray_children(chainarray, link_idx)
    end do
 end subroutine
 
-subroutine print_partitionarray_neighbors(chainarray, link_idx)
+subroutine print_partitionarray_signatures(chainarray, link_idx)
    type(chainarray_t), intent(in) :: chainarray
    integer, intent(in) :: link_idx
    integer :: i, j
 
    write(stderr,*)
-   write(stderr,'(A)') "Neighbors"
+   write(stderr,'(A)') "Signatures"
    write(stderr,'(A)') repeat("-", 10)
 
    do i = 1, chainarray%partitions(link_idx)%num_parts
       write(stderr,'(I3,A)',advance='no') i, ":"
-      do j = 1, chainarray%partitions(link_idx)%parts(i)%num_neighbors
+      do j = 1, size(chainarray%partitions(link_idx)%parts(i)%signature)
          write(stderr,'(1X,I3)',advance='no') &
-            chainarray%partitions(link_idx)%parts(i)%neighbors(j)
+            chainarray%partitions(link_idx)%parts(i)%signature(j)
       end do
       write(stderr,*)
    end do
 end subroutine
 
-function tree_from_partitionarray(partition) result(tree_root)
+function chain_from_partitionarray(partition) result(chain_root)
    type(partitionarray_t), intent(in) :: partition
-   type(tree_node_t), pointer :: tree_root
+   type(chain_root_t), pointer :: chain_root
    type(link_node_t), pointer :: new_link
    type(part_node_t), pointer :: part
    integer :: i, j
 
-   ! Create root branch
-   tree_root => make_new_tree(size(partition%itemdir1), size(partition%itemdir2))
-   new_link => add_new_link(tree_root)
+   ! Create root chain
+   chain_root => make_chain_root(size(partition%itemdir1), size(partition%itemdir2))
+   new_link => add_new_link(chain_root)
 
    ! Create parts and add items
    do i = 1, partition%num_parts
-      part => add_new_part(new_link)
-      part%num_neighbors = partition%parts(i)%num_neighbors
+      part => make_new_part()
+      call add_part(new_link, part)
 
       do j = 1, partition%parts(i)%num_items1
          call add_new_item1(part, partition%parts(i)%items1(j))
@@ -964,38 +887,38 @@ end function
 
 subroutine sort_parts_by_size(partition_root)
    type(link_node_t), pointer, intent(inout) :: partition_root
-   type(part_node_t), pointer :: current, next_part, prev
+   type(partref_node_t), pointer :: partref, next_partref, prev_partref
    logical :: swapped
 
-   ! Bubble sort implementation for linked list
+   ! Bubble sort implementation for part reference linked list
    do
       swapped = .false.
-      current => partition_root%first_part
-      prev => null()
-      do while (associated(current%next_part))
-         next_part => current%next_part
+      partref => partition_root%first_partref
+      prev_partref => null()
+      do while (associated(partref) .and. associated(partref%next_partref))
+         next_partref => partref%next_partref
          ! Check if we need to swap (current has more items than next)
-         if (current%num_items1 > next_part%num_items1) then
+         if (partref%part_ptr%num_items1 > next_partref%part_ptr%num_items1) then
             swapped = .true.
             ! Perform the swap
-            current%next_part => next_part%next_part
-            next_part%next_part => current
-            if (associated(prev)) then
-               prev%next_part => next_part
+            partref%next_partref => next_partref%next_partref
+            next_partref%next_partref => partref
+            if (associated(prev_partref)) then
+               prev_partref%next_partref => next_partref
             else
-               ! Update first_part if we're swapping the first element
-               partition_root%first_part => next_part
+               ! Update first_partref if we're swapping the first element
+               partition_root%first_partref => next_partref
             end if
-            ! Update last_part if necessary
-            if (.not. associated(current%next_part)) then
-               partition_root%last_part => current
+            ! Update last_partref if necessary
+            if (.not. associated(partref%next_partref)) then
+               partition_root%last_partref => partref
             end if
-            ! Update prev for next iteration
-            prev => next_part
+            ! Update prev_partref for next iteration
+            prev_partref => next_partref
          else
             ! No swap needed, just advance
-            prev => current
-            current => next_part
+            prev_partref => partref
+            partref => next_partref
          end if
       end do
       ! If no swaps occurred, the list is sorted

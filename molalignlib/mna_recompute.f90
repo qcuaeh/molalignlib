@@ -11,7 +11,7 @@ end interface
 contains
 
 subroutine chain_to_chainarray(chain_root, chainarray)
-   type(tree_node_t), target, intent(in) :: chain_root
+   type(chain_root_t), target, intent(in) :: chain_root
    type(chainarray_t), target, intent(out) :: chainarray
    type(link_node_t), pointer :: curr_link
    type(part_node_t), pointer :: part

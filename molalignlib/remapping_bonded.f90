@@ -30,7 +30,7 @@ use pruning
 use lcrs_tree
 use eltype_compute
 use mna_compute
-use mna_recompute
+!use mna_recompute
 use reactivity
 use registry
 
@@ -43,7 +43,7 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
    type(bondatomperm_registry), target, intent(out) :: results
 
    ! Local variables
-   type(tree_node_t), pointer :: mnachain
+   type(chain_root_t), pointer :: mnachain
    type(partitionarray_t) :: eltypes
    integer, dimension(:), allocatable :: atomperm, auxperm
    integer :: num_trials, num_steps
@@ -96,7 +96,7 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
    end if
 
    ! Compute consistent MNA types
-   mnachain => tree_from_partitionarray( eltypes)
+   mnachain => eltypetree( mol1, mol2)
    call compute_consistent_mnas( mol1, mol2, mnachain)
 
    ! Mirror coordinates
@@ -153,7 +153,7 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
 end subroutine
 
 subroutine assign_atoms_conf( mnachain, mol1, mol2, coords1, coords2, atomperm, dist)
-   type(tree_node_t), pointer, intent(inout) :: mnachain
+   type(chain_root_t), pointer, intent(inout) :: mnachain
    type(mol_type), intent(in) :: mol1, mol2
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    integer, dimension(:), intent(out) :: atomperm
@@ -165,7 +165,7 @@ subroutine assign_atoms_conf( mnachain, mol1, mol2, coords1, coords2, atomperm, 
 !   call print_atoms( mol1)
 !   write (stderr, *) 'Mol 2'
 !   call print_atoms( mol2)
-!   call print_tree( mnachain)
+!   call print_chain( mnachain)
 
 !   call chain_to_chainarray( mnachain, mnachainarray)
 !   call print_chainarray( mnachainarray)
@@ -173,8 +173,9 @@ subroutine assign_atoms_conf( mnachain, mol1, mol2, coords1, coords2, atomperm, 
 !   call recompute_consistent_mnas( mol1, mol2, mnachainarray)
 !   call print_chainarray( mnachainarray)
 
+!   call sort_parts_by_size( mnachain%last_link)
    call split_mnas( mol1, mol2, mnachain)
-   call print_tree( mnachain)
+   call print_chain( mnachain)
 
    stop
 end subroutine

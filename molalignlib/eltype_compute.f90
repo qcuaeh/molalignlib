@@ -18,28 +18,26 @@ end type
 
 contains
 
-subroutine add_atomtype(atomtypetable, elnum, label, part)
+subroutine add_atomtype(atomtypetable, atom, part)
    type(atomtype_table), intent(inout) :: atomtypetable
-   integer, intent(in) :: elnum
-   integer, intent(in) :: label
+   type(atom_type), intent(in) :: atom
    type(part_node_t), pointer, intent(in) :: part
 
    atomtypetable%num_items = atomtypetable%num_items + 1
-   atomtypetable%items(atomtypetable%num_items)%elnum = elnum
-   atomtypetable%items(atomtypetable%num_items)%label = label
+   atomtypetable%items(atomtypetable%num_items)%elnum = atom%elnum
+   atomtypetable%items(atomtypetable%num_items)%label = atom%label
    atomtypetable%items(atomtypetable%num_items)%part => part
 end subroutine
 
-function find_atomtype(atomtypetable, elnum, label) result(part)
+function find_atomtype(atomtypetable, atom) result(part)
    type(atomtype_table), intent(in) :: atomtypetable
-   integer, intent(in) :: elnum
-   integer, intent(in) :: label
+   type(atom_type), intent(in) :: atom
    type(part_node_t), pointer :: part
    integer :: i
 
    do i = 1, atomtypetable%num_items
-      if (atomtypetable%items(i)%elnum == elnum .and. &
-          atomtypetable%items(i)%label == label) then
+      if (atomtypetable%items(i)%elnum == atom%elnum .and. &
+          atomtypetable%items(i)%label == atom%label) then
          part => atomtypetable%items(i)%part
          return
       end if
@@ -52,49 +50,67 @@ subroutine compute_eltypes(mol1, mol2, eltypes)
 ! Partition atoms by atomic number and label
    type(mol_type), intent(in) :: mol1, mol2
    type(partitionarray_t), intent(out) :: eltypes
+   type(chain_root_t), pointer :: chain_root
+
+   chain_root => eltypetree(mol1, mol2)
+   call partition_to_partitionarray(chain_root%last_link, eltypes)
+   call delete_chain(chain_root)
+end subroutine
+
+function eltypetree(mol1, mol2) result(chain_root)
+! Partition atoms by atomic number and label
+   type(mol_type), intent(in) :: mol1, mol2
    ! Local variables
-   type(tree_node_t), pointer :: tree_root
+   type(part_node_t), pointer :: root_part, child_part
+   type(chain_root_t), pointer :: chain_root
    type(link_node_t), pointer :: new_link
-   type(part_node_t), pointer :: part
+   type(item_node_t), pointer :: item1, item2
    type(atomtype_table) :: atomtypetable
-   integer :: i, elnum, label, num_atoms1, num_atoms2
+   integer :: i, num_atoms1, num_atoms2
 
    num_atoms1 = size(mol1%atoms)
    num_atoms2 = size(mol2%atoms)
 
-   tree_root => make_new_tree(num_atoms1, num_atoms2)
-   new_link => add_new_link(tree_root)
+   root_part => make_new_part()
+   chain_root => make_chain_root(num_atoms1, num_atoms2)
+   new_link => add_new_link(chain_root)
+   call add_part(new_link, root_part)
+   new_link => add_new_link(chain_root)
+
    allocate(atomtypetable%items(num_atoms1 + num_atoms2))
    atomtypetable%num_items = 0
 
-   ! First molecule
    do i = 1, num_atoms1
-      elnum = mol1%atoms(i)%elnum
-      label = mol1%atoms(i)%label
-      part => find_atomtype(atomtypetable, elnum, label)
-      if (.not. associated(part)) then
-         part => add_new_part(new_link)
-         call add_atomtype(atomtypetable, elnum, label, part)
+      call add_new_item1(root_part, i)
+   end do
+
+   do i = 1, num_atoms2
+      call add_new_item2(root_part, i)
+   end do
+
+   ! First molecule
+   item1 => root_part%first_item1
+   do while(associated(item1))
+      child_part => find_atomtype(atomtypetable, mol1%atoms(item1%value))
+      if (.not. associated(child_part)) then
+         child_part => add_new_part(new_link, root_part)
+         call add_atomtype(atomtypetable, mol1%atoms(item1%value), child_part)
       end if
-      call add_new_item1(part, i)
+      call add_new_item1(child_part, item1%value)
+      item1 => item1%next_item
    end do
 
    ! Second molecule
-   do i = 1, num_atoms2
-      elnum = mol2%atoms(i)%elnum
-      label = mol2%atoms(i)%label
-      part => find_atomtype(atomtypetable, elnum, label)
-      if (.not. associated(part)) then
-         part => add_new_part(new_link)
-         call add_atomtype(atomtypetable, elnum, label, part)
+   item2 => root_part%first_item2
+   do while(associated(item2))
+      child_part => find_atomtype(atomtypetable, mol2%atoms(item2%value))
+      if (.not. associated(child_part)) then
+         child_part => add_new_part(new_link, root_part)
+         call add_atomtype(atomtypetable, mol2%atoms(item2%value), child_part)
       end if
-      call add_new_item2(part, i)
+      call add_new_item2(child_part, item2%value)
+      item2 => item2%next_item
    end do
-
-   call partition_to_partitionarray(new_link, eltypes)
-
-   ! Clean up
-   call delete_tree(tree_root)
-end subroutine
+end function
 
 end module

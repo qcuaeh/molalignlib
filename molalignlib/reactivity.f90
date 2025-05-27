@@ -27,6 +27,7 @@ use biasing
 use molecule
 use tracking
 use lcrs_tree
+use eltype_compute
 use mna_compute
 use registry
 
@@ -40,7 +41,7 @@ subroutine find_reactive_bonds( mol1, mol2, eltypes, atomperm)
    integer, dimension(:), intent(out) :: atomperm
 
    ! Local variables
-   type(tree_node_t), pointer :: mnachain
+   type(chain_root_t), pointer :: mnachain
    type(partitionarray_t) :: mnatypes
    type(int_list), dimension(:), allocatable :: molfrags1, molfrags2
    type(int_matrix), dimension(:), allocatable :: biases
@@ -76,7 +77,7 @@ subroutine find_reactive_bonds( mol1, mol2, eltypes, atomperm)
    call translate_coords( coords2, center1)
 
    ! Compute MNA types
-   mnachain => tree_from_partitionarray( eltypes)
+   mnachain => eltypetree( mol1, mol2)
    call compute_consistent_mnas( mol1, mol2, mnachain)
    call partition_to_partitionarray( mnachain%last_link, mnatypes)
 
