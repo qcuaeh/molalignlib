@@ -34,8 +34,10 @@ subroutine compute_mna_biases(mol1, mol2, eltypes, biases)
    type(int_matrix), dimension(:), allocatable, intent(out) :: biases
    ! Local variables
    type(chain_root_t), pointer :: mnachain
-   integer :: link_idx, prev_num_parts
+   type(branch_node_t), pointer :: root_branch
    integer :: h, i, j, iatom, jatom
+   integer :: num_splits
+!   integer :: link_idx
 
    allocate(biases(eltypes%num_parts))
 
@@ -45,19 +47,20 @@ subroutine compute_mna_biases(mol1, mol2, eltypes, biases)
    end do
 
    ! Initialize mna chain with element types
-   mnachain => eltypetree( mol1, mol2)
+   call chain_from_partitionarray( eltypes, mnachain, root_branch)
 
-   link_idx = 0
+!   link_idx = 0
    do
 
 !      write(stderr, *)
 !      write(stderr, '(a)') repeat('-- link_idx '//str(link_idx)//' --', 6)
 !      call print_link(mnachain%last_link)
 
-      prev_num_parts = mnachain%last_link%num_parts
-      call compute_nextlevel_mnas(mol1, mol2, mnachain)
-      if (mnachain%last_link%num_parts == prev_num_parts) exit
-      link_idx = link_idx + 1
+      ! Call compute_nextlevel_mnas and get the number of splits
+      call compute_nextlevel_mnas(mol1, mol2, mnachain, root_branch, num_splits)
+
+      ! Exit loop if no splits occurred in the last iteration
+      if (num_splits == 0) exit
 
       ! Update biases with MNAs at current level
       do h = 1, eltypes%num_parts
@@ -65,7 +68,7 @@ subroutine compute_mna_biases(mol1, mol2, eltypes, biases)
             jatom = eltypes%parts(h)%items2(j)
             do i = 1, eltypes%parts(h)%num_items1
                iatom = eltypes%parts(h)%items1(i)
-               if (.not. associated( &
+               if (associated( &
                   mnachain%last_link%itemdir1(iatom)%ptr, &
                   mnachain%last_link%itemdir2(jatom)%ptr) &
                ) then
@@ -75,6 +78,7 @@ subroutine compute_mna_biases(mol1, mol2, eltypes, biases)
          end do
       end do
 
+!      link_idx = link_idx + 1
    end do
 
 !   do h = 1, eltypes%num_parts

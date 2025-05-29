@@ -55,7 +55,7 @@ subroutine molecule_align( mol1, mol2, coords2)
    end if
 
    ! Compute atomic types
-   call compute_eltypes( mol1, mol2, eltypes)
+   call set_eltypes( mol1, mol2, eltypes)
 
    ! Abort if there are conflicting atomic types
    if (any(sorted(eltypes%itemdir1) /= sorted(eltypes%itemdir2))) then

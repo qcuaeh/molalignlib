@@ -152,15 +152,16 @@ subroutine solve_lap_biased(part, p, q, biases, perm, dist)
    integer, dimension(:), intent(out) :: perm
    real(rk), intent(out) :: dist
    ! Local variables
-   integer :: i, j
    real(rk), dimension(:,:), allocatable :: costs
+   integer :: i, j, maxbias
 
    allocate (costs(part%num_items1, part%num_items2))
+   maxbias = maxval(biases)
 
    do j = 1, part%num_items2
       do i = 1, part%num_items1
-!         costs(i, j) = biases(i, j) + bias_scale*sum((p(:, part%items1(i)) - q(:, part%items2(j)))**2)
-         costs(i, j) = biases(i, j) + random_standard_uniform()
+!         costs(i, j) = maxbias - biases(i, j) + bias_scale*sum((p(:, part%items1(i)) - q(:, part%items2(j)))**2)
+         costs(i, j) = maxbias - biases(i, j) + random_standard_uniform()
       end do
    end do
 
