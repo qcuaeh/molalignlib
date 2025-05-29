@@ -28,7 +28,6 @@ use adjacency
 use biasing
 use pruning
 use lcrs_tree
-use eltype_compute
 use mna_compute
 !use mna_recompute
 use reactivity
@@ -43,8 +42,9 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
    type(bondatomperm_registry), target, intent(out) :: results
 
    ! Local variables
-   type(chain_root_t), pointer :: mnachain
    type(partitionarray_t) :: eltypes
+   type(chain_root_t), pointer :: mnachain
+   type(branch_node_t), pointer :: split_branch
    integer, dimension(:), allocatable :: atomperm, auxperm
    integer :: num_trials, num_steps
    integer, dimension(:), allocatable :: elnums1, elnums2
@@ -67,7 +67,7 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
    end if
 
    ! Compute atomic types
-   call compute_eltypes( mol1, mol2, eltypes)
+   call set_eltypes( mol1, mol2, eltypes)
 
    ! Abort if there are conflicting atomic types
 !   if (any(sorted(eltypes%itemdir1) /= sorted(eltypes%itemdir2))) then
@@ -95,9 +95,9 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
       write (stderr, *) 'adjd after ', adjacencydiff( atomperm, adjmat1, adjmat2)
    end if
 
-   ! Compute consistent MNA types
-   mnachain => eltypetree( mol1, mol2)
-   call compute_consistent_mnas( mol1, mol2, mnachain)
+   call chain_from_partitionarray( eltypes, mnachain, split_branch)
+   call assign_conform_atoms( mol1, mol2, mnachain, split_branch)
+   stop
 
    ! Mirror coordinates
    if (mirror_flag) then
@@ -120,8 +120,6 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
    ! Initialize local minima registry
    call registry_init( results, max_records, coords1, adjmat1)
 
-   call assign_atoms_conf( mnachain, mol1, mol2, coords1, coords2, atomperm, dist)
-
    ! Optimize atom permutation
    do while (results%records(1)%count < max_count .and. results%num_trials < max_trials)
 
@@ -131,13 +129,13 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
       call rotate_coords( coords2, randrotquat(), center1)
 
       ! Assign atoms with current orientation
-      call assign_atoms_conf( mnachain, mol1, mol2, coords1, coords2, atomperm, dist)
+      call minimize_conformation_distance( mnachain, split_branch, coords1, coords2, atomperm, dist)
       total_rotation = optimal_rotation( atomperm, coords1, coords2, center1)
       call rotate_coords( coords2, total_rotation, center1)
       num_steps = 1
 
       do while (iter_flag)
-         call assign_atoms_conf( mnachain, mol1, mol2, coords1, coords2, auxperm, dist)
+         call minimize_conformation_distance( mnachain, split_branch, coords1, coords2, auxperm, dist)
          if (all(auxperm == atomperm)) exit
          atomperm = auxperm
          step_rotation = optimal_rotation( atomperm, coords1, coords2, center1)
@@ -152,32 +150,12 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
    end do
 end subroutine
 
-subroutine assign_atoms_conf( mnachain, mol1, mol2, coords1, coords2, atomperm, dist)
-   type(chain_root_t), pointer, intent(inout) :: mnachain
-   type(mol_type), intent(in) :: mol1, mol2
+subroutine minimize_conformation_distance( mnachain, split_branch, coords1, coords2, atomperm, dist)
+   type(chain_root_t), pointer, intent(in) :: mnachain
+   type(branch_node_t), pointer, intent(in) :: split_branch
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    integer, dimension(:), intent(out) :: atomperm
    real(rk), intent(out) :: dist
-   ! Local variables
-!   type(chainarray_t) :: mnachainarray
-
-!   write (stderr, *) 'Mol 1'
-!   call print_atoms( mol1)
-!   write (stderr, *) 'Mol 2'
-!   call print_atoms( mol2)
-!   call print_chain( mnachain)
-
-!   call chain_to_chainarray( mnachain, mnachainarray)
-!   call print_chainarray( mnachainarray)
-!   mnachainarray%num_links = 1
-!   call recompute_consistent_mnas( mol1, mol2, mnachainarray)
-!   call print_chainarray( mnachainarray)
-
-!   call sort_parts_by_size( mnachain%last_link)
-   call split_mnas( mol1, mol2, mnachain)
-   call print_chain( mnachain)
-
-   stop
 end subroutine
 
 end module

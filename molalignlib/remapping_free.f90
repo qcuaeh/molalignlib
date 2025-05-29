@@ -59,7 +59,7 @@ subroutine remap_free_atoms(mol1, mol2, results)
    end if
 
    ! Compute atomic types
-   call compute_eltypes( mol1, mol2, eltypes)
+   call set_eltypes( mol1, mol2, eltypes)
 
    ! Abort if there are conflicting atomic types
 !   if (any(sorted(eltypes%itemdir1) /= sorted(eltypes%itemdir2))) then
