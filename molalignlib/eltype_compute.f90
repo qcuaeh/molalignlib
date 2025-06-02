@@ -46,9 +46,9 @@ function find_atomtype(atomtypetable, atom) result(part_index)
    part_index = 0  ! Not found
 end function
 
-subroutine set_eltypes(mol1, mol2, eltypes)
+subroutine set_eltypes(atoms1, atoms2, eltypes)
 ! Partition atoms by atomic number and label using arrays directly
-   type(mol_type), intent(in) :: mol1, mol2
+   type(atom_type), dimension(:), intent(in) :: atoms1, atoms2
    type(partitionarray_t), intent(out) :: eltypes
    ! Local variables
    type(atomtype_table) :: atomtypetable
@@ -60,8 +60,8 @@ subroutine set_eltypes(mol1, mol2, eltypes)
    integer, dimension(:,:), allocatable :: part_items1, part_items2
    integer, dimension(:), allocatable :: itemdir1_temp, itemdir2_temp
 
-   num_atoms1 = size(mol1%atoms)
-   num_atoms2 = size(mol2%atoms)
+   num_atoms1 = size(atoms1)
+   num_atoms2 = size(atoms2)
    max_parts = num_atoms1 + num_atoms2  ! Maximum possible partitions
 
    ! Allocate temporary arrays
@@ -81,12 +81,12 @@ subroutine set_eltypes(mol1, mol2, eltypes)
 
    ! First molecule
    do i = 1, num_atoms1
-      part_index = find_atomtype(atomtypetable, mol1%atoms(i))
+      part_index = find_atomtype(atomtypetable, atoms1(i))
 
       if (part_index == 0) then
          ! Create new partition
          current_part = current_part + 1
-         call add_atomtype(atomtypetable, mol1%atoms(i), current_part)
+         call add_atomtype(atomtypetable, atoms1(i), current_part)
          part_index = current_part
       end if
 
@@ -98,12 +98,12 @@ subroutine set_eltypes(mol1, mol2, eltypes)
 
    ! Second molecule
    do i = 1, num_atoms2
-      part_index = find_atomtype(atomtypetable, mol2%atoms(i))
+      part_index = find_atomtype(atomtypetable, atoms2(i))
 
       if (part_index == 0) then
          ! Create new partition
          current_part = current_part + 1
-         call add_atomtype(atomtypetable, mol2%atoms(i), current_part)
+         call add_atomtype(atomtypetable, atoms2(i), current_part)
          part_index = current_part
       end if
 
@@ -131,19 +131,10 @@ subroutine set_eltypes(mol1, mol2, eltypes)
       eltypes%parts(i)%num_children = 0
 
       ! Allocate and copy items
-      if (part_num_items1(i) > 0) then
-         allocate(eltypes%parts(i)%items1(part_num_items1(i)))
-         eltypes%parts(i)%items1 = part_items1(1:part_num_items1(i), i)
-      else
-         allocate(eltypes%parts(i)%items1(0))
-      end if
-
-      if (part_num_items2(i) > 0) then
-         allocate(eltypes%parts(i)%items2(part_num_items2(i)))
-         eltypes%parts(i)%items2 = part_items2(1:part_num_items2(i), i)
-      else
-         allocate(eltypes%parts(i)%items2(0))
-      end if
+      allocate(eltypes%parts(i)%items1(part_num_items1(i)))
+      allocate(eltypes%parts(i)%items2(part_num_items2(i)))
+      eltypes%parts(i)%items1 = part_items1(1:part_num_items1(i), i)
+      eltypes%parts(i)%items2 = part_items2(1:part_num_items2(i), i)
 
       ! Allocate empty arrays for neighbors and children
       allocate(eltypes%parts(i)%signature(0))
