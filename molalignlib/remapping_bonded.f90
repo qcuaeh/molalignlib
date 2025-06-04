@@ -43,7 +43,8 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
 
    ! Local variables
    type(partitionarray_t) :: eltypes
-   type(chain_root_t), pointer :: mnachain
+   type(part_node_t), pointer :: root_part
+   type(branch_node_t), pointer :: mnachain
    type(branch_node_t), pointer :: split_branch
    integer, dimension(:), allocatable :: atomperm, auxperm
    integer :: num_trials, num_steps
@@ -95,8 +96,8 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
       write (stderr, *) 'adjd after ', adjacencydiff( atomperm, adjmat1, adjmat2)
    end if
 
-   call chain_from_partitionarray( eltypes, mnachain, split_branch)
-   call assign_conform_atoms( mol1, mol2, mnachain, split_branch)
+   call chain_from_partitionarray( eltypes, root_part, mnachain)
+   call assign_conform_atoms( mol1, mol2, root_part, mnachain, split_branch)
    stop
 
    ! Mirror coordinates
@@ -151,7 +152,7 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
 end subroutine
 
 subroutine minimize_conformation_distance( mnachain, split_branch, coords1, coords2, atomperm, dist)
-   type(chain_root_t), pointer, intent(in) :: mnachain
+   type(branch_node_t), pointer, intent(in) :: mnachain
    type(branch_node_t), pointer, intent(in) :: split_branch
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    integer, dimension(:), intent(out) :: atomperm

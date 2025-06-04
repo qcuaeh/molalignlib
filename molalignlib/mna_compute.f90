@@ -7,154 +7,170 @@ implicit none
 
 contains
 
-function would_part_split(mol1, mol2, leaf_part) result(would_split)
-! Check if a part would split by comparing signatures
-   type(mol_type), intent(in) :: mol1, mol2
-   type(part_node_t), pointer, intent(in) :: leaf_part
-   ! Local variables
-   logical :: would_split
-   type(item_node_t), pointer :: item1, item2
-   type(part_nodeptr_t), dimension(:), allocatable :: signature, first_signature
-
-   would_split = .false.
-   item1 => leaf_part%first_item1
-   item2 => leaf_part%first_item2
-
-   ! Set first signature from first available item
-   if (associated(item1)) then
-      first_signature = leaf_part%parent_link%itemdir1(mol1%atoms(item1%value)%adjlist)
-      item1 => item1%next_item
-   else if (associated(item2)) then
-      first_signature = leaf_part%parent_link%itemdir2(mol2%atoms(item2%value)%adjlist)
-      item2 => item2%next_item
-   else
-      return  ! No items to process
-   end if
-
-   ! Check remaining items in first molecule
-   do while (associated(item1))
-      signature = leaf_part%parent_link%itemdir1(mol1%atoms(item1%value)%adjlist)
-      if (.not. (signature .equiv. first_signature)) then
-         would_split = .true.
-         return
-      end if
-      item1 => item1%next_item
-   end do
-
-   ! Check remaining items in second molecule
-   do while (associated(item2))
-      signature = leaf_part%parent_link%itemdir2(mol2%atoms(item2%value)%adjlist)
-      if (.not. (signature .equiv. first_signature)) then
-         would_split = .true.
-         return
-      end if
-      item2 => item2%next_item
-   end do
-end function
-
-subroutine split_part_mnas(mol1, mol2, part, link, branch_link)
-! Split a part by creating children with different signatures
-   type(mol_type), intent(in) :: mol1, mol2
+subroutine split_part_mna(atoms1, atoms2, itemdir1, itemdir2, part)
+! Create children for different signatures - caller decides what to do with them
+! Note: part is always a leaf part with no existing children
+   type(atom_type), dimension(:), intent(in) :: atoms1, atoms2
+   type(part_nodeptr_t), dimension(:), intent(in) :: itemdir1, itemdir2
    type(part_node_t), pointer, intent(inout) :: part
-   type(link_node_t), pointer, intent(inout) :: link, branch_link
    ! Local variables
    type(item_node_t), pointer :: item
    type(part_nodeptr_t), dimension(:), allocatable :: signature
    type(part_node_t), pointer :: child_part
 
-   ! Process first molecule items
+   ! Process first molecule items - create children for each unique signature
    item => part%first_item1
    do while (associated(item))
-      signature = part%parent_link%itemdir1(mol1%atoms(item%value)%adjlist)
-      child_part => find_child_part_node(part, signature)
+      signature = itemdir1(atoms1(item%value)%adjlist)
+      child_part => find_child_part(part, signature)
       if (.not. associated(child_part)) then
-         child_part => add_new_part(link, part)
+         child_part => new_child_part(part)
          child_part%signature = signature
-!         call add_part(branch_link, part)
       end if
       call add_new_item1(child_part, item%value)
       item => item%next_item
    end do
 
-   ! Process second molecule items
+   ! Process second molecule items - create children for each unique signature
    item => part%first_item2
    do while (associated(item))
-      signature = part%parent_link%itemdir2(mol2%atoms(item%value)%adjlist)
-      child_part => find_child_part_node(part, signature)
+      signature = itemdir2(atoms2(item%value)%adjlist)
+      child_part => find_child_part(part, signature)
       if (.not. associated(child_part)) then
-         child_part => add_new_part(link, part)
+         child_part => new_child_part(part)
          child_part%signature = signature
-!         call add_part(branch_link, part)
       end if
       call add_new_item2(child_part, item%value)
       item => item%next_item
    end do
 end subroutine
 
-subroutine compute_nextlevel_mnas(mol1, mol2, mnachain, branch, num_splits)
-! Compute next level MNA types by processing the last partition
+subroutine compute_nextlevel_mnas(mol1, mol2, mnachain, num_splits)
+! Compute next level MNA types - always keeps all children (original behavior)
    type(mol_type), intent(in) :: mol1, mol2
-   type(chain_root_t), pointer, intent(inout) :: mnachain
-   type(branch_node_t), pointer, intent(inout) :: branch
-   integer, intent(out) :: num_splits ! New argument for split count
+   type(branch_node_t), pointer, intent(inout) :: mnachain
+   integer, intent(out) :: num_splits
    ! Local variables
-   type(link_node_t), pointer :: last_link, new_link, branch_link
+   type(link_node_t), pointer :: last_link, new_link
    type(partref_node_t), pointer :: partref
 
-   num_splits = 0 ! Initialize split count
+   num_splits = 0
 
-   ! Get the last link in the chain
+   ! Save the last link before creating a new one
    last_link => mnachain%last_link
-
-   ! Create a new link for the next level
-   new_link => add_new_link(mnachain)
-!   branch_link => add_new_link_branch(branch)
+   new_link => new_chain_link(mnachain)
 
    ! Process all parts in the current partition
    partref => last_link%first_partref
    do while (associated(partref))
-      ! All parts in the last link are leaf parts - split if necessary, otherwise reuse
-      if (would_part_split(mol1, mol2, partref%part_node)) then
-         call split_part_mnas(mol1, mol2, partref%part_node, new_link, branch_link)
-         call update_branch_parts(branch, partref%part_node)
-         num_splits = num_splits + 1 ! Increment split count
-      else
-         call add_part(new_link, partref%part_node)
-      end if
-      partref => partref%next_partref
+      ! Create children based on signatures
+      call split_part_mna(mol1%atoms, mol2%atoms, last_link%itemdir1, last_link%itemdir2, partref%part)
+
+      ! Always link all children to new_link (preserves original behavior)
+      call update_link_parts(new_link, partref%part)
+
+      ! Count splits (children beyond the original part)
+      num_splits = num_splits + partref%part%num_children - 1
+
+      partref => partref%nextref
    end do
 end subroutine
 
-subroutine compute_consistent_mnas(mol1, mol2, mnachain, branch)
+subroutine compute_nextlevel_mnas_branch(mol1, mol2, mnachain, mnabranch, branch_parts, num_splits)
+! Compute next level MNA types - only keeps children if real split occurred
+   type(mol_type), intent(in) :: mol1, mol2
+   type(branch_node_t), pointer, intent(inout) :: mnachain
+   type(branch_node_t), pointer, intent(inout) :: mnabranch
+   type(link_node_t), pointer, intent(inout) :: branch_parts
+   integer, intent(out) :: num_splits
+   ! Local variables
+   type(link_node_t), pointer :: last_link, new_link, leaf_link
+   type(partref_node_t), pointer :: partref
+
+   num_splits = 0
+
+   ! Save the last link before creating a new one
+   last_link => mnachain%last_link
+   new_link => new_chain_link(mnachain)
+   leaf_link => new_chain_link(mnabranch)
+
+   ! Process all parts in the current partition (all are leaf parts)
+   partref => last_link%first_partref
+   do while (associated(partref))
+      ! Create children based on signatures
+      call split_part_mna(mol1%atoms, mol2%atoms, last_link%itemdir1, last_link%itemdir2, partref%part)
+
+      ! Check if real split occurred (more than one child)
+      if (partref%part%num_children > 1) then
+         ! Real split - link all children to new_link
+         call update_link_parts(new_link, partref%part)
+         call add_link_part(leaf_link, partref%part)
+!         call update_link_parts(leaf_link, partref%part)
+         call update_branch_parts(branch_parts, partref%part)
+         num_splits = num_splits + 1
+      else
+         ! No real split (num_children == 1) - remove the single child and reuse original part
+         call remove_onlychild_part(partref%part)
+         call add_link_part(new_link, partref%part)
+      end if
+
+      partref => partref%nextref
+   end do
+
+   ! If no splits occurred, remove the newly created links
+   if (num_splits == 0) then
+      call remove_last_link(mnachain)
+      call remove_last_link(mnabranch)
+   end if
+end subroutine
+
+subroutine compute_consistent_mnas(mol1, mol2, mnachain)
 ! Iteratively compute MNA types until convergence
    type(mol_type), intent(in) :: mol1, mol2
-   type(chain_root_t), pointer, intent(inout) :: mnachain
-   type(branch_node_t), pointer, intent(inout) :: branch
+   type(branch_node_t), pointer, intent(inout) :: mnachain
    ! Local variables
    integer :: num_splits
 
    do
       ! Call compute_nextlevel_mnas and get the number of splits
-      call compute_nextlevel_mnas(mol1, mol2, mnachain, branch, num_splits)
+      call compute_nextlevel_mnas(mol1, mol2, mnachain, num_splits)
 
       ! Exit loop if no splits occurred in the last iteration
       if (num_splits == 0) exit
    end do
 end subroutine
 
-subroutine split_part_item(link, branch_link, part)
-   type(link_node_t), pointer, intent(inout) :: link, branch_link
+subroutine compute_consistent_mnas_branch(mol1, mol2, mnachain, mnabranch, branch_parts)
+! Iteratively compute MNA types until convergence
+   type(mol_type), intent(in) :: mol1, mol2
+   type(branch_node_t), pointer, intent(inout) :: mnachain
+   type(branch_node_t), pointer, intent(inout) :: mnabranch
+   type(link_node_t), pointer, intent(inout) :: branch_parts
+   ! Local variables
+   integer :: num_splits
+
+   do
+      ! Call compute_nextlevel_mnas and get the number of splits
+      call compute_nextlevel_mnas_branch(mol1, mol2, mnachain, mnabranch, branch_parts, num_splits)
+
+      ! Exit loop if no splits occurred in the last iteration
+      if (num_splits == 0) exit
+   end do
+end subroutine
+
+subroutine split_part_item(part)
    type(part_node_t), pointer, intent(inout) :: part
    ! Local variables
    type(part_node_t), pointer :: child_part
    type(item_node_t), pointer :: item1, item2
 
-   child_part => add_new_part(link, part)
-!   call add_part(branch_link, part)
+   ! Create first child and add first item from each molecule
+   child_part => new_child_part(part)
    call add_new_item1(child_part, part%first_item1%value)
    call add_new_item2(child_part, part%first_item2%value)
-   child_part => add_new_part(link, part)
-!   call add_part(branch_link, part)
+
+   ! Create second child and add remaining items
+   child_part => new_child_part(part)
    item1 => part%first_item1%next_item
    item2 => part%first_item2%next_item
    do while (associated(item1))
@@ -165,113 +181,131 @@ subroutine split_part_item(link, branch_link, part)
    end do
 end subroutine
 
-function should_split(down_part, top_part)
-   type(part_node_t), pointer, intent(in) :: down_part, top_part
+! Modified split_single_part as a function that returns the created child branch
+function split_single_part(mnachain, branch, part, branch_parts) result(child_branch)
+   type(branch_node_t), pointer, intent(inout) :: mnachain
+   type(branch_node_t), pointer, intent(inout) :: branch
+   type(part_node_t), pointer, intent(inout) :: part
+   type(link_node_t), pointer, intent(inout) :: branch_parts
+   type(branch_node_t), pointer :: child_branch
    ! Local variables
-   logical :: should_split
-   type(part_node_t), pointer :: up_part
+   type(link_node_t), pointer :: last_link, new_link, leaf_link
+   type(partref_node_t), pointer :: partref
 
-   if (down_part%num_items1 >= 2) then
-      up_part => down_part
-      do while (up_part%depth >= top_part%depth)
-         if (associated(up_part, top_part)) then
-            should_split = .true.
-            return
-         end if
-         up_part => up_part%parent_part
-      end do
-   end if
+   ! Save the last link before creating a new one
+   last_link => mnachain%last_link
+   new_link => new_chain_link(mnachain)
 
-   should_split = .false.
+   ! Add non-target parts to new link
+   partref => last_link%first_partref
+   do while (associated(partref))
+      if (.not. associated(partref%part, part)) then
+         call add_link_part(new_link, partref%part)
+      end if
+      partref => partref%nextref
+   end do
+
+   ! Split target part and add its children to the new link
+   call split_part_item(part)
+   call update_link_parts(new_link, part)
+
+   ! Create a new child branch for this leaf part
+   child_branch => new_child_branch(branch)
+   leaf_link => new_chain_link(child_branch)
+   
+   ! Update branch parts
+   call add_link_part(leaf_link, part)
+   call update_branch_parts(branch_parts, part)
 end function
 
-recursive subroutine split_branch_items(mol1, mol2, mnachain, branch)
+! Modified split_dependent_parts as a function that returns the final branch
+recursive function split_dependent_parts(mol1, mol2, mnachain, branch, fork_part, branch_parts) result(branch_tip)
    type(mol_type), intent(in) :: mol1, mol2
-   type(chain_root_t), pointer, intent(inout) :: mnachain
+   type(branch_node_t), pointer, intent(inout) :: mnachain
    type(branch_node_t), pointer, intent(inout) :: branch
+   type(part_node_t), pointer, intent(in) :: fork_part
+   type(link_node_t), pointer, intent(inout) :: branch_parts
+   type(branch_node_t), pointer :: branch_tip
    ! Local variables
-   type(link_node_t), pointer :: new_link, branch_link
    type(partref_node_t), pointer :: partref
+   type(part_node_t), pointer :: split_part
 
-   ! Get parts from current last link
+   ! Start with the input branch
+   branch_tip => branch
+
+   ! Compute consistent MNAs
+   call compute_consistent_mnas_branch(mol1, mol2, mnachain, branch_tip, branch_parts)
+
+   ! Find a degenerate descendant part to split
+   split_part => null()
    partref => mnachain%last_link%first_partref
-
-   ! Create new link (this updates mnachain%last_link)
-   new_link => add_new_link(mnachain)
-!   branch_link => add_new_link_branch(branch)
-
-   ! Process all parts, looking for one to split
-   do while (associated(partref))
-      if (should_split(partref%part_node, branch%part_node)) then
-         ! Found a part to split
-         call split_part_item(new_link, branch_link, partref%part_node)
-         call update_branch_parts(branch, partref%part_node)
-
-         ! Add all remaining parts
-         partref => partref%next_partref
-         do while (associated(partref))
-            call add_part(new_link, partref%part_node)
-            partref => partref%next_partref
-         end do
-
-         ! Compute consistent MNAs and recurse
-         call compute_consistent_mnas(mol1, mol2, mnachain, branch)
-         call split_branch_items(mol1, mol2, mnachain, branch)
-         return
+   do while (associated(partref) .and. .not. associated(split_part))
+      if (partref%part%num_items1 >= 2) then
+         if (isdescendant(partref%part, fork_part)) then
+            split_part => partref%part
+         end if
       end if
-
-      ! No split needed, just add this part
-      call add_part(new_link, partref%part_node)
-      partref => partref%next_partref
+      partref => partref%nextref
    end do
 
-   ! Base case: no splits found, recursion ends
-end subroutine
+   ! Perform split if target found
+   if (associated(split_part)) then
+      ! Split the target part and get the new child branch
+      branch_tip => split_single_part(mnachain, branch_tip, split_part, branch_parts)
+      ! Call itself again to split the next degenerate descendant part
+      branch_tip => split_dependent_parts(mol1, mol2, mnachain, branch_tip, fork_part, branch_parts)
+   end if
+end function
 
-recursive subroutine build_permutation_tree( mol1, mol2, mnachain, branch)
+! Updated split_independent_parts to use the new function signatures
+recursive subroutine split_independent_parts(mol1, mol2, mnachain, branch, branch_parts)
    type(mol_type), intent(in) :: mol1, mol2
-   type(chain_root_t), pointer, intent(out) :: mnachain
-   type(branch_node_t), pointer, intent(out) :: branch
+   type(branch_node_t), pointer, intent(inout) :: mnachain, branch
+   type(link_node_t), pointer, intent(in) :: branch_parts
    ! Local variables
+   type(link_node_t), pointer :: new_branch_parts
+   type(branch_node_t), pointer :: branch_tip
    type(partref_node_t), pointer :: partref
-   type(branch_node_t), pointer :: new_branch
 
-   ! Traverse all parts referenced by this branch
-   partref => branch%first_partref
+   ! Process each part in branch_parts
+   partref => branch_parts%first_partref
    do while (associated(partref))
-      ! Only process leaf parts (parts with no children)
-      if (partref%part_node%num_children == 0) then
-         ! Create a new child branch for this leaf part
-         new_branch => add_new_branch(branch, partref%part_node)
-
-         ! Split items in this part if needed, creating new partition levels
-         call split_branch_items(mol1, mol2, mnachain, new_branch)
-
-         ! Recursively process the new branch to find more leaf parts
-         call build_permutation_tree( mol1, mol2, mnachain, new_branch)
+      if (partref%part%num_children == 0) then
+         ! Create a new part registry for this branch part
+         new_branch_parts => new_root_link()
+         ! Split the target part and get the new child branch
+         branch_tip => split_single_part(mnachain, branch, partref%part, new_branch_parts)
+         ! Split items for this specific part until convergence
+         branch_tip => split_dependent_parts(mol1, mol2, mnachain, branch_tip, partref%part, new_branch_parts)
+         ! Recursively process the resulting branch parts
+         call split_independent_parts(mol1, mol2, mnachain, branch_tip, new_branch_parts)
       end if
-      partref => partref%next_partref
+      partref => partref%nextref
    end do
-
-   ! Base case: when no leaf parts are found, recursion ends
 end subroutine
 
-subroutine assign_conform_atoms( mol1, mol2, mnachain, root_branch)
+subroutine assign_conform_atoms( mol1, mol2, root_part, mnachain, root_branch)
    type(mol_type), intent(in) :: mol1, mol2
-   type(chain_root_t), pointer, intent(inout) :: mnachain
-   type(branch_node_t), pointer, intent(inout) :: root_branch
+   type(part_node_t), pointer, intent(inout) :: root_part
+   type(branch_node_t), pointer, intent(inout) :: mnachain
+   type(branch_node_t), pointer, intent(out) :: root_branch
+   type(link_node_t), pointer :: leaf_link, branch_parts
    ! Local variables
 
 !   call print_atoms( mol1)
 !   call print_atoms( mol2)
 
-   call compute_consistent_mnas( mol1, mol2, mnachain, root_branch)
-   call build_permutation_tree( mol1, mol2, mnachain, root_branch)
+   root_branch => new_root_branch( mnachain%tot_items1, mnachain%tot_items2)
+   leaf_link => new_chain_link( root_branch)
+   call add_link_part(leaf_link, root_part)
+   branch_parts => new_root_link()
+
+   call compute_consistent_mnas_branch( mol1, mol2, mnachain, root_branch, branch_parts)
+   call split_independent_parts( mol1, mol2, mnachain, root_branch, branch_parts)
 
 !   call print_chain( mnachain)
-   call print_part_tree( mnachain%first_link%first_partref%part_node)
+   call print_part_tree( root_part)
    call print_branch_tree( root_branch)
-!   call print_branch_contents( root_branch)
 end subroutine
 
 end module
