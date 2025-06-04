@@ -33,8 +33,8 @@ subroutine compute_mna_biases(mol1, mol2, eltypes, biases)
    type(partitionarray_t), intent(in) :: eltypes
    type(int_matrix), dimension(:), allocatable, intent(out) :: biases
    ! Local variables
-   type(chain_root_t), pointer :: mnachain
-   type(branch_node_t), pointer :: root_branch
+   type(part_node_t), pointer :: root_part
+   type(branch_node_t), pointer :: mnachain
    integer :: h, i, j, iatom, jatom
    integer :: num_splits
 !   integer :: link_idx
@@ -47,7 +47,7 @@ subroutine compute_mna_biases(mol1, mol2, eltypes, biases)
    end do
 
    ! Initialize mna chain with element types
-   call chain_from_partitionarray( eltypes, mnachain, root_branch)
+   call chain_from_partitionarray( eltypes, root_part, mnachain)
 
 !   link_idx = 0
    do
@@ -57,7 +57,7 @@ subroutine compute_mna_biases(mol1, mol2, eltypes, biases)
 !      call print_link(mnachain%last_link)
 
       ! Call compute_nextlevel_mnas and get the number of splits
-      call compute_nextlevel_mnas(mol1, mol2, mnachain, root_branch, num_splits)
+      call compute_nextlevel_mnas(mol1, mol2, mnachain, num_splits)
 
       ! Exit loop if no splits occurred in the last iteration
       if (num_splits == 0) exit
@@ -90,6 +90,7 @@ subroutine compute_mna_biases(mol1, mol2, eltypes, biases)
 
 !   call print_chain(mnachain)
    call delete_chain(mnachain)  ! Cleanup
+   call delete_part_tree(root_part)  ! Cleanup
 end subroutine
 
 end module

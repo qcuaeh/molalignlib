@@ -42,8 +42,8 @@ subroutine find_reactive_bonds( mol1, mol2, eltypes, atomperm)
 
    ! Local variables
    type(partitionarray_t) :: mnatypes
-   type(chain_root_t), pointer :: mnachain
-   type(branch_node_t), pointer :: root_branch
+   type(part_node_t), pointer :: root_part
+   type(branch_node_t), pointer :: mnachain
    type(int_list), dimension(:), allocatable :: molfrags1, molfrags2
    type(int_matrix), dimension(:), allocatable :: biases
    type(topoatomperm_registry), target :: results
@@ -78,8 +78,8 @@ subroutine find_reactive_bonds( mol1, mol2, eltypes, atomperm)
    call translate_coords( coords2, center1)
 
    ! Compute MNA types
-   call chain_from_partitionarray( eltypes, mnachain, root_branch)
-   call compute_consistent_mnas( mol1, mol2, mnachain, root_branch)
+   call chain_from_partitionarray( eltypes, root_part, mnachain)
+   call compute_consistent_mnas( mol1, mol2, mnachain)
    call partition_to_partitionarray( mnachain%last_link, mnatypes)
 
    ! Find molecular fragments
