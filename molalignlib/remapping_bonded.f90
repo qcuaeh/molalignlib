@@ -29,7 +29,8 @@ use biasing
 use pruning
 use lcrs_tree
 use mna_compute
-!use mna_recompute
+use mna_precompute
+use mna_recompute
 use reactivity
 use registry
 
@@ -43,17 +44,14 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
 
    ! Local variables
    type(partitionarray_t) :: eltypes
-   type(part_node_t), pointer :: root_part
-   type(branch_node_t), pointer :: mnachain
-   type(branch_node_t), pointer :: split_branch
-   integer, dimension(:), allocatable :: atomperm, auxperm
-   integer :: num_trials, num_steps
-   integer, dimension(:), allocatable :: elnums1, elnums2
-   real(rk), dimension(:,:), allocatable :: coords1, coords2
    logical, dimension(:,:), allocatable :: adjmat1, adjmat2
+   integer, dimension(:), allocatable :: atomperm, auxperm
+   integer, dimension(:), allocatable :: elnums1, elnums2
+   integer :: num_trials, num_steps
+   real(rk), dimension(:,:), allocatable :: coords1, coords2
    real(rk) :: step_rotation(4), total_rotation(4)
    real(rk) :: center1(3), center2(3)
-   real(rk) :: dist
+!   real(rk) :: dist
 
    ! Abort if molecules have different number of atoms
    if (size(mol1%atoms) /= size(mol2%atoms)) then
@@ -96,8 +94,7 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
       write (stderr, *) 'adjd after ', adjacencydiff( atomperm, adjmat1, adjmat2)
    end if
 
-   call chain_from_partitionarray( eltypes, root_part, mnachain)
-   call assign_conform_atoms( mol1, mol2, root_part, mnachain, split_branch)
+   call assign_conform_atoms( mol1, mol2, eltypes)
    stop
 
    ! Mirror coordinates
@@ -130,13 +127,13 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
       call rotate_coords( coords2, randrotquat(), center1)
 
       ! Assign atoms with current orientation
-      call minimize_conformation_distance( mnachain, split_branch, coords1, coords2, atomperm, dist)
+!      call minimize_conformation_distance( split_branch, coords1, coords2, atomperm, dist)
       total_rotation = optimal_rotation( atomperm, coords1, coords2, center1)
       call rotate_coords( coords2, total_rotation, center1)
       num_steps = 1
 
       do while (iter_flag)
-         call minimize_conformation_distance( mnachain, split_branch, coords1, coords2, auxperm, dist)
+!         call minimize_conformation_distance( split_branch, coords1, coords2, auxperm, dist)
          if (all(auxperm == atomperm)) exit
          atomperm = auxperm
          step_rotation = optimal_rotation( atomperm, coords1, coords2, center1)
@@ -151,12 +148,49 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
    end do
 end subroutine
 
-subroutine minimize_conformation_distance( mnachain, split_branch, coords1, coords2, atomperm, dist)
-   type(branch_node_t), pointer, intent(in) :: mnachain
-   type(branch_node_t), pointer, intent(in) :: split_branch
-   real(rk), dimension(:,:), intent(in) :: coords1, coords2
-   integer, dimension(:), intent(out) :: atomperm
-   real(rk), intent(out) :: dist
+subroutine assign_conform_atoms( mol1, mol2, eltypes)
+   type(mol_type), intent(in) :: mol1, mol2
+   type(partitionarray_t), intent(in) :: eltypes
+   ! Local variables
+   type(part_node_t), pointer :: root_part, temp_part
+   type(split_node_t), pointer :: mnachain, temp_chain, root_branch
+   type(link_node_t), pointer :: branch_parts
+   type(part_node_t), pointer :: child_part
+
+!   call print_atoms( mol1)
+!   call print_atoms( mol2)
+
+!   call init_chain_from_partarray( eltypes, mnachain, root_part)
+!   root_branch => new_root_branch( mnachain%tot_items1, mnachain%tot_items2)
+!   leaf_link => new_generic_link( root_branch)
+!   call update_itemdir_children( leaf_link, root_part)
+!   branch_parts => new_root_link()
+!   call update_branch_parts(branch_parts, root_part)
+!   call precompute_consistent_mnas(mol1, mol2, mnachain, root_branch, branch_parts)
+
+   call init_chain_from_partarray( eltypes, temp_chain, temp_part)
+   call compute_consistent_mnas( mol1, mol2, temp_chain)
+   call init_chain_from_link( temp_chain%last_link, mnachain, root_part)
+   root_branch => new_root_branch( mnachain%tot_items1, mnachain%tot_items2)
+   branch_parts => new_root_link()
+   child_part => root_part%first_child_part
+   do while (associated(child_part))
+      call add_branch_part(branch_parts, child_part)
+      child_part => child_part%next_sibling_part
+   end do
+   call split_independent_parts( mol1, mol2, mnachain, root_branch, branch_parts)
+   call print_part_tree( root_part)
+   call print_tree_items( root_part)
+
+   call print_tree_signatures( root_part)
+   call print_split_tree( root_branch)
+!   call print_chain( mnachain)
+!   call print_chain( root_branch%first_child_branch)
+
+   call random_init(.false., .true.)
+   call redistribute_items( mol1, mol2, root_branch)
+!   call print_part_tree( root_part)
+   call print_leaf_items( root_part)
 end subroutine
 
 end module

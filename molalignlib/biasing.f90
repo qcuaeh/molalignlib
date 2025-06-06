@@ -34,7 +34,7 @@ subroutine compute_mna_biases(mol1, mol2, eltypes, biases)
    type(int_matrix), dimension(:), allocatable, intent(out) :: biases
    ! Local variables
    type(part_node_t), pointer :: root_part
-   type(branch_node_t), pointer :: mnachain
+   type(split_node_t), pointer :: mnachain
    integer :: h, i, j, iatom, jatom
    integer :: num_splits
 !   integer :: link_idx
@@ -47,7 +47,7 @@ subroutine compute_mna_biases(mol1, mol2, eltypes, biases)
    end do
 
    ! Initialize mna chain with element types
-   call chain_from_partitionarray( eltypes, root_part, mnachain)
+   call init_chain_from_partarray( eltypes, mnachain, root_part)
 
 !   link_idx = 0
    do
