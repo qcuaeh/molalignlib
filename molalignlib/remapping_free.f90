@@ -37,7 +37,7 @@ subroutine remap_free_atoms(mol1, mol2, results)
    type(atomperm_registry), intent(out) :: results
 
    ! Local variables
-   type(partitionarray_t) :: eltypes
+   type(partition_t) :: eltypes
    type(bool_matrix), dimension(:), allocatable :: prunes
    integer :: num_steps
    integer, dimension(:), allocatable :: atomperm, auxperm

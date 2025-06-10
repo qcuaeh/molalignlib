@@ -6,11 +6,12 @@ implicit none
 
 contains
 
-subroutine resplit_part_mna(atoms1, atoms2, itemdir1, itemdir2, part)
+subroutine resplit_part_mna(atoms1, atoms2, itemdir1, itemdir2, part, link)
 ! Update item values of existing item nodes instead of adding new item nodes
    type(atom_type), dimension(:), intent(in) :: atoms1, atoms2
    type(part_nodeptr_t), dimension(:), intent(in) :: itemdir1, itemdir2
    type(part_node_t), pointer, intent(inout) :: part
+   type(link_node_t), pointer, intent(inout) :: link
    ! Local variables
    type(item_node_t), pointer :: item
    type(part_nodeptr_t), dimension(:), allocatable :: signature
@@ -39,6 +40,7 @@ subroutine resplit_part_mna(atoms1, atoms2, itemdir1, itemdir2, part)
          child_part%last_item1 => child_part%last_item1%next_item
       end if
       child_part%last_item1%value = item%value
+      link%itemdir1(item%value)%ptr => child_part
       item => item%next_item
    end do
 
@@ -57,6 +59,7 @@ subroutine resplit_part_mna(atoms1, atoms2, itemdir1, itemdir2, part)
          child_part%last_item2 => child_part%last_item2%next_item
       end if
       child_part%last_item2%value = item%value
+      link%itemdir2(item%value)%ptr => child_part
       item => item%next_item
    end do
 end subroutine
@@ -67,19 +70,13 @@ subroutine recompute_nextlevel_mnas(mol1, mol2, link)
    type(link_node_t), pointer, intent(inout) :: link
    ! Local variables
    type(partref_node_t), pointer :: partref
-   type(part_node_t), pointer :: child_part
 
    ! Process all parts in the current partition
    partref => link%first_partref
    do while (associated(partref))
 !      write (stderr,'(A,1X,A)') 'Part', address(partref%part)
       ! Distribute items based on signatures
-      call resplit_part_mna(mol1%atoms, mol2%atoms, link%itemdir1, link%itemdir2, partref%part)
-      child_part => partref%part%first_child_part
-      do while (associated(child_part))
-         call update_itemdir(link%next_link, child_part)
-         child_part => child_part%next_sibling_part
-      end do
+      call resplit_part_mna(mol1%atoms, mol2%atoms, link%itemdir1, link%itemdir2, partref%part, link%next_link)
       partref => partref%nextref
    end do
 end subroutine
@@ -87,7 +84,7 @@ end subroutine
 subroutine recompute_consistent_mnas(mol1, mol2, branch)
 ! Iteratively compute MNA types until convergence
    type(mol_type), intent(in) :: mol1, mol2
-   type(split_node_t), pointer, intent(inout) :: branch
+   type(chain_node_t), pointer, intent(inout) :: branch
    ! Local variables
    type(link_node_t), pointer :: link
    integer link_idx
@@ -104,39 +101,48 @@ subroutine recompute_consistent_mnas(mol1, mol2, branch)
    end do
 end subroutine
 
-subroutine resplit_part_first(part)
+subroutine resplit_part_first(part, link)
    type(part_node_t), pointer, intent(inout) :: part
+   type(link_node_t), pointer, intent(inout) :: link
    ! Local variables
    type(part_node_t), pointer :: child_part
    type(item_node_t), pointer :: item1, item2
 
    ! Add first item to first child
    child_part => part%first_child_part
-   child_part%first_item1%value = part%first_item1%value
-   child_part%first_item2%value = part%first_item2%value
-
-   ! Add second item to second child
-   child_part => part%first_child_part%next_sibling_part
-   child_part%first_item1%value = part%first_item1%next_item%value
-   child_part%first_item2%value = part%first_item2%next_item%value
+   item1 => part%first_item1
+   item2 => part%first_item2
+   child_part%first_item1%value = item1%value
+   child_part%first_item2%value = item2%value
+   link%itemdir1(item1%value)%ptr => child_part
+   link%itemdir2(item2%value)%ptr => child_part
 
    ! Add remaining items to second child
-   item1 => part%first_item1%next_item%next_item
-   item2 => part%first_item2%next_item%next_item
-   child_part%last_item1 => child_part%first_item1
-   child_part%last_item2 => child_part%first_item2
+   child_part => child_part%next_sibling_part
+   child_part%last_item1 => null()
+   child_part%last_item2 => null()
+   item1 => item1%next_item
+   item2 => item2%next_item
    do while (associated(item1))
-      child_part%last_item1 => child_part%last_item1%next_item
-      child_part%last_item2 => child_part%last_item2%next_item
+      if (.not. associated(child_part%last_item1)) then
+         child_part%last_item1 => child_part%first_item1
+         child_part%last_item2 => child_part%first_item2
+      else
+         child_part%last_item1 => child_part%last_item1%next_item
+         child_part%last_item2 => child_part%last_item2%next_item
+      end if
       child_part%last_item1%value = item1%value
       child_part%last_item2%value = item2%value
+      link%itemdir1(item1%value)%ptr => child_part
+      link%itemdir2(item2%value)%ptr => child_part
       item1 => item1%next_item
       item2 => item2%next_item
    end do
 end subroutine
 
-subroutine resplit_part_random(part)
+subroutine resplit_part_random(part, link)
    type(part_node_t), pointer, intent(inout) :: part
+   type(link_node_t), pointer, intent(inout) :: link
    ! Local variables
    type(part_node_t), pointer :: child_part1, child_part2
    type(item_node_t), pointer :: item1, item2
@@ -168,6 +174,7 @@ subroutine resplit_part_random(part)
       current_index = current_index + 1
    end do
    child_part1%first_item1%value = item1%value
+   link%itemdir1(item1%value)%ptr => child_part1
 
    ! Find and assign the random item from items2 to first child
    item2 => part%first_item2
@@ -177,23 +184,26 @@ subroutine resplit_part_random(part)
       current_index = current_index + 1
    end do
    child_part1%first_item2%value = item2%value
+   link%itemdir2(item2%value)%ptr => child_part1
 
    write (stderr,*) address(part), item1%value, item2%value
 
    ! Now assign all other items from items1 to second child
    item1 => part%first_item1
    current_index = 1
-   child_part2%last_item1 => child_part2%first_item1
+   child_part2%last_item1 => null()
 
    do while (associated(item1))
       if (current_index /= random_index1) then
-         ! This is not the random item, assign to second child
-         child_part2%last_item1%value = item1%value
-
-         ! Move to next position in second child (if not the last item)
-         if (associated(child_part2%last_item1%next_item)) then
+         ! Move to next position in second child
+         if (.not. associated(child_part2%last_item1)) then
+            child_part2%last_item1 => child_part2%first_item1
+         else
             child_part2%last_item1 => child_part2%last_item1%next_item
          end if
+         ! This is not the random item, assign to second child
+         child_part2%last_item1%value = item1%value
+         link%itemdir1(item1%value)%ptr => child_part2
       end if
 
       ! Move to next item in parent
@@ -204,17 +214,19 @@ subroutine resplit_part_random(part)
    ! Now assign all other items from items2 to second child
    item2 => part%first_item2
    current_index = 1
-   child_part2%last_item2 => child_part2%first_item2
+   child_part2%last_item2 => null()
 
    do while (associated(item2))
       if (current_index /= random_index2) then
-         ! This is not the random item, assign to second child
-         child_part2%last_item2%value = item2%value
-
-         ! Move to next position in second child (if not the last item)
-         if (associated(child_part2%last_item2%next_item)) then
+         ! Move to next position in second child
+         if (.not. associated(child_part2%last_item2)) then
+            child_part2%last_item2 => child_part2%first_item2
+         else
             child_part2%last_item2 => child_part2%last_item2%next_item
          end if
+         ! This is not the random item, assign to second child
+         child_part2%last_item2%value = item2%value
+         link%itemdir2(item2%value)%ptr => child_part2
       end if
 
       ! Move to next item in parent
@@ -225,31 +237,27 @@ end subroutine
 
 recursive subroutine redistribute_items(mol1, mol2, branch)
    type(mol_type), intent(in) :: mol1, mol2
-   type(split_node_t), pointer, intent(inout) :: branch
-   type(split_node_t), pointer :: child_branch
+   type(chain_node_t), pointer, intent(inout) :: branch
+   type(chain_node_t), pointer :: child_branch
    type(part_node_t), pointer :: child_part
 
    ! Process all children of this branch
-   child_branch => branch%first_child_branch
+   child_branch => branch%first_child_chain
    do while (associated(child_branch))
       ! Process this child branch's split_part
 !      write (stderr,*)
 !      write (stderr,'(A,1X,A)') 'Split Part', address(child_branch%split_part)
-!      call resplit_part_first(child_branch%split_part)
-      call resplit_part_random(child_branch%split_part)
+!      call resplit_part_first(child_branch%split_part, child_branch%first_link)
+      call resplit_part_random(child_branch%split_part, child_branch%first_link)
       ! Add target part children to links
       child_part => child_branch%split_part%first_child_part
-      do while (associated(child_part))
-         call update_itemdir(child_branch%first_link, child_part)
-         child_part => child_part%next_sibling_part
-      end do
       call recompute_consistent_mnas(mol1, mol2, child_branch)
 
       ! Recursively process this child's descendants (depth-first)
       call redistribute_items(mol1, mol2, child_branch)
 
       ! Move to next sibling
-      child_branch => child_branch%next_sibling_branch
+      child_branch => child_branch%next_sibling_chain
    end do
 end subroutine
 

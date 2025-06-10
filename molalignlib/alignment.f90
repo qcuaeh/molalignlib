@@ -36,7 +36,7 @@ subroutine molecule_align( mol1, mol2, coords2)
    type(mol_type), intent(in) :: mol1, mol2
    real(rk), dimension(:,:), allocatable, intent(out) :: coords2
    ! Local variables
-   type(partitionarray_t) :: eltypes
+   type(partition_t) :: eltypes
    real(rk) :: center1(3), center2(3), rotquat(4)
    real(rk), dimension(:,:), allocatable :: coords1
    real(rk), dimension(:), allocatable :: weights1, weights2

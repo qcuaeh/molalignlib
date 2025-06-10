@@ -44,7 +44,7 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
    type(bondatomperm_registry), target, intent(out) :: results
 
    ! Local variables
-   type(partitionarray_t) :: eltypes
+   type(partition_t) :: eltypes
    logical, dimension(:,:), allocatable :: adjmat1, adjmat2
    integer, dimension(:), allocatable :: atomperm, auxperm
    integer, dimension(:), allocatable :: elnums1, elnums2
@@ -151,10 +151,10 @@ end subroutine
 
 subroutine assign_conform_atoms( mol1, mol2, eltypes)
    type(mol_type), intent(in) :: mol1, mol2
-   type(partitionarray_t), intent(in) :: eltypes
+   type(partition_t), intent(in) :: eltypes
    ! Local variables
    type(part_node_t), pointer :: root_part, temp_part
-   type(split_node_t), pointer :: mnachain, temp_chain, root_branch
+   type(chain_node_t), pointer :: mnachain2, mnachain1, chain_tree
    type(link_node_t), pointer :: branch_parts
    type(part_node_t), pointer :: child_part
    integer unit1, unit2
@@ -167,38 +167,37 @@ subroutine assign_conform_atoms( mol1, mol2, eltypes)
 !   call print_atoms( mol1)
 !   call print_atoms( mol2)
 
-!   call init_chain_from_partarray( eltypes, mnachain, root_part)
-!   root_branch => new_root_branch( mnachain%tot_items1, mnachain%tot_items2)
-!   leaf_link => new_generic_link( root_branch)
+!   call init_chain_from_partition( eltypes, mnachain2, root_part)
+!   chain_tree => new_root_chain( mnachain2%tot_items1, mnachain2%tot_items2)
+!   leaf_link => new_chain_link( chain_tree)
 !   call update_itemdir_children( leaf_link, root_part)
-!   branch_parts => new_root_link()
+!   branch_parts => new_bare_link()
 !   call update_branch_parts(branch_parts, root_part)
-!   call precompute_consistent_mnas(mol1, mol2, mnachain, root_branch, branch_parts)
+!   call precompute_consistent_mnas(mol1, mol2, mnachain2, chain_tree, branch_parts)
 
-   call init_chain_from_partarray( eltypes, temp_chain, temp_part)
-   call compute_consistent_mnas( mol1, mol2, temp_chain)
-   call init_chain_from_link( temp_chain%last_link, mnachain, root_part)
+   call init_chain_from_partition( eltypes, mnachain1, temp_part)
+   call compute_consistent_mnas( mol1, mol2, mnachain1)
+   call init_chain_from_link( mnachain1%last_link, mnachain2, root_part)
    call print_tree_items( root_part)
 
-   root_branch => new_root_branch( mnachain%tot_items1, mnachain%tot_items2)
-   branch_parts => new_root_link()
+   chain_tree => new_root_chain( mnachain2%tot_items1, mnachain2%tot_items2)
+   branch_parts => new_bare_link()
    child_part => root_part%first_child_part
    do while (associated(child_part))
       call add_branch_part(branch_parts, child_part)
       child_part => child_part%next_sibling_part
    end do
 
-   call split_independent_parts( mol1, mol2, mnachain, root_branch, branch_parts)
+   call split_independent_parts( mol1, mol2, mnachain2, chain_tree, branch_parts)
    call print_part_tree( root_part)
-!   call print_tree_items( root_part)
+!   call print_part_indices( root_part)
+!   call print_chain_indices( chain_tree)
 
 !   call print_tree_signatures( root_part)
-   call print_split_tree( root_branch)
-!   call print_chain( mnachain)
-!   call print_chain( root_branch%first_child_branch)
+   call print_chain_tree( chain_tree)
 
-   call random_init(.false., .true.)
-   call redistribute_items( mol1, mol2, root_branch)
+   call random_init(.true., .true.)
+   call redistribute_items( mol1, mol2, chain_tree)
    call print_leaf_items( root_part)
 end subroutine
 

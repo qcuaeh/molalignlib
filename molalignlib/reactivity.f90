@@ -37,13 +37,13 @@ contains
 
 subroutine find_reactive_bonds( mol1, mol2, eltypes, atomperm)
    type(mol_type), intent(in) :: mol1, mol2
-   type(partitionarray_t), intent(in) :: eltypes
+   type(partition_t), intent(in) :: eltypes
    integer, dimension(:), intent(out) :: atomperm
 
    ! Local variables
-   type(partitionarray_t) :: mnatypes
+   type(partition_t) :: mnatypes
    type(part_node_t), pointer :: root_part
-   type(split_node_t), pointer :: mnachain
+   type(chain_node_t), pointer :: mnachain
    type(int_list), dimension(:), allocatable :: molfrags1, molfrags2
    type(int_matrix), dimension(:), allocatable :: biases
    type(topoatomperm_registry), target :: results
@@ -78,9 +78,9 @@ subroutine find_reactive_bonds( mol1, mol2, eltypes, atomperm)
    call translate_coords( coords2, center1)
 
    ! Compute MNA types
-   call init_chain_from_partarray( eltypes, mnachain, root_part)
+   call init_chain_from_partition( eltypes, mnachain, root_part)
    call compute_consistent_mnas( mol1, mol2, mnachain)
-   call partition_to_partitionarray( mnachain%last_link, mnatypes)
+   call link_to_partition( mnachain%last_link, mnatypes)
 
    ! Find molecular fragments
    call find_molfrags( mol1, first_partition(eltypes), molfrags1)
@@ -113,7 +113,7 @@ end subroutine
 subroutine remove_reactive_bonds( mol1, mol2, eltypes, atomperm)
    ! Remove reactive bonds
    type(mol_type), intent(inout) :: mol1, mol2
-   type(partitionarray_t), intent(in) :: eltypes
+   type(partition_t), intent(in) :: eltypes
    integer, dimension(:), intent(in) :: atomperm
    ! Local variables
    logical, dimension(:,:), allocatable :: adjmat1, adjmat2
