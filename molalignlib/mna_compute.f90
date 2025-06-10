@@ -52,7 +52,7 @@ end subroutine
 subroutine compute_nextlevel_mnas(mol1, mol2, mnachain, num_splits)
 ! Compute next level MNA types - always keeps all children (original behavior)
    type(mol_type), intent(in) :: mol1, mol2
-   type(split_node_t), pointer, intent(inout) :: mnachain
+   type(chain_node_t), pointer, intent(inout) :: mnachain
    integer, intent(out) :: num_splits
    ! Local variables
    type(link_node_t), pointer :: link, new_link
@@ -62,7 +62,7 @@ subroutine compute_nextlevel_mnas(mol1, mol2, mnachain, num_splits)
 
    ! Save the last link before creating a new one
    link => mnachain%last_link
-   new_link => new_generic_link(mnachain)
+   new_link => new_chain_link(mnachain)
 
    ! Process all parts in the current partition
    partref => link%first_partref
@@ -80,7 +80,7 @@ end subroutine
 subroutine compute_consistent_mnas(mol1, mol2, mnachain)
 ! Iteratively compute MNA types until convergence
    type(mol_type), intent(in) :: mol1, mol2
-   type(split_node_t), pointer, intent(inout) :: mnachain
+   type(chain_node_t), pointer, intent(inout) :: mnachain
    ! Local variables
    integer :: num_splits
 
@@ -88,8 +88,8 @@ subroutine compute_consistent_mnas(mol1, mol2, mnachain)
       ! Call compute_nextlevel_mnas and get the number of splits
       call compute_nextlevel_mnas(mol1, mol2, mnachain, num_splits)
 
-      ! Return if no splits occurred
-      if (num_splits == 0) return
+      ! Exit loop if no splits occurred
+      if (num_splits == 0) exit
    end do
 end subroutine
 

@@ -37,7 +37,7 @@ contains
 subroutine assign_atoms_nearest( eltypes, coords1, coords2, atomperm)
 ! Find best correspondence between points sets with fixed orientation
 
-   type(partitionarray_t), target, intent(in) :: eltypes
+   type(partition_t), target, intent(in) :: eltypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    integer, dimension(:), intent(out) :: atomperm
    ! Local variables
@@ -62,7 +62,7 @@ end subroutine
 subroutine assign_atoms_pruned( eltypes, coords1, coords2, prunes, atomperm)
 ! Find best correspondence between points sets with fixed orientation
 
-   type(partitionarray_t), target, intent(in) :: eltypes
+   type(partition_t), target, intent(in) :: eltypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    type(bool_matrix), dimension(:), intent(in) :: prunes
    integer, dimension(:), intent(out) :: atomperm
@@ -87,7 +87,7 @@ end subroutine
 subroutine assign_atoms( eltypes, coords1, coords2, atomperm, dist)
 ! Find best correspondence between points sets with fixed orientation
 
-   type(partitionarray_t), intent(in) :: eltypes
+   type(partition_t), intent(in) :: eltypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    integer, dimension(:), intent(out) :: atomperm
    real(rk), intent(out) :: dist
@@ -107,7 +107,7 @@ end subroutine
 subroutine assign_atoms_biased( eltypes, coords1, coords2, biases, atomperm)
 ! Find best correspondence between points sets with fixed orientation
 
-   type(partitionarray_t), intent(in) :: eltypes
+   type(partition_t), intent(in) :: eltypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    type(int_matrix), dimension(:), intent(in) :: biases
    integer, dimension(:), intent(out) :: atomperm
@@ -126,7 +126,7 @@ subroutine assign_atoms_biased( eltypes, coords1, coords2, biases, atomperm)
 end subroutine
 
 subroutine solve_lap(part, p, q, perm, dist)
-   type(partarray_t), intent(in) :: part
+   type(partition_part_t), intent(in) :: part
    real(rk), dimension(:,:), intent(in) :: p, q
    integer, dimension(:), intent(out) :: perm
    real(rk), intent(out) :: dist
@@ -146,7 +146,7 @@ subroutine solve_lap(part, p, q, perm, dist)
 end subroutine
 
 subroutine solve_lap_biased(part, p, q, biases, perm, dist)
-   type(partarray_t), intent(in) :: part
+   type(partition_part_t), intent(in) :: part
    real(rk), dimension(:,:), intent(in) :: p, q
    integer, dimension(:,:), intent(in) :: biases
    integer, dimension(:), intent(out) :: perm

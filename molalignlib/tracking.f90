@@ -22,7 +22,7 @@ contains
 
 subroutine find_molfrags( mol, eltypes, molfrags)
    type(mol_type), intent(in) :: mol
-   type(semipartitionarray_t), intent(in) :: eltypes
+   type(semipartition_t), intent(in) :: eltypes
    type(int_list), dimension(:), allocatable, intent(out) :: molfrags
    ! Local variables
    integer :: i, nfrag
@@ -98,7 +98,7 @@ subroutine minadjdiff( eltypes, mnatypes, molfrags, mol1, mol2, coords1, &
 !
 
    ! Arguments
-   type(partitionarray_t), intent(in) :: eltypes, mnatypes
+   type(partition_t), intent(in) :: eltypes, mnatypes
    type(int_list), dimension(:), intent(in) :: molfrags
    type(mol_type), intent(in) :: mol1, mol2
    real(rk), dimension(:,:), intent(in) :: coords1, coords2

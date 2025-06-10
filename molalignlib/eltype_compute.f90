@@ -49,7 +49,7 @@ end function
 subroutine set_eltypes(atoms1, atoms2, eltypes)
 ! Partition atoms by atomic number and label using arrays directly
    type(atom_type), dimension(:), intent(in) :: atoms1, atoms2
-   type(partitionarray_t), intent(out) :: eltypes
+   type(partition_t), intent(out) :: eltypes
    ! Local variables
    type(atomtype_table) :: atomtypetable
    integer :: i, num_atoms1, num_atoms2
@@ -113,7 +113,7 @@ subroutine set_eltypes(atoms1, atoms2, eltypes)
       itemdir2_temp(i) = part_index
    end do
 
-   ! Now build the final partitionarray_t structure
+   ! Now build the final partition_t structure
    eltypes%num_parts = current_part
    allocate(eltypes%parts(eltypes%num_parts))
    allocate(eltypes%itemdir1(num_atoms1))
