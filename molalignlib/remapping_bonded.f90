@@ -28,9 +28,11 @@ use adjacency
 use biasing
 use pruning
 use lcrs_tree
+use array_trees
 use mna_compute
 use mna_precompute
 use mna_recompute
+use mna_recompute_arrays
 use reactivity
 use registry
 use fileio
@@ -157,6 +159,7 @@ subroutine assign_conform_atoms( mol1, mol2, eltypes)
    type(chain_node_t), pointer :: mnachain2, mnachain1, root_chain
    type(link_node_t), pointer :: branch_parts
    type(part_node_t), pointer :: child_part
+   type(array_trees_t) :: array_trees
    integer unit1, unit2
 
    open(newunit=unit1, file='molec1.mol2', action='write', status='replace')
@@ -178,7 +181,7 @@ subroutine assign_conform_atoms( mol1, mol2, eltypes)
    call init_chain_from_partition( eltypes, mnachain1, temp_part)
    call compute_consistent_mnas( mol1, mol2, mnachain1)
    call init_chain_from_link( mnachain1%last_link, mnachain2, root_part)
-   call print_tree_items( root_part)
+!   call print_tree_items( root_part)
 
    root_chain => new_root_chain( mnachain2%tot_items1, mnachain2%tot_items2)
    branch_parts => new_bare_link()
@@ -189,16 +192,25 @@ subroutine assign_conform_atoms( mol1, mol2, eltypes)
    end do
 
    call split_independent_parts( mol1, mol2, mnachain2, root_chain, branch_parts)
-   call print_part_tree( root_part)
+!   call print_part_tree( root_part)
 !   call print_part_indices( root_part)
 !   call print_chain_indices( root_chain)
 
 !   call print_tree_signatures( root_part)
-   call print_chain_tree( root_chain)
+!   call print_chain_tree( root_chain)
+
+!   call random_init(.true., .true.)
+!   call redistribute_items( mol1, mol2, root_chain)
+!   call print_tree_items( root_part)
 
    call random_init(.true., .true.)
-   call redistribute_items( mol1, mol2, root_chain)
-   call print_leaf_items( root_part)
+   call convert_trees_to_arrays( root_part, root_chain, array_trees)
+   call validate_conversion(root_part, root_chain, array_trees)
+   call print_part_tree_array( array_trees)
+   call print_first_level_items_array( array_trees)
+   call print_chain_tree_array( array_trees)
+   call redistribute_items_array( mol1, mol2, array_trees, 1)
+   call print_leaf_items_array( array_trees)
 end subroutine
 
 end module
