@@ -21,10 +21,12 @@ writemol.f90
 fileio.f90
 argparse.f90
 lcrs_tree.f90
+array_trees.f90
 eltype_compute.f90
 mna_compute.f90
 mna_precompute.f90
 mna_recompute.f90
+mna_recompute_arrays.f90
 registry.f90
 biasing.f90
 pruning.f90
