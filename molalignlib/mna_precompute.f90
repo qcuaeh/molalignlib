@@ -89,7 +89,7 @@ subroutine precompute_nextlevel_mnas(mol1, mol2, mnachain, leafchain, branch_par
    if (any_splits) then
       ! Create new level link for mnachain
       next_level_link => new_chain_link(mnachain)
-      
+
       ! Process all parts using cached split results
       partref => level_link%first_partref
       do i = 1, level_link%num_parts

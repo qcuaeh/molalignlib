@@ -230,7 +230,7 @@ function new_root_part() result(new_part)
    new_part => new_bare_part()
    new_part%depth = 0
    new_part%global_index = 1
-   
+
    ! Allocate counters for root and assign initial values
    allocate(new_part%total_parts)
    allocate(new_part%total_items1)
@@ -272,7 +272,7 @@ subroutine link_part(link, part)
    allocate(newref)
    newref%part => part
    newref%nextref => null()
-   
+
    ! Assign global index and increment counter
    link%total_partrefs = link%total_partrefs + 1
    newref%global_index = link%total_partrefs
@@ -302,7 +302,7 @@ function new_child_part(parent_part) result(new_part)
    new_part%total_parts => parent_part%total_parts
    new_part%total_items1 => parent_part%total_items1
    new_part%total_items2 => parent_part%total_items2
-   
+
    ! Assign global index and increment counter
    new_part%total_parts = new_part%total_parts + 1
    new_part%global_index = new_part%total_parts
@@ -326,7 +326,7 @@ subroutine add_new_item1(part, value)
    allocate(new_item)
    new_item%value = value
    new_item%next_item => null()
-   
+
    ! Assign global index and increment counter
    part%total_items1 = part%total_items1 + 1
    new_item%global_index = part%total_items1
@@ -349,7 +349,7 @@ subroutine add_new_item2(part, value)
    allocate(new_item)
    new_item%value = value
    new_item%next_item => null()
-   
+
    ! Assign global index and increment counter
    part%total_items2 = part%total_items2 + 1
    new_item%global_index = part%total_items2
@@ -655,7 +655,7 @@ function new_root_chain(tot_items1, tot_items2) result(new_chain)
    new_chain%parent_chain => null()
    new_chain%split_part => null()
    new_chain%global_index = 1
-   
+
    ! Allocate counters for root and assign initial values
    allocate(new_chain%total_chains)
    allocate(new_chain%total_links)
@@ -684,10 +684,10 @@ function new_chain_link(chain) result(new_link)
 
    ! Use the initialization function
    new_link => new_bare_link()
-   
+
    ! Point to chain's partref counter
    new_link%total_partrefs => chain%total_partrefs
-   
+
    ! Assign global index and increment counter
    chain%total_links = chain%total_links + 1
    new_link%global_index = chain%total_links
@@ -933,12 +933,12 @@ function new_child_chain(chain, split_part) result(new_chain)
 
    ! Set up parent-child relationship
    new_chain%parent_chain => chain
-   
+
    ! Point to parent's counters
    new_chain%total_chains => chain%total_chains
    new_chain%total_links => chain%total_links
    new_chain%total_partrefs => chain%total_partrefs
-   
+
    ! Assign global index and increment counter
    new_chain%total_chains = new_chain%total_chains + 1
    new_chain%global_index = new_chain%total_chains
@@ -1279,14 +1279,14 @@ recursive subroutine print_part_indices_recursive(part)
    do while (associated(child_part))
       ! Print the child part index
       write(stderr, '(A,I0,A,A,A)') "Part ", child_part%global_index, " (address: ", address(child_part), ")"
-      
+
       ! Print items in this part
       item => child_part%first_item1
       do while (associated(item))
          write(stderr, '(A,I0,A,I0,A)') "  Item1 ", item%global_index, " (value: ", item%value, ")"
          item => item%next_item
       end do
-      
+
       item => child_part%first_item2
       do while (associated(item))
          write(stderr, '(A,I0,A,I0,A)') "  Item2 ", item%global_index, " (value: ", item%value, ")"
@@ -1338,14 +1338,14 @@ recursive subroutine print_chain_indices_recursive(chain)
    link => chain%first_link
    do while (associated(link))
       write(stderr, '(A,I0,A,I0,A)') "  Link ", link%global_index, " (", link%num_parts, " parts)"
-      
+
       ! Print partrefs in this link
       partref => link%first_partref
       do while (associated(partref))
          write(stderr, '(A,I0,A,A,A)') "    Partref ", partref%global_index, " (part: ", address(partref%part), ")"
          partref => partref%nextref
       end do
-      
+
       link => link%next_link
    end do
 
