@@ -160,7 +160,8 @@ subroutine assign_conform_atoms( mol1, mol2, eltypes)
    type(link_node_t), pointer :: branch_parts
    type(part_node_t), pointer :: child_part
    type(array_trees_t) :: array_trees
-   integer unit1, unit2
+   integer :: unit1, unit2
+   real(rk) :: rmsd
 
    open(newunit=unit1, file='molec1.mol2', action='write', status='replace')
    open(newunit=unit2, file='molec2.mol2', action='write', status='replace')
@@ -209,7 +210,7 @@ subroutine assign_conform_atoms( mol1, mol2, eltypes)
    call print_part_tree_array( array_trees)
    call print_first_level_items_array( array_trees)
    call print_chain_tree_array( array_trees)
-   call redistribute_items_array( mol1, mol2, array_trees, 1)
+   call redistribute_items_array( mol1, mol2, array_trees, 1, rmsd)
    call print_leaf_items_array( array_trees)
 end subroutine
 

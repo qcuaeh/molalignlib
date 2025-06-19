@@ -4,121 +4,52 @@ use molecule
 use array_trees
 implicit none
 
+! Module-level signature workspace to eliminate allocations
+integer :: signature_array(MAX_COORD)
+integer :: signature_length
+
+! Module-level redistribution counters (replaces items1_fill_count/items2_fill_count in parts)
+! These track the current number of items placed in each part during redistribution
+integer, parameter :: MAX_PARTS = 10000
+integer :: part_items1_fill(MAX_PARTS)
+integer :: part_items2_fill(MAX_PARTS)
+
+! Module-level total squared distance tracking variables
+real(rk) :: total_squared_distance
+integer :: total_assigned_pairs
+
 contains
 
-subroutine resplit_part_mna_array(atoms1, atoms2, array_trees, part_idx, read_link_idx, write_link_idx)
-! Array-based version of resplit_part_mna
-   type(atom_type), dimension(:), intent(in) :: atoms1, atoms2
-   type(array_trees_t), intent(inout) :: array_trees
-   integer, intent(in) :: part_idx, read_link_idx, write_link_idx
-   ! Local variables
-   integer :: i, child_idx, target_part_idx, start_idx
-   integer, dimension(:), allocatable :: signature
-
-   ! Reset fill counters for all children
-   child_idx = array_trees%parts(part_idx)%first_child_idx
-   do while (child_idx > 0)
-      array_trees%parts(child_idx)%items1_fill_count = 0
-      array_trees%parts(child_idx)%items2_fill_count = 0
-      child_idx = array_trees%parts(child_idx)%next_sibling_idx
-   end do
-
-   ! Process first molecule items using pure array iteration
-   start_idx = array_trees%parts(part_idx)%items1_start_idx
-   do i = 1, array_trees%parts(part_idx)%items1_count
-      signature = get_signature_from_itemdir1_array(array_trees, read_link_idx, atoms1, array_trees%item1_values(start_idx + i - 1))
-      target_part_idx = find_child_part_array(array_trees, part_idx, signature)
-      if (target_part_idx == 0) error stop 'part not found'
-
-      call update_item1_in_child_array(array_trees, target_part_idx, array_trees%item1_values(start_idx + i - 1))
-      call update_itemdir1_entry_array(array_trees, write_link_idx, array_trees%item1_values(start_idx + i - 1), target_part_idx)
-   end do
-
-   ! Process second molecule items using pure array iteration
-   start_idx = array_trees%parts(part_idx)%items2_start_idx
-   do i = 1, array_trees%parts(part_idx)%items2_count
-      signature = get_signature_from_itemdir2_array(array_trees, read_link_idx, atoms2, array_trees%item2_values(start_idx + i - 1))
-      target_part_idx = find_child_part_array(array_trees, part_idx, signature)
-      if (target_part_idx == 0) error stop 'part not found'
-
-      call update_item2_in_child_array(array_trees, target_part_idx, array_trees%item2_values(start_idx + i - 1))
-      call update_itemdir2_entry_array(array_trees, write_link_idx, array_trees%item2_values(start_idx + i - 1), target_part_idx)
-   end do
-end subroutine
-
-function get_signature_from_itemdir1_array(array_trees, link_idx, atoms, item_value) result(signature)
-   type(array_trees_t), intent(in) :: array_trees
-   integer, intent(in) :: link_idx, item_value
-   type(atom_type), dimension(:), intent(in) :: atoms
-   integer, dimension(:), allocatable :: signature
-   integer :: i, adjlist_size, itemdir1_start
-
-   adjlist_size = size(atoms(item_value)%adjlist)
-   allocate(signature(adjlist_size))
-   itemdir1_start = array_trees%links(link_idx)%itemdir1_start_idx
-
-   ! Direct array access - no .part_idx needed!
-   do i = 1, adjlist_size
-      signature(i) = array_trees%itemdir_entries(itemdir1_start + atoms(item_value)%adjlist(i) - 1)
-   end do
-end function
-
-function get_signature_from_itemdir2_array(array_trees, link_idx, atoms, item_value) result(signature)
-   type(array_trees_t), intent(in) :: array_trees
-   integer, intent(in) :: link_idx, item_value
-   type(atom_type), dimension(:), intent(in) :: atoms
-   integer, dimension(:), allocatable :: signature
-   integer :: i, adjlist_size, itemdir2_start
-
-   adjlist_size = size(atoms(item_value)%adjlist)
-   allocate(signature(adjlist_size))
-   itemdir2_start = array_trees%links(link_idx)%itemdir2_start_idx
-
-   ! Direct array access - no .part_idx needed!
-   do i = 1, adjlist_size
-      signature(i) = array_trees%itemdir_entries(itemdir2_start + atoms(item_value)%adjlist(i) - 1)
-   end do
-end function
-
-function find_child_part_array(array_trees, parent_idx, signature) result(child_idx)
-   type(array_trees_t), intent(in) :: array_trees
-   integer, intent(in) :: parent_idx
-   integer, dimension(:), intent(in) :: signature
-   integer :: child_idx
-
-   child_idx = array_trees%parts(parent_idx)%first_child_idx
-   do while (child_idx > 0)
-      if (signature_equivalence_array(array_trees, child_idx, signature)) then
-         return
-      end if
-      child_idx = array_trees%parts(child_idx)%next_sibling_idx
-   end do
-
-   child_idx = 0
-end function
-
-function signature_equivalence_array(array_trees, part_idx, target_signature) result(equiv)
+function signature_equivalence_array(array_trees, part_idx) result(equiv)
+   ! OPTIMIZED: Fast path for length-1 signatures (most common case)
    type(array_trees_t), intent(in) :: array_trees
    integer, intent(in) :: part_idx
-   integer, dimension(:), intent(in) :: target_signature
    logical :: equiv
-   integer :: matches1, matches2, i, j, sig_len
+   integer :: signature_frequencies, i, j
 
-   sig_len = array_trees%parts(part_idx)%signature_length
-   if (sig_len /= size(target_signature)) then
+   if (signature_length /= array_trees%parts(part_idx)%signature_length) then
       equiv = .false.
       return
    end if
 
-   ! Direct signature comparison - much simpler with fixed-size arrays!
-   do i = 1, sig_len
-      matches1 = 0
-      matches2 = 0
-      do j = 1, sig_len
-         if (array_trees%parts(part_idx)%signature(i) == target_signature(j)) matches1 = matches1 + 1
-         if (array_trees%parts(part_idx)%signature(i) == array_trees%parts(part_idx)%signature(j)) matches2 = matches2 + 1
+   ! FAST PATH: Direct comparison for length-1 signatures (most common)
+   if (array_trees%parts(part_idx)%signature_length == 1) then
+      equiv = (signature_array(1) == array_trees%parts(part_idx)%signature_values(1))
+      return
+   end if
+
+   ! GENERIC PATH
+   do i = 1, array_trees%parts(part_idx)%signature_unique_count
+      signature_frequencies = 0
+
+      ! Count matches in target signature
+      do j = 1, signature_length
+         if (signature_array(j) == array_trees%parts(part_idx)%signature_values(i)) then
+            signature_frequencies = signature_frequencies + 1
+         end if
       end do
-      if (matches1 /= matches2) then
+
+      if (signature_frequencies /= array_trees%parts(part_idx)%signature_frequencies(i)) then
          equiv = .false.
          return
       end if
@@ -127,56 +58,200 @@ function signature_equivalence_array(array_trees, part_idx, target_signature) re
    equiv = .true.
 end function
 
-subroutine update_item1_in_child_array(array_trees, child_idx, item_value)
-   type(array_trees_t), intent(inout) :: array_trees
-   integer, intent(in) :: child_idx, item_value
-   integer :: target_idx
+function find_child_part_array(array_trees, parent_idx) result(child_idx)
+   ! OPTIMIZED: Fast path for exactly 2 children (most common case)
+   type(array_trees_t), intent(in) :: array_trees
+   integer, intent(in) :: parent_idx
+   integer :: child_idx, i, num_children
 
-   ! Much simpler with pure arrays - just calculate the target index
-   array_trees%parts(child_idx)%items1_fill_count = array_trees%parts(child_idx)%items1_fill_count + 1
-   target_idx = array_trees%parts(child_idx)%items1_start_idx + array_trees%parts(child_idx)%items1_fill_count - 1
-   array_trees%item1_values(target_idx) = item_value
+   num_children = array_trees%parts(parent_idx)%num_children
+
+   ! FAST PATH: Exactly 2 children (most common case)
+   if (num_children == 2) then
+      ! Check first child
+      child_idx = array_trees%parts(parent_idx)%child_indices(1)
+      if (signature_equivalence_array(array_trees, child_idx)) then
+         return
+      end if
+
+      ! Check second child
+      child_idx = array_trees%parts(parent_idx)%child_indices(2)
+      if (signature_equivalence_array(array_trees, child_idx)) then
+         return
+      end if
+
+      child_idx = 0
+      return
+   end if
+
+   ! GENERIC PATH
+   do i = 1, num_children
+      child_idx = array_trees%parts(parent_idx)%child_indices(i)
+      if (signature_equivalence_array(array_trees, child_idx)) then
+         return
+      end if
+   end do
+
+   child_idx = 0
+end function
+
+subroutine calculate_leaf_squared_distance_contribution(mol1, mol2, array_trees, part_idx)
+   ! Calculate squared distance contribution for a leaf part (items1_count == items2_count == 1)
+   type(mol_type), intent(in) :: mol1, mol2
+   type(array_trees_t), intent(in) :: array_trees
+   integer, intent(in) :: part_idx
+   integer :: item1_idx, item2_idx
+   real(rk) :: squared_distance
+   real(rk) :: dx, dy, dz
+
+   ! Verify this is a leaf part with exactly one item from each molecule
+   if (array_trees%parts(part_idx)%items1_count /= 1 .or. &
+       array_trees%parts(part_idx)%items2_count /= 1) then
+      write(stderr, '(A,I0,A,I0,A,I0)') 'Warning: Part ', part_idx, &
+         ' is not a proper leaf (items1=', array_trees%parts(part_idx)%items1_count, &
+         ', items2=', array_trees%parts(part_idx)%items2_count, ')'
+      return
+   end if
+
+   ! Get the assigned items
+   item1_idx = array_trees%item1_values(array_trees%parts(part_idx)%items1_offset + 1)
+   item2_idx = array_trees%item2_values(array_trees%parts(part_idx)%items2_offset + 1)
+
+   ! Calculate squared distance between assigned atoms
+   dx = mol1%atoms(item1_idx)%coords(1) - mol2%atoms(item2_idx)%coords(1)
+   dy = mol1%atoms(item1_idx)%coords(2) - mol2%atoms(item2_idx)%coords(2)
+   dz = mol1%atoms(item1_idx)%coords(3) - mol2%atoms(item2_idx)%coords(3)
+   
+   squared_distance = dx*dx + dy*dy + dz*dz
+
+   ! Update progressive total squared distance calculation
+   total_squared_distance = total_squared_distance + squared_distance
+   total_assigned_pairs = total_assigned_pairs + 1
+
+   ! Optional: Print progressive total squared distance for monitoring
+!   write(stderr, '(A,I0,A,I0,A,F8.4)') &
+!      'Assignment: atom ', item1_idx, ' -> atom ', item2_idx, &
+!      ', pair distance=', squared_distance
 end subroutine
 
-subroutine update_item2_in_child_array(array_trees, child_idx, item_value)
-   type(array_trees_t), intent(inout) :: array_trees
-   integer, intent(in) :: child_idx, item_value
-   integer :: target_idx
+subroutine check_leaf_parts_for_squared_distance(mol1, mol2, array_trees, part_idx)
+   ! Check if child parts are leaves and calculate squared distance contributions
+   type(mol_type), intent(in) :: mol1, mol2
+   type(array_trees_t), intent(in) :: array_trees
+   integer, intent(in) :: part_idx
+   integer :: i, child_idx
 
-   ! Much simpler with pure arrays - just calculate the target index
-   array_trees%parts(child_idx)%items2_fill_count = array_trees%parts(child_idx)%items2_fill_count + 1
-   target_idx = array_trees%parts(child_idx)%items2_start_idx + array_trees%parts(child_idx)%items2_fill_count - 1
-   array_trees%item2_values(target_idx) = item_value
+   ! Check all children of this part
+   do i = 1, array_trees%parts(part_idx)%num_children
+      child_idx = array_trees%parts(part_idx)%child_indices(i)
+      
+      ! If this child is a leaf (no children), calculate squared distance contribution
+      if (array_trees%parts(child_idx)%num_children == 0) then
+         call calculate_leaf_squared_distance_contribution(mol1, mol2, array_trees, child_idx)
+      end if
+   end do
 end subroutine
 
-subroutine update_itemdir1_entry_array(array_trees, link_idx, item_value, part_idx)
+subroutine resplit_part_mna_array(mol1, mol2, array_trees, part_idx, read_link_idx, write_link_idx)
+! Array-based version of resplit_part_mna with inlined signature generation
+! UPDATED: Now uses module-level redistribution counters instead of part-level fill counts
+! UPDATED: Added RMSD calculation for newly created leaf parts
+   type(mol_type), intent(in) :: mol1, mol2
    type(array_trees_t), intent(inout) :: array_trees
-   integer, intent(in) :: link_idx, item_value, part_idx
+   integer, intent(in) :: part_idx, read_link_idx, write_link_idx
+   ! Local variables
+   integer :: i, j, target_part_idx, item_value, target_idx, part_ref_idx
+   integer :: items1_offset, items1_count, items2_offset, items2_count
+   integer :: itemdir1_offset, itemdir2_offset, read_itemdir1_offset, read_itemdir2_offset
+   integer :: child_idx
 
-   array_trees%itemdir_entries(array_trees%links(link_idx)%itemdir1_start_idx + item_value - 1) = part_idx
-end subroutine
+   ! INITIALIZATION: Reset redistribution counters for all child parts
+   do i = 1, array_trees%parts(part_idx)%num_children
+      child_idx = array_trees%parts(part_idx)%child_indices(i)
+      part_items1_fill(child_idx) = 0
+      part_items2_fill(child_idx) = 0
+   end do
 
-subroutine update_itemdir2_entry_array(array_trees, link_idx, item_value, part_idx)
-   type(array_trees_t), intent(inout) :: array_trees
-   integer, intent(in) :: link_idx, item_value, part_idx
+   ! Extract commonly used values for readability
+   items1_offset = array_trees%parts(part_idx)%items1_offset
+   items1_count = array_trees%parts(part_idx)%items1_count
+   items2_offset = array_trees%parts(part_idx)%items2_offset
+   items2_count = array_trees%parts(part_idx)%items2_count
+   itemdir1_offset = array_trees%links(write_link_idx)%itemdir1_offset
+   itemdir2_offset = array_trees%links(write_link_idx)%itemdir2_offset
+   read_itemdir1_offset = array_trees%links(read_link_idx)%itemdir1_offset
+   read_itemdir2_offset = array_trees%links(read_link_idx)%itemdir2_offset
 
-   array_trees%itemdir_entries(array_trees%links(link_idx)%itemdir2_start_idx + item_value - 1) = part_idx
+   ! Process first molecule items with inlined signature generation
+   do i = 1, items1_count
+      item_value = array_trees%item1_values(items1_offset + i)
+
+      ! INLINED: Generate compact signature from itemdir1
+      signature_length = 0
+      do j = 1, size(mol1%atoms(item_value)%adjlist)
+         part_ref_idx = array_trees%itemdir_entries(read_itemdir1_offset + mol1%atoms(item_value)%adjlist(j))
+         if (part_ref_idx /= 0) then
+            signature_length = signature_length + 1
+            signature_array(signature_length) = part_ref_idx
+         end if
+      end do
+
+      target_part_idx = find_child_part_array(array_trees, part_idx)
+      if (target_part_idx == 0) error stop 'part not found'
+
+      ! Add item to target child using module-level redistribution counter
+      part_items1_fill(target_part_idx) = part_items1_fill(target_part_idx) + 1
+      target_idx = array_trees%parts(target_part_idx)%items1_offset + part_items1_fill(target_part_idx)
+      array_trees%item1_values(target_idx) = item_value
+
+      ! Update itemdir
+      array_trees%itemdir_entries(itemdir1_offset + item_value) = target_part_idx
+   end do
+
+   ! Process second molecule items with inlined signature generation
+   do i = 1, items2_count
+      item_value = array_trees%item2_values(items2_offset + i)
+
+      ! INLINED: Generate compact signature from itemdir2
+      signature_length = 0
+      do j = 1, size(mol2%atoms(item_value)%adjlist)
+         part_ref_idx = array_trees%itemdir_entries(read_itemdir2_offset + mol2%atoms(item_value)%adjlist(j))
+         if (part_ref_idx /= 0) then
+            signature_length = signature_length + 1
+            signature_array(signature_length) = part_ref_idx
+         end if
+      end do
+
+      target_part_idx = find_child_part_array(array_trees, part_idx)
+      if (target_part_idx == 0) error stop 'part not found'
+
+      ! Add item to target child using module-level redistribution counter
+      part_items2_fill(target_part_idx) = part_items2_fill(target_part_idx) + 1
+      target_idx = array_trees%parts(target_part_idx)%items2_offset + part_items2_fill(target_part_idx)
+      array_trees%item2_values(target_idx) = item_value
+
+      ! Update itemdir
+      array_trees%itemdir_entries(itemdir2_offset + item_value) = target_part_idx
+   end do
+
+   ! Check if the split created any leaf parts and calculate squared distance contributions
+   call check_leaf_parts_for_squared_distance(mol1, mol2, array_trees, part_idx)
 end subroutine
 
 subroutine recompute_nextlevel_mnas_array(mol1, mol2, array_trees, link_idx)
    type(mol_type), intent(in) :: mol1, mol2
    type(array_trees_t), intent(inout) :: array_trees
    integer, intent(in) :: link_idx
-   ! Local variables
    integer :: next_link_idx, i, part_idx
+   integer :: num_parts, partref_offset
 
-   ! In pure array approach, next link is simply the next sequential link
    next_link_idx = link_idx + 1
+   num_parts = array_trees%links(link_idx)%num_parts
+   partref_offset = array_trees%links(link_idx)%partref_offset
 
-   ! Process all partrefs using pure array iteration - much cleaner!
-   do i = 1, array_trees%links(link_idx)%num_parts
-      part_idx = array_trees%partref_entries(array_trees%links(link_idx)%partref_start_idx + i - 1)
-      call resplit_part_mna_array(mol1%atoms, mol2%atoms, array_trees, part_idx, link_idx, next_link_idx)
+   do i = 1, num_parts
+      part_idx = array_trees%partref_entries(partref_offset + i)
+      call resplit_part_mna_array(mol1, mol2, array_trees, part_idx, link_idx, next_link_idx)
    end do
 end subroutine
 
@@ -185,63 +260,88 @@ subroutine recompute_consistent_mnas_array(mol1, mol2, array_trees, branch_idx)
    type(array_trees_t), intent(inout) :: array_trees
    integer, intent(in) :: branch_idx
    integer :: i, link_idx
+   integer :: num_links, link_offset
 
-   ! Iterate through all links in branch using pure array access - much cleaner!
-   do i = 1, array_trees%chains(branch_idx)%num_links
-      link_idx = array_trees%chains(branch_idx)%link_start_idx + i - 1
+   num_links = array_trees%chains(branch_idx)%num_links
+   link_offset = array_trees%chains(branch_idx)%link_offset
+
+   do i = 1, num_links
+      link_idx = link_offset + i
       call recompute_nextlevel_mnas_array(mol1, mol2, array_trees, link_idx)
    end do
 end subroutine
 
-subroutine resplit_part_first_array(array_trees, part_idx, write_link_idx)
+subroutine resplit_part_first_array(mol1, mol2, array_trees, part_idx, write_link_idx)
+   ! OPTIMIZED: No redistribution counters needed - direct placement only
+   ! UPDATED: Added RMSD calculation for newly created leaf parts
+   type(mol_type), intent(in) :: mol1, mol2
    type(array_trees_t), intent(inout) :: array_trees
    integer, intent(in) :: part_idx, write_link_idx
-   integer :: child_part1, child_part2, first_item1_value, first_item2_value, start_idx, i
+   integer :: child_part1, child_part2, first_item1, first_item2, i, item_value, target_idx
+   integer :: items1_offset, items1_count, items2_offset, items2_count
+   integer :: itemdir1_offset, itemdir2_offset
+
+   ! Extract commonly used offsets and values
+   items1_offset = array_trees%parts(part_idx)%items1_offset
+   items1_count = array_trees%parts(part_idx)%items1_count
+   items2_offset = array_trees%parts(part_idx)%items2_offset
+   items2_count = array_trees%parts(part_idx)%items2_count
+   itemdir1_offset = array_trees%links(write_link_idx)%itemdir1_offset
+   itemdir2_offset = array_trees%links(write_link_idx)%itemdir2_offset
 
    ! Get child parts using direct array access
-   child_part1 = array_trees%parts(part_idx)%first_child_idx
-   child_part2 = array_trees%parts(child_part1)%next_sibling_idx
+   child_part1 = array_trees%parts(part_idx)%child_indices(1)
+   child_part2 = array_trees%parts(part_idx)%child_indices(2)
 
-   ! Get first items using pure array access
-   start_idx = array_trees%parts(part_idx)%items1_start_idx
-   first_item1_value = array_trees%item1_values(start_idx)
-   start_idx = array_trees%parts(part_idx)%items2_start_idx
-   first_item2_value = array_trees%item2_values(start_idx)
+   ! Get first items
+   first_item1 = array_trees%item1_values(items1_offset + 1)
+   first_item2 = array_trees%item2_values(items2_offset + 1)
 
-   ! Add first item to first child
-   array_trees%item1_values(array_trees%parts(child_part1)%items1_start_idx) = first_item1_value
-   array_trees%item2_values(array_trees%parts(child_part1)%items2_start_idx) = first_item2_value
+   ! Add first items to first child (direct placement)
+   array_trees%item1_values(array_trees%parts(child_part1)%items1_offset + 1) = first_item1
+   array_trees%item2_values(array_trees%parts(child_part1)%items2_offset + 1) = first_item2
+   array_trees%itemdir_entries(itemdir1_offset + first_item1) = child_part1
+   array_trees%itemdir_entries(itemdir2_offset + first_item2) = child_part1
 
-   call update_itemdir1_entry_array(array_trees, write_link_idx, first_item1_value, child_part1)
-   call update_itemdir2_entry_array(array_trees, write_link_idx, first_item2_value, child_part1)
-
-   ! Add remaining items to second child using pure array access
-   array_trees%parts(child_part2)%items1_fill_count = 0
-   array_trees%parts(child_part2)%items2_fill_count = 0
-
-   start_idx = array_trees%parts(part_idx)%items1_start_idx
-   do i = 2, array_trees%parts(part_idx)%items1_count  ! Skip first item
-      call update_item1_in_child_array(array_trees, child_part2, array_trees%item1_values(start_idx + i - 1))
-      call update_itemdir1_entry_array(array_trees, write_link_idx, array_trees%item1_values(start_idx + i - 1), child_part2)
+   ! Add remaining items to second child (direct placement - no redistribution counters needed)
+   do i = 2, items1_count
+      item_value = array_trees%item1_values(items1_offset + i)
+      target_idx = array_trees%parts(child_part2)%items1_offset + (i - 1)
+      array_trees%item1_values(target_idx) = item_value
+      array_trees%itemdir_entries(itemdir1_offset + item_value) = child_part2
    end do
 
-   start_idx = array_trees%parts(part_idx)%items2_start_idx
-   do i = 2, array_trees%parts(part_idx)%items2_count  ! Skip first item
-      call update_item2_in_child_array(array_trees, child_part2, array_trees%item2_values(start_idx + i - 1))
-      call update_itemdir2_entry_array(array_trees, write_link_idx, array_trees%item2_values(start_idx + i - 1), child_part2)
+   do i = 2, items2_count
+      item_value = array_trees%item2_values(items2_offset + i)
+      target_idx = array_trees%parts(child_part2)%items2_offset + (i - 1)
+      array_trees%item2_values(target_idx) = item_value
+      array_trees%itemdir_entries(itemdir2_offset + item_value) = child_part2
    end do
+
+   ! Check if the split created any leaf parts and calculate squared distance contributions
+   call check_leaf_parts_for_squared_distance(mol1, mol2, array_trees, part_idx)
 end subroutine
 
-subroutine resplit_part_random_array(array_trees, part_idx, write_link_idx)
+subroutine resplit_part_random_array(mol1, mol2, array_trees, part_idx, write_link_idx)
+   ! OPTIMIZED: No redistribution counters needed - direct placement only
+   ! UPDATED: Added RMSD calculation for newly created leaf parts
+   type(mol_type), intent(in) :: mol1, mol2
    type(array_trees_t), intent(inout) :: array_trees
    integer, intent(in) :: part_idx, write_link_idx
-   integer :: child_part1, child_part2, i, start_idx
+   integer :: child_part1, child_part2, i, item_value, target_idx
    integer :: num_items1, num_items2, random_index1, random_index2
-   integer :: chosen_item1_value, chosen_item2_value
+   integer :: chosen_item1, chosen_item2
+   integer :: items1_offset, items2_offset, itemdir1_offset, itemdir2_offset
    real :: random_real
 
+   ! Extract commonly used values
+   items1_offset = array_trees%parts(part_idx)%items1_offset
+   items2_offset = array_trees%parts(part_idx)%items2_offset
    num_items1 = array_trees%parts(part_idx)%items1_count
    num_items2 = array_trees%parts(part_idx)%items2_count
+   itemdir1_offset = array_trees%links(write_link_idx)%itemdir1_offset
+   itemdir2_offset = array_trees%links(write_link_idx)%itemdir2_offset
+
    if (num_items1 < 1 .or. num_items2 < 1) error stop "Cannot split part with less than 1 item in either list"
 
    ! Generate random indices
@@ -250,59 +350,103 @@ subroutine resplit_part_random_array(array_trees, part_idx, write_link_idx)
    call random_number(random_real)
    random_index2 = int(random_real * num_items2) + 1
 
-   child_part1 = array_trees%parts(part_idx)%first_child_idx
-   child_part2 = array_trees%parts(child_part1)%next_sibling_idx
+   ! Get child parts using direct array access
+   child_part1 = array_trees%parts(part_idx)%child_indices(1)
+   child_part2 = array_trees%parts(part_idx)%child_indices(2)
 
-   ! Get random items using direct array access - much simpler!
-   start_idx = array_trees%parts(part_idx)%items1_start_idx
-   chosen_item1_value = array_trees%item1_values(start_idx + random_index1 - 1)
-   start_idx = array_trees%parts(part_idx)%items2_start_idx
-   chosen_item2_value = array_trees%item2_values(start_idx + random_index2 - 1)
+   ! Get randomly chosen items
+   chosen_item1 = array_trees%item1_values(items1_offset + random_index1)
+   chosen_item2 = array_trees%item2_values(items2_offset + random_index2)
 
-   write (stderr,*) part_idx, chosen_item1_value, chosen_item2_value
+   ! Assign chosen items to first child (direct placement)
+   array_trees%item1_values(array_trees%parts(child_part1)%items1_offset + 1) = chosen_item1
+   array_trees%item2_values(array_trees%parts(child_part1)%items2_offset + 1) = chosen_item2
+   array_trees%itemdir_entries(itemdir1_offset + chosen_item1) = child_part1
+   array_trees%itemdir_entries(itemdir2_offset + chosen_item2) = child_part1
 
-   ! Assign to first child
-   array_trees%item1_values(array_trees%parts(child_part1)%items1_start_idx) = chosen_item1_value
-   array_trees%item2_values(array_trees%parts(child_part1)%items2_start_idx) = chosen_item2_value
-   call update_itemdir1_entry_array(array_trees, write_link_idx, chosen_item1_value, child_part1)
-   call update_itemdir2_entry_array(array_trees, write_link_idx, chosen_item2_value, child_part1)
-
-   ! Assign remaining items to second child using clean iteration pattern
-   array_trees%parts(child_part2)%items1_fill_count = 0
-   start_idx = array_trees%parts(part_idx)%items1_start_idx
+   ! Copy remaining items1 to second child (direct placement - no redistribution counters needed)
+   target_idx = array_trees%parts(child_part2)%items1_offset
    do i = 1, num_items1
       if (i /= random_index1) then
-         call update_item1_in_child_array(array_trees, child_part2, array_trees%item1_values(start_idx + i - 1))
-         call update_itemdir1_entry_array(array_trees, write_link_idx, array_trees%item1_values(start_idx + i - 1), child_part2)
+         item_value = array_trees%item1_values(items1_offset + i)
+         target_idx = target_idx + 1
+         array_trees%item1_values(target_idx) = item_value
+         array_trees%itemdir_entries(itemdir1_offset + item_value) = child_part2
       end if
    end do
 
-   array_trees%parts(child_part2)%items2_fill_count = 0
-   start_idx = array_trees%parts(part_idx)%items2_start_idx
+   ! Copy remaining items2 to second child (direct placement - no redistribution counters needed)
+   target_idx = array_trees%parts(child_part2)%items2_offset
    do i = 1, num_items2
       if (i /= random_index2) then
-         call update_item2_in_child_array(array_trees, child_part2, array_trees%item2_values(start_idx + i - 1))
-         call update_itemdir2_entry_array(array_trees, write_link_idx, array_trees%item2_values(start_idx + i - 1), child_part2)
+         item_value = array_trees%item2_values(items2_offset + i)
+         target_idx = target_idx + 1
+         array_trees%item2_values(target_idx) = item_value
+         array_trees%itemdir_entries(itemdir2_offset + item_value) = child_part2
       end if
    end do
+
+   ! Check if the split created any leaf parts and calculate squared distance contributions
+   call check_leaf_parts_for_squared_distance(mol1, mol2, array_trees, part_idx)
 end subroutine
 
-recursive subroutine redistribute_items_array(mol1, mol2, array_trees, branch_idx)
+recursive subroutine redistribute_items_array_recursive(mol1, mol2, array_trees, branch_idx)
+   ! UPDATED: No longer performs global initialization - this is now done in wrapper
    type(mol_type), intent(in) :: mol1, mol2
    type(array_trees_t), intent(inout) :: array_trees
    integer, intent(in) :: branch_idx
-   integer :: child_branch_idx, first_link_idx
+   integer :: child_branch_idx, first_link_idx, split_part_idx, i
 
-   ! Process all child branches using clean iteration pattern
-   child_branch_idx = array_trees%chains(branch_idx)%first_child_idx
-   do while (child_branch_idx > 0)
-      ! Get first link using pure array approach
-      first_link_idx = array_trees%chains(child_branch_idx)%link_start_idx
-      call resplit_part_random_array(array_trees, array_trees%chains(child_branch_idx)%split_part_idx, first_link_idx)
+   ! OPTIMIZATION: Use direct array access instead of linked list traversal
+   ! This provides much better cache locality and eliminates pointer chasing
+   do i = 1, array_trees%chains(branch_idx)%num_children
+      child_branch_idx = array_trees%chains(branch_idx)%child_indices(i)
+
+      first_link_idx = array_trees%chains(child_branch_idx)%link_offset + 1
+      split_part_idx = array_trees%chains(child_branch_idx)%split_part_idx
+
+!      call resplit_part_first_array(mol1, mol2, array_trees, split_part_idx, first_link_idx)
+      call resplit_part_random_array(mol1, mol2, array_trees, split_part_idx, first_link_idx)
       call recompute_consistent_mnas_array(mol1, mol2, array_trees, child_branch_idx)
-      call redistribute_items_array(mol1, mol2, array_trees, child_branch_idx)
-      child_branch_idx = array_trees%chains(child_branch_idx)%next_sibling_idx
+      call redistribute_items_array_recursive(mol1, mol2, array_trees, child_branch_idx)
    end do
+end subroutine
+
+subroutine redistribute_items_array(mol1, mol2, array_trees, branch_idx, final_total_squared_distance)
+   ! OPTIMIZED: Simplified wrapper - only resets itemdir since redistribution counters are handled locally
+   ! UPDATED: Added total squared distance calculation and returns final value
+   type(mol_type), intent(in) :: mol1, mol2
+   type(array_trees_t), intent(inout) :: array_trees
+   integer, intent(in) :: branch_idx
+   real(rk), intent(out), optional :: final_total_squared_distance
+
+   ! Initialize total squared distance tracking variables
+   total_squared_distance = 0.0_rk
+   total_assigned_pairs = 0
+
+   ! Clear all itemdir entries
+   array_trees%itemdir_entries = 0
+
+   write(stderr, '(A)') "=== Starting item redistribution with squared distance tracking ==="
+
+   ! Perform redistribution
+   call redistribute_items_array_recursive(mol1, mol2, array_trees, branch_idx)
+
+   ! Report final total squared distance
+   if (total_assigned_pairs > 0) then
+      write(stderr, '(A)') repeat("=", 50)
+      write(stderr, '(A,I0)') "Total assigned pairs: ", total_assigned_pairs
+      write(stderr, '(A,F10.4)') "Total squared distance: ", total_squared_distance
+      write(stderr, '(A)') repeat("=", 50)
+   else
+      write(stderr, '(A)') "Warning: No leaf assignments found!"
+      total_squared_distance = 0.0_rk
+   end if
+
+   ! Return final total squared distance if requested
+   if (present(final_total_squared_distance)) then
+      final_total_squared_distance = total_squared_distance
+   end if
 end subroutine
 
 end module
