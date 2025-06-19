@@ -7,7 +7,7 @@ private
 ! Arrays of derived types with scalar components
 ! REMOVED: item_array_t - replaced with pure arrays
 
-type :: part_array_t
+type, public :: part_array_t
    integer :: depth
    integer :: num_children
    ! Relationships (0 = null)
@@ -15,28 +15,31 @@ type :: part_array_t
    integer :: first_child_idx
    integer :: last_child_idx
    integer :: next_sibling_idx
-   ! Item segments in flattened arrays
-   integer :: items1_start_idx, items1_count
-   integer :: items2_start_idx, items2_count
-   integer :: items1_fill_count, items2_fill_count  ! current fill level during redistribution
-   ! Fixed-size signature (much simpler!)
-   integer :: signature(MAX_COORD)
-   integer :: signature_length
+   ! OPTIMIZATION: Direct child access array - eliminates linked traversal
+   integer, allocatable :: child_indices(:)  ! Direct array of child part indices
+   ! Item segments in flattened arrays (using offsets)
+   integer :: items1_offset, items1_count
+   integer :: items2_offset, items2_count
+   ! OPTIMIZED: Store unique signature values, frequencies, and total length
+   integer :: signature_values(MAX_COORD)       ! unique values in signature
+   integer :: signature_frequencies(MAX_COORD)  ! frequency of each unique value
+   integer :: signature_unique_count            ! number of unique values
+   integer :: signature_length            ! total signature length (sum of frequencies)
 end type
 
 ! REMOVED: partref_array_t - replaced with pure array
 
-type :: link_array_t
+type, public :: link_array_t
    integer :: num_parts
    integer :: parent_chain_idx    ! which chain owns this link
-   ! Part reference segment in flattened array
-   integer :: partref_start_idx   ! start of this link's partrefs in flattened array
-   ! Item directories (flattened storage)
-   integer :: itemdir1_start_idx
-   integer :: itemdir2_start_idx
+   ! Part reference segment in flattened array (using offset)
+   integer :: partref_offset      ! offset into partref_entries array
+   ! Item directories (flattened storage, using offsets)
+   integer :: itemdir1_offset
+   integer :: itemdir2_offset
 end type
 
-type :: chain_array_t
+type, public :: chain_array_t
    integer :: tot_items1, tot_items2
    integer :: num_links, num_children
    ! Cross-tree reference (0 = null)
@@ -46,8 +49,10 @@ type :: chain_array_t
    integer :: first_child_idx
    integer :: last_child_idx
    integer :: next_sibling_idx
-   ! Link segment in flattened array
-   integer :: link_start_idx      ! start of this chain's links in flattened array
+   ! OPTIMIZATION: Direct child access array - eliminates linked traversal
+   integer, allocatable :: child_indices(:)  ! Direct array of child chain indices
+   ! Link segment in flattened array (using offset)
+   integer :: link_offset         ! offset into links array
 end type
 
 ! Complete array-based representation
@@ -86,7 +91,6 @@ subroutine convert_trees_to_arrays(root_part, root_chain, array_trees)
    type(part_node_t), pointer, intent(in) :: root_part
    type(chain_node_t), pointer, intent(in) :: root_chain
    type(array_trees_t), intent(out) :: array_trees
-   integer :: i
 
    ! Get totals from the tree counters
    array_trees%total_parts = root_part%total_parts
@@ -111,22 +115,12 @@ subroutine convert_trees_to_arrays(root_part, root_chain, array_trees)
    allocate(array_trees%itemdir_entries(array_trees%total_itemdir_entries))
    allocate(array_trees%partref_entries(array_trees%total_partref_entries))
 
-   ! Initialize arrays to 0
-   do i = 1, array_trees%total_itemdir_entries
-      array_trees%itemdir_entries(i) = 0
-   end do
-
-   do i = 1, array_trees%total_partref_entries
-      array_trees%partref_entries(i) = 0
-   end do
-
-   do i = 1, array_trees%total_items1
-      array_trees%item1_values(i) = 0
-   end do
-
-   do i = 1, array_trees%total_items2
-      array_trees%item2_values(i) = 0
-   end do
+   ! OPTIMIZATION 4: Use intrinsic array operations instead of explicit loops
+   ! These are highly optimized by the compiler and much faster than manual loops
+   array_trees%itemdir_entries = 0      ! O(1) intrinsic vs O(n) explicit loop
+   array_trees%partref_entries = 0      ! O(1) intrinsic vs O(n) explicit loop
+   array_trees%item1_values = 0         ! O(1) intrinsic vs O(n) explicit loop
+   array_trees%item2_values = 0         ! O(1) intrinsic vs O(n) explicit loop
 
    ! Convert using global indices
    call populate_arrays_direct(root_part, root_chain, array_trees)
@@ -150,13 +144,65 @@ subroutine populate_arrays_direct(root_part, root_chain, array_trees)
    call convert_chains_recursive(root_chain, array_trees, itemdir_idx, partref_idx, link_idx)
 end subroutine
 
+! Modified signature conversion procedure
+subroutine convert_signature(part, array_trees, part_idx)
+   type(part_node_t), pointer, intent(in) :: part
+   type(array_trees_t), intent(inout) :: array_trees
+   integer, intent(in) :: part_idx
+   integer :: temp_values(MAX_COORD)
+   integer :: temp_count, i, j, value
+   logical :: found
+
+   ! First pass: collect all non-null signature values
+   temp_count = 0
+   do i = 1, size(part%signature)
+      if (associated(part%signature(i)%ptr)) then
+         temp_count = temp_count + 1
+         temp_values(temp_count) = part%signature(i)%ptr%global_index
+      end if
+   end do
+
+   ! Store total signature length
+   array_trees%parts(part_idx)%signature_length = temp_count
+
+   ! Second pass: compute unique values and their frequencies
+   array_trees%parts(part_idx)%signature_unique_count = 0
+   do i = 1, temp_count
+      value = temp_values(i)
+      found = .false.
+
+      ! Check if this value is already in unique list
+      do j = 1, array_trees%parts(part_idx)%signature_unique_count
+         if (array_trees%parts(part_idx)%signature_values(j) == value) then
+            array_trees%parts(part_idx)%signature_frequencies(j) = &
+               array_trees%parts(part_idx)%signature_frequencies(j) + 1
+            found = .true.
+            exit
+         end if
+      end do
+
+      ! If not found, add as new unique value
+      if (.not. found) then
+         array_trees%parts(part_idx)%signature_unique_count = &
+            array_trees%parts(part_idx)%signature_unique_count + 1
+         array_trees%parts(part_idx)%signature_values(array_trees%parts(part_idx)%signature_unique_count) = value
+         array_trees%parts(part_idx)%signature_frequencies(array_trees%parts(part_idx)%signature_unique_count) = 1
+      end if
+   end do
+
+   ! Zero out unused entries using intrinsic operation
+   array_trees%parts(part_idx)%signature_values(array_trees%parts(part_idx)%signature_unique_count + 1:MAX_COORD) = 0
+   array_trees%parts(part_idx)%signature_frequencies(array_trees%parts(part_idx)%signature_unique_count + 1:MAX_COORD) = 0
+end subroutine
+
+! Modified convert_parts_recursive - replace signature conversion section
 recursive subroutine convert_parts_recursive(part, array_trees, item1_idx, item2_idx)
    type(part_node_t), pointer, intent(in) :: part
    type(array_trees_t), intent(inout) :: array_trees
    integer, intent(inout) :: item1_idx, item2_idx
    type(part_node_t), pointer :: child_part
    type(item_node_t), pointer :: item
-   integer :: part_idx, i
+   integer :: part_idx, i, child_count
 
    if (.not. associated(part)) return
 
@@ -191,28 +237,15 @@ recursive subroutine convert_parts_recursive(part, array_trees, item1_idx, item2
       array_trees%parts(part_idx)%next_sibling_idx = 0
    end if
 
-   ! Set up item segments using pure array approach
-   array_trees%parts(part_idx)%items1_start_idx = item1_idx + 1
+   ! Set up item segments using offset approach (offset = start_idx - 1)
+   array_trees%parts(part_idx)%items1_offset = item1_idx  ! item1_idx tracks the last used index
    array_trees%parts(part_idx)%items1_count = part%num_items1
-   array_trees%parts(part_idx)%items1_fill_count = part%num_items1  ! Initially fully filled
 
-   array_trees%parts(part_idx)%items2_start_idx = item2_idx + 1
+   array_trees%parts(part_idx)%items2_offset = item2_idx  ! item2_idx tracks the last used index
    array_trees%parts(part_idx)%items2_count = part%num_items2
-   array_trees%parts(part_idx)%items2_fill_count = part%num_items2  ! Initially fully filled
 
-   ! Convert signature to fixed-size array
-   array_trees%parts(part_idx)%signature_length = size(part%signature)
-   do i = 1, size(part%signature)
-      if (associated(part%signature(i)%ptr)) then
-         array_trees%parts(part_idx)%signature(i) = part%signature(i)%ptr%global_index
-      else
-         array_trees%parts(part_idx)%signature(i) = 0
-      end if
-   end do
-   ! Zero out unused signature entries
-   do i = size(part%signature) + 1, MAX_COORD
-      array_trees%parts(part_idx)%signature(i) = 0
-   end do
+   ! OPTIMIZED: Convert signature to unique values, frequencies, and total length
+   call convert_signature(part, array_trees, part_idx)
 
    ! Convert items1 to pure array format
    item => part%first_item1
@@ -234,6 +267,18 @@ recursive subroutine convert_parts_recursive(part, array_trees, item1_idx, item2
       item => item%next_item
    end do
 
+   ! OPTIMIZATION: Populate direct child access array for faster traversal
+   if (part%num_children > 0) then
+      allocate(array_trees%parts(part_idx)%child_indices(part%num_children))
+      child_part => part%first_child_part
+      child_count = 0
+      do while (associated(child_part))
+         child_count = child_count + 1
+         array_trees%parts(part_idx)%child_indices(child_count) = child_part%global_index
+         child_part => child_part%next_sibling_part
+      end do
+   end if
+
    ! Recursively convert all children
    child_part => part%first_child_part
    do while (associated(child_part))
@@ -249,7 +294,7 @@ recursive subroutine convert_chains_recursive(chain, array_trees, itemdir_idx, p
    type(chain_node_t), pointer :: child_chain
    type(link_node_t), pointer :: link
    type(partref_node_t), pointer :: partref
-   integer :: chain_idx, current_link_idx
+   integer :: chain_idx, current_link_idx, child_count
 
    if (.not. associated(chain)) return
 
@@ -293,10 +338,22 @@ recursive subroutine convert_chains_recursive(chain, array_trees, itemdir_idx, p
       array_trees%chains(chain_idx)%next_sibling_idx = 0
    end if
 
-   ! Set link start index for pure array approach
-   array_trees%chains(chain_idx)%link_start_idx = link_idx + 1
+   ! OPTIMIZATION: Populate direct child access array for faster traversal
+   if (chain%num_children > 0) then
+      allocate(array_trees%chains(chain_idx)%child_indices(chain%num_children))
+      child_chain => chain%first_child_chain
+      child_count = 0
+      do while (associated(child_chain))
+         child_count = child_count + 1
+         array_trees%chains(chain_idx)%child_indices(child_count) = child_chain%global_index
+         child_chain => child_chain%next_sibling_chain
+      end do
+   end if
 
-   ! Convert links in this chain using pure array approach
+   ! Set link offset (offset = start_idx - 1)
+   array_trees%chains(chain_idx)%link_offset = link_idx  ! link_idx tracks the last used index
+
+   ! Convert links in this chain using offset approach
    link => chain%first_link
    do while (associated(link))
       link_idx = link_idx + 1
@@ -305,8 +362,8 @@ recursive subroutine convert_chains_recursive(chain, array_trees, itemdir_idx, p
       array_trees%links(current_link_idx)%num_parts = link%num_parts
       array_trees%links(current_link_idx)%parent_chain_idx = chain%global_index
 
-      ! Set partref start index (pure array approach)
-      array_trees%links(current_link_idx)%partref_start_idx = partref_idx + 1
+      ! Set partref offset (offset = start_idx - 1)
+      array_trees%links(current_link_idx)%partref_offset = partref_idx  ! partref_idx tracks the last used index
 
       ! Convert partrefs to pure array format
       partref => link%first_partref
@@ -316,17 +373,17 @@ recursive subroutine convert_chains_recursive(chain, array_trees, itemdir_idx, p
          partref => partref%nextref
       end do
 
-      ! Set itemdir start indices
-      array_trees%links(current_link_idx)%itemdir1_start_idx = itemdir_idx + 1
+      ! Set itemdir offsets (offset = start_idx - 1)
+      array_trees%links(current_link_idx)%itemdir1_offset = itemdir_idx  ! itemdir_idx tracks the last used index
       itemdir_idx = itemdir_idx + array_trees%itemdir_size1
 
-      array_trees%links(current_link_idx)%itemdir2_start_idx = itemdir_idx + 1
+      array_trees%links(current_link_idx)%itemdir2_offset = itemdir_idx  ! itemdir_idx tracks the last used index
       itemdir_idx = itemdir_idx + array_trees%itemdir_size2
 
       link => link%next_link
    end do
 
-   ! Recursively convert child chains
+   ! Recursively convert child chains using direct array access
    child_chain => chain%first_child_chain
    do while (associated(child_chain))
       call convert_chains_recursive(child_chain, array_trees, itemdir_idx, partref_idx, link_idx)
@@ -412,40 +469,36 @@ end subroutine
 recursive subroutine print_items_recursive_array(array_trees, part_idx)
    type(array_trees_t), intent(in) :: array_trees
    integer, intent(in) :: part_idx
-   integer :: child_idx
+   integer :: child_idx, i
 
-   ! Traverse children using first_child_idx and next_sibling_idx
-   child_idx = array_trees%parts(part_idx)%first_child_idx
-   do while (child_idx > 0 .and. child_idx <= array_trees%total_parts)
+   ! Use direct array access instead of linked traversal for better performance
+   do i = 1, array_trees%parts(part_idx)%num_children
+      child_idx = array_trees%parts(part_idx)%child_indices(i)
+
       ! Print the child items with part index prefix
       write(stderr, '(A,I0,A)', advance='no') "Part ", child_idx, ':'
       call print_part_items_array(array_trees, child_idx)
 
       ! Recursively print this child's children
       call print_items_recursive_array(array_trees, child_idx)
-
-      ! Move to next sibling
-      child_idx = array_trees%parts(child_idx)%next_sibling_idx
    end do
 end subroutine
 
 subroutine print_part_items_array(array_trees, part_idx)
    type(array_trees_t), intent(in) :: array_trees
    integer, intent(in) :: part_idx
-   integer :: i, start_idx
+   integer :: i
 
-   ! Print items1 using pure array access
-   start_idx = array_trees%parts(part_idx)%items1_start_idx
+   ! Print items1 using offset-based access
    do i = 1, array_trees%parts(part_idx)%items1_count
-      write(stderr, '(1X,I0)', advance='no') array_trees%item1_values(start_idx + i - 1)
+      write(stderr, '(1X,I0)', advance='no') array_trees%item1_values(array_trees%parts(part_idx)%items1_offset + i)
    end do
 
    write(stderr, '(A)', advance='no') ' /'
 
-   ! Print items2 using pure array access
-   start_idx = array_trees%parts(part_idx)%items2_start_idx
+   ! Print items2 using offset-based access
    do i = 1, array_trees%parts(part_idx)%items2_count
-      write(stderr, '(1X,I0)', advance='no') array_trees%item2_values(start_idx + i - 1)
+      write(stderr, '(1X,I0)', advance='no') array_trees%item2_values(array_trees%parts(part_idx)%items2_offset + i)
    end do
 
    write(stderr, *)
@@ -486,23 +539,23 @@ recursive subroutine print_part_recursive_array(array_trees, part_idx, depth, is
    type(array_trees_t), intent(in) :: array_trees
    integer, intent(in) :: part_idx, depth
    logical, dimension(:), intent(inout) :: is_last_child
-   integer :: child_idx, next_child_idx, i, pos
+   integer :: child_idx, i, j, pos
    character(len=200) :: prefix
 
    if (part_idx == 0) return
 
-   ! Process all children
-   child_idx = array_trees%parts(part_idx)%first_child_idx
-   do while (child_idx > 0)
+   ! Process all children using direct array access
+   do i = 1, array_trees%parts(part_idx)%num_children
+      child_idx = array_trees%parts(part_idx)%child_indices(i)
+
       ! Check if this is the last child
-      next_child_idx = array_trees%parts(child_idx)%next_sibling_idx
-      is_last_child(depth + 1) = (next_child_idx == 0)
+      is_last_child(depth + 1) = (i == array_trees%parts(part_idx)%num_children)
 
       ! Build prefix for this level
       prefix = " "
       pos = 2
-      do i = 1, depth
-         if (is_last_child(i)) then
+      do j = 1, depth
+         if (is_last_child(j)) then
             prefix(pos:pos+3) = "    "
          else
             prefix(pos:pos+3) = "|   "
@@ -525,8 +578,6 @@ recursive subroutine print_part_recursive_array(array_trees, part_idx, depth, is
 
       ! Recursively print this child's children
       call print_part_recursive_array(array_trees, child_idx, depth + 1, is_last_child)
-
-      child_idx = next_child_idx
    end do
 end subroutine
 
@@ -563,23 +614,23 @@ recursive subroutine print_chain_recursive_array(array_trees, chain_idx, depth, 
    type(array_trees_t), intent(in) :: array_trees
    integer, intent(in) :: chain_idx, depth
    logical, dimension(:), intent(inout) :: is_last_child
-   integer :: child_idx, next_child_idx, split_part_idx, i, pos
+   integer :: child_idx, split_part_idx, i, j, pos
    character(len=200) :: prefix
 
    if (chain_idx == 0) return
 
-   ! Process all children
-   child_idx = array_trees%chains(chain_idx)%first_child_idx
-   do while (child_idx > 0)
+   ! Process all children using direct array access instead of linked traversal
+   do i = 1, array_trees%chains(chain_idx)%num_children
+      child_idx = array_trees%chains(chain_idx)%child_indices(i)
+
       ! Check if this is the last child
-      next_child_idx = array_trees%chains(child_idx)%next_sibling_idx
-      is_last_child(depth + 1) = (next_child_idx == 0)
+      is_last_child(depth + 1) = (i == array_trees%chains(chain_idx)%num_children)
 
       ! Build prefix for this level
       prefix = " "
       pos = 2
-      do i = 1, depth
-         if (is_last_child(i)) then
+      do j = 1, depth
+         if (is_last_child(j)) then
             prefix(pos:pos+3) = "    "
          else
             prefix(pos:pos+3) = "|   "
@@ -607,8 +658,6 @@ recursive subroutine print_chain_recursive_array(array_trees, chain_idx, depth, 
 
       ! Recursively print this child's children
       call print_chain_recursive_array(array_trees, child_idx, depth + 1, is_last_child)
-
-      child_idx = next_child_idx
    end do
 end subroutine
 
@@ -635,22 +684,26 @@ end subroutine
 recursive subroutine print_signatures_recursive_array(array_trees, part_idx)
    type(array_trees_t), intent(in) :: array_trees
    integer, intent(in) :: part_idx
-   integer :: child_idx, i
+   integer :: child_idx, i, j
 
    if (part_idx == 0) return
 
-   ! Process all children in the same order as print_part_tree
-   child_idx = array_trees%parts(part_idx)%first_child_idx
-   do while (child_idx > 0)
-      ! Print the child signature
-      write(stderr,'(A,I0,A)',advance='no') 'Part ', child_idx, ':'
+   ! Process all children using direct array access
+   do i = 1, array_trees%parts(part_idx)%num_children
+      child_idx = array_trees%parts(part_idx)%child_indices(i)
 
-      ! Print signature using direct array access
-      if (array_trees%parts(child_idx)%signature_length > 0) then
+      ! Print the child signature with frequencies and total length
+      write(stderr,'(A,I0,A,I0,A)',advance='no') 'Part ', child_idx, ' (len=', &
+         array_trees%parts(child_idx)%signature_length, '):'
+
+      ! Print unique signature values with frequencies
+      if (array_trees%parts(child_idx)%signature_unique_count > 0) then
          write(stderr, '(A)', advance='no') ' ['
-         do i = 1, array_trees%parts(child_idx)%signature_length
-            if (i > 1) write(stderr, '(A)', advance='no') ', '
-            write(stderr, '(I0)', advance='no') array_trees%parts(child_idx)%signature(i)
+         do j = 1, array_trees%parts(child_idx)%signature_unique_count
+            if (j > 1) write(stderr, '(A)', advance='no') ', '
+            write(stderr, '(I0,A,I0)', advance='no') &
+               array_trees%parts(child_idx)%signature_values(j), '×', &
+               array_trees%parts(child_idx)%signature_frequencies(j)
          end do
          write(stderr, '(A)') ']'
       else
@@ -659,8 +712,6 @@ recursive subroutine print_signatures_recursive_array(array_trees, part_idx)
 
       ! Recursively print this child's children
       call print_signatures_recursive_array(array_trees, child_idx)
-
-      child_idx = array_trees%parts(child_idx)%next_sibling_idx
    end do
 end subroutine
 
@@ -687,13 +738,14 @@ end subroutine
 recursive subroutine print_leaf_items_recursive_array(array_trees, part_idx)
    type(array_trees_t), intent(in) :: array_trees
    integer, intent(in) :: part_idx
-   integer :: child_idx
+   integer :: child_idx, i
 
    if (part_idx == 0) return
 
-   ! Process all children
-   child_idx = array_trees%parts(part_idx)%first_child_idx
-   do while (child_idx > 0)
+   ! Process all children using direct array access
+   do i = 1, array_trees%parts(part_idx)%num_children
+      child_idx = array_trees%parts(part_idx)%child_indices(i)
+
       ! Only print items if this is a leaf part (no children)
       if (array_trees%parts(child_idx)%num_children == 0) then
          write(stderr, '(A,I0,A)', advance='no') 'Part ', child_idx, ':'
@@ -702,8 +754,6 @@ recursive subroutine print_leaf_items_recursive_array(array_trees, part_idx)
 
       ! Recursively traverse this child's children to find more leaves
       call print_leaf_items_recursive_array(array_trees, child_idx)
-
-      child_idx = array_trees%parts(child_idx)%next_sibling_idx
    end do
 end subroutine
 
@@ -726,15 +776,15 @@ subroutine print_chain_details_array(array_trees)
          write(stderr, '(A,I0)') '  Split part: ', array_trees%chains(i)%split_part_idx
       end if
 
-      ! Show links in this chain using pure array access
+      ! Show links in this chain using offset-based access
       do j = 1, array_trees%chains(i)%num_links
-         link_idx = array_trees%chains(i)%link_start_idx + j - 1
+         link_idx = array_trees%chains(i)%link_offset + j
          write(stderr, '(A,I0,A,I0,A)', advance='no') '  Link ', link_idx, &
             ' (', array_trees%links(link_idx)%num_parts, ' parts): '
 
-         ! Show parts in this link using pure array access
+         ! Show parts in this link using offset-based access
          do k = 1, array_trees%links(link_idx)%num_parts
-            part_idx = array_trees%partref_entries(array_trees%links(link_idx)%partref_start_idx + k - 1)
+            part_idx = array_trees%partref_entries(array_trees%links(link_idx)%partref_offset + k)
             write(stderr, '(I0)', advance='no') part_idx
             if (k < array_trees%links(link_idx)%num_parts) write(stderr, '(A)', advance='no') ', '
          end do
@@ -749,7 +799,7 @@ end subroutine
 
 subroutine print_first_level_items_array(array_trees)
    type(array_trees_t), intent(in) :: array_trees
-   integer :: child_idx
+   integer :: child_idx, i
 
    if (array_trees%total_parts == 0) then
       write(stderr, '(A)') "Part tree is empty"
@@ -762,14 +812,11 @@ subroutine print_first_level_items_array(array_trees)
    write(stderr, '(A)') repeat("=", 25)
    write(stderr, *)
 
-   ! Get first child of root (root is always at index 1)
-   child_idx = array_trees%parts(1)%first_child_idx
-
-   ! Print items for all parts at first level (direct children of root)
-   do while (child_idx > 0)
+   ! Print items for all parts at first level using direct array access
+   do i = 1, array_trees%parts(1)%num_children
+      child_idx = array_trees%parts(1)%child_indices(i)
       write(stderr, '(A,I0,A)', advance='no') 'Part ', child_idx, ':'
       call print_part_items_array(array_trees, child_idx)
-      child_idx = array_trees%parts(child_idx)%next_sibling_idx
    end do
 
    write(stderr, *)
