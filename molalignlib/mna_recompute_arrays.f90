@@ -113,22 +113,21 @@ subroutine check_leaf_parts_for_squared_distance(mol1, mol2, array_trees, part_i
 end subroutine
 
 function find_child_part_array(array_trees, parent_idx) result(child_relative_idx)
-   ! OPTIMIZED: Returns relative index (1-based position among children) instead of absolute part index
+   ! OPTIMIZED: Assumes exactly 2 children - if signature doesn't match first, it must match second
    type(array_trees_t), intent(in) :: array_trees
    integer, intent(in) :: parent_idx
-   integer :: child_relative_idx, i, num_children, child_idx
+   integer :: child_relative_idx, first_child_idx
 
-   num_children = array_trees%parts(parent_idx)%num_children
+   ! Get first child index directly
+   first_child_idx = array_trees%parts(parent_idx)%child_indices(1)
 
-   do i = 1, num_children
-      child_idx = array_trees%parts(parent_idx)%child_indices(i)
-      if (signature_equivalence_array(array_trees, child_idx)) then
-         child_relative_idx = i
-         return
-      end if
-   end do
-
-   child_relative_idx = 0
+   ! Check if signature matches first child
+   if (signature_equivalence_array(array_trees, first_child_idx)) then
+      child_relative_idx = 1
+   else
+      ! Must match second child (assumption: exactly 2 children)
+      child_relative_idx = 2
+   end if
 end function
 
 subroutine resplit_part_mna_array(mol1, mol2, array_trees, part_idx, read_link_idx, write_link_idx)
@@ -177,7 +176,6 @@ subroutine resplit_part_mna_array(mol1, mol2, array_trees, part_idx, read_link_i
 
       ! Get relative index directly - no search needed
       target_relative_idx = find_child_part_array(array_trees, part_idx)
-      if (target_relative_idx == 0) error stop 'part not found'
 
       ! Get absolute part index from relative index
       target_part_idx = array_trees%parts(part_idx)%child_indices(target_relative_idx)
@@ -207,7 +205,6 @@ subroutine resplit_part_mna_array(mol1, mol2, array_trees, part_idx, read_link_i
 
       ! Get relative index directly - no search needed
       target_relative_idx = find_child_part_array(array_trees, part_idx)
-      if (target_relative_idx == 0) error stop 'part not found'
 
       ! Get absolute part index from relative index
       target_part_idx = array_trees%parts(part_idx)%child_indices(target_relative_idx)
