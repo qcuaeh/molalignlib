@@ -1,0 +1,157 @@
+At line 66 of file remapping_bonded.f90
+Fortran runtime warning: An array temporary was created
+At line 66 of file remapping_bonded.f90
+Fortran runtime warning: An array temporary was created
+At line 59 of file tracking.f90
+Fortran runtime warning: An array temporary was created
+At line 59 of file tracking.f90
+Fortran runtime warning: An array temporary was created
+ adjd before           0
+ adjd after            0
+=== CONVERSION VALIDATION ===
+✓ Conversion validation PASSED
+
+=========================
+   Chain Tree (Array)
+=========================
+
+ROOT
+ `--23 (3/3)
+     `--25 (2/2)
+         |--109 (2/2)
+         |--108 (2/2)
+         |--99 (2/2)
+         |--98 (2/2)
+         |--65 (2/2)
+         |--54 (2/2)
+         |--111 (3/3)
+         |   `--125 (2/2)
+         |--110 (3/3)
+         |   `--129 (2/2)
+         |--103 (3/3)
+         |   `--133 (2/2)
+         |--102 (3/3)
+         |   `--137 (2/2)
+         |--87 (3/3)
+         |   `--141 (2/2)
+         |--86 (3/3)
+         |   `--145 (2/2)
+         |--67 (3/3)
+         |   `--149 (2/2)
+         |--58 (3/3)
+         |   `--153 (2/2)
+         `--42 (3/3)
+             `--157 (2/2)
+
+=== Starting DFS exploration of all assignment possibilities ===
+Exploration 1, new best distance:  2350.4009
+Exploration 2, new best distance:    69.8630
+Exploration 11, new best distance:    37.5041
+Exploration 12, new best distance:    33.0266
+Exploration 32, new best distance:    23.6797
+Exploration 68, new best distance:    10.0905
+Exploration 79, new best distance:     8.0750
+Exploration 80, new best distance:     7.2144
+Exploration 81, new best distance:     3.6068
+Exploration 84, new best distance:     3.2893
+============================================================
+Total assignment combinations explored: 396
+Total assigned pairs in optimal solution: 42
+Optimal total squared distance:     3.2893
+============================================================
+
+=========================
+   Leaf Items (Array)
+=========================
+
+Part 94: 1 / 22
+Part 95: 3 / 56
+Part 51: 5 / 41
+Part 56: 2 / 43
+Part 100: 4 / 73
+Part 101: 6 / 31
+Part 38: 20 / 66
+Part 82: 48 / 11
+Part 83: 76 / 18
+Part 104: 7 / 75
+Part 105: 35 / 25
+Part 61: 63 / 63
+Part 106: 8 / 76
+Part 107: 36 / 34
+Part 63: 64 / 1
+Part 52: 23 / 48
+Part 96: 51 / 89
+Part 97: 79 / 50
+Part 30: 28 / 57
+Part 74: 56 / 8
+Part 75: 84 / 61
+Part 40: 14 / 90
+Part 84: 42 / 27
+Part 85: 70 / 39
+Part 26: 16 / 46
+Part 70: 44 / 17
+Part 71: 72 / 13
+Part 28: 18 / 19
+Part 72: 46 / 87
+Part 73: 74 / 36
+Part 32: 19 / 29
+Part 76: 47 / 9
+Part 77: 75 / 82
+Part 34: 21 / 78
+Part 78: 49 / 59
+Part 79: 77 / 32
+Part 128: 9 / 72
+Part 130: 10 / 26
+Part 131: 11 / 23
+Part 124: 37 / 71
+Part 126: 38 / 69
+Part 127: 39 / 53
+Part 148: 65 / 70
+Part 150: 66 / 65
+Part 151: 67 / 5
+Part 152: 24 / 81
+Part 154: 25 / 67
+Part 155: 26 / 60
+Part 136: 52 / 79
+Part 138: 53 / 40
+Part 139: 54 / 38
+Part 132: 80 / 54
+Part 134: 81 / 49
+Part 135: 82 / 12
+Part 156: 29 / 24
+Part 158: 30 / 16
+Part 159: 31 / 6
+Part 144: 57 / 62
+Part 146: 58 / 47
+Part 147: 59 / 28
+Part 140: 85 / 35
+Part 142: 86 / 14
+Part 143: 87 / 2
+Part 114: 12 / 84
+Part 115: 13 / 15
+Part 112: 40 / 44
+Part 113: 41 / 30
+Part 120: 68 / 80
+Part 121: 69 / 4
+Part 44: 22 / 88
+Part 88: 50 / 45
+Part 89: 78 / 52
+Part 46: 27 / 77
+Part 90: 55 / 10
+Part 91: 83 / 3
+Part 122: 33 / 42
+Part 123: 34 / 33
+Part 118: 61 / 85
+Part 119: 62 / 7
+Part 116: 89 / 83
+Part 117: 90 / 51
+Part 48: 32 / 64
+Part 92: 60 / 20
+Part 93: 88 / 37
+Part 36: 15 / 68
+Part 80: 43 / 21
+Part 81: 71 / 74
+Part 24: 17 / 86
+Part 68: 45 / 58
+Part 69: 73 / 55
+
