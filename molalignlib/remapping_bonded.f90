@@ -161,10 +161,15 @@ subroutine assign_conform_atoms( mol1, mol2, eltypes)
    type(part_node_t), pointer :: child_part
    type(array_trees_t) :: array_trees
    integer :: unit1, unit2
+   real(rk), dimension(:,:), allocatable :: coords1, coords2
    real(rk) :: rmsd
+
+   coords1 = get_coords(mol1)
+   coords2 = get_coords(mol2)
 
    open(newunit=unit1, file='molec1.mol2', action='write', status='replace')
    open(newunit=unit2, file='molec2.mol2', action='write', status='replace')
+
    call writefile( unit1, 'mol2', mol1)
    call writefile( unit2, 'mol2', mol2)
 
@@ -205,12 +210,12 @@ subroutine assign_conform_atoms( mol1, mol2, eltypes)
 !   call print_tree_items( root_part)
 
    call random_init(.true., .true.)
-   call convert_trees_to_arrays( root_part, root_chain, array_trees)
+   call convert_trees_to_arrays( root_part, root_chain, array_trees, mol1, mol2)
    call validate_conversion(root_part, root_chain, array_trees)
 !   call print_part_tree_array( array_trees)
 !   call print_first_level_items_array( array_trees)
    call print_chain_tree_array( array_trees)
-   call redistribute_items_array( mol1, mol2, array_trees, 1, rmsd)
+   call redistribute_items_array( coords1, coords2, array_trees, 1, rmsd)
    call print_leaf_items_array( array_trees)
 end subroutine
 

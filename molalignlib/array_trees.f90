@@ -1,11 +1,11 @@
 module array_trees
 use parameters
 use lcrs_tree
+use molecule
 implicit none
 private
 
 ! Arrays of derived types with scalar components
-! REMOVED: item_array_t - replaced with pure arrays
 
 type, public :: part_array_t
    integer :: depth
@@ -26,8 +26,6 @@ type, public :: part_array_t
    integer :: signature_unique_count            ! number of unique values
    integer :: signature_length            ! total signature length (sum of frequencies)
 end type
-
-! REMOVED: partref_array_t - replaced with pure array
 
 type, public :: link_array_t
    integer :: num_parts
@@ -68,11 +66,18 @@ type, public :: array_trees_t
    integer, allocatable :: itemdir_entries(:)   ! Part indices for itemdir (no wrapper type!)
    integer, allocatable :: partref_entries(:)   ! Part indices for partrefs
 
+   ! NEW: Adjacency information stored directly for fastest access
+   integer, allocatable :: adj_lists1(:,:)     ! Direct 2D adjacency lists for mol1 [atom_idx, neighbor_idx]
+   integer, allocatable :: adj_lists2(:,:)     ! Direct 2D adjacency lists for mol2 [atom_idx, neighbor_idx]
+   integer, allocatable :: adj_counts1(:)      ! Count for each mol1 atom's adjacency list
+   integer, allocatable :: adj_counts2(:)      ! Count for each mol2 atom's adjacency list
+
    ! Metadata
    integer :: total_items1, total_items2, total_parts
    integer :: total_links, total_chains
    integer :: total_itemdir_entries, total_partref_entries
    integer :: itemdir_size1, itemdir_size2  ! size of each itemdir
+   integer :: num_atoms1, num_atoms2  ! NEW: number of atoms in each molecule
 end type
 
 public convert_trees_to_arrays
@@ -87,10 +92,11 @@ public print_chain_details_array
 
 contains
 
-subroutine convert_trees_to_arrays(root_part, root_chain, array_trees)
+subroutine convert_trees_to_arrays(root_part, root_chain, array_trees, mol1, mol2)
    type(part_node_t), pointer, intent(in) :: root_part
    type(chain_node_t), pointer, intent(in) :: root_chain
    type(array_trees_t), intent(out) :: array_trees
+   type(mol_type), intent(in) :: mol1, mol2  ! NEW: molecules for adjacency extraction
 
    ! Get totals from the tree counters
    array_trees%total_parts = root_part%total_parts
@@ -101,6 +107,10 @@ subroutine convert_trees_to_arrays(root_part, root_chain, array_trees)
    array_trees%total_partref_entries = root_chain%total_partrefs  ! Same count, just stored differently
    array_trees%itemdir_size1 = root_chain%tot_items1
    array_trees%itemdir_size2 = root_chain%tot_items2
+
+   ! NEW: Store molecule sizes
+   array_trees%num_atoms1 = size(mol1%atoms)
+   array_trees%num_atoms2 = size(mol2%atoms)
 
    ! Calculate itemdir storage needs
    array_trees%total_itemdir_entries = array_trees%total_links * &
@@ -115,6 +125,12 @@ subroutine convert_trees_to_arrays(root_part, root_chain, array_trees)
    allocate(array_trees%itemdir_entries(array_trees%total_itemdir_entries))
    allocate(array_trees%partref_entries(array_trees%total_partref_entries))
 
+   ! NEW: Allocate adjacency arrays - 2D format for direct access using MAX_COORD
+   allocate(array_trees%adj_lists1(array_trees%num_atoms1, MAX_COORD))
+   allocate(array_trees%adj_lists2(array_trees%num_atoms2, MAX_COORD))
+   allocate(array_trees%adj_counts1(array_trees%num_atoms1))
+   allocate(array_trees%adj_counts2(array_trees%num_atoms2))
+
    ! OPTIMIZATION 4: Use intrinsic array operations instead of explicit loops
    ! These are highly optimized by the compiler and much faster than manual loops
    array_trees%itemdir_entries = 0      ! O(1) intrinsic vs O(n) explicit loop
@@ -122,8 +138,54 @@ subroutine convert_trees_to_arrays(root_part, root_chain, array_trees)
    array_trees%item1_values = 0         ! O(1) intrinsic vs O(n) explicit loop
    array_trees%item2_values = 0         ! O(1) intrinsic vs O(n) explicit loop
 
+   ! NEW: Initialize adjacency arrays
+   array_trees%adj_lists1 = 0
+   array_trees%adj_lists2 = 0
+   array_trees%adj_counts1 = 0
+   array_trees%adj_counts2 = 0
+
+   ! NEW: Populate adjacency information
+   call populate_adjacency_arrays(mol1, mol2, array_trees)
+
    ! Convert using global indices
    call populate_arrays_direct(root_part, root_chain, array_trees)
+end subroutine
+
+subroutine populate_adjacency_arrays(mol1, mol2, array_trees)
+   ! Populate the 2D adjacency arrays directly - each atom gets its own row
+   type(mol_type), intent(in) :: mol1, mol2
+   type(array_trees_t), intent(inout) :: array_trees
+   integer :: i, j
+
+   ! Populate mol1 adjacency information - direct 2D storage
+   do i = 1, array_trees%num_atoms1
+      array_trees%adj_counts1(i) = size(mol1%atoms(i)%adjlist)
+
+      ! Copy adjacency list directly to 2D array
+      do j = 1, size(mol1%atoms(i)%adjlist)
+         array_trees%adj_lists1(i, j) = mol1%atoms(i)%adjlist(j)
+      end do
+
+      ! Zero out unused entries (though not strictly necessary)
+      do j = size(mol1%atoms(i)%adjlist) + 1, MAX_COORD
+         array_trees%adj_lists1(i, j) = 0
+      end do
+   end do
+
+   ! Populate mol2 adjacency information - direct 2D storage
+   do i = 1, array_trees%num_atoms2
+      array_trees%adj_counts2(i) = size(mol2%atoms(i)%adjlist)
+
+      ! Copy adjacency list directly to 2D array
+      do j = 1, size(mol2%atoms(i)%adjlist)
+         array_trees%adj_lists2(i, j) = mol2%atoms(i)%adjlist(j)
+      end do
+
+      ! Zero out unused entries (though not strictly necessary)
+      do j = size(mol2%atoms(i)%adjlist) + 1, MAX_COORD
+         array_trees%adj_lists2(i, j) = 0
+      end do
+   end do
 end subroutine
 
 subroutine populate_arrays_direct(root_part, root_chain, array_trees)

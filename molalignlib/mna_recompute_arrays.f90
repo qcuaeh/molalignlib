@@ -1,6 +1,5 @@
 module mna_recompute_arrays
 use parameters
-use molecule
 use array_trees
 implicit none
 
@@ -60,9 +59,10 @@ function signature_equivalence_array(array_trees, part_idx) result(equiv)
    equiv = .true.
 end function
 
-subroutine calculate_leaf_squared_distance_contribution(mol1, mol2, array_trees, part_idx)
+subroutine calculate_leaf_squared_distance_contribution(coords1, coords2, array_trees, part_idx)
    ! Calculate squared distance contribution for a leaf part (items1_count == items2_count == 1)
-   type(mol_type), intent(in) :: mol1, mol2
+   ! UPDATED: Now uses coordinate matrices instead of molecule types
+   real(rk), intent(in) :: coords1(:,:), coords2(:,:)  ! coords(dimension, atom_index)
    type(array_trees_t), intent(in) :: array_trees
    integer, intent(in) :: part_idx
    integer :: item1_idx, item2_idx
@@ -82,10 +82,10 @@ subroutine calculate_leaf_squared_distance_contribution(mol1, mol2, array_trees,
    item1_idx = array_trees%item1_values(array_trees%parts(part_idx)%items1_offset + 1)
    item2_idx = array_trees%item2_values(array_trees%parts(part_idx)%items2_offset + 1)
 
-   ! Calculate squared distance between assigned atoms
-   dx = mol1%atoms(item1_idx)%coords(1) - mol2%atoms(item2_idx)%coords(1)
-   dy = mol1%atoms(item1_idx)%coords(2) - mol2%atoms(item2_idx)%coords(2)
-   dz = mol1%atoms(item1_idx)%coords(3) - mol2%atoms(item2_idx)%coords(3)
+   ! Calculate squared distance between assigned atoms using coordinate matrices
+   dx = coords1(1, item1_idx) - coords2(1, item2_idx)
+   dy = coords1(2, item1_idx) - coords2(2, item2_idx)
+   dz = coords1(3, item1_idx) - coords2(3, item2_idx)
 
    squared_distance = dx*dx + dy*dy + dz*dz
 
@@ -94,9 +94,10 @@ subroutine calculate_leaf_squared_distance_contribution(mol1, mol2, array_trees,
    total_assigned_pairs = total_assigned_pairs + 1
 end subroutine
 
-subroutine check_leaf_parts_for_squared_distance(mol1, mol2, array_trees, part_idx)
+subroutine check_leaf_parts_for_squared_distance(coords1, coords2, array_trees, part_idx)
    ! Check if child parts are leaves and calculate squared distance contributions
-   type(mol_type), intent(in) :: mol1, mol2
+   ! UPDATED: Now uses coordinate matrices instead of molecule types
+   real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(in) :: array_trees
    integer, intent(in) :: part_idx
    integer :: i, child_idx
@@ -107,7 +108,7 @@ subroutine check_leaf_parts_for_squared_distance(mol1, mol2, array_trees, part_i
 
       ! If this child is a leaf (no children), calculate squared distance contribution
       if (array_trees%parts(child_idx)%num_children == 0) then
-         call calculate_leaf_squared_distance_contribution(mol1, mol2, array_trees, child_idx)
+         call calculate_leaf_squared_distance_contribution(coords1, coords2, array_trees, child_idx)
       end if
    end do
 end subroutine
@@ -130,15 +131,16 @@ function find_child_part_array(array_trees, parent_idx) result(child_relative_id
    end if
 end function
 
-subroutine resplit_part_mna_array(mol1, mol2, array_trees, part_idx, read_link_idx, write_link_idx)
-! Array-based version of resplit_part_mna with inlined signature generation
-! UPDATED: Now uses relative indices directly without searching - more efficient
+subroutine resplit_part_mna_array(coords1, coords2, array_trees, part_idx, read_link_idx, write_link_idx)
+! ULTRA-OPTIMIZED: Array-based version with direct 2D adjacency access for maximum performance
+! UPDATED: Now uses direct 2D adjacency arrays - no offset calculations needed
 ! UPDATED: Added RMSD calculation for newly created leaf parts
-   type(mol_type), intent(in) :: mol1, mol2
+! UPDATED: Now uses coordinate matrices instead of molecule types
+   real(rk), intent(in) :: coords1(:,:), coords2(:,:)  ! coords(dimension, atom_index)
    type(array_trees_t), intent(inout) :: array_trees
    integer, intent(in) :: part_idx, read_link_idx, write_link_idx
    integer :: items1_trackers(MAX_CHILDREN), items2_trackers(MAX_CHILDREN)
-   integer :: i, j, target_relative_idx, target_part_idx, item_value, target_idx, part_ref_idx
+   integer :: i, j, target_relative_idx, target_part_idx, item_value, target_idx, part_ref_idx, adj_atom
    integer :: items1_offset, items1_count, items2_offset, items2_count
    integer :: itemdir1_offset, itemdir2_offset, read_itemdir1_offset, read_itemdir2_offset
    integer :: num_children
@@ -160,14 +162,15 @@ subroutine resplit_part_mna_array(mol1, mol2, array_trees, part_idx, read_link_i
       items2_trackers(i) = 0
    end do
 
-   ! Process first molecule items with inlined signature generation
+   ! Process first molecule items with ULTRA-OPTIMIZED signature generation using direct 2D adjacency
    do i = 1, items1_count
       item_value = array_trees%item1_values(items1_offset + i)
 
-      ! INLINED: Generate compact signature from itemdir1
+      ! ULTRA-OPTIMIZED: Generate compact signature using direct 2D adjacency access
       signature_length = 0
-      do j = 1, size(mol1%atoms(item_value)%adjlist)
-         part_ref_idx = array_trees%itemdir_entries(read_itemdir1_offset + mol1%atoms(item_value)%adjlist(j))
+      do j = 1, array_trees%adj_counts1(item_value)
+         adj_atom = array_trees%adj_lists1(item_value, j)
+         part_ref_idx = array_trees%itemdir_entries(read_itemdir1_offset + adj_atom)
          if (part_ref_idx /= 0) then
             signature_length = signature_length + 1
             signature_array(signature_length) = part_ref_idx
@@ -189,14 +192,15 @@ subroutine resplit_part_mna_array(mol1, mol2, array_trees, part_idx, read_link_i
       array_trees%itemdir_entries(itemdir1_offset + item_value) = target_part_idx
    end do
 
-   ! Process second molecule items with inlined signature generation
+   ! Process second molecule items with ULTRA-OPTIMIZED signature generation using direct 2D adjacency
    do i = 1, items2_count
       item_value = array_trees%item2_values(items2_offset + i)
 
-      ! INLINED: Generate compact signature from itemdir2
+      ! ULTRA-OPTIMIZED: Generate compact signature using direct 2D adjacency access
       signature_length = 0
-      do j = 1, size(mol2%atoms(item_value)%adjlist)
-         part_ref_idx = array_trees%itemdir_entries(read_itemdir2_offset + mol2%atoms(item_value)%adjlist(j))
+      do j = 1, array_trees%adj_counts2(item_value)
+         adj_atom = array_trees%adj_lists2(item_value, j)
+         part_ref_idx = array_trees%itemdir_entries(read_itemdir2_offset + adj_atom)
          if (part_ref_idx /= 0) then
             signature_length = signature_length + 1
             signature_array(signature_length) = part_ref_idx
@@ -219,11 +223,11 @@ subroutine resplit_part_mna_array(mol1, mol2, array_trees, part_idx, read_link_i
    end do
 
    ! Check if the split created any leaf parts and calculate squared distance contributions
-   call check_leaf_parts_for_squared_distance(mol1, mol2, array_trees, part_idx)
+   call check_leaf_parts_for_squared_distance(coords1, coords2, array_trees, part_idx)
 end subroutine
 
-subroutine recompute_nextlevel_mnas_array(mol1, mol2, array_trees, link_idx)
-   type(mol_type), intent(in) :: mol1, mol2
+subroutine recompute_nextlevel_mnas_array(coords1, coords2, array_trees, link_idx)
+   real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: array_trees
    integer, intent(in) :: link_idx
    integer :: next_link_idx, i, part_idx
@@ -235,12 +239,12 @@ subroutine recompute_nextlevel_mnas_array(mol1, mol2, array_trees, link_idx)
 
    do i = 1, num_parts
       part_idx = array_trees%partref_entries(partref_offset + i)
-      call resplit_part_mna_array(mol1, mol2, array_trees, part_idx, link_idx, next_link_idx)
+      call resplit_part_mna_array(coords1, coords2, array_trees, part_idx, link_idx, next_link_idx)
    end do
 end subroutine
 
-subroutine recompute_consistent_mnas_array(mol1, mol2, array_trees, branch_idx)
-   type(mol_type), intent(in) :: mol1, mol2
+subroutine recompute_consistent_mnas_array(coords1, coords2, array_trees, branch_idx)
+   real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: array_trees
    integer, intent(in) :: branch_idx
    integer :: i, link_idx
@@ -251,14 +255,15 @@ subroutine recompute_consistent_mnas_array(mol1, mol2, array_trees, branch_idx)
 
    do i = 1, num_links
       link_idx = link_offset + i
-      call recompute_nextlevel_mnas_array(mol1, mol2, array_trees, link_idx)
+      call recompute_nextlevel_mnas_array(coords1, coords2, array_trees, link_idx)
    end do
 end subroutine
 
-subroutine resplit_part_dfs_assignment(mol1, mol2, array_trees, part_idx, write_link_idx, chosen_item2_idx)
+subroutine resplit_part_dfs_assignment(coords1, coords2, array_trees, part_idx, write_link_idx, chosen_item2_idx)
    ! DFS assignment version: assigns first item1 with chosen_item2_idx-th item2
    ! UPDATED: Added RMSD calculation for newly created leaf parts
-   type(mol_type), intent(in) :: mol1, mol2
+   ! UPDATED: Now uses coordinate matrices instead of molecule types
+   real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: array_trees
    integer, intent(in) :: part_idx, write_link_idx, chosen_item2_idx
    integer :: child_part1, child_part2, first_item1, chosen_item2, i, item_value, target_idx
@@ -308,7 +313,7 @@ subroutine resplit_part_dfs_assignment(mol1, mol2, array_trees, part_idx, write_
    end do
 
    ! Check if the split created any leaf parts and calculate squared distance contributions
-   call check_leaf_parts_for_squared_distance(mol1, mol2, array_trees, part_idx)
+   call check_leaf_parts_for_squared_distance(coords1, coords2, array_trees, part_idx)
 end subroutine
 
 subroutine save_itemdir_state(array_trees, saved_state)
@@ -329,9 +334,9 @@ subroutine restore_itemdir_state(array_trees, saved_state)
    array_trees%itemdir_entries = saved_state
 end subroutine
 
-recursive subroutine redistribute_items_dfs_recursive(mol1, mol2, array_trees, branch_idx)
+recursive subroutine redistribute_items_dfs_recursive(coords1, coords2, array_trees, branch_idx)
    ! DFS exploration of all assignment possibilities
-   type(mol_type), intent(in) :: mol1, mol2
+   real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: array_trees
    integer, intent(in) :: branch_idx
 
@@ -353,13 +358,13 @@ recursive subroutine redistribute_items_dfs_recursive(mol1, mol2, array_trees, b
          call save_itemdir_state(array_trees, saved_itemdir_state)
 
          ! Make assignment: first item1 with j-th item2
-         call resplit_part_dfs_assignment(mol1, mol2, array_trees, split_part_idx, first_link_idx, j)
+         call resplit_part_dfs_assignment(coords1, coords2, array_trees, split_part_idx, first_link_idx, j)
 
          ! Recompute MNAs for this assignment
-         call recompute_consistent_mnas_array(mol1, mol2, array_trees, child_branch_idx)
+         call recompute_consistent_mnas_array(coords1, coords2, array_trees, child_branch_idx)
 
          ! Recursively explore subtree
-         call redistribute_items_dfs_recursive(mol1, mol2, array_trees, child_branch_idx)
+         call redistribute_items_dfs_recursive(coords1, coords2, array_trees, child_branch_idx)
 
          ! Check if this is a leaf level (no more child branches)
          if (array_trees%chains(child_branch_idx)%num_children == 0) then
@@ -387,9 +392,9 @@ recursive subroutine redistribute_items_dfs_recursive(mol1, mol2, array_trees, b
    end do
 end subroutine
 
-subroutine redistribute_items_array(mol1, mol2, array_trees, branch_idx, final_total_squared_distance)
+subroutine redistribute_items_array(coords1, coords2, array_trees, branch_idx, final_total_squared_distance)
    ! DFS exploration wrapper - finds optimal assignment among all possibilities
-   type(mol_type), intent(in) :: mol1, mol2
+   real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: array_trees
    integer, intent(in) :: branch_idx
    real(rk), intent(out), optional :: final_total_squared_distance
@@ -406,7 +411,7 @@ subroutine redistribute_items_array(mol1, mol2, array_trees, branch_idx, final_t
    write(stderr, '(A)') "=== Starting DFS exploration of all assignment possibilities ==="
 
    ! Perform DFS exploration to find optimal assignment
-   call redistribute_items_dfs_recursive(mol1, mol2, array_trees, branch_idx)
+   call redistribute_items_dfs_recursive(coords1, coords2, array_trees, branch_idx)
 
    ! Restore the best assignment found
    if (allocated(best_assignment_state)) then
@@ -415,7 +420,7 @@ subroutine redistribute_items_array(mol1, mol2, array_trees, branch_idx, final_t
       ! Recalculate final distance with best assignment
       total_squared_distance = 0.0_rk
       total_assigned_pairs = 0
-      call calculate_final_distance_recursive(mol1, mol2, array_trees, branch_idx)
+      call calculate_final_distance_recursive(coords1, coords2, array_trees, branch_idx)
    end if
 
    ! Report final results
@@ -431,9 +436,9 @@ subroutine redistribute_items_array(mol1, mol2, array_trees, branch_idx, final_t
    end if
 end subroutine
 
-recursive subroutine calculate_final_distance_recursive(mol1, mol2, array_trees, branch_idx)
+recursive subroutine calculate_final_distance_recursive(coords1, coords2, array_trees, branch_idx)
    ! Recalculate total distance for the final optimal assignment
-   type(mol_type), intent(in) :: mol1, mol2
+   real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(in) :: array_trees
    integer, intent(in) :: branch_idx
    integer :: i, child_branch_idx, split_part_idx, j, child_part_idx
@@ -447,40 +452,13 @@ recursive subroutine calculate_final_distance_recursive(mol1, mol2, array_trees,
       do j = 1, array_trees%parts(split_part_idx)%num_children
          child_part_idx = array_trees%parts(split_part_idx)%child_indices(j)
          if (array_trees%parts(child_part_idx)%num_children == 0) then
-            call calculate_leaf_squared_distance_contribution(mol1, mol2, array_trees, child_part_idx)
+            call calculate_leaf_squared_distance_contribution(coords1, coords2, array_trees, child_part_idx)
          end if
       end do
 
       ! Recursively process child branches
-      call calculate_final_distance_recursive(mol1, mol2, array_trees, child_branch_idx)
+      call calculate_final_distance_recursive(coords1, coords2, array_trees, child_branch_idx)
    end do
-end subroutine
-
-! Legacy functions for compatibility - no longer used in DFS mode
-subroutine resplit_part_first_array(mol1, mol2, array_trees, part_idx, write_link_idx)
-   type(mol_type), intent(in) :: mol1, mol2
-   type(array_trees_t), intent(inout) :: array_trees
-   integer, intent(in) :: part_idx, write_link_idx
-
-   ! Call DFS assignment with first item2 (index 1)
-   call resplit_part_dfs_assignment(mol1, mol2, array_trees, part_idx, write_link_idx, 1)
-end subroutine
-
-subroutine resplit_part_random_array(mol1, mol2, array_trees, part_idx, write_link_idx)
-   type(mol_type), intent(in) :: mol1, mol2
-   type(array_trees_t), intent(inout) :: array_trees
-   integer, intent(in) :: part_idx, write_link_idx
-   integer :: random_item2_idx, items2_count
-   real :: random_real
-
-   items2_count = array_trees%parts(part_idx)%items2_count
-
-   ! Generate random index for item2
-   call random_number(random_real)
-   random_item2_idx = int(random_real * items2_count) + 1
-
-   ! Call DFS assignment with random item2
-   call resplit_part_dfs_assignment(mol1, mol2, array_trees, part_idx, write_link_idx, random_item2_idx)
 end subroutine
 
 end module
