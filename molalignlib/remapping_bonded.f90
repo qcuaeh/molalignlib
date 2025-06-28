@@ -216,7 +216,7 @@ subroutine assign_conform_atoms( mol1, mol2, eltypes)
 !   call print_first_level_items_array( array_trees)
    call print_chain_tree_array( array_trees)
    call redistribute_items_array( coords1, coords2, array_trees, 1, rmsd)
-   call print_leaf_items_array( array_trees)
+!   call print_leaf_items_array( array_trees)
 end subroutine
 
 end module

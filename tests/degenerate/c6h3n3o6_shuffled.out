@@ -1,0 +1,29 @@
+At line 66 of file remapping_bonded.f90
+Fortran runtime warning: An array temporary was created
+At line 66 of file remapping_bonded.f90
+Fortran runtime warning: An array temporary was created
+At line 59 of file tracking.f90
+Fortran runtime warning: An array temporary was created
+At line 59 of file tracking.f90
+Fortran runtime warning: An array temporary was created
+ adjd before           0
+ adjd after            0
+=== CONVERSION VALIDATION ===
+✓ Conversion validation PASSED
+
+=========================
+   Chain Tree (Array)
+=========================
+
+ROOT
+ `--6 (3/3)
+     `--8 (2/2)
+         |--20 (2/2)
+         |--19 (2/2)
+         `--10 (2/2)
+
+=== Starting DFS exploration of all assignment possibilities ===
+============================================================
+Assignment combinations probed: 36
+Optimal total squared distance:     0.0000
+============================================================
