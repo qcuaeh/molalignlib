@@ -162,7 +162,8 @@ subroutine assign_conform_atoms( mol1, mol2, eltypes)
    type(array_trees_t) :: array_trees
    integer :: unit1, unit2
    real(rk), dimension(:,:), allocatable :: coords1, coords2
-   real(rk) :: rmsd
+   integer, allocatable :: atomperm(:)
+   real(rk) :: atomdist
 
    coords1 = get_coords(mol1)
    coords2 = get_coords(mol2)
@@ -215,7 +216,7 @@ subroutine assign_conform_atoms( mol1, mol2, eltypes)
 !   call print_part_tree_array( array_trees)
 !   call print_first_level_items_array( array_trees)
    call print_chain_tree_array( array_trees)
-   call redistribute_items_array( coords1, coords2, array_trees, 1, rmsd)
+   call redistribute_items_array( coords1, coords2, array_trees, 1, atomperm, atomdist)
 !   call print_leaf_items_array( array_trees)
 end subroutine
 
