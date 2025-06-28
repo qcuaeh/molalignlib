@@ -11,13 +11,12 @@ integer :: signature_array(MAX_COORD)
 integer :: signature_length
 
 ! Module-level total squared distance tracking variables
-real(rk) :: total_squared_distance
+real(rk) :: total_distance
 integer :: total_assigned_pairs
 
 ! DFS exploration variables
 real(rk) :: best_total_distance
 integer :: exploration_count
-integer, allocatable :: best_assignment_state(:)  ! Store best itemdir state
 
 contains
 
@@ -90,7 +89,7 @@ subroutine calculate_leaf_squared_distance_contribution(coords1, coords2, array_
    squared_distance = dx*dx + dy*dy + dz*dz
 
    ! Update progressive total squared distance calculation
-   total_squared_distance = total_squared_distance + squared_distance
+   total_distance = total_distance + squared_distance
    total_assigned_pairs = total_assigned_pairs + 1
 end subroutine
 
@@ -133,7 +132,7 @@ end function
 
 subroutine resplit_part_mna_array(coords1, coords2, array_trees, part_idx, read_link_idx, write_link_idx)
 ! ULTRA-OPTIMIZED: Array-based version with direct 2D adjacency access for maximum performance
-! UPDATED: Now uses direct 2D adjacency arrays - no offset calculations needed
+! UPDATED: Now uses direct 2D itemdir arrays - no offset calculations needed
 ! UPDATED: Added RMSD calculation for newly created leaf parts
 ! UPDATED: Now uses coordinate matrices instead of molecule types
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)  ! coords(dimension, atom_index)
@@ -142,7 +141,6 @@ subroutine resplit_part_mna_array(coords1, coords2, array_trees, part_idx, read_
    integer :: items1_trackers(MAX_CHILDREN), items2_trackers(MAX_CHILDREN)
    integer :: i, j, target_relative_idx, target_part_idx, item_value, target_idx, part_ref_idx, adj_atom
    integer :: items1_offset, items1_count, items2_offset, items2_count
-   integer :: itemdir1_offset, itemdir2_offset, read_itemdir1_offset, read_itemdir2_offset
    integer :: num_children
 
    ! Extract commonly used values for readability
@@ -150,10 +148,6 @@ subroutine resplit_part_mna_array(coords1, coords2, array_trees, part_idx, read_
    items1_count = array_trees%parts(part_idx)%items1_count
    items2_offset = array_trees%parts(part_idx)%items2_offset
    items2_count = array_trees%parts(part_idx)%items2_count
-   itemdir1_offset = array_trees%links(write_link_idx)%itemdir1_offset
-   itemdir2_offset = array_trees%links(write_link_idx)%itemdir2_offset
-   read_itemdir1_offset = array_trees%links(read_link_idx)%itemdir1_offset
-   read_itemdir2_offset = array_trees%links(read_link_idx)%itemdir2_offset
    num_children = array_trees%parts(part_idx)%num_children
 
    ! INITIALIZATION: Reset redistribution counters using relative indices (1 to num_children)
@@ -170,7 +164,7 @@ subroutine resplit_part_mna_array(coords1, coords2, array_trees, part_idx, read_
       signature_length = 0
       do j = 1, array_trees%adj_counts1(item_value)
          adj_atom = array_trees%adj_lists1(item_value, j)
-         part_ref_idx = array_trees%itemdir_entries(read_itemdir1_offset + adj_atom)
+         part_ref_idx = array_trees%itemdir1_entries(read_link_idx, adj_atom)
          if (part_ref_idx /= 0) then
             signature_length = signature_length + 1
             signature_array(signature_length) = part_ref_idx
@@ -188,8 +182,8 @@ subroutine resplit_part_mna_array(coords1, coords2, array_trees, part_idx, read_
       target_idx = array_trees%parts(target_part_idx)%items1_offset + items1_trackers(target_relative_idx)
       array_trees%item1_values(target_idx) = item_value
 
-      ! Update itemdir
-      array_trees%itemdir_entries(itemdir1_offset + item_value) = target_part_idx
+      ! Update itemdir using 2D array - no offset calculation needed
+      array_trees%itemdir1_entries(write_link_idx, item_value) = target_part_idx
    end do
 
    ! Process second molecule items with ULTRA-OPTIMIZED signature generation using direct 2D adjacency
@@ -200,7 +194,7 @@ subroutine resplit_part_mna_array(coords1, coords2, array_trees, part_idx, read_
       signature_length = 0
       do j = 1, array_trees%adj_counts2(item_value)
          adj_atom = array_trees%adj_lists2(item_value, j)
-         part_ref_idx = array_trees%itemdir_entries(read_itemdir2_offset + adj_atom)
+         part_ref_idx = array_trees%itemdir2_entries(read_link_idx, adj_atom)
          if (part_ref_idx /= 0) then
             signature_length = signature_length + 1
             signature_array(signature_length) = part_ref_idx
@@ -218,8 +212,8 @@ subroutine resplit_part_mna_array(coords1, coords2, array_trees, part_idx, read_
       target_idx = array_trees%parts(target_part_idx)%items2_offset + items2_trackers(target_relative_idx)
       array_trees%item2_values(target_idx) = item_value
 
-      ! Update itemdir
-      array_trees%itemdir_entries(itemdir2_offset + item_value) = target_part_idx
+      ! Update itemdir using 2D array - no offset calculation needed
+      array_trees%itemdir2_entries(write_link_idx, item_value) = target_part_idx
    end do
 
    ! Check if the split created any leaf parts and calculate squared distance contributions
@@ -261,6 +255,7 @@ end subroutine
 
 subroutine resplit_part_dfs_assignment(coords1, coords2, array_trees, part_idx, write_link_idx, chosen_item2_idx)
    ! DFS assignment version: assigns first item1 with chosen_item2_idx-th item2
+   ! UPDATED: Now uses 2D itemdir arrays - no offset calculations needed
    ! UPDATED: Added RMSD calculation for newly created leaf parts
    ! UPDATED: Now uses coordinate matrices instead of molecule types
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
@@ -268,15 +263,12 @@ subroutine resplit_part_dfs_assignment(coords1, coords2, array_trees, part_idx, 
    integer, intent(in) :: part_idx, write_link_idx, chosen_item2_idx
    integer :: child_part1, child_part2, first_item1, chosen_item2, i, item_value, target_idx
    integer :: items1_offset, items1_count, items2_offset, items2_count
-   integer :: itemdir1_offset, itemdir2_offset
 
    ! Extract commonly used offsets and values
    items1_offset = array_trees%parts(part_idx)%items1_offset
    items1_count = array_trees%parts(part_idx)%items1_count
    items2_offset = array_trees%parts(part_idx)%items2_offset
    items2_count = array_trees%parts(part_idx)%items2_count
-   itemdir1_offset = array_trees%links(write_link_idx)%itemdir1_offset
-   itemdir2_offset = array_trees%links(write_link_idx)%itemdir2_offset
 
    ! Get child parts using direct array access
    child_part1 = array_trees%parts(part_idx)%child_indices(1)
@@ -289,8 +281,10 @@ subroutine resplit_part_dfs_assignment(coords1, coords2, array_trees, part_idx, 
    ! Assign chosen items to first child (direct placement)
    array_trees%item1_values(array_trees%parts(child_part1)%items1_offset + 1) = first_item1
    array_trees%item2_values(array_trees%parts(child_part1)%items2_offset + 1) = chosen_item2
-   array_trees%itemdir_entries(itemdir1_offset + first_item1) = child_part1
-   array_trees%itemdir_entries(itemdir2_offset + chosen_item2) = child_part1
+
+   ! Update itemdir using 2D arrays - no offset calculation needed
+   array_trees%itemdir1_entries(write_link_idx, first_item1) = child_part1
+   array_trees%itemdir2_entries(write_link_idx, chosen_item2) = child_part1
 
    ! Copy remaining items1 to second child (skip the first item)
    target_idx = array_trees%parts(child_part2)%items1_offset
@@ -298,7 +292,7 @@ subroutine resplit_part_dfs_assignment(coords1, coords2, array_trees, part_idx, 
       item_value = array_trees%item1_values(items1_offset + i)
       target_idx = target_idx + 1
       array_trees%item1_values(target_idx) = item_value
-      array_trees%itemdir_entries(itemdir1_offset + item_value) = child_part2
+      array_trees%itemdir1_entries(write_link_idx, item_value) = child_part2
    end do
 
    ! Copy remaining items2 to second child (skip the chosen item)
@@ -308,30 +302,12 @@ subroutine resplit_part_dfs_assignment(coords1, coords2, array_trees, part_idx, 
          item_value = array_trees%item2_values(items2_offset + i)
          target_idx = target_idx + 1
          array_trees%item2_values(target_idx) = item_value
-         array_trees%itemdir_entries(itemdir2_offset + item_value) = child_part2
+         array_trees%itemdir2_entries(write_link_idx, item_value) = child_part2
       end if
    end do
 
    ! Check if the split created any leaf parts and calculate squared distance contributions
    call check_leaf_parts_for_squared_distance(coords1, coords2, array_trees, part_idx)
-end subroutine
-
-subroutine save_itemdir_state(array_trees, saved_state)
-   ! Save current itemdir state for backtracking
-   type(array_trees_t), intent(in) :: array_trees
-   integer, allocatable, intent(out) :: saved_state(:)
-
-   if (allocated(saved_state)) deallocate(saved_state)
-   allocate(saved_state(size(array_trees%itemdir_entries)))
-   saved_state = array_trees%itemdir_entries
-end subroutine
-
-subroutine restore_itemdir_state(array_trees, saved_state)
-   ! Restore itemdir state for backtracking
-   type(array_trees_t), intent(inout) :: array_trees
-   integer, intent(in) :: saved_state(:)
-
-   array_trees%itemdir_entries = saved_state
 end subroutine
 
 recursive subroutine redistribute_items_dfs_recursive(coords1, coords2, array_trees, branch_idx)
@@ -341,8 +317,21 @@ recursive subroutine redistribute_items_dfs_recursive(coords1, coords2, array_tr
    integer, intent(in) :: branch_idx
 
    integer :: child_branch_idx, first_link_idx, split_part_idx, i, items2_count, j
-   integer, allocatable :: saved_itemdir_state(:)
-   real(rk) :: current_distance
+   integer, allocatable :: temp_itemdir1_entries(:,:), temp_itemdir2_entries(:,:)
+
+   ! Check if this is a leaf level (no more child branches)
+   if (array_trees%chains(branch_idx)%num_children == 0) then
+      exploration_count = exploration_count + 1
+
+      if (total_distance < best_total_distance) then
+         best_total_distance = total_distance
+
+         write(stderr, '(A,I0,A,F10.4)') "Exploration ", exploration_count, &
+            ", new best distance: ", best_total_distance
+      end if
+
+      return
+   end if
 
    ! Process each child branch
    do i = 1, array_trees%chains(branch_idx)%num_children
@@ -354,8 +343,9 @@ recursive subroutine redistribute_items_dfs_recursive(coords1, coords2, array_tr
 
       ! Try pairing first item1 with each item2
       do j = 1, items2_count
-         ! Save current state for backtracking
-         call save_itemdir_state(array_trees, saved_itemdir_state)
+         ! Save current state for backtracking (automatic allocation)
+         temp_itemdir1_entries = array_trees%itemdir1_entries
+         temp_itemdir2_entries = array_trees%itemdir2_entries
 
          ! Make assignment: first item1 with j-th item2
          call resplit_part_dfs_assignment(coords1, coords2, array_trees, split_part_idx, first_link_idx, j)
@@ -366,99 +356,47 @@ recursive subroutine redistribute_items_dfs_recursive(coords1, coords2, array_tr
          ! Recursively explore subtree
          call redistribute_items_dfs_recursive(coords1, coords2, array_trees, child_branch_idx)
 
-         ! Check if this is a leaf level (no more child branches)
-         if (array_trees%chains(child_branch_idx)%num_children == 0) then
-            exploration_count = exploration_count + 1
-            current_distance = total_squared_distance
-
-            if (current_distance < best_total_distance) then
-               best_total_distance = current_distance
-               ! Save best assignment state
-               if (allocated(best_assignment_state)) deallocate(best_assignment_state)
-               call save_itemdir_state(array_trees, best_assignment_state)
-
-               write(stderr, '(A,I0,A,F10.4)') "Exploration ", exploration_count, &
-                  ", new best distance: ", best_total_distance
-            end if
-         end if
-
-         ! Backtrack: restore state for next iteration
-         call restore_itemdir_state(array_trees, saved_itemdir_state)
-         total_squared_distance = 0.0_rk
+         ! Backtrack: restore state for next iteration (automatic allocation)
+         array_trees%itemdir1_entries = temp_itemdir1_entries
+         array_trees%itemdir2_entries = temp_itemdir2_entries
+         total_distance = 0
          total_assigned_pairs = 0
-
-         deallocate(saved_itemdir_state)
       end do
    end do
 end subroutine
 
-subroutine redistribute_items_array(coords1, coords2, array_trees, branch_idx, final_total_squared_distance)
+subroutine redistribute_items_array(coords1, coords2, array_trees, branch_idx, final_total_distance)
    ! DFS exploration wrapper - finds optimal assignment among all possibilities
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: array_trees
    integer, intent(in) :: branch_idx
-   real(rk), intent(out), optional :: final_total_squared_distance
+   real(rk), intent(out), optional :: final_total_distance
 
    ! Initialize DFS exploration variables
    best_total_distance = huge(1.0_rk)  ! Start with worst possible distance
    exploration_count = 0
-   total_squared_distance = 0.0_rk
+   total_distance = 0
    total_assigned_pairs = 0
 
-   ! Clear all itemdir entries
-   array_trees%itemdir_entries = 0
+   ! Clear all itemdir entries using 2D array operations
+   array_trees%itemdir1_entries = 0
+   array_trees%itemdir2_entries = 0
 
    write(stderr, '(A)') "=== Starting DFS exploration of all assignment possibilities ==="
 
    ! Perform DFS exploration to find optimal assignment
    call redistribute_items_dfs_recursive(coords1, coords2, array_trees, branch_idx)
 
-   ! Restore the best assignment found
-   if (allocated(best_assignment_state)) then
-      call restore_itemdir_state(array_trees, best_assignment_state)
-
-      ! Recalculate final distance with best assignment
-      total_squared_distance = 0.0_rk
-      total_assigned_pairs = 0
-      call calculate_final_distance_recursive(coords1, coords2, array_trees, branch_idx)
-   end if
-
    ! Report final results
    write(stderr, '(A)') repeat("=", 60)
    write(stderr, '(A,I0)') "Total assignment combinations explored: ", exploration_count
-   write(stderr, '(A,I0)') "Total assigned pairs in optimal solution: ", total_assigned_pairs
    write(stderr, '(A,F10.4)') "Optimal total squared distance: ", best_total_distance
    write(stderr, '(A)') repeat("=", 60)
 
    ! Return optimal distance if requested
-   if (present(final_total_squared_distance)) then
-      final_total_squared_distance = best_total_distance
+   if (present(final_total_distance)) then
+      final_total_distance = best_total_distance
    end if
-end subroutine
-
-recursive subroutine calculate_final_distance_recursive(coords1, coords2, array_trees, branch_idx)
-   ! Recalculate total distance for the final optimal assignment
-   real(rk), intent(in) :: coords1(:,:), coords2(:,:)
-   type(array_trees_t), intent(in) :: array_trees
-   integer, intent(in) :: branch_idx
-   integer :: i, child_branch_idx, split_part_idx, j, child_part_idx
-
-   ! Process each child branch
-   do i = 1, array_trees%chains(branch_idx)%num_children
-      child_branch_idx = array_trees%chains(branch_idx)%child_indices(i)
-      split_part_idx = array_trees%chains(child_branch_idx)%split_part_idx
-
-      ! Check leaf parts in this split part
-      do j = 1, array_trees%parts(split_part_idx)%num_children
-         child_part_idx = array_trees%parts(split_part_idx)%child_indices(j)
-         if (array_trees%parts(child_part_idx)%num_children == 0) then
-            call calculate_leaf_squared_distance_contribution(coords1, coords2, array_trees, child_part_idx)
-         end if
-      end do
-
-      ! Recursively process child branches
-      call calculate_final_distance_recursive(coords1, coords2, array_trees, child_branch_idx)
-   end do
 end subroutine
 
 end module

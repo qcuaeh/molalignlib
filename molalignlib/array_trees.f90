@@ -32,9 +32,7 @@ type, public :: link_array_t
    integer :: parent_chain_idx    ! which chain owns this link
    ! Part reference segment in flattened array (using offset)
    integer :: partref_offset      ! offset into partref_entries array
-   ! Item directories (flattened storage, using offsets)
-   integer :: itemdir1_offset
-   integer :: itemdir2_offset
+   ! NOTE: itemdir1_offset and itemdir2_offset REMOVED - no longer needed with 2D arrays
 end type
 
 type, public :: chain_array_t
@@ -53,7 +51,7 @@ type, public :: chain_array_t
    integer :: link_offset         ! offset into links array
 end type
 
-! Complete array-based representation
+! Array-based assignment tree with 2D itemdir arrays
 type, public :: array_trees_t
    ! Pure arrays for item values (no linked lists!)
    integer, allocatable :: item1_values(:)
@@ -63,8 +61,9 @@ type, public :: array_trees_t
    type(chain_array_t), allocatable :: chains(:)
 
    ! Flattened variable-length data - all pure integer arrays!
-   integer, allocatable :: itemdir_entries(:)   ! Part indices for itemdir (no wrapper type!)
-   integer, allocatable :: partref_entries(:)   ! Part indices for partrefs
+   integer, allocatable :: itemdir1_entries(:,:)  ! [link_idx, atom_idx] - mol1 itemdir 2D array
+   integer, allocatable :: itemdir2_entries(:,:)  ! [link_idx, atom_idx] - mol2 itemdir 2D array
+   integer, allocatable :: partref_entries(:)     ! Part indices for partrefs
 
    ! NEW: Adjacency information stored directly for fastest access
    integer, allocatable :: adj_lists1(:,:)     ! Direct 2D adjacency lists for mol1 [atom_idx, neighbor_idx]
@@ -75,9 +74,9 @@ type, public :: array_trees_t
    ! Metadata
    integer :: total_items1, total_items2, total_parts
    integer :: total_links, total_chains
-   integer :: total_itemdir_entries, total_partref_entries
-   integer :: itemdir_size1, itemdir_size2  ! size of each itemdir
-   integer :: num_atoms1, num_atoms2  ! NEW: number of atoms in each molecule
+   integer :: total_partref_entries
+   integer :: num_atoms1, num_atoms2  ! number of atoms in each molecule
+   ! NOTE: total_itemdir_entries, itemdir_size1, itemdir_size2 REMOVED - no longer needed
 end type
 
 public convert_trees_to_arrays
@@ -96,7 +95,7 @@ subroutine convert_trees_to_arrays(root_part, root_chain, array_trees, mol1, mol
    type(part_node_t), pointer, intent(in) :: root_part
    type(chain_node_t), pointer, intent(in) :: root_chain
    type(array_trees_t), intent(out) :: array_trees
-   type(mol_type), intent(in) :: mol1, mol2  ! NEW: molecules for adjacency extraction
+   type(mol_type), intent(in) :: mol1, mol2
 
    ! Get totals from the tree counters
    array_trees%total_parts = root_part%total_parts
@@ -104,17 +103,11 @@ subroutine convert_trees_to_arrays(root_part, root_chain, array_trees, mol1, mol
    array_trees%total_items2 = root_part%total_items2
    array_trees%total_chains = root_chain%total_chains
    array_trees%total_links = root_chain%total_links
-   array_trees%total_partref_entries = root_chain%total_partrefs  ! Same count, just stored differently
-   array_trees%itemdir_size1 = root_chain%tot_items1
-   array_trees%itemdir_size2 = root_chain%tot_items2
+   array_trees%total_partref_entries = root_chain%total_partrefs
 
-   ! NEW: Store molecule sizes
+   ! Store molecule sizes
    array_trees%num_atoms1 = size(mol1%atoms)
    array_trees%num_atoms2 = size(mol2%atoms)
-
-   ! Calculate itemdir storage needs
-   array_trees%total_itemdir_entries = array_trees%total_links * &
-                                      (array_trees%itemdir_size1 + array_trees%itemdir_size2)
 
    ! Allocate all arrays with exact sizes
    allocate(array_trees%item1_values(array_trees%total_items1))
@@ -122,29 +115,34 @@ subroutine convert_trees_to_arrays(root_part, root_chain, array_trees, mol1, mol
    allocate(array_trees%parts(array_trees%total_parts))
    allocate(array_trees%links(array_trees%total_links))
    allocate(array_trees%chains(array_trees%total_chains))
-   allocate(array_trees%itemdir_entries(array_trees%total_itemdir_entries))
    allocate(array_trees%partref_entries(array_trees%total_partref_entries))
 
-   ! NEW: Allocate adjacency arrays - 2D format for direct access using MAX_COORD
+   ! NEW: Allocate 2D itemdir arrays - one for each molecule
+   allocate(array_trees%itemdir1_entries(array_trees%total_links, array_trees%num_atoms1))
+   allocate(array_trees%itemdir2_entries(array_trees%total_links, array_trees%num_atoms2))
+
+   ! Allocate adjacency arrays - 2D format for direct access using MAX_COORD
    allocate(array_trees%adj_lists1(array_trees%num_atoms1, MAX_COORD))
    allocate(array_trees%adj_lists2(array_trees%num_atoms2, MAX_COORD))
    allocate(array_trees%adj_counts1(array_trees%num_atoms1))
    allocate(array_trees%adj_counts2(array_trees%num_atoms2))
 
-   ! OPTIMIZATION 4: Use intrinsic array operations instead of explicit loops
-   ! These are highly optimized by the compiler and much faster than manual loops
-   array_trees%itemdir_entries = 0      ! O(1) intrinsic vs O(n) explicit loop
-   array_trees%partref_entries = 0      ! O(1) intrinsic vs O(n) explicit loop
-   array_trees%item1_values = 0         ! O(1) intrinsic vs O(n) explicit loop
-   array_trees%item2_values = 0         ! O(1) intrinsic vs O(n) explicit loop
+   ! OPTIMIZATION: Use intrinsic array operations instead of explicit loops
+   array_trees%partref_entries = 0
+   array_trees%item1_values = 0
+   array_trees%item2_values = 0
 
-   ! NEW: Initialize adjacency arrays
+   ! NEW: Initialize 2D itemdir arrays
+   array_trees%itemdir1_entries = 0
+   array_trees%itemdir2_entries = 0
+
+   ! Initialize adjacency arrays
    array_trees%adj_lists1 = 0
    array_trees%adj_lists2 = 0
    array_trees%adj_counts1 = 0
    array_trees%adj_counts2 = 0
 
-   ! NEW: Populate adjacency information
+   ! Populate adjacency information
    call populate_adjacency_arrays(mol1, mol2, array_trees)
 
    ! Convert using global indices
@@ -192,7 +190,7 @@ subroutine populate_arrays_direct(root_part, root_chain, array_trees)
    type(part_node_t), pointer, intent(in) :: root_part
    type(chain_node_t), pointer, intent(in) :: root_chain
    type(array_trees_t), intent(inout) :: array_trees
-   integer :: itemdir_idx, partref_idx, link_idx, item1_idx, item2_idx
+   integer :: partref_idx, link_idx, item1_idx, item2_idx
 
    ! Convert part tree starting from root with global item tracking
    item1_idx = 0
@@ -200,13 +198,12 @@ subroutine populate_arrays_direct(root_part, root_chain, array_trees)
    call convert_parts_recursive(root_part, array_trees, item1_idx, item2_idx)
 
    ! Convert chain tree starting from root with global tracking
-   itemdir_idx = 0
+   ! NOTE: itemdir_idx removed - no longer needed with 2D arrays
    partref_idx = 0
    link_idx = 0
-   call convert_chains_recursive(root_chain, array_trees, itemdir_idx, partref_idx, link_idx)
+   call convert_chains_recursive(root_chain, array_trees, partref_idx, link_idx)
 end subroutine
 
-! Modified signature conversion procedure
 subroutine convert_signature(part, array_trees, part_idx)
    type(part_node_t), pointer, intent(in) :: part
    type(array_trees_t), intent(inout) :: array_trees
@@ -257,7 +254,6 @@ subroutine convert_signature(part, array_trees, part_idx)
    array_trees%parts(part_idx)%signature_frequencies(array_trees%parts(part_idx)%signature_unique_count + 1:MAX_COORD) = 0
 end subroutine
 
-! Modified convert_parts_recursive - replace signature conversion section
 recursive subroutine convert_parts_recursive(part, array_trees, item1_idx, item2_idx)
    type(part_node_t), pointer, intent(in) :: part
    type(array_trees_t), intent(inout) :: array_trees
@@ -349,10 +345,10 @@ recursive subroutine convert_parts_recursive(part, array_trees, item1_idx, item2
    end do
 end subroutine
 
-recursive subroutine convert_chains_recursive(chain, array_trees, itemdir_idx, partref_idx, link_idx)
+recursive subroutine convert_chains_recursive(chain, array_trees, partref_idx, link_idx)
    type(chain_node_t), pointer, intent(in) :: chain
    type(array_trees_t), intent(inout) :: array_trees
-   integer, intent(inout) :: itemdir_idx, partref_idx, link_idx
+   integer, intent(inout) :: partref_idx, link_idx
    type(chain_node_t), pointer :: child_chain
    type(link_node_t), pointer :: link
    type(partref_node_t), pointer :: partref
@@ -413,7 +409,7 @@ recursive subroutine convert_chains_recursive(chain, array_trees, itemdir_idx, p
    end if
 
    ! Set link offset (offset = start_idx - 1)
-   array_trees%chains(chain_idx)%link_offset = link_idx  ! link_idx tracks the last used index
+   array_trees%chains(chain_idx)%link_offset = link_idx
 
    ! Convert links in this chain using offset approach
    link => chain%first_link
@@ -425,7 +421,7 @@ recursive subroutine convert_chains_recursive(chain, array_trees, itemdir_idx, p
       array_trees%links(current_link_idx)%parent_chain_idx = chain%global_index
 
       ! Set partref offset (offset = start_idx - 1)
-      array_trees%links(current_link_idx)%partref_offset = partref_idx  ! partref_idx tracks the last used index
+      array_trees%links(current_link_idx)%partref_offset = partref_idx
 
       ! Convert partrefs to pure array format
       partref => link%first_partref
@@ -435,25 +431,20 @@ recursive subroutine convert_chains_recursive(chain, array_trees, itemdir_idx, p
          partref => partref%nextref
       end do
 
-      ! Set itemdir offsets (offset = start_idx - 1)
-      array_trees%links(current_link_idx)%itemdir1_offset = itemdir_idx  ! itemdir_idx tracks the last used index
-      itemdir_idx = itemdir_idx + array_trees%itemdir_size1
-
-      array_trees%links(current_link_idx)%itemdir2_offset = itemdir_idx  ! itemdir_idx tracks the last used index
-      itemdir_idx = itemdir_idx + array_trees%itemdir_size2
+      ! NOTE: itemdir offset calculations REMOVED - 2D arrays handle this automatically
+      ! Each link gets its own row in the 2D itemdir arrays
 
       link => link%next_link
    end do
 
-   ! Recursively convert child chains using direct array access
+   ! Recursively convert child chains
    child_chain => chain%first_child_chain
    do while (associated(child_chain))
-      call convert_chains_recursive(child_chain, array_trees, itemdir_idx, partref_idx, link_idx)
+      call convert_chains_recursive(child_chain, array_trees, partref_idx, link_idx)
       child_chain => child_chain%next_sibling_chain
    end do
 end subroutine
 
-! Simplified validation procedure
 subroutine validate_conversion(root_part, root_chain, array_trees)
    type(part_node_t), pointer, intent(in) :: root_part
    type(chain_node_t), pointer, intent(in) :: root_chain
@@ -498,6 +489,31 @@ subroutine validate_conversion(root_part, root_chain, array_trees)
    if (array_trees%total_partref_entries /= root_chain%total_partrefs) then
       write(stderr, '(A,I0,A,I0)') "ERROR: Partref count mismatch: ", &
          array_trees%total_partref_entries, " vs ", root_chain%total_partrefs
+      validation_passed = .false.
+   end if
+
+   ! NEW: Validate 2D itemdir array dimensions
+   if (size(array_trees%itemdir1_entries, 1) /= array_trees%total_links) then
+      write(stderr, '(A,I0,A,I0)') "ERROR: Itemdir1 links dimension mismatch: ", &
+         size(array_trees%itemdir1_entries, 1), " vs ", array_trees%total_links
+      validation_passed = .false.
+   end if
+
+   if (size(array_trees%itemdir1_entries, 2) /= array_trees%num_atoms1) then
+      write(stderr, '(A,I0,A,I0)') "ERROR: Itemdir1 atoms dimension mismatch: ", &
+         size(array_trees%itemdir1_entries, 2), " vs ", array_trees%num_atoms1
+      validation_passed = .false.
+   end if
+
+   if (size(array_trees%itemdir2_entries, 1) /= array_trees%total_links) then
+      write(stderr, '(A,I0,A,I0)') "ERROR: Itemdir2 links dimension mismatch: ", &
+         size(array_trees%itemdir2_entries, 1), " vs ", array_trees%total_links
+      validation_passed = .false.
+   end if
+
+   if (size(array_trees%itemdir2_entries, 2) /= array_trees%num_atoms2) then
+      write(stderr, '(A,I0,A,I0)') "ERROR: Itemdir2 atoms dimension mismatch: ", &
+         size(array_trees%itemdir2_entries, 2), " vs ", array_trees%num_atoms2
       validation_passed = .false.
    end if
 
