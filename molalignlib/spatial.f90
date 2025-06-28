@@ -38,6 +38,7 @@ public optimal_rotation
 interface totsqdist
    module procedure totsqdist_ord
    module procedure totsqdist_perm
+   module procedure totsqdist_idcs_perm
 end interface
 
 contains
@@ -199,6 +200,18 @@ real(rk) function totsqdist_perm(atomperm, coords1, coords2) result(totsqdist)
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
 
    totsqdist = sum(sum((coords1 - coords2(:, atomperm))**2, dim=1))
+end function
+
+real(rk) function totsqdist_idcs_perm(atomset, atomperm, coords1, coords2) result(totsqdist)
+   integer, dimension(:), intent(in) :: atomset, atomperm
+   real(rk), dimension(:,:), intent(in) :: coords1, coords2
+   integer :: i
+
+   totsqdist = 0
+
+   do i = 1, size(atomset)
+      totsqdist = totsqdist + sum((coords1(:, atomset(i)) - coords2(:, atomperm(atomset(i))))**2, dim=1)
+   end do
 end function
 
 function optimal_rotation(atomperm, coords1, coords2, center) result(rotquat)

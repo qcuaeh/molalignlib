@@ -1,5 +1,7 @@
 module mna_recompute_arrays
 use parameters
+use permutation
+use spatial
 use array_trees
 implicit none
 
@@ -13,7 +15,25 @@ integer :: signature_length
 ! DFS exploration variables
 integer :: combination_count
 
+! OPTIMIZATION: Reduced allocations by allocating once per branch instead of per combination
+
+! NEW: Derived type to track assignments without using zero sentinels
+type :: assignment_t
+   integer, allocatable :: permutation(:)      ! permutation(i) = j means atom i -> atom j
+   integer, allocatable :: assigned_indices(:) ! indices of assigned entries in permutation
+   integer :: num_assigned                     ! number of assigned entries
+end type
+
 contains
+
+subroutine init_assignment(assignment, num_atoms)
+   type(assignment_t), intent(out) :: assignment
+   integer, intent(in) :: num_atoms
+
+   allocate(assignment%permutation(num_atoms))
+   allocate(assignment%assigned_indices(num_atoms))
+   assignment%num_assigned = 0
+end subroutine
 
 function signature_equivalence_array(array_trees, part_idx) result(equiv)
    ! OPTIMIZED: Fast path for length-1 signatures (most common case)
@@ -53,86 +73,63 @@ function signature_equivalence_array(array_trees, part_idx) result(equiv)
    equiv = .true.
 end function
 
-function calculate_leaf_squared_distance_contribution(coords1, coords2, array_trees, part_idx) result(squared_distance)
-   ! Calculate squared distance contribution for a leaf part (items1_count == items2_count == 1)
-   ! UPDATED: Now returns distance instead of accumulating globally
-   real(rk), intent(in) :: coords1(:,:), coords2(:,:)  ! coords(dimension, atom_index)
+subroutine collect_leaf_assignments(array_trees, part_idx, assignment)
+   ! Collect assignment pairs from leaf parts into assignment
    type(array_trees_t), intent(in) :: array_trees
    integer, intent(in) :: part_idx
-   real(rk) :: squared_distance
-   integer :: item1_idx, item2_idx
-   real(rk) :: dx, dy, dz
-
-   ! Verify this is a leaf part with exactly one item from each molecule
-   if (array_trees%parts(part_idx)%items1_count /= 1 .or. &
-       array_trees%parts(part_idx)%items2_count /= 1) then
-      write(stderr, '(A,I0,A,I0,A,I0)') 'Warning: Part ', part_idx, &
-         ' is not a proper leaf (items1=', array_trees%parts(part_idx)%items1_count, &
-         ', items2=', array_trees%parts(part_idx)%items2_count, ')'
-      squared_distance = 0.0_rk
-      return
-   end if
-
-   ! Get the assigned items
-   item1_idx = array_trees%item1_values(array_trees%parts(part_idx)%items1_offset + 1)
-   item2_idx = array_trees%item2_values(array_trees%parts(part_idx)%items2_offset + 1)
-
-   ! Calculate squared distance between assigned atoms using coordinate matrices
-   dx = coords1(1, item1_idx) - coords2(1, item2_idx)
-   dy = coords1(2, item1_idx) - coords2(2, item2_idx)
-   dz = coords1(3, item1_idx) - coords2(3, item2_idx)
-
-   squared_distance = dx*dx + dy*dy + dz*dz
-end function
-
-function check_leaf_parts_for_squared_distance(coords1, coords2, array_trees, part_idx) result(total_distance)
-   ! Check if child parts are leaves and calculate squared distance contributions
-   ! UPDATED: Now returns total distance instead of accumulating globally
-   real(rk), intent(in) :: coords1(:,:), coords2(:,:)
-   type(array_trees_t), intent(in) :: array_trees
-   integer, intent(in) :: part_idx
-   real(rk) :: total_distance
-   integer :: i, child_idx
-
-   total_distance = 0.0_rk
+   type(assignment_t), intent(inout) :: assignment
+   integer :: i, child_idx, item1_idx, item2_idx
 
    ! Check all children of this part
    do i = 1, array_trees%parts(part_idx)%num_children
       child_idx = array_trees%parts(part_idx)%child_indices(i)
 
-      ! If this child is a leaf (no children), calculate squared distance contribution
+      ! If this child is a leaf (no children), collect its assignment
       if (array_trees%parts(child_idx)%num_children == 0) then
-         total_distance = total_distance + calculate_leaf_squared_distance_contribution(coords1, coords2, array_trees, child_idx)
+         ! Verify this is a proper leaf part with exactly one item from each molecule
+         if (array_trees%parts(child_idx)%items1_count == 1 .and. &
+             array_trees%parts(child_idx)%items2_count == 1) then
+
+            ! Get the assigned items
+            item1_idx = array_trees%item1_values(array_trees%parts(child_idx)%items1_offset + 1)
+            item2_idx = array_trees%item2_values(array_trees%parts(child_idx)%items2_offset + 1)
+
+            ! Add item pair to assignment
+            assignment%permutation(item1_idx) = item2_idx
+            assignment%num_assigned = assignment%num_assigned + 1
+            assignment%assigned_indices(assignment%num_assigned) = item1_idx
+         end if
       end if
    end do
-end function
+end subroutine
 
 function find_child_part_array(array_trees, parent_idx) result(child_relative_idx)
    ! OPTIMIZED: Assumes exactly 2 children - if signature doesn't match first, it must match second
    type(array_trees_t), intent(in) :: array_trees
    integer, intent(in) :: parent_idx
-   integer :: child_relative_idx, first_child_idx
+   integer :: child_relative_idx, first_child_idx, second_child_idx
 
    ! Get first child index directly
    first_child_idx = array_trees%parts(parent_idx)%child_indices(1)
+   second_child_idx = array_trees%parts(parent_idx)%child_indices(2)
 
-   ! Check if signature matches first child
+   ! Check if signature matches first or second child
    if (signature_equivalence_array(array_trees, first_child_idx)) then
       child_relative_idx = 1
-   else
-      ! Must match second child (assumption: exactly 2 children)
+   else if (signature_equivalence_array(array_trees, second_child_idx)) then
       child_relative_idx = 2
+   else
+      error stop 'Part signature does not match any child'
    end if
 end function
 
-subroutine resplit_part_mna_array(coords1, coords2, array_trees, part_idx, read_link_idx, write_link_idx, total_distance)
+subroutine resplit_part_mna(array_trees, part_idx, read_link_idx, write_link_idx, assignment)
 ! ULTRA-OPTIMIZED: Array-based version with direct 2D adjacency access for maximum performance
-! UPDATED: Now accumulates distance contribution from newly created leaf parts into total_distance
-   real(rk), intent(in) :: coords1(:,:), coords2(:,:)  ! coords(dimension, atom_index)
+! UPDATED: Now collects assignment pairs from newly created leaf parts into assignment
    type(array_trees_t), intent(inout) :: array_trees
    integer, intent(in) :: part_idx, read_link_idx, write_link_idx
-   real(rk), intent(inout) :: total_distance
-   integer :: items1_trackers(MAX_CHILDREN), items2_trackers(MAX_CHILDREN)
+   type(assignment_t), intent(inout) :: assignment
+   integer, dimension(MAX_CHILDREN) :: items1_trackers, items2_trackers
    integer :: i, j, target_relative_idx, target_part_idx, item_value, target_idx, part_ref_idx, adj_atom
    integer :: items1_offset, items1_count, items2_offset, items2_count
    integer :: num_children
@@ -210,15 +207,14 @@ subroutine resplit_part_mna_array(coords1, coords2, array_trees, part_idx, read_
       array_trees%itemdir2_entries(write_link_idx, item_value) = target_part_idx
    end do
 
-   ! Check if the split created any leaf parts and accumulate distance contribution
-   total_distance = total_distance + check_leaf_parts_for_squared_distance(coords1, coords2, array_trees, part_idx)
+   ! Collect assignment pairs from newly created leaf parts into assignment
+   call collect_leaf_assignments(array_trees, part_idx, assignment)
 end subroutine
 
-subroutine recompute_nextlevel_mnas_array(coords1, coords2, array_trees, link_idx, total_distance)
-   real(rk), intent(in) :: coords1(:,:), coords2(:,:)
+subroutine recompute_nextlevel_mnas(array_trees, link_idx, assignment)
    type(array_trees_t), intent(inout) :: array_trees
    integer, intent(in) :: link_idx
-   real(rk), intent(inout) :: total_distance
+   type(assignment_t), intent(inout) :: assignment
    integer :: next_link_idx, i, part_idx
    integer :: num_parts, partref_offset
 
@@ -228,18 +224,18 @@ subroutine recompute_nextlevel_mnas_array(coords1, coords2, array_trees, link_id
 
    do i = 1, num_parts
       part_idx = array_trees%partref_entries(partref_offset + i)
-      call resplit_part_mna_array(coords1, coords2, array_trees, part_idx, link_idx, next_link_idx, total_distance)
+      call resplit_part_mna(array_trees, part_idx, link_idx, next_link_idx, assignment)
    end do
 end subroutine
 
-subroutine assign_and_recompute_mnas_array(coords1, coords2, array_trees, split_part_idx, child_branch_idx, &
-      first_link_idx, chosen_item2_idx, total_distance)
+subroutine assign_and_recompute_mnas(array_trees, split_part_idx, child_branch_idx, &
+      first_link_idx, chosen_item2_idx, assignment)
    ! Combined procedure: DFS assignment + MNA recomputation
    ! Makes assignment (first item1 with chosen_item2_idx-th item2) then recomputes MNAs for the branch
-   real(rk), intent(in) :: coords1(:,:), coords2(:,:)
+   ! UPDATED: Now collects assignment pairs into assignment
    type(array_trees_t), intent(inout) :: array_trees
    integer, intent(in) :: split_part_idx, child_branch_idx, first_link_idx, chosen_item2_idx
-   real(rk), intent(inout) :: total_distance
+   type(assignment_t), intent(inout) :: assignment
    integer :: child_part1, child_part2, first_item1, chosen_item2, i, item_value, target_idx
    integer :: items1_offset, items1_count, items2_offset, items2_count
    integer :: link_idx, num_links, link_offset
@@ -288,8 +284,8 @@ subroutine assign_and_recompute_mnas_array(coords1, coords2, array_trees, split_
       end if
    end do
 
-   ! Accumulate distance from assignment (leaf parts created by the split)
-   total_distance = total_distance + check_leaf_parts_for_squared_distance(coords1, coords2, array_trees, split_part_idx)
+   ! Collect assignment pairs from assignment (leaf parts created by the split)
+   call collect_leaf_assignments(array_trees, split_part_idx, assignment)
 
    ! === PART 2: MNA RECOMPUTATION ===
 
@@ -298,21 +294,25 @@ subroutine assign_and_recompute_mnas_array(coords1, coords2, array_trees, split_
 
    do i = 1, num_links
       link_idx = link_offset + i
-      call recompute_nextlevel_mnas_array(coords1, coords2, array_trees, link_idx, total_distance)
+      call recompute_nextlevel_mnas(array_trees, link_idx, assignment)
    end do
 end subroutine
 
-recursive subroutine redistribute_items_dfs_recursive(coords1, coords2, array_trees, branch_idx, total_distance)
-   ! DFS exploration of all assignment possibilities - accumulates sum of best distances from all child branches
-   real(rk), intent(in) :: coords1(:,:), coords2(:,:)
+recursive subroutine redistribute_items_dfs_recursive(coords1, coords2, array_trees, branch_idx, optimal_assignment)
+   ! DFS exploration of all assignment possibilities - finds permutation that minimizes total distance
+   ! OPTIMIZED: Reduces allocations by reusing arrays within branch scope, but maintains isolation between branches
+   real(rk), intent(in) :: coords1(:,:), coords2(:,:)  ! coordinates needed for distance calculation
    type(array_trees_t), intent(inout) :: array_trees
    integer, intent(in) :: branch_idx
-   real(rk), intent(inout) :: total_distance
+   type(assignment_t), intent(inout) :: optimal_assignment
 
    integer :: child_branch_idx, first_link_idx, split_part_idx, i, items2_count, j
-   integer, allocatable :: temp_itemdir1_entries(:,:), temp_itemdir2_entries(:,:)
-   real(rk) :: combination_distance
-   real(rk) :: best_branch_distance
+   integer :: link_idx, branch_link_offset, branch_num_links
+   type(assignment_t) :: best_branch_assignment, branch_assignment
+   real(rk) :: branch_distance, best_branch_distance
+   integer :: num_atoms
+
+   num_atoms = array_trees%num_atoms1
 
    ! Check if this is a leaf level (no more child branches)
    if (array_trees%chains(branch_idx)%num_children == 0) then
@@ -325,71 +325,119 @@ recursive subroutine redistribute_items_dfs_recursive(coords1, coords2, array_tr
       child_branch_idx = array_trees%chains(branch_idx)%child_indices(i)
       first_link_idx = array_trees%chains(child_branch_idx)%link_offset + 1
       split_part_idx = array_trees%chains(child_branch_idx)%split_part_idx
+      branch_link_offset = array_trees%chains(child_branch_idx)%link_offset
+      branch_num_links = array_trees%chains(child_branch_idx)%num_links
 
       items2_count = array_trees%parts(split_part_idx)%items2_count
       best_branch_distance = huge(1.0_rk)  ! Best distance for this specific branch
 
+      call init_assignment(best_branch_assignment, num_atoms)
+      call init_assignment(branch_assignment, num_atoms)
+
       ! Try pairing first item1 with each item2 to find best assignment for this branch
       do j = 1, items2_count
-         ! Save current state for backtracking (automatic allocation)
-         temp_itemdir1_entries = array_trees%itemdir1_entries
-         temp_itemdir2_entries = array_trees%itemdir2_entries
-         combination_distance = 0.0_rk  ! Start fresh for this combination
+         ! Reset branch assignment for this iteration
+         branch_assignment%num_assigned = 0
 
          ! Make assignment and recompute MNAs in one combined operation
-         call assign_and_recompute_mnas_array(coords1, coords2, array_trees, split_part_idx, child_branch_idx, &
-            first_link_idx, j, combination_distance)
+         call assign_and_recompute_mnas(array_trees, split_part_idx, child_branch_idx, first_link_idx, j, &
+            branch_assignment)
 
-         ! Recursively explore subtree and accumulate distance
-         call redistribute_items_dfs_recursive(coords1, coords2, array_trees, child_branch_idx, combination_distance)
+         ! Recursively explore subtree and collect child permutation
+         call redistribute_items_dfs_recursive(coords1, coords2, array_trees, child_branch_idx, branch_assignment)
+
+         ! Calculate partial distance for this branch
+         branch_distance = totsqdist(branch_assignment%assigned_indices(1:branch_assignment%num_assigned), &
+            branch_assignment%permutation, coords1, coords2)
 
          ! Update best distance for this branch if this assignment is better
-         if (combination_distance < best_branch_distance) then
-            best_branch_distance = combination_distance
+         if (branch_distance < best_branch_distance) then
+            best_branch_distance = branch_distance
+            best_branch_assignment = branch_assignment
          end if
 
-         ! Backtrack: restore state for next iteration (automatic allocation)
-         array_trees%itemdir1_entries = temp_itemdir1_entries
-         array_trees%itemdir2_entries = temp_itemdir2_entries
+         ! Reset state for next iteration - only reset links used by this branch
+         do link_idx = branch_link_offset + 1, branch_link_offset + branch_num_links
+            array_trees%itemdir1_entries(link_idx, :) = 0
+            array_trees%itemdir2_entries(link_idx, :) = 0
+         end do
       end do
 
-      ! Add the best distance from this branch to the total
-      total_distance = total_distance + best_branch_distance
+      ! Update the optimal assignment with the best assigment from this branch
+      call update_assignment(optimal_assignment, best_branch_assignment)
    end do
 end subroutine
 
-subroutine redistribute_items_array(coords1, coords2, array_trees, branch_idx, final_total_distance)
+subroutine update_assignment(target, source)
+   ! Merge source assignment into target assignment
+   type(assignment_t), intent(inout) :: target
+   type(assignment_t), intent(in) :: source
+   integer :: i, atom1_idx, atom2_idx
+
+   do i = 1, source%num_assigned
+      atom1_idx = source%assigned_indices(i)
+      atom2_idx = source%permutation(atom1_idx)
+
+      ! Check for conflicts in existing assignments
+      if (any(target%assigned_indices(1:target%num_assigned) == atom1_idx)) then
+         write(stderr, '(A,I0,A)') &
+            "ERROR: Attempting to overwrite assignment at position ", atom1_idx
+         error stop "Assignment update conflict"
+      end if
+
+      ! Add assignment directly
+      target%num_assigned = target%num_assigned + 1
+      target%assigned_indices(target%num_assigned) = atom1_idx
+      target%permutation(atom1_idx) = atom2_idx
+   end do
+end subroutine
+
+subroutine redistribute_items_array(coords1, coords2, array_trees, branch_idx, optimal_permutation, total_distance)
    ! DFS exploration wrapper - finds optimal assignment among all possibilities
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: array_trees
    integer, intent(in) :: branch_idx
-   real(rk), intent(out), optional :: final_total_distance
+   integer, allocatable, intent(out) :: optimal_permutation(:)
+   real(rk), intent(out) :: total_distance
 
-   real(rk) :: optimal_distance
+   type(assignment_t) :: optimal_assignment
+   integer :: num_atoms, assigned_count
+
+   num_atoms = array_trees%num_atoms1
+
+   ! Initialize optimal assignment
+   call init_assignment(optimal_assignment, num_atoms)
+
+   ! Initialize optimal assignment with preassigned pairs
+   call collect_leaf_assignments(array_trees, 1, optimal_assignment)
 
    ! Initialize DFS exploration variables
    combination_count = 0
-   optimal_distance = 0.0_rk
-
-   ! Clear all itemdir entries using 2D array operations
-   array_trees%itemdir1_entries = 0
-   array_trees%itemdir2_entries = 0
 
    write(stderr, '(A)') "=== Starting DFS exploration of all assignment possibilities ==="
 
    ! Perform DFS exploration to find optimal assignment
-   call redistribute_items_dfs_recursive(coords1, coords2, array_trees, branch_idx, optimal_distance)
+   call redistribute_items_dfs_recursive(coords1, coords2, array_trees, branch_idx, optimal_assignment)
+
+   ! Copy final permutation array from assignment
+   optimal_permutation = optimal_assignment%permutation
+
+   ! Calculate distance from the optimal permutation array for verification
+   total_distance = totsqdist(optimal_assignment%assigned_indices(1:optimal_assignment%num_assigned), &
+      optimal_assignment%permutation, coords1, coords2)
+
+   ! Count assigned atoms
+   assigned_count = optimal_assignment%num_assigned
 
    ! Report final results
    write(stderr, '(A)') repeat("=", 60)
    write(stderr, '(A,I0)') "Assignment combinations probed: ", combination_count
-   write(stderr, '(A,F10.4)') "Optimal total squared distance: ", optimal_distance
+   write(stderr, '(A,I0,A,I0,A)') "Atoms assigned: ", assigned_count, " out of ", num_atoms, " total atoms"
+   write(stderr, '(A,F10.4)') "Optimal total squared distance: ", total_distance
    write(stderr, '(A)') repeat("=", 60)
 
-   ! Return optimal distance if requested
-   if (present(final_total_distance)) then
-      final_total_distance = optimal_distance
-   end if
+   ! Validate permutation consistency
+   call validate_perm(optimal_permutation)
 end subroutine
 
 end module

@@ -15,7 +15,6 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module permutation
-
 implicit none
 
 contains
@@ -30,7 +29,6 @@ function identity_perm(n) result(perm)
    do i = 1, n
       perm(i) = i
    end do
-
 end function
 
 ! Get the inverse perm of perm
@@ -45,28 +43,62 @@ function inverse_perm(perm)
    do i = 1, size(perm)
       inverse_perm(perm(i)) = i
    end do
-
 end function
 
-logical function is_perm(arr)
+logical function is_perm(perm)
    implicit none
-   integer, dimension(:), intent(in) :: arr
+   integer, dimension(:), intent(in) :: perm
    integer :: i, N
-   logical :: seen(size(arr))
+   logical :: seen(size(perm))
 
-   N = size(arr)
+   N = size(perm)
    seen = .false.
    is_perm = .true.
 
    do i = 1, N
-      if (arr(i) < 1 .or. arr(i) > N .or. seen(arr(i))) then
+      if (perm(i) < 1 .or. perm(i) > N) then
          is_perm = .false.
          return
       end if
-      seen(arr(i)) = .true.
+      if (seen(perm(i))) then
+         is_perm = .false.
+         return
+      end if
+      seen(perm(i)) = .true.
    end do
-
 end function
+
+subroutine validate_perm(perm)
+   implicit none
+   integer, dimension(:), intent(in) :: perm
+   integer :: i, N
+   logical :: seen(size(perm))
+   logical :: has_errors
+   
+   N = size(perm)
+   seen = .false.
+   has_errors = .false.
+   
+   do i = 1, N
+      ! Check if out of bounds
+      if (perm(i) < 1 .or. perm(i) > N) then
+         write(0, '(A,I0,A,I0,A)') 'Index ', perm(i), ' at position ', i, ' is out of range'
+         has_errors = .true.
+      else
+         ! Only check for repetition if within bounds
+         if (seen(perm(i))) then
+            write(0, '(A,I0,A)') 'Index ', perm(i), ' appears multiple times in permutation'
+            has_errors = .true.
+         else
+            seen(perm(i)) = .true.
+         end if
+      end if
+   end do
+   
+   if (has_errors) then
+      error stop 'Invalid permutation'
+   end if
+end subroutine
 
 subroutine perm1_next3 ( n, p, more, rank )
 !This subroutine was obtained from:
