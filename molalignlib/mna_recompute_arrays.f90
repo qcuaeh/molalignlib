@@ -229,18 +229,18 @@ subroutine recompute_nextlevel_mnas(array_trees, link_idx, assignment)
 end subroutine
 
 subroutine assign_and_recompute_mnas(array_trees, split_part_idx, child_branch_idx, &
-      first_link_idx, chosen_item2_idx, assignment)
-   ! Combined procedure: DFS assignment + MNA recomputation
-   ! Makes assignment (first item1 with chosen_item2_idx-th item2) then recomputes MNAs for the branch
-   ! UPDATED: Now collects assignment pairs into assignment
+      first_link_idx, chosen_item1_idx, chosen_item2_idx, assignment)
+   ! Combined procedure: assignment + MNA recomputation
+   ! Makes assignment (chosen_item1_idx-th item1 with chosen_item2_idx-th item2) then recomputes MNAs for the branch
+   ! UPDATED: Now accepts both item1 and item2 indices to match original random assignment behavior
    type(array_trees_t), intent(inout) :: array_trees
-   integer, intent(in) :: split_part_idx, child_branch_idx, first_link_idx, chosen_item2_idx
+   integer, intent(in) :: split_part_idx, child_branch_idx, first_link_idx, chosen_item1_idx, chosen_item2_idx
    type(assignment_t), intent(inout) :: assignment
-   integer :: child_part1, child_part2, first_item1, chosen_item2, i, item_value, target_idx
+   integer :: child_part1, child_part2, chosen_item1, chosen_item2, i, item_value, target_idx
    integer :: items1_offset, items1_count, items2_offset, items2_count
    integer :: link_idx, num_links, link_offset
 
-   ! === PART 1: DFS ASSIGNMENT ===
+   ! === PART 1: ASSIGNMENT ===
 
    ! Extract commonly used offsets and values
    items1_offset = array_trees%parts(split_part_idx)%items1_offset
@@ -252,25 +252,27 @@ subroutine assign_and_recompute_mnas(array_trees, split_part_idx, child_branch_i
    child_part1 = array_trees%parts(split_part_idx)%child_indices(1)
    child_part2 = array_trees%parts(split_part_idx)%child_indices(2)
 
-   ! Get first item1 and chosen item2
-   first_item1 = array_trees%item1_values(items1_offset + 1)
+   ! Get chosen items based on provided indices
+   chosen_item1 = array_trees%item1_values(items1_offset + chosen_item1_idx)
    chosen_item2 = array_trees%item2_values(items2_offset + chosen_item2_idx)
 
    ! Assign chosen items to first child (direct placement)
-   array_trees%item1_values(array_trees%parts(child_part1)%items1_offset + 1) = first_item1
+   array_trees%item1_values(array_trees%parts(child_part1)%items1_offset + 1) = chosen_item1
    array_trees%item2_values(array_trees%parts(child_part1)%items2_offset + 1) = chosen_item2
 
    ! Update itemdir using 2D arrays - no offset calculation needed
-   array_trees%itemdir1_entries(first_link_idx, first_item1) = child_part1
+   array_trees%itemdir1_entries(first_link_idx, chosen_item1) = child_part1
    array_trees%itemdir2_entries(first_link_idx, chosen_item2) = child_part1
 
-   ! Copy remaining items1 to second child (skip the first item)
+   ! Copy remaining items1 to second child (skip the chosen item)
    target_idx = array_trees%parts(child_part2)%items1_offset
-   do i = 2, items1_count
-      item_value = array_trees%item1_values(items1_offset + i)
-      target_idx = target_idx + 1
-      array_trees%item1_values(target_idx) = item_value
-      array_trees%itemdir1_entries(first_link_idx, item_value) = child_part2
+   do i = 1, items1_count
+      if (i /= chosen_item1_idx) then
+         item_value = array_trees%item1_values(items1_offset + i)
+         target_idx = target_idx + 1
+         array_trees%item1_values(target_idx) = item_value
+         array_trees%itemdir1_entries(first_link_idx, item_value) = child_part2
+      end if
    end do
 
    ! Copy remaining items2 to second child (skip the chosen item)
@@ -339,8 +341,8 @@ recursive subroutine redistribute_items_dfs_recursive(coords1, coords2, array_tr
          ! Reset branch assignment for this iteration
          branch_assignment%num_assigned = 0
 
-         ! Make assignment and recompute MNAs in one combined operation
-         call assign_and_recompute_mnas(array_trees, split_part_idx, child_branch_idx, first_link_idx, j, &
+         ! Make assignment and recompute MNAs in one combined operation (using first item1, index=1)
+         call assign_and_recompute_mnas(array_trees, split_part_idx, child_branch_idx, first_link_idx, 1, j, &
             branch_assignment)
 
          ! Recursively explore subtree and collect child permutation
@@ -368,6 +370,56 @@ recursive subroutine redistribute_items_dfs_recursive(coords1, coords2, array_tr
    end do
 end subroutine
 
+recursive subroutine redistribute_items_random_recursive(coords1, coords2, array_trees, branch_idx, assignment)
+   ! Random exploration - generates one assignment randomly using same traversal order as random module
+   ! Similar to redistribute_items_dfs_recursive but picks one random assignment instead of exploring all
+   real(rk), intent(in) :: coords1(:,:), coords2(:,:)
+   type(array_trees_t), intent(inout) :: array_trees
+   integer, intent(in) :: branch_idx
+   type(assignment_t), intent(inout) :: assignment
+
+   integer :: child_branch_idx, first_link_idx, split_part_idx, i, items1_count, items2_count
+   integer :: random_choice1, random_choice2
+   integer :: link_idx, branch_link_offset, branch_num_links
+   real :: random_real
+
+   ! Check if this is a leaf level (no more child branches)
+   if (array_trees%chains(branch_idx)%num_children == 0) then
+      return
+   end if
+
+   ! Process each child branch using same traversal order as random module
+   do i = 1, array_trees%chains(branch_idx)%num_children
+      child_branch_idx = array_trees%chains(branch_idx)%child_indices(i)
+      first_link_idx = array_trees%chains(child_branch_idx)%link_offset + 1
+      split_part_idx = array_trees%chains(child_branch_idx)%split_part_idx
+      branch_link_offset = array_trees%chains(child_branch_idx)%link_offset
+      branch_num_links = array_trees%chains(child_branch_idx)%num_links
+
+      items1_count = array_trees%parts(split_part_idx)%items1_count
+      items2_count = array_trees%parts(split_part_idx)%items2_count
+
+      ! Generate random choices for both item1 and item2 indices (matching original random module)
+      call random_number(random_real)
+      random_choice1 = int(random_real * items1_count) + 1
+      call random_number(random_real)
+      random_choice2 = int(random_real * items2_count) + 1
+
+      ! Make random assignment and recompute MNAs using existing procedure
+      call assign_and_recompute_mnas(array_trees, split_part_idx, child_branch_idx, first_link_idx, &
+         random_choice1, random_choice2, assignment)
+
+      ! Recursively explore child branch
+      call redistribute_items_random_recursive(coords1, coords2, array_trees, child_branch_idx, assignment)
+
+      ! Reset state for next iteration - only reset links used by this branch
+      do link_idx = branch_link_offset + 1, branch_link_offset + branch_num_links
+         array_trees%itemdir1_entries(link_idx, :) = 0
+         array_trees%itemdir2_entries(link_idx, :) = 0
+      end do
+   end do
+end subroutine
+
 subroutine update_assignment(target, source)
    ! Merge source assignment into target assignment
    type(assignment_t), intent(inout) :: target
@@ -392,11 +444,10 @@ subroutine update_assignment(target, source)
    end do
 end subroutine
 
-subroutine redistribute_items_array(coords1, coords2, array_trees, branch_idx, optimal_permutation, total_distance)
+subroutine redistribute_items_dfs(coords1, coords2, array_trees, optimal_permutation, total_distance)
    ! DFS exploration wrapper - finds optimal assignment among all possibilities
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: array_trees
-   integer, intent(in) :: branch_idx
    integer, allocatable, intent(out) :: optimal_permutation(:)
    real(rk), intent(out) :: total_distance
 
@@ -416,8 +467,8 @@ subroutine redistribute_items_array(coords1, coords2, array_trees, branch_idx, o
 
    write(stderr, '(A)') "=== Starting DFS exploration of all assignment possibilities ==="
 
-   ! Perform DFS exploration to find optimal assignment
-   call redistribute_items_dfs_recursive(coords1, coords2, array_trees, branch_idx, optimal_assignment)
+   ! Perform DFS exploration to find optimal assignment (starting from root chain at index 1)
+   call redistribute_items_dfs_recursive(coords1, coords2, array_trees, 1, optimal_assignment)
 
    ! Copy final permutation array from assignment
    optimal_permutation = optimal_assignment%permutation
@@ -438,6 +489,50 @@ subroutine redistribute_items_array(coords1, coords2, array_trees, branch_idx, o
 
    ! Validate permutation consistency
    call validate_perm(optimal_permutation)
+end subroutine
+
+subroutine redistribute_items_random(coords1, coords2, array_trees, random_permutation, total_distance)
+   ! Random exploration wrapper - generates one random assignment
+   ! Similar to redistribute_items_dfs but generates random assignment instead of optimal
+   real(rk), intent(in) :: coords1(:,:), coords2(:,:)
+   type(array_trees_t), intent(inout) :: array_trees
+   integer, allocatable, intent(out) :: random_permutation(:)
+   real(rk), intent(out) :: total_distance
+
+   type(assignment_t) :: random_assignment
+   integer :: num_atoms, assigned_count
+
+   num_atoms = array_trees%num_atoms1
+
+   ! Initialize random assignment
+   call init_assignment(random_assignment, num_atoms)
+
+   ! Initialize assignment with preassigned pairs
+   call collect_leaf_assignments(array_trees, 1, random_assignment)
+
+   write(stderr, '(A)') "=== Starting random assignment generation ==="
+
+   ! Perform random exploration to generate one assignment (starting from root chain at index 1)
+   call redistribute_items_random_recursive(coords1, coords2, array_trees, 1, random_assignment)
+
+   ! Copy final permutation array from assignment
+   random_permutation = random_assignment%permutation
+
+   ! Calculate distance from the random permutation array
+   total_distance = totsqdist(random_assignment%assigned_indices(1:random_assignment%num_assigned), &
+      random_assignment%permutation, coords1, coords2)
+
+   ! Count assigned atoms
+   assigned_count = random_assignment%num_assigned
+
+   ! Report final results
+   write(stderr, '(A)') repeat("=", 60)
+   write(stderr, '(A,I0,A,I0,A)') "Atoms assigned: ", assigned_count, " out of ", num_atoms, " total atoms"
+   write(stderr, '(A,F10.4)') "Random assignment total squared distance: ", total_distance
+   write(stderr, '(A)') repeat("=", 60)
+
+   ! Validate permutation consistency
+   call validate_perm(random_permutation)
 end subroutine
 
 end module
