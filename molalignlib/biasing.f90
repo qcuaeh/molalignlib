@@ -33,8 +33,8 @@ subroutine compute_mna_biases(mol1, mol2, eltypes, biases)
    type(partition_t), intent(in) :: eltypes
    type(int_matrix), dimension(:), allocatable, intent(out) :: biases
    ! Local variables
-   type(part_node_t), pointer :: root_part
-   type(chain_node_t), pointer :: mnachain
+   type(partree_node_t), pointer :: root_part
+   type(assigntree_node_t), pointer :: mnachain
    integer :: h, i, j, iatom, jatom
    integer :: num_splits
 !   integer :: link_idx

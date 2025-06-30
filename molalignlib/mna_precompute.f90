@@ -11,7 +11,7 @@ function would_part_split(atoms1, atoms2, itemdir1, itemdir2, part) result(would
 ! Check if a part would split by comparing signatures
    type(atom_type), dimension(:), intent(in) :: atoms1, atoms2
    type(part_nodeptr_t), dimension(:), intent(in) :: itemdir1, itemdir2
-   type(part_node_t), pointer, intent(inout) :: part
+   type(partree_node_t), pointer, intent(inout) :: part
    ! Local variables
    logical :: would_split
    type(item_node_t), pointer :: item1, item2
@@ -56,14 +56,14 @@ end function
 subroutine precompute_nextlevel_mnas(mol1, mol2, mnachain, leafchain, branch_parts, num_splits)
 ! Compute next level MNA types - only keeps children if real split occurred
    type(mol_type), intent(in) :: mol1, mol2
-   type(chain_node_t), pointer, intent(inout) :: mnachain
-   type(chain_node_t), pointer, intent(inout) :: leafchain
-   type(link_node_t), pointer, intent(inout) :: branch_parts
+   type(assigntree_node_t), pointer, intent(inout) :: mnachain
+   type(assigntree_node_t), pointer, intent(inout) :: leafchain
+   type(chain_node_t), pointer, intent(inout) :: branch_parts
    integer, intent(out) :: num_splits
    ! Local variables
-   type(link_node_t), pointer :: level_link, next_level_link, leafchain_link
+   type(chain_node_t), pointer :: level_link, next_level_link, leafchain_link
    type(partref_node_t), pointer :: partref
-   type(part_node_t), pointer :: child_part
+   type(partree_node_t), pointer :: child_part
    logical, dimension(:), allocatable :: will_split
    logical :: any_splits
    integer :: i
@@ -122,9 +122,9 @@ end subroutine
 subroutine precompute_consistent_mnas(mol1, mol2, mnachain, leafchain, branch_parts)
 ! Iteratively compute MNA types until convergence
    type(mol_type), intent(in) :: mol1, mol2
-   type(chain_node_t), pointer, intent(inout) :: mnachain
-   type(chain_node_t), pointer, intent(inout) :: leafchain
-   type(link_node_t), pointer, intent(inout) :: branch_parts
+   type(assigntree_node_t), pointer, intent(inout) :: mnachain
+   type(assigntree_node_t), pointer, intent(inout) :: leafchain
+   type(chain_node_t), pointer, intent(inout) :: branch_parts
    ! Local variables
    integer :: num_splits
 
@@ -138,10 +138,10 @@ subroutine precompute_consistent_mnas(mol1, mol2, mnachain, leafchain, branch_pa
 end subroutine
 
 subroutine split_part_first(part, link)
-   type(part_node_t), pointer, intent(inout) :: part
-   type(link_node_t), pointer, intent(inout) :: link
+   type(partree_node_t), pointer, intent(inout) :: part
+   type(chain_node_t), pointer, intent(inout) :: link
    ! Local variables
-   type(part_node_t), pointer :: child_part
+   type(partree_node_t), pointer :: child_part
    type(item_node_t), pointer :: item1, item2
 
    ! Create first child and add first item from each molecule
@@ -168,15 +168,15 @@ subroutine split_part_first(part, link)
 end subroutine
 
 subroutine split_single_part(split_part, mnachain, leafchain, branch_parts)
-   type(part_node_t), pointer, intent(inout) :: split_part
-   type(chain_node_t), pointer, intent(inout) :: mnachain
-   type(chain_node_t), pointer, intent(inout) :: leafchain
-   type(link_node_t), pointer, intent(inout) :: branch_parts
+   type(partree_node_t), pointer, intent(inout) :: split_part
+   type(assigntree_node_t), pointer, intent(inout) :: mnachain
+   type(assigntree_node_t), pointer, intent(inout) :: leafchain
+   type(chain_node_t), pointer, intent(inout) :: branch_parts
    ! Local variables
-   type(link_node_t), pointer :: level_link, next_level_link
-   type(link_node_t), pointer :: first_leafchain_link
+   type(chain_node_t), pointer :: level_link, next_level_link
+   type(chain_node_t), pointer :: first_leafchain_link
    type(partref_node_t), pointer :: partref
-   type(part_node_t), pointer :: child_part
+   type(partree_node_t), pointer :: child_part
 
    ! Save the last link before creating a new one
    level_link => mnachain%last_link
@@ -209,13 +209,13 @@ end subroutine
 ! Modified split_dependent_parts as a function that returns the final branch
 recursive subroutine split_dependent_parts(mol1, mol2, mnachain, leafchain, fork_part, branch_parts)
    type(mol_type), intent(in) :: mol1, mol2
-   type(chain_node_t), pointer, intent(inout) :: mnachain
-   type(chain_node_t), pointer, intent(inout) :: leafchain
-   type(part_node_t), pointer, intent(in) :: fork_part
-   type(link_node_t), pointer, intent(inout) :: branch_parts
+   type(assigntree_node_t), pointer, intent(inout) :: mnachain
+   type(assigntree_node_t), pointer, intent(inout) :: leafchain
+   type(partree_node_t), pointer, intent(in) :: fork_part
+   type(chain_node_t), pointer, intent(inout) :: branch_parts
    ! Local variables
    type(partref_node_t), pointer :: partref
-   type(part_node_t), pointer :: split_part
+   type(partree_node_t), pointer :: split_part
 
    ! Compute consistent MNAs
    call precompute_consistent_mnas(mol1, mol2, mnachain, leafchain, branch_parts)
@@ -244,11 +244,11 @@ end subroutine
 ! Updated split_independent_parts to use the new function signatures
 recursive subroutine split_independent_parts(mol1, mol2, mnachain, branchain, branch_parts)
    type(mol_type), intent(in) :: mol1, mol2
-   type(chain_node_t), pointer, intent(inout) :: mnachain, branchain
-   type(link_node_t), pointer, intent(in) :: branch_parts
+   type(assigntree_node_t), pointer, intent(inout) :: mnachain, branchain
+   type(chain_node_t), pointer, intent(in) :: branch_parts
    ! Local variables
-   type(link_node_t), pointer :: new_branch_parts
-   type(chain_node_t), pointer :: leafchain
+   type(chain_node_t), pointer :: new_branch_parts
+   type(assigntree_node_t), pointer :: leafchain
    type(partref_node_t), pointer :: partref
 
    ! Process each part in branch_parts

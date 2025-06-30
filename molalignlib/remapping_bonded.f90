@@ -155,10 +155,10 @@ subroutine assign_conform_atoms( mol1, mol2, eltypes)
    type(mol_type), intent(in) :: mol1, mol2
    type(partition_t), intent(in) :: eltypes
    ! Local variables
-   type(part_node_t), pointer :: root_part, temp_part
-   type(chain_node_t), pointer :: mnachain2, mnachain1, root_chain
-   type(link_node_t), pointer :: branch_parts
-   type(part_node_t), pointer :: child_part
+   type(partree_node_t), pointer :: root_part, temp_part
+   type(assigntree_node_t), pointer :: mnachain2, mnachain1, root_chain
+   type(chain_node_t), pointer :: branch_parts
+   type(partree_node_t), pointer :: child_part
    type(array_trees_t) :: array_trees
    integer :: unit1, unit2
    real(rk), dimension(:,:), allocatable :: coords1, coords2

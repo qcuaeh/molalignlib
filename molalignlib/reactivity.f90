@@ -42,8 +42,8 @@ subroutine find_reactive_bonds( mol1, mol2, eltypes, atomperm)
 
    ! Local variables
    type(partition_t) :: mnatypes
-   type(part_node_t), pointer :: root_part
-   type(chain_node_t), pointer :: mnachain
+   type(partree_node_t), pointer :: root_part
+   type(assigntree_node_t), pointer :: mnachain
    type(int_list), dimension(:), allocatable :: molfrags1, molfrags2
    type(int_matrix), dimension(:), allocatable :: biases
    type(topoatomperm_registry), target :: results
