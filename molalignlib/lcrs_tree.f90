@@ -10,27 +10,20 @@ type, public :: item_node_t
    type(item_node_t), pointer :: next_item
 end type
 
-! Part reference node
-type, public :: partref_node_t
-   integer :: global_index
-   type(part_node_t), pointer :: part
-   type(partref_node_t), pointer :: nextref
-end type
-
-! Link node
-type, public :: link_node_t
+! Chain node
+type, public :: chain_node_t
    integer :: num_parts
    integer :: global_index
    integer, pointer :: total_partrefs => null()
-   type(link_node_t), pointer :: next_link
+   type(chain_node_t), pointer :: next_link
    type(partref_node_t), pointer :: first_partref
    type(partref_node_t), pointer :: last_partref
    type(part_nodeptr_t), dimension(:), allocatable :: itemdir1
    type(part_nodeptr_t), dimension(:), allocatable :: itemdir2
 end type
 
-! LCRS chain node
-type, public :: chain_node_t
+! Assignment tree node
+type, public :: assigntree_node_t
    integer :: tot_items1
    integer :: tot_items2
    integer :: num_links
@@ -39,17 +32,17 @@ type, public :: chain_node_t
    integer, pointer :: total_chains => null()
    integer, pointer :: total_links => null()
    integer, pointer :: total_partrefs => null()
-   type(chain_node_t), pointer :: parent_chain
-   type(chain_node_t), pointer :: first_child_chain
-   type(chain_node_t), pointer :: last_child_chain
-   type(chain_node_t), pointer :: next_sibling_chain
-   type(link_node_t), pointer :: first_link
-   type(link_node_t), pointer :: last_link
-   type(part_node_t), pointer :: split_part
+   type(assigntree_node_t), pointer :: parent_chain
+   type(assigntree_node_t), pointer :: first_child_chain
+   type(assigntree_node_t), pointer :: last_child_chain
+   type(assigntree_node_t), pointer :: next_sibling_chain
+   type(chain_node_t), pointer :: first_link
+   type(chain_node_t), pointer :: last_link
+   type(partree_node_t), pointer :: split_part
 end type
 
-! LCRS part node
-type, public :: part_node_t
+! Part tree node
+type, public :: partree_node_t
    integer :: depth
    integer :: global_index
    integer :: num_items1
@@ -62,16 +55,23 @@ type, public :: part_node_t
    type(item_node_t), pointer :: first_item2
    type(item_node_t), pointer :: last_item1
    type(item_node_t), pointer :: last_item2
-   type(part_node_t), pointer :: parent_part
-   type(part_node_t), pointer :: first_child_part
-   type(part_node_t), pointer :: last_child_part
-   type(part_node_t), pointer :: next_sibling_part
+   type(partree_node_t), pointer :: parent_part
+   type(partree_node_t), pointer :: first_child_part
+   type(partree_node_t), pointer :: last_child_part
+   type(partree_node_t), pointer :: next_sibling_part
    type(part_nodeptr_t), dimension(:), allocatable :: signature
+end type
+
+! Part reference node
+type, public :: partref_node_t
+   integer :: global_index
+   type(partree_node_t), pointer :: part
+   type(partref_node_t), pointer :: nextref
 end type
 
 ! Part node pointer
 type, public :: part_nodeptr_t
-   type(part_node_t), pointer :: ptr
+   type(partree_node_t), pointer :: ptr
 end type
 
 ! Semipart array
@@ -161,7 +161,7 @@ contains
 
 character(4) function address_part(nodeptr) result(address)
    use iso_c_binding, only: c_loc, c_intptr_t
-   type(part_node_t), pointer, intent(in) :: nodeptr
+   type(partree_node_t), pointer, intent(in) :: nodeptr
    if (associated(nodeptr)) then
       write (address, '(Z4.4)') modulo(transfer(c_loc(nodeptr), c_intptr_t), 16**4)
    else
@@ -203,9 +203,9 @@ function signature_equivalence(array1, array2) result(equiv)
 end function
 
 logical function isdescendant(part, top_part)
-   type(part_node_t), pointer, intent(in) :: part, top_part
+   type(partree_node_t), pointer, intent(in) :: part, top_part
    ! Local variables
-   type(part_node_t), pointer :: up_part
+   type(partree_node_t), pointer :: up_part
 
    if (part%depth <= top_part%depth) then
       isdescendant = .false.
@@ -225,7 +225,7 @@ logical function isdescendant(part, top_part)
 end function
 
 function new_root_part() result(new_part)
-   type(part_node_t), pointer :: new_part
+   type(partree_node_t), pointer :: new_part
 
    new_part => new_bare_part()
    new_part%depth = 0
@@ -242,7 +242,7 @@ function new_root_part() result(new_part)
 end function
 
 function new_bare_part() result(new_part)
-   type(part_node_t), pointer :: new_part
+   type(partree_node_t), pointer :: new_part
 
    allocate (new_part)
 
@@ -265,8 +265,8 @@ function new_bare_part() result(new_part)
 end function
 
 subroutine link_part(link, part)
-   type(link_node_t), target, intent(inout) :: link
-   type(part_node_t), target, intent(inout) :: part
+   type(chain_node_t), target, intent(inout) :: link
+   type(partree_node_t), target, intent(inout) :: part
    type(partref_node_t), pointer :: newref
 
    allocate(newref)
@@ -287,8 +287,8 @@ subroutine link_part(link, part)
 end subroutine
 
 function new_child_part(parent_part) result(new_part)
-   type(part_node_t), pointer, intent(inout) :: parent_part
-   type(part_node_t), pointer :: new_part
+   type(partree_node_t), pointer, intent(inout) :: parent_part
+   type(partree_node_t), pointer :: new_part
 
    ! Create new part with correct depth
    new_part => new_bare_part()
@@ -319,7 +319,7 @@ end function
 
 subroutine add_new_item1(part, value)
 ! Add item to part without updating link itemdir (for temporary children)
-   type(part_node_t), target, intent(inout) :: part
+   type(partree_node_t), target, intent(inout) :: part
    integer, intent(in) :: value
    type(item_node_t), pointer :: new_item
 
@@ -342,7 +342,7 @@ end subroutine
 
 subroutine add_new_item2(part, value)
 ! Add item to part without updating link itemdir (for temporary children)
-   type(part_node_t), target, intent(inout) :: part
+   type(partree_node_t), target, intent(inout) :: part
    integer, intent(in) :: value
    type(item_node_t), pointer :: new_item
 
@@ -365,8 +365,8 @@ end subroutine
 
 subroutine move_first_item1(src, dest)
 ! Move first item from src to dest without updating link itemdir
-   type(part_node_t), intent(inout) :: src
-   type(part_node_t), target, intent(inout) :: dest
+   type(partree_node_t), intent(inout) :: src
+   type(partree_node_t), target, intent(inout) :: dest
    type(item_node_t), pointer :: item_to_move
 
    item_to_move => src%first_item1
@@ -393,8 +393,8 @@ end subroutine
 
 subroutine move_first_item2(src, dest)
 ! Move first item from src to dest without updating link itemdir
-   type(part_node_t), intent(inout) :: src
-   type(part_node_t), target, intent(inout) :: dest
+   type(partree_node_t), intent(inout) :: src
+   type(partree_node_t), target, intent(inout) :: dest
    type(item_node_t), pointer :: item_to_move
 
    item_to_move => src%first_item2
@@ -421,7 +421,7 @@ end subroutine
 
 subroutine move_part_items(src, dest)
 ! Move all items from src to dest without updating link itemdir
-   type(part_node_t), intent(inout) :: src, dest
+   type(partree_node_t), intent(inout) :: src, dest
 
    do while (associated(src%first_item1))
       call move_first_item1(src, dest)
@@ -433,8 +433,8 @@ subroutine move_part_items(src, dest)
 end subroutine
 
 subroutine delete_chain(chain_root)
-   type(chain_node_t), pointer, intent(inout) :: chain_root
-   type(link_node_t), pointer :: link, next_link
+   type(assigntree_node_t), pointer, intent(inout) :: chain_root
+   type(chain_node_t), pointer :: link, next_link
 
    if ((.not. associated(chain_root))) error stop
 
@@ -452,7 +452,7 @@ subroutine delete_chain(chain_root)
 end subroutine
 
 subroutine delete_link(link)
-   type(link_node_t), pointer, intent(inout) :: link
+   type(chain_node_t), pointer, intent(inout) :: link
    type(partref_node_t), pointer :: partref, nextref
 
    if ((.not. associated(link))) error stop
@@ -478,7 +478,7 @@ end subroutine
 
 subroutine delete_part_tree(root_part)
 ! Deletes an entire part tree starting from the root
-   type(part_node_t), pointer, intent(inout) :: root_part
+   type(partree_node_t), pointer, intent(inout) :: root_part
 
    if (.not. associated(root_part)) error stop
 
@@ -496,8 +496,8 @@ end subroutine
 
 recursive subroutine delete_part_children(parent_part)
 ! Deletes all children of a part recursively
-   type(part_node_t), pointer, intent(in) :: parent_part
-   type(part_node_t), pointer :: child_part, next_child
+   type(partree_node_t), pointer, intent(in) :: parent_part
+   type(partree_node_t), pointer :: child_part, next_child
 
    if (.not. associated(parent_part)) error stop
 
@@ -516,7 +516,7 @@ end subroutine
 
 subroutine delete_part(part_node)
 ! Deletes a single part node (assumes children are already deleted)
-   type(part_node_t), pointer, intent(inout) :: part_node
+   type(partree_node_t), pointer, intent(inout) :: part_node
 
    if ((.not. associated(part_node))) error stop
 
@@ -549,7 +549,7 @@ subroutine deallocate_items(first_item)
 end subroutine
 
 subroutine link_to_partition(link, partition)
-   type(link_node_t), target, intent(in) :: link
+   type(chain_node_t), target, intent(in) :: link
    type(partition_t), intent(out) :: partition
    type(partref_node_t), pointer :: partref
    type(item_node_t), pointer :: item
@@ -590,7 +590,7 @@ subroutine link_to_partition(link, partition)
 end subroutine
 
 subroutine print_part_items(part)
-   type(part_node_t), pointer, intent(in) :: part
+   type(partree_node_t), pointer, intent(in) :: part
    type(item_node_t), pointer :: item
 
    item => part%first_item1
@@ -611,7 +611,7 @@ subroutine print_part_items(part)
 end subroutine
 
 subroutine print_link_itemdir(link)
-   type(link_node_t), intent(in) :: link
+   type(chain_node_t), intent(in) :: link
    integer :: i
 
    write(stderr, *)
@@ -629,7 +629,7 @@ end subroutine
 
 function new_bare_chain(tot_items1, tot_items2) result(new_chain)
    integer, intent(in) :: tot_items1, tot_items2
-   type(chain_node_t), pointer :: new_chain
+   type(assigntree_node_t), pointer :: new_chain
 
    allocate(new_chain)
    new_chain%num_links = 0
@@ -649,7 +649,7 @@ end function
 
 function new_root_chain(tot_items1, tot_items2) result(new_chain)
    integer, intent(in) :: tot_items1, tot_items2
-   type(chain_node_t), pointer :: new_chain
+   type(assigntree_node_t), pointer :: new_chain
 
    new_chain => new_bare_chain(tot_items1, tot_items2)
    new_chain%parent_chain => null()
@@ -666,7 +666,7 @@ function new_root_chain(tot_items1, tot_items2) result(new_chain)
 end function
 
 function new_bare_link() result(new_link)
-   type(link_node_t), pointer :: new_link
+   type(chain_node_t), pointer :: new_link
 
    allocate(new_link)
    new_link%num_parts = 0
@@ -678,8 +678,8 @@ function new_bare_link() result(new_link)
 end function
 
 function new_chain_link(chain) result(new_link)
-   type(chain_node_t), target, intent(inout) :: chain
-   type(link_node_t), pointer :: new_link
+   type(assigntree_node_t), target, intent(inout) :: chain
+   type(chain_node_t), pointer :: new_link
    integer :: i
 
    ! Use the initialization function
@@ -715,9 +715,9 @@ function new_chain_link(chain) result(new_link)
 end function
 
 function find_child_part(part, signature) result(child_part)
-   type(part_node_t), intent(in) :: part
+   type(partree_node_t), intent(in) :: part
    type(part_nodeptr_t), dimension(:), intent(in) :: signature
-   type(part_node_t), pointer :: child_part
+   type(partree_node_t), pointer :: child_part
 
    child_part => part%first_child_part
    do while (associated(child_part))
@@ -731,7 +731,7 @@ function find_child_part(part, signature) result(child_part)
 end function
 
 subroutine print_part_tree(root_part)
-   type(part_node_t), pointer, intent(in) :: root_part
+   type(partree_node_t), pointer, intent(in) :: root_part
    logical, dimension(:), allocatable :: is_last_child
 
    if (.not. associated(root_part)) then
@@ -760,10 +760,10 @@ subroutine print_part_tree(root_part)
 end subroutine
 
 recursive subroutine print_part_recursive(part, depth, is_last_child)
-   type(part_node_t), pointer, intent(in) :: part
+   type(partree_node_t), pointer, intent(in) :: part
    integer, intent(in) :: depth
    logical, dimension(:), intent(inout) :: is_last_child
-   type(part_node_t), pointer :: child_part, next_child
+   type(partree_node_t), pointer :: child_part, next_child
    integer :: i, pos
    character(len=200) :: prefix
 
@@ -808,11 +808,11 @@ recursive subroutine print_part_recursive(part, depth, is_last_child)
 end subroutine
 
 subroutine init_chain_from_link(input_link, chain_root, root_part)
-   type(link_node_t), intent(in) :: input_link
-   type(chain_node_t), pointer, intent(out) :: chain_root
-   type(part_node_t), pointer, intent(out) :: root_part
-   type(link_node_t), pointer :: first_link
-   type(part_node_t), pointer :: new_part
+   type(chain_node_t), intent(in) :: input_link
+   type(assigntree_node_t), pointer, intent(out) :: chain_root
+   type(partree_node_t), pointer, intent(out) :: root_part
+   type(chain_node_t), pointer :: first_link
+   type(partree_node_t), pointer :: new_part
    type(partref_node_t), pointer :: partref
    type(item_node_t), pointer :: item
 
@@ -853,10 +853,10 @@ end subroutine
 
 subroutine init_chain_from_partition(partition, chain_root, root_part)
    type(partition_t), intent(in) :: partition
-   type(chain_node_t), pointer, intent(out) :: chain_root
-   type(part_node_t), pointer, intent(out) :: root_part
-   type(link_node_t), pointer :: first_link
-   type(part_node_t), pointer :: new_part
+   type(assigntree_node_t), pointer, intent(out) :: chain_root
+   type(partree_node_t), pointer, intent(out) :: root_part
+   type(chain_node_t), pointer :: first_link
+   type(partree_node_t), pointer :: new_part
    integer :: i, j
 
    ! Create root part (decoupled from chain)
@@ -923,9 +923,9 @@ function second_partition(partition) result(semipartition)
 end function
 
 function new_child_chain(chain, split_part) result(new_chain)
-   type(chain_node_t), pointer, intent(inout) :: chain
-   type(part_node_t), pointer, intent(in) :: split_part
-   type(chain_node_t), pointer :: new_chain
+   type(assigntree_node_t), pointer, intent(inout) :: chain
+   type(partree_node_t), pointer, intent(in) :: split_part
+   type(assigntree_node_t), pointer :: new_chain
 
    ! Create new child chain
    new_chain => new_bare_chain(chain%tot_items1, chain%tot_items2)
@@ -959,8 +959,8 @@ end function
 
 subroutine add_branch_part(link, part)
 ! Adds parts in sorted order by num_items1
-   type(link_node_t), target, intent(inout) :: link
-   type(part_node_t), target, intent(in) :: part
+   type(chain_node_t), target, intent(inout) :: link
+   type(partree_node_t), target, intent(in) :: part
    type(partref_node_t), pointer :: partref, prevref, newref
 
    ! Do not add assigned parts
@@ -1016,8 +1016,8 @@ end subroutine
 
 subroutine update_itemdir(link, part)
 ! Updates itemdir pointers for all items in a single part
-   type(link_node_t), target, intent(inout) :: link
-   type(part_node_t), target, intent(in) :: part
+   type(chain_node_t), target, intent(inout) :: link
+   type(partree_node_t), target, intent(in) :: part
    type(item_node_t), pointer :: item
 
    ! Register all items from molecule 1
@@ -1036,7 +1036,7 @@ subroutine update_itemdir(link, part)
 end subroutine
 
 subroutine print_chain_tree(root_chain)
-   type(chain_node_t), pointer, intent(in) :: root_chain
+   type(assigntree_node_t), pointer, intent(in) :: root_chain
    logical, dimension(:), allocatable :: is_last_child
 
    if (.not. associated(root_chain)) error stop
@@ -1060,10 +1060,10 @@ subroutine print_chain_tree(root_chain)
 end subroutine
 
 recursive subroutine print_chain_recursive(chain, depth, is_last_child)
-   type(chain_node_t), pointer, intent(in) :: chain
+   type(assigntree_node_t), pointer, intent(in) :: chain
    integer, intent(in) :: depth
    logical, dimension(:), intent(inout) :: is_last_child
-   type(chain_node_t), pointer :: child_chain, next_child
+   type(assigntree_node_t), pointer :: child_chain, next_child
    integer :: i, pos
    character(len=200) :: prefix
 
@@ -1119,7 +1119,7 @@ end subroutine
 
 ! New procedure to print signatures of all parts in a part tree
 subroutine print_tree_signatures(root_part)
-   type(part_node_t), pointer, intent(in) :: root_part
+   type(partree_node_t), pointer, intent(in) :: root_part
 
    if (.not. associated(root_part)) then
       write(stderr, '(A)') "Part tree is empty"
@@ -1140,8 +1140,8 @@ end subroutine
 
 ! Helper recursive procedure for print_tree_signatures
 recursive subroutine print_signature_recursive(part)
-   type(part_node_t), pointer, intent(in) :: part
-   type(part_node_t), pointer :: child_part
+   type(partree_node_t), pointer, intent(in) :: part
+   type(partree_node_t), pointer :: child_part
 
    if (.not. associated(part)) return
 
@@ -1160,7 +1160,7 @@ recursive subroutine print_signature_recursive(part)
 end subroutine
 
 subroutine print_tree_items(root_part)
-   type(part_node_t), pointer, intent(in) :: root_part
+   type(partree_node_t), pointer, intent(in) :: root_part
 
    if (.not. associated(root_part)) then
       write(stderr, '(A)') "Part tree is empty"
@@ -1180,8 +1180,8 @@ subroutine print_tree_items(root_part)
 end subroutine
 
 recursive subroutine print_items_recursive(part)
-   type(part_node_t), pointer, intent(in) :: part
-   type(part_node_t), pointer :: child_part
+   type(partree_node_t), pointer, intent(in) :: part
+   type(partree_node_t), pointer :: child_part
 
    if (.not. associated(part)) return
 
@@ -1200,7 +1200,7 @@ recursive subroutine print_items_recursive(part)
 end subroutine
 
 subroutine print_leaf_items(root_part)
-   type(part_node_t), pointer, intent(in) :: root_part
+   type(partree_node_t), pointer, intent(in) :: root_part
 
    if (.not. associated(root_part)) then
       write(stderr, '(A)') "Part tree is empty"
@@ -1220,8 +1220,8 @@ subroutine print_leaf_items(root_part)
 end subroutine
 
 recursive subroutine print_leaf_items_recursive(part)
-   type(part_node_t), pointer, intent(in) :: part
-   type(part_node_t), pointer :: child_part
+   type(partree_node_t), pointer, intent(in) :: part
+   type(partree_node_t), pointer :: child_part
 
    if (.not. associated(part)) return
 
@@ -1243,7 +1243,7 @@ end subroutine
 
 ! New procedure to print global indices
 subroutine print_part_indices(root_part)
-   type(part_node_t), pointer, intent(in) :: root_part
+   type(partree_node_t), pointer, intent(in) :: root_part
 
    if (.not. associated(root_part)) then
       write(stderr, '(A)') "Part tree is empty"
@@ -1268,8 +1268,8 @@ end subroutine
 
 ! Helper recursive procedure for print_part_indices
 recursive subroutine print_part_indices_recursive(part)
-   type(part_node_t), pointer, intent(in) :: part
-   type(part_node_t), pointer :: child_part
+   type(partree_node_t), pointer, intent(in) :: part
+   type(partree_node_t), pointer :: child_part
    type(item_node_t), pointer :: item
 
    if (.not. associated(part)) return
@@ -1302,7 +1302,7 @@ end subroutine
 
 ! New procedure to print global indices for chain tree
 subroutine print_chain_indices(root_chain)
-   type(chain_node_t), pointer, intent(in) :: root_chain
+   type(assigntree_node_t), pointer, intent(in) :: root_chain
 
    if (.not. associated(root_chain)) then
       write(stderr, '(A)') "Chain tree is empty"
@@ -1327,9 +1327,9 @@ end subroutine
 
 ! Helper recursive procedure for print_chain_indices
 recursive subroutine print_chain_indices_recursive(chain)
-   type(chain_node_t), pointer, intent(in) :: chain
-   type(chain_node_t), pointer :: child_chain
-   type(link_node_t), pointer :: link
+   type(assigntree_node_t), pointer, intent(in) :: chain
+   type(assigntree_node_t), pointer :: child_chain
+   type(chain_node_t), pointer :: link
    type(partref_node_t), pointer :: partref
 
    if (.not. associated(chain)) return

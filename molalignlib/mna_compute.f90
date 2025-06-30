@@ -11,12 +11,12 @@ subroutine split_part_mna(atoms1, atoms2, itemdir1, itemdir2, part, link)
 ! Note: part is always a leaf part with no existing children
    type(atom_type), dimension(:), intent(in) :: atoms1, atoms2
    type(part_nodeptr_t), dimension(:), intent(in) :: itemdir1, itemdir2
-   type(part_node_t), pointer, intent(inout) :: part
-   type(link_node_t), pointer, intent(inout) :: link
+   type(partree_node_t), pointer, intent(inout) :: part
+   type(chain_node_t), pointer, intent(inout) :: link
    ! Local variables
    type(item_node_t), pointer :: item
    type(part_nodeptr_t), dimension(:), allocatable :: signature
-   type(part_node_t), pointer :: child_part
+   type(partree_node_t), pointer :: child_part
 
    ! Process first molecule items - create children for each unique signature
    item => part%first_item1
@@ -52,10 +52,10 @@ end subroutine
 subroutine compute_nextlevel_mnas(mol1, mol2, mnachain, num_splits)
 ! Compute next level MNA types - always keeps all children (original behavior)
    type(mol_type), intent(in) :: mol1, mol2
-   type(chain_node_t), pointer, intent(inout) :: mnachain
+   type(assigntree_node_t), pointer, intent(inout) :: mnachain
    integer, intent(out) :: num_splits
    ! Local variables
-   type(link_node_t), pointer :: link, new_link
+   type(chain_node_t), pointer :: link, new_link
    type(partref_node_t), pointer :: partref
 
    num_splits = 0
@@ -80,7 +80,7 @@ end subroutine
 subroutine compute_consistent_mnas(mol1, mol2, mnachain)
 ! Iteratively compute MNA types until convergence
    type(mol_type), intent(in) :: mol1, mol2
-   type(chain_node_t), pointer, intent(inout) :: mnachain
+   type(assigntree_node_t), pointer, intent(inout) :: mnachain
    ! Local variables
    integer :: num_splits
 

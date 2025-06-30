@@ -42,29 +42,29 @@ function signature_equivalence_array(array_trees, part_idx) result(equiv)
    logical :: equiv
    integer :: signature_frequencies, i, j
 
-   if (signature_length /= array_trees%parts(part_idx)%signature_length) then
+   if (signature_length /= array_trees%partree(part_idx)%signature_length) then
       equiv = .false.
       return
    end if
 
    ! FAST PATH: Direct comparison for length-1 signatures (most common)
-   if (array_trees%parts(part_idx)%signature_length == 1) then
-      equiv = (signature_array(1) == array_trees%parts(part_idx)%signature_values(1))
+   if (array_trees%partree(part_idx)%signature_length == 1) then
+      equiv = (signature_array(1) == array_trees%partree(part_idx)%signature_values(1))
       return
    end if
 
    ! GENERIC PATH
-   do i = 1, array_trees%parts(part_idx)%signature_unique_count
+   do i = 1, array_trees%partree(part_idx)%signature_unique_count
       signature_frequencies = 0
 
       ! Count matches in target signature
       do j = 1, signature_length
-         if (signature_array(j) == array_trees%parts(part_idx)%signature_values(i)) then
+         if (signature_array(j) == array_trees%partree(part_idx)%signature_values(i)) then
             signature_frequencies = signature_frequencies + 1
          end if
       end do
 
-      if (signature_frequencies /= array_trees%parts(part_idx)%signature_frequencies(i)) then
+      if (signature_frequencies /= array_trees%partree(part_idx)%signature_frequencies(i)) then
          equiv = .false.
          return
       end if
@@ -81,18 +81,18 @@ subroutine collect_leaf_assignments(array_trees, part_idx, assignment)
    integer :: i, child_idx, item1_idx, item2_idx
 
    ! Check all children of this part
-   do i = 1, array_trees%parts(part_idx)%num_children
-      child_idx = array_trees%parts(part_idx)%child_indices(i)
+   do i = 1, array_trees%partree(part_idx)%num_children
+      child_idx = array_trees%partree(part_idx)%child_indices(i)
 
       ! If this child is a leaf (no children), collect its assignment
-      if (array_trees%parts(child_idx)%num_children == 0) then
+      if (array_trees%partree(child_idx)%num_children == 0) then
          ! Verify this is a proper leaf part with exactly one item from each molecule
-         if (array_trees%parts(child_idx)%items1_count == 1 .and. &
-             array_trees%parts(child_idx)%items2_count == 1) then
+         if (array_trees%partree(child_idx)%items1_count == 1 .and. &
+             array_trees%partree(child_idx)%items2_count == 1) then
 
             ! Get the assigned items
-            item1_idx = array_trees%item1_values(array_trees%parts(child_idx)%items1_offset + 1)
-            item2_idx = array_trees%item2_values(array_trees%parts(child_idx)%items2_offset + 1)
+            item1_idx = array_trees%item1_values(array_trees%partree(child_idx)%items1_offset + 1)
+            item2_idx = array_trees%item2_values(array_trees%partree(child_idx)%items2_offset + 1)
 
             ! Add item pair to assignment
             assignment%permutation(item1_idx) = item2_idx
@@ -110,8 +110,8 @@ function find_child_part_array(array_trees, parent_idx) result(child_relative_id
    integer :: child_relative_idx, first_child_idx, second_child_idx
 
    ! Get first child index directly
-   first_child_idx = array_trees%parts(parent_idx)%child_indices(1)
-   second_child_idx = array_trees%parts(parent_idx)%child_indices(2)
+   first_child_idx = array_trees%partree(parent_idx)%child_indices(1)
+   second_child_idx = array_trees%partree(parent_idx)%child_indices(2)
 
    ! Check if signature matches first or second child
    if (signature_equivalence_array(array_trees, first_child_idx)) then
@@ -135,11 +135,11 @@ subroutine resplit_part_mna(array_trees, part_idx, read_link_idx, write_link_idx
    integer :: num_children
 
    ! Extract commonly used values for readability
-   items1_offset = array_trees%parts(part_idx)%items1_offset
-   items1_count = array_trees%parts(part_idx)%items1_count
-   items2_offset = array_trees%parts(part_idx)%items2_offset
-   items2_count = array_trees%parts(part_idx)%items2_count
-   num_children = array_trees%parts(part_idx)%num_children
+   items1_offset = array_trees%partree(part_idx)%items1_offset
+   items1_count = array_trees%partree(part_idx)%items1_count
+   items2_offset = array_trees%partree(part_idx)%items2_offset
+   items2_count = array_trees%partree(part_idx)%items2_count
+   num_children = array_trees%partree(part_idx)%num_children
 
    ! INITIALIZATION: Reset redistribution counters using relative indices (1 to num_children)
    do i = 1, num_children
@@ -166,11 +166,11 @@ subroutine resplit_part_mna(array_trees, part_idx, read_link_idx, write_link_idx
       target_relative_idx = find_child_part_array(array_trees, part_idx)
 
       ! Get absolute part index from relative index
-      target_part_idx = array_trees%parts(part_idx)%child_indices(target_relative_idx)
+      target_part_idx = array_trees%partree(part_idx)%child_indices(target_relative_idx)
 
       ! Add item to target child using relative index directly
       items1_trackers(target_relative_idx) = items1_trackers(target_relative_idx) + 1
-      target_idx = array_trees%parts(target_part_idx)%items1_offset + items1_trackers(target_relative_idx)
+      target_idx = array_trees%partree(target_part_idx)%items1_offset + items1_trackers(target_relative_idx)
       array_trees%item1_values(target_idx) = item_value
 
       ! Update itemdir using 2D array - no offset calculation needed
@@ -196,11 +196,11 @@ subroutine resplit_part_mna(array_trees, part_idx, read_link_idx, write_link_idx
       target_relative_idx = find_child_part_array(array_trees, part_idx)
 
       ! Get absolute part index from relative index
-      target_part_idx = array_trees%parts(part_idx)%child_indices(target_relative_idx)
+      target_part_idx = array_trees%partree(part_idx)%child_indices(target_relative_idx)
 
       ! Add item to target child using relative index directly
       items2_trackers(target_relative_idx) = items2_trackers(target_relative_idx) + 1
-      target_idx = array_trees%parts(target_part_idx)%items2_offset + items2_trackers(target_relative_idx)
+      target_idx = array_trees%partree(target_part_idx)%items2_offset + items2_trackers(target_relative_idx)
       array_trees%item2_values(target_idx) = item_value
 
       ! Update itemdir using 2D array - no offset calculation needed
@@ -219,8 +219,8 @@ subroutine recompute_nextlevel_mnas(array_trees, link_idx, assignment)
    integer :: num_parts, partref_offset
 
    next_link_idx = link_idx + 1
-   num_parts = array_trees%links(link_idx)%num_parts
-   partref_offset = array_trees%links(link_idx)%partref_offset
+   num_parts = array_trees%chain(link_idx)%num_parts
+   partref_offset = array_trees%chain(link_idx)%partref_offset
 
    do i = 1, num_parts
       part_idx = array_trees%partref_entries(partref_offset + i)
@@ -243,29 +243,29 @@ subroutine assign_and_recompute_mnas(array_trees, split_part_idx, child_branch_i
    ! === PART 1: ASSIGNMENT ===
 
    ! Extract commonly used offsets and values
-   items1_offset = array_trees%parts(split_part_idx)%items1_offset
-   items1_count = array_trees%parts(split_part_idx)%items1_count
-   items2_offset = array_trees%parts(split_part_idx)%items2_offset
-   items2_count = array_trees%parts(split_part_idx)%items2_count
+   items1_offset = array_trees%partree(split_part_idx)%items1_offset
+   items1_count = array_trees%partree(split_part_idx)%items1_count
+   items2_offset = array_trees%partree(split_part_idx)%items2_offset
+   items2_count = array_trees%partree(split_part_idx)%items2_count
 
    ! Get child parts using direct array access
-   child_part1 = array_trees%parts(split_part_idx)%child_indices(1)
-   child_part2 = array_trees%parts(split_part_idx)%child_indices(2)
+   child_part1 = array_trees%partree(split_part_idx)%child_indices(1)
+   child_part2 = array_trees%partree(split_part_idx)%child_indices(2)
 
    ! Get chosen items based on provided indices
    chosen_item1 = array_trees%item1_values(items1_offset + chosen_item1_idx)
    chosen_item2 = array_trees%item2_values(items2_offset + chosen_item2_idx)
 
    ! Assign chosen items to first child (direct placement)
-   array_trees%item1_values(array_trees%parts(child_part1)%items1_offset + 1) = chosen_item1
-   array_trees%item2_values(array_trees%parts(child_part1)%items2_offset + 1) = chosen_item2
+   array_trees%item1_values(array_trees%partree(child_part1)%items1_offset + 1) = chosen_item1
+   array_trees%item2_values(array_trees%partree(child_part1)%items2_offset + 1) = chosen_item2
 
    ! Update itemdir using 2D arrays - no offset calculation needed
    array_trees%itemdir1_entries(first_link_idx, chosen_item1) = child_part1
    array_trees%itemdir2_entries(first_link_idx, chosen_item2) = child_part1
 
    ! Copy remaining items1 to second child (skip the chosen item)
-   target_idx = array_trees%parts(child_part2)%items1_offset
+   target_idx = array_trees%partree(child_part2)%items1_offset
    do i = 1, items1_count
       if (i /= chosen_item1_idx) then
          item_value = array_trees%item1_values(items1_offset + i)
@@ -276,7 +276,7 @@ subroutine assign_and_recompute_mnas(array_trees, split_part_idx, child_branch_i
    end do
 
    ! Copy remaining items2 to second child (skip the chosen item)
-   target_idx = array_trees%parts(child_part2)%items2_offset
+   target_idx = array_trees%partree(child_part2)%items2_offset
    do i = 1, items2_count
       if (i /= chosen_item2_idx) then
          item_value = array_trees%item2_values(items2_offset + i)
@@ -291,8 +291,8 @@ subroutine assign_and_recompute_mnas(array_trees, split_part_idx, child_branch_i
 
    ! === PART 2: MNA RECOMPUTATION ===
 
-   num_links = array_trees%chains(child_branch_idx)%num_links
-   link_offset = array_trees%chains(child_branch_idx)%link_offset
+   num_links = array_trees%assigntree(child_branch_idx)%num_links
+   link_offset = array_trees%assigntree(child_branch_idx)%link_offset
 
    do i = 1, num_links
       link_idx = link_offset + i
@@ -317,20 +317,20 @@ recursive subroutine redistribute_items_dfs_recursive(coords1, coords2, array_tr
    num_atoms = array_trees%num_atoms1
 
    ! Check if this is a leaf level (no more child branches)
-   if (array_trees%chains(branch_idx)%num_children == 0) then
+   if (array_trees%assigntree(branch_idx)%num_children == 0) then
       combination_count = combination_count + 1
       return
    end if
 
    ! Process each child branch independently
-   do i = 1, array_trees%chains(branch_idx)%num_children
-      child_branch_idx = array_trees%chains(branch_idx)%child_indices(i)
-      first_link_idx = array_trees%chains(child_branch_idx)%link_offset + 1
-      split_part_idx = array_trees%chains(child_branch_idx)%split_part_idx
-      branch_link_offset = array_trees%chains(child_branch_idx)%link_offset
-      branch_num_links = array_trees%chains(child_branch_idx)%num_links
+   do i = 1, array_trees%assigntree(branch_idx)%num_children
+      child_branch_idx = array_trees%assigntree(branch_idx)%child_indices(i)
+      first_link_idx = array_trees%assigntree(child_branch_idx)%link_offset + 1
+      split_part_idx = array_trees%assigntree(child_branch_idx)%split_part_idx
+      branch_link_offset = array_trees%assigntree(child_branch_idx)%link_offset
+      branch_num_links = array_trees%assigntree(child_branch_idx)%num_links
 
-      items2_count = array_trees%parts(split_part_idx)%items2_count
+      items2_count = array_trees%partree(split_part_idx)%items2_count
       best_branch_distance = huge(1.0_rk)  ! Best distance for this specific branch
 
       call init_assignment(best_branch_assignment, num_atoms)
@@ -384,20 +384,20 @@ recursive subroutine redistribute_items_random_recursive(coords1, coords2, array
    real :: random_real
 
    ! Check if this is a leaf level (no more child branches)
-   if (array_trees%chains(branch_idx)%num_children == 0) then
+   if (array_trees%assigntree(branch_idx)%num_children == 0) then
       return
    end if
 
    ! Process each child branch using same traversal order as random module
-   do i = 1, array_trees%chains(branch_idx)%num_children
-      child_branch_idx = array_trees%chains(branch_idx)%child_indices(i)
-      first_link_idx = array_trees%chains(child_branch_idx)%link_offset + 1
-      split_part_idx = array_trees%chains(child_branch_idx)%split_part_idx
-      branch_link_offset = array_trees%chains(child_branch_idx)%link_offset
-      branch_num_links = array_trees%chains(child_branch_idx)%num_links
+   do i = 1, array_trees%assigntree(branch_idx)%num_children
+      child_branch_idx = array_trees%assigntree(branch_idx)%child_indices(i)
+      first_link_idx = array_trees%assigntree(child_branch_idx)%link_offset + 1
+      split_part_idx = array_trees%assigntree(child_branch_idx)%split_part_idx
+      branch_link_offset = array_trees%assigntree(child_branch_idx)%link_offset
+      branch_num_links = array_trees%assigntree(child_branch_idx)%num_links
 
-      items1_count = array_trees%parts(split_part_idx)%items1_count
-      items2_count = array_trees%parts(split_part_idx)%items2_count
+      items1_count = array_trees%partree(split_part_idx)%items1_count
+      items2_count = array_trees%partree(split_part_idx)%items2_count
 
       ! Generate random choices for both item1 and item2 indices (matching original random module)
       call random_number(random_real)

@@ -10,12 +10,12 @@ subroutine resplit_part_mna(atoms1, atoms2, itemdir1, itemdir2, part, link)
 ! Update item values of existing item nodes instead of adding new item nodes
    type(atom_type), dimension(:), intent(in) :: atoms1, atoms2
    type(part_nodeptr_t), dimension(:), intent(in) :: itemdir1, itemdir2
-   type(part_node_t), pointer, intent(inout) :: part
-   type(link_node_t), pointer, intent(inout) :: link
+   type(partree_node_t), pointer, intent(inout) :: part
+   type(chain_node_t), pointer, intent(inout) :: link
    ! Local variables
    type(item_node_t), pointer :: item
    type(part_nodeptr_t), dimension(:), allocatable :: signature
-   type(part_node_t), pointer :: child_part
+   type(partree_node_t), pointer :: child_part
 
    ! Reset last item pointers for all children
    child_part => part%first_child_part
@@ -67,7 +67,7 @@ end subroutine
 subroutine recompute_nextlevel_mnas(mol1, mol2, link)
 ! Compute next level MNA types - always keeps all children (original behavior)
    type(mol_type), intent(in) :: mol1, mol2
-   type(link_node_t), pointer, intent(inout) :: link
+   type(chain_node_t), pointer, intent(inout) :: link
    ! Local variables
    type(partref_node_t), pointer :: partref
 
@@ -84,9 +84,9 @@ end subroutine
 subroutine recompute_consistent_mnas(mol1, mol2, branch)
 ! Iteratively compute MNA types until convergence
    type(mol_type), intent(in) :: mol1, mol2
-   type(chain_node_t), pointer, intent(inout) :: branch
+   type(assigntree_node_t), pointer, intent(inout) :: branch
    ! Local variables
-   type(link_node_t), pointer :: link
+   type(chain_node_t), pointer :: link
    integer link_idx
 
    link_idx = 1
@@ -102,10 +102,10 @@ subroutine recompute_consistent_mnas(mol1, mol2, branch)
 end subroutine
 
 subroutine resplit_part_first(part, link)
-   type(part_node_t), pointer, intent(inout) :: part
-   type(link_node_t), pointer, intent(inout) :: link
+   type(partree_node_t), pointer, intent(inout) :: part
+   type(chain_node_t), pointer, intent(inout) :: link
    ! Local variables
-   type(part_node_t), pointer :: child_part
+   type(partree_node_t), pointer :: child_part
    type(item_node_t), pointer :: item1, item2
 
    ! Add first item to first child
@@ -141,10 +141,10 @@ subroutine resplit_part_first(part, link)
 end subroutine
 
 subroutine resplit_part_random(part, link)
-   type(part_node_t), pointer, intent(inout) :: part
-   type(link_node_t), pointer, intent(inout) :: link
+   type(partree_node_t), pointer, intent(inout) :: part
+   type(chain_node_t), pointer, intent(inout) :: link
    ! Local variables
-   type(part_node_t), pointer :: child_part1, child_part2
+   type(partree_node_t), pointer :: child_part1, child_part2
    type(item_node_t), pointer :: item1, item2
    integer :: num_items1, num_items2, random_index1, random_index2, current_index
    real :: random_real
@@ -237,9 +237,9 @@ end subroutine
 
 recursive subroutine redistribute_items(mol1, mol2, branch)
    type(mol_type), intent(in) :: mol1, mol2
-   type(chain_node_t), pointer, intent(inout) :: branch
-   type(chain_node_t), pointer :: child_branch
-   type(part_node_t), pointer :: child_part
+   type(assigntree_node_t), pointer, intent(inout) :: branch
+   type(assigntree_node_t), pointer :: child_branch
+   type(partree_node_t), pointer :: child_part
 
    ! Process all children of this branch
    child_branch => branch%first_child_chain
