@@ -19,7 +19,7 @@ use parameters
 use globals
 use sorting
 use molecule
-use spatial
+use spatial_transforms
 use permutation
 use adjacency
 use lcrs_tree
@@ -91,11 +91,12 @@ subroutine molecule_align( mol1, mol2, coords2)
    call translate_coords( coords2, center1)
 
    ! Calculate optimal rotation matrix
-   rotquat = optimal_rotation( &
+   call optimize_rotation( &
       identity_perm(num_atoms1), &
       coords1, &
       coords2, &
-      center1 &
+      center1, &
+      rotquat &
    )
 
    call rotate_coords( coords2, rotquat, center1)

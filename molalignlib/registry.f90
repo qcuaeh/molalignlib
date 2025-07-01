@@ -16,7 +16,7 @@
 
 module registry
 use parameters
-use spatial
+use spatial_transforms
 use adjacency
 
 implicit none
@@ -141,7 +141,7 @@ subroutine atomperm_registry_push(self, coords2, atomperm, num_steps, rotation)
       end if
    end do
 
-   rmsd = sqrt(totsqdist(atomperm, self%coords1, coords2))
+   rmsd = sqrt(total_sqdist(atomperm, self%coords1, coords2))
 
    do i = 1, size(self%records)
       record => self%records(i)
@@ -220,7 +220,7 @@ subroutine bondatomperm_registry_push(self, coords2, adjmat2, atomperm, num_step
    end do
 
    adjd = adjacencydiff(atomperm, self%adjmat1, adjmat2)
-   rmsd = sqrt(totsqdist(atomperm, self%coords1, coords2))
+   rmsd = sqrt(total_sqdist(atomperm, self%coords1, coords2))
 
    do i = 1, size(self%records)
       record => self%records(i)

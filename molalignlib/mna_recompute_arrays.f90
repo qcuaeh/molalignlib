@@ -1,7 +1,7 @@
 module mna_recompute_arrays
 use parameters
 use permutation
-use spatial
+use spatial_transforms
 use array_trees
 implicit none
 
@@ -349,7 +349,7 @@ recursive subroutine redistribute_items_dfs_recursive(coords1, coords2, array_tr
          call redistribute_items_dfs_recursive(coords1, coords2, array_trees, child_branch_idx, branch_assignment)
 
          ! Calculate partial distance for this branch
-         branch_distance = totsqdist(branch_assignment%assigned_indices(1:branch_assignment%num_assigned), &
+         branch_distance = total_sqdist(branch_assignment%assigned_indices(1:branch_assignment%num_assigned), &
             branch_assignment%permutation, coords1, coords2)
 
          ! Update best distance for this branch if this assignment is better
@@ -474,7 +474,7 @@ subroutine redistribute_items_dfs(coords1, coords2, array_trees, optimal_permuta
    optimal_permutation = optimal_assignment%permutation
 
    ! Calculate distance from the optimal permutation array for verification
-   total_distance = totsqdist(optimal_assignment%assigned_indices(1:optimal_assignment%num_assigned), &
+   total_distance = total_sqdist(optimal_assignment%assigned_indices(1:optimal_assignment%num_assigned), &
       optimal_assignment%permutation, coords1, coords2)
 
    ! Count assigned atoms
@@ -519,7 +519,7 @@ subroutine redistribute_items_random(coords1, coords2, array_trees, random_permu
    random_permutation = random_assignment%permutation
 
    ! Calculate distance from the random permutation array
-   total_distance = totsqdist(random_assignment%assigned_indices(1:random_assignment%num_assigned), &
+   total_distance = total_sqdist(random_assignment%assigned_indices(1:random_assignment%num_assigned), &
       random_assignment%permutation, coords1, coords2)
 
    ! Count assigned atoms

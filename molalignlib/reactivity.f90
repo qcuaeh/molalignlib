@@ -19,7 +19,7 @@ use parameters
 use basetypes
 use globals
 use random
-use spatial
+use spatial_transforms
 use adjacency
 use permutation
 use assignment
