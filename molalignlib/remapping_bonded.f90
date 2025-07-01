@@ -210,15 +210,15 @@ subroutine assign_conform_atoms( mol1, mol2, eltypes)
 !   call redistribute_items( mol1, mol2, root_chain)
 !   call print_tree_items( root_part)
 
-   call random_init(.true., .true.)
    call convert_trees_to_arrays( root_part, root_chain, array_trees, mol1, mol2)
    call validate_conversion(root_part, root_chain, array_trees)
 !   call print_part_tree_array( array_trees)
 !   call print_first_level_items_array( array_trees)
    call print_chain_tree_array( array_trees)
-   call redistribute_items_dfs( coords1, coords2, array_trees, atomperm, atomdist)
-   call redistribute_items_random( coords1, coords2, array_trees, atomperm, atomdist)
+!   call random_init(.true., .true.)
+!   call redistribute_items_random( coords1, coords2, array_trees, atomperm, atomdist)
 !   call print_leaf_items_array( array_trees)
+   call redistribute_items_dfs( coords1, coords2, array_trees, atomperm, atomdist)
 end subroutine
 
 end module

@@ -16,6 +16,8 @@
 
 module random
 use parameters
+use globals
+use randlib
 
 implicit none
 
@@ -24,30 +26,38 @@ contains
 subroutine random_initialize()
 
    if (test_flag) then
-      call random_init(.true., .true.)
+      call default_set_seeds()
    else
-      call random_init(.false., .true.)
+      call time_set_seeds()
    end if
 
 end subroutine
 
-function randvec() result(r)
-   real(rk) :: r(3)
-   call random_number(r)
+function randvec() result(x)
+   real(rk) :: x(3)
+   x(1) = random_standard_real()
+   x(2) = random_standard_real()
+   x(3) = random_standard_real()
 end function
 
 subroutine shuffle(a)
 ! Fisher-Yates shuffle
    integer, dimension(:), intent(inout) :: a
    integer :: i, j, temp
-   real(rk) :: r
    do i = size(a), 2, -1
-      call random_number(r)
-      j = int(r * i) + 1
+!      j = int(random_standard_real() * i) + 1
+      j = random_uniform_integer(1, i)
       temp = a(j)
       a(j) = a(i)
       a(i) = temp
    end do
 end subroutine
+
+function random_element(a) result(e)
+   integer, dimension(:), intent(in) :: a
+   integer :: i, e
+   i = random_uniform_integer(1, size(a))
+   e = a(i)
+end function
 
 end module

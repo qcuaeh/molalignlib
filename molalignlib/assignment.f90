@@ -161,7 +161,7 @@ subroutine solve_lap_biased(part, p, q, biases, perm, dist)
    do j = 1, part%num_items2
       do i = 1, part%num_items1
 !         costs(i, j) = maxbias - biases(i, j) + bias_scale*sum((p(:, part%items1(i)) - q(:, part%items2(j)))**2)
-         costs(i, j) = maxbias - biases(i, j) + random_standard_uniform()
+         costs(i, j) = maxbias - biases(i, j) + random_standard_real()
       end do
    end do
 

@@ -40,7 +40,7 @@
         random_large_integer, reinitialize_current_generator, &
         set_all_seeds, set_antithetic, set_current_generator, &
         set_current_seed, default_set_seeds, time_set_seeds, &
-        random_standard_uniform, random_uniform_integer
+        random_uniform_real, random_uniform_integer, random_standard_real
 ! ..
     CONTAINS
 
@@ -578,28 +578,6 @@
 
 !*********************************************************************
 
-      SUBROUTINE phrase_set_seeds(phrase)
-! .. Implicit None Statement ..
-        IMPLICIT NONE
-! ..
-! .. Scalar Arguments ..
-        CHARACTER (*), INTENT (IN) :: phrase
-! ..
-! .. Local Scalars ..
-        INTEGER :: seed1, seed2
-! ..
-! .. Executable Statements ..
-
-        CALL phrase_to_seed(phrase,seed1,seed2)
-
-        CALL set_all_seeds(seed1,seed2)
-
-        CALL set_current_generator(1)
-
-      END SUBROUTINE phrase_set_seeds
-
-!*********************************************************************
-
       SUBROUTINE phrase_to_seed(phrase,seed1,seed2)
 !----------------------------------------------------------------------
 !     SUBROUTINE PHRTSD( PHRASE, SEED1, SEED2 )
@@ -667,65 +645,6 @@
         RETURN
 
       END SUBROUTINE phrase_to_seed
-
-!*********************************************************************
-
-      SUBROUTINE set_seeds(which)
-!!! Set random number seeds from time (if which == 1) else from
-!!! user entered phrase (if which /=1)
-!!! If which is ommitted, ask user what to do
-! .. Implicit None Statement ..
-        IMPLICIT NONE
-! ..
-! .. Scalar Arguments ..
-        INTEGER, OPTIONAL, INTENT (IN) :: which
-! ..
-! .. Local Scalars ..
-        INTEGER :: local_which
-! ..
-! .. Intrinsic Functions ..
-        INTRINSIC PRESENT
-! ..
-! .. Executable Statements ..
-
-        IF (PRESENT(which)) THEN
-
-          local_which = which
-
-        ELSE
-
-          DO
-
-            message_format = '(/5X,''Enter (1) to set random &
-              &number seeds from the time of day''/5X,''   &
-              &       (Computer runs so set cannot be replicated &
-              &exactly)''//5X,''      (2) to set seeds from &
-              &a phrase (character string) entered''/5X,'' &
-              &         by you''/5X,''          (Computer runs &
-              &so set can be replicated exactly)''/)'
-
-            WRITE (*,message_format)
-            READ (*,*) local_which
-
-            IF (local_which<1 .OR. local_which>2) THEN
-               CYCLE
-            ELSE
-               EXIT
-            END IF
-
-          END DO
-
-        END IF
-
-        IF (local_which==1) THEN
-          CALL time_set_seeds
-        ELSE
-          CALL inter_phrase_set_seeds
-        END IF
-
-        RETURN
-
-      END SUBROUTINE set_seeds
 
 !*********************************************************************
 
@@ -803,7 +722,7 @@
 
 !*********************************************************************
 
-      FUNCTION random_standard_uniform()
+      FUNCTION random_uniform_real()
 ! .. Use Statements ..
         USE parameters
 ! ..
@@ -811,12 +730,12 @@
         IMPLICIT NONE
 ! ..
 ! .. Function Return Value ..
-        REAL (rk) :: random_standard_uniform
+        REAL (rk) :: random_uniform_real
 ! ..
 ! .. Executable Statements ..
 
 !----------------------------------------------------------------------
-!     REAL FUNCTION random_standard_uniform()
+!     REAL FUNCTION random_uniform_real()
 !     Returns a random floating point number from a uniform distribution
 !     over 0 - 1 (endpoints of this interval are not returned) using the
 !     current generator
@@ -829,10 +748,10 @@
 !     4.656613057E-10 is 1/M1  M1 is set in a data statement in
 !     random_large_integer
 !      and is currently 2147483563. If M1 changes, change this also.
-        random_standard_uniform = random_large_integer()*4.656613057E-10
+        random_uniform_real = random_large_integer()*4.656613057E-10
         RETURN
 
-      END FUNCTION random_standard_uniform
+      END FUNCTION random_uniform_real
 
 !*********************************************************************
 
@@ -920,6 +839,36 @@
 
         STOP ' ( HIGH - LOW ) > 2,147,483,561 in IGNUIN'
       END FUNCTION random_uniform_integer
+
+!*********************************************************************
+
+      FUNCTION random_standard_real()
+! .. Use Statements ..
+        USE parameters
+! ..
+! .. Implicit None Statement ..
+        IMPLICIT NONE
+! ..
+! .. Function Return Value ..
+        REAL (rk) :: random_standard_real
+! ..
+! .. Executable Statements ..
+
+!----------------------------------------------------------------------
+!     REAL FUNCTION random_standard_real()
+!     Returns a random floating point number from a uniform distribution
+!     over [0,1) (0 is included, 1 is excluded) using the current generator
+!     
+!     This is similar to random_uniform_real but includes 0 in the range
+!----------------------------------------------------------------------
+!     4.656613101E-10 is 1/2147483562
+!     random_large_integer returns values from 1 to 2147483562 inclusive
+!     By subtracting 1, we get range [0, 2147483561] 
+!     Then dividing by 2147483562 gives us [0, 2147483561/2147483562) = [0,1)
+        random_standard_real = (random_large_integer() - 1) * 4.656613101E-10
+        RETURN
+
+      END FUNCTION random_standard_real
 
 !*********************************************************************
 
