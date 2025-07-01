@@ -13,7 +13,7 @@ random-randlib.f90
 #random-builtin.f90
 chemdata.f90
 chemutils.f90
-spatial.f90
+spatial_transforms.f90
 adjacency.f90
 molecule.f90
 readmol.f90

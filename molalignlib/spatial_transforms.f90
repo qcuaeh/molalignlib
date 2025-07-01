@@ -14,7 +14,7 @@
 ! You should have received a copy of the GNU General Public License
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-module spatial
+module spatial_transforms
 use parameters
 use random
 use eigen
@@ -32,13 +32,22 @@ public rotate_coords
 public mirror_coords
 public translate_coords
 public centroid
-public totsqdist
-public optimal_rotation
+public total_sqdist
+public least_total_sqdist
+public optimize_rotation
 
-interface totsqdist
-   module procedure totsqdist_ord
-   module procedure totsqdist_perm
-   module procedure totsqdist_idcs_perm
+interface total_sqdist
+   module procedure totsqdist_mol
+   module procedure totsqdist_perm_mol
+   module procedure totsqdist_perm_atoms
+end interface
+
+interface least_total_sqdist
+   module procedure leastotsqdist_perm_atoms
+end interface
+
+interface optimize_rotation
+   module procedure optrotquat_perm_mol
 end interface
 
 contains
@@ -189,81 +198,119 @@ function centroid(coords)
    centroid(:) = centroid(:) / size(coords, dim=2)
 end function
 
-real(rk) function totsqdist_ord(coords1, coords2) result(totsqdist)
+real(rk) function totsqdist_mol(coords1, coords2) result(total_sqdist)
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
 
-   totsqdist = sum(sum((coords1 - coords2)**2, dim=1))
+   total_sqdist = sum(sum((coords1 - coords2)**2, dim=1))
 end function
 
-real(rk) function totsqdist_perm(atomperm, coords1, coords2) result(totsqdist)
+real(rk) function totsqdist_perm_mol(atomperm, coords1, coords2) result(total_sqdist)
    integer, dimension(:), intent(in) :: atomperm
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
 
-   totsqdist = sum(sum((coords1 - coords2(:, atomperm))**2, dim=1))
+   total_sqdist = sum(sum((coords1 - coords2(:, atomperm))**2, dim=1))
 end function
 
-real(rk) function totsqdist_idcs_perm(atomset, atomperm, coords1, coords2) result(totsqdist)
-   integer, dimension(:), intent(in) :: atomset, atomperm
+real(rk) function totsqdist_perm_atoms(atomidcs, atomperm, coords1, coords2) result(total_sqdist)
+   integer, dimension(:), intent(in) :: atomidcs, atomperm
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    integer :: i
 
-   totsqdist = 0
+   total_sqdist = 0
 
-   do i = 1, size(atomset)
-      totsqdist = totsqdist + sum((coords1(:, atomset(i)) - coords2(:, atomperm(atomset(i))))**2, dim=1)
+   do i = 1, size(atomidcs)
+      total_sqdist = total_sqdist + sum((coords1(:, atomidcs(i)) - coords2(:, atomperm(atomidcs(i))))**2, dim=1)
    end do
 end function
 
-function optimal_rotation(atomperm, coords1, coords2, center) result(rotquat)
-! Find the optimal rotation in quaternion representation by least squares minimization
+subroutine compute_residuals_matrix(coordsp, coordsm, residuals)
+! Compute the 4x4 residuals matrix for optimal rotation calculation
 ! Reference: Acta Cryst. (1989). A45, 208-210
-   integer, dimension(:), intent(in) :: atomperm
-   real(rk), dimension(:,:), intent(in) :: coords1, coords2
-   real(rk), intent(in) :: center(3)
-   ! Local variables
-   real(rk) :: rotquat(4)
+   real(rk), dimension(:,:), intent(in) :: coordsp, coordsm
+   real(rk), dimension(4,4), intent(out) :: residuals
    integer :: i, num_atoms
-   real(rk) :: residuals(4, 4)
-   real(rk), dimension(:,:), allocatable :: p, q
 
-   num_atoms = size(atomperm)
+   num_atoms = size(coordsp, dim=2)
 
-   allocate (p(3, num_atoms))
-   allocate (q(3, num_atoms))
-
-   do i = 1, num_atoms
-      p(:, i) = coords1(:, i) + coords2(:, atomperm(i)) - 2*center(:)
-      q(:, i) = coords1(:, i) - coords2(:, atomperm(i))
-   end do
+   ! Initialize residuals matrix
+   residuals = 0.0_rk
 
    ! Calculate upper matrix elements
-
-   residuals = 0
-
    do i = 1, num_atoms
-      residuals(1, 1) = residuals(1, 1) + (q(1, i)**2 + q(2, i)**2 + q(3, i)**2)
-      residuals(1, 2) = residuals(1, 2) + (p(2, i)*q(3, i) - q(2, i)*p(3, i))
-      residuals(1, 3) = residuals(1, 3) + (q(1, i)*p(3, i) - p(1, i)*q(3, i))
-      residuals(1, 4) = residuals(1, 4) + (p(1, i)*q(2, i) - q(1, i)*p(2, i))
-      residuals(2, 2) = residuals(2, 2) + (p(2, i)**2 + p(3, i)**2 + q(1, i)**2)
-      residuals(2, 3) = residuals(2, 3) + (q(1, i)*q(2, i) - p(1, i)*p(2, i))
-      residuals(2, 4) = residuals(2, 4) + (q(1, i)*q(3, i) - p(1, i)*p(3, i))
-      residuals(3, 3) = residuals(3, 3) + (p(1, i)**2 + p(3, i)**2 + q(2, i)**2)
-      residuals(3, 4) = residuals(3, 4) + (q(2, i)*q(3, i) - p(2, i)*p(3, i))
-      residuals(4, 4) = residuals(4, 4) + (p(1, i)**2 + p(2, i)**2 + q(3, i)**2)
+      residuals(1, 1) = residuals(1, 1) + (coordsm(1, i)**2 + coordsm(2, i)**2 + coordsm(3, i)**2)
+      residuals(1, 2) = residuals(1, 2) + (coordsp(2, i)*coordsm(3, i) - coordsm(2, i)*coordsp(3, i))
+      residuals(1, 3) = residuals(1, 3) + (coordsm(1, i)*coordsp(3, i) - coordsp(1, i)*coordsm(3, i))
+      residuals(1, 4) = residuals(1, 4) + (coordsp(1, i)*coordsm(2, i) - coordsm(1, i)*coordsp(2, i))
+      residuals(2, 2) = residuals(2, 2) + (coordsp(2, i)**2 + coordsp(3, i)**2 + coordsm(1, i)**2)
+      residuals(2, 3) = residuals(2, 3) + (coordsm(1, i)*coordsm(2, i) - coordsp(1, i)*coordsp(2, i))
+      residuals(2, 4) = residuals(2, 4) + (coordsm(1, i)*coordsm(3, i) - coordsp(1, i)*coordsp(3, i))
+      residuals(3, 3) = residuals(3, 3) + (coordsp(1, i)**2 + coordsp(3, i)**2 + coordsm(2, i)**2)
+      residuals(3, 4) = residuals(3, 4) + (coordsm(2, i)*coordsm(3, i) - coordsp(2, i)*coordsp(3, i))
+      residuals(4, 4) = residuals(4, 4) + (coordsp(1, i)**2 + coordsp(2, i)**2 + coordsm(3, i)**2)
    end do
 
    ! Symmetrize matrix
-
    residuals(2, 1) = residuals(1, 2)
    residuals(3, 1) = residuals(1, 3)
    residuals(4, 1) = residuals(1, 4)
    residuals(3, 2) = residuals(2, 3)
    residuals(4, 2) = residuals(2, 4)
    residuals(4, 3) = residuals(3, 4)
+end subroutine
 
-!   least_totsqdist = leasteigval(residuals)
+subroutine optrotquat_perm_mol(atomperm, coords1, coords2, center, rotquat)
+! Find the optimal rotation in quaternion representation by least squares minimization
+! Reference: Acta Cryst. (1989). A45, 208-210
+   integer, dimension(:), intent(in) :: atomperm
+   real(rk), dimension(:,:), intent(in) :: coords1, coords2
+   real(rk), intent(in) :: center(3)
+   real(rk), intent(out) :: rotquat(4)
+   ! Local variables
+   integer :: i, num_atoms
+   real(rk) :: residuals(4, 4)
+   real(rk), dimension(:,:), allocatable :: coordsp, coordsm
+
+   num_atoms = size(atomperm)
+
+   allocate (coordsp(3, num_atoms))
+   allocate (coordsm(3, num_atoms))
+
+   do i = 1, num_atoms
+      coordsp(:, i) = coords1(:, i) + coords2(:, atomperm(i)) - 2*center(:)
+      coordsm(:, i) = coords1(:, i) - coords2(:, atomperm(i))
+   end do
+
+   ! Compute residuals matrix using the common procedure
+   call compute_residuals_matrix(coordsp, coordsm, residuals)
+
    rotquat = leasteigvec(residuals)
+end subroutine
+
+function leastotsqdist_perm_atoms(atomidcs, atomperm, coords1, coords2) result(leastotsqdist)
+! Find the optimal rotation in quaternion representation by least squares minimization
+! Reference: Acta Cryst. (1989). A45, 208-210
+   integer, dimension(:), intent(in) :: atomidcs, atomperm
+   real(rk), dimension(:,:), intent(in) :: coords1, coords2
+   ! Local variables
+   real(rk) :: leastotsqdist
+   integer :: i, num_atoms
+   real(rk) :: residuals(4, 4)
+   real(rk), dimension(:,:), allocatable :: coordsp, coordsm
+
+   num_atoms = size(atomidcs)
+
+   allocate (coordsp(3, num_atoms))
+   allocate (coordsm(3, num_atoms))
+
+   do i = 1, num_atoms
+      coordsp(:, i) = coords1(:, atomidcs(i)) + coords2(:, atomperm(atomidcs(i)))
+      coordsm(:, i) = coords1(:, atomidcs(i)) - coords2(:, atomperm(atomidcs(i)))
+   end do
+
+   ! Compute residuals matrix using the common procedure
+   call compute_residuals_matrix(coordsp, coordsm, residuals)
+
+   leastotsqdist = max(leasteigval(residuals), 0._rk)
 end function
 
 end module

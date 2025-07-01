@@ -20,7 +20,7 @@ use globals
 use random
 use molecule
 use chemdata
-use spatial
+use spatial_transforms
 use assignment
 use lcrs_tree
 use mna_compute
@@ -108,7 +108,7 @@ subroutine remap_free_atoms(mol1, mol2, results)
 
       ! Assign atoms with current orientation
       call assign_atoms_pruned( eltypes, coords1, coords2, prunes, atomperm)
-      total_rotation = optimal_rotation( atomperm, coords1, coords2, center1)
+      call optimize_rotation( atomperm, coords1, coords2, center1, total_rotation)
       call rotate_coords( coords2, total_rotation, center1)
       num_steps = 1
 
@@ -116,7 +116,7 @@ subroutine remap_free_atoms(mol1, mol2, results)
          call assign_atoms_pruned( eltypes, coords1, coords2, prunes, auxperm)
          if (all(auxperm == atomperm)) exit
          atomperm = auxperm
-         step_rotation = optimal_rotation( atomperm, coords1, coords2, center1)
+         call optimize_rotation( atomperm, coords1, coords2, center1, step_rotation)
          call rotate_coords( coords2, step_rotation, center1)
          total_rotation = quatmul( step_rotation, total_rotation)
          num_steps = num_steps + 1

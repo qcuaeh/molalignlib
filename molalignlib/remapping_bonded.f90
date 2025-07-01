@@ -22,7 +22,7 @@ use molecule
 use strutils
 use chemdata
 use permutation
-use spatial
+use spatial_transforms
 use assignment
 use adjacency
 use biasing
@@ -131,7 +131,7 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
 
       ! Assign atoms with current orientation
 !      call minimize_conformation_distance( split_branch, coords1, coords2, atomperm, dist)
-      total_rotation = optimal_rotation( atomperm, coords1, coords2, center1)
+      call optimize_rotation( atomperm, coords1, coords2, center1, total_rotation)
       call rotate_coords( coords2, total_rotation, center1)
       num_steps = 1
 
@@ -139,7 +139,7 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
 !         call minimize_conformation_distance( split_branch, coords1, coords2, auxperm, dist)
          if (all(auxperm == atomperm)) exit
          atomperm = auxperm
-         step_rotation = optimal_rotation( atomperm, coords1, coords2, center1)
+         call optimize_rotation( atomperm, coords1, coords2, center1, step_rotation)
          call rotate_coords( coords2, step_rotation, center1)
          total_rotation = quatmul( step_rotation, total_rotation)
          num_steps = num_steps + 1

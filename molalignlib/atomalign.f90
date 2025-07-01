@@ -21,7 +21,7 @@ program atomalign
 use parameters
 use globals
 use molecule
-use spatial
+use spatial_transforms
 use strutils
 use chemutils
 use adjacency
@@ -190,7 +190,7 @@ if (remap_flag) then
 
       atomperm = results%records(i)%atomperm
       coords2 = results%records(i)%coords2
-      rmsd = sqrt(totsqdist( atomperm, coords1, coords2))
+      rmsd = sqrt(total_sqdist( atomperm, coords1, coords2))
       call unweight_coords( coords2, weights2)
 
       write (stderr, "(a)") str(rmsd, 4)
@@ -206,7 +206,7 @@ else
 
    ! Align atoms
    call molecule_align( mol1, mol2, coords2)
-   rmsd = sqrt(totsqdist( coords1, coords2))
+   rmsd = sqrt(total_sqdist( coords1, coords2))
    call unweight_coords( coords2, weights2)
 
    write (stderr, "(a)") str(rmsd, 4)

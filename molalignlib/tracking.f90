@@ -6,7 +6,7 @@ use random
 use sorting
 use permutation
 use adjacency
-use spatial
+use spatial_transforms
 use lcrs_tree
 use molecule
 use basetypes
@@ -159,7 +159,7 @@ subroutine minadjdiff( eltypes, mnatypes, molfrags, mol1, mol2, coords1, &
    tracked(:) = .false.
    invatomperm = inverse_perm( atomperm)
    moldiff = adjacencydiff( atomperm, adjmat1, adjmat2)
-   moldist = totsqdist( atomperm, coords1, coords2)
+   moldist = total_sqdist( atomperm, coords1, coords2)
 
    if ( print_info ) then
       print '(a,1x,i0)', "moldiff:", moldiff
@@ -175,7 +175,7 @@ subroutine minadjdiff( eltypes, mnatypes, molfrags, mol1, mol2, coords1, &
    if ( print_info ) then
       print '(a,1x,i0)', "Fragments:", size(molfrags)
       print '(a,1x,i0,1x,i0)', "moldiff:", adjacencydiff( atomperm, adjmat1, adjmat2), moldiff
-      print '(a,1x,f0.4,1x,f0.4)', "moldist:", totsqdist( atomperm, coords1, coords2), moldist
+      print '(a,1x,f0.4,1x,f0.4)', "moldist:", total_sqdist( atomperm, coords1, coords2), moldist
    end if
 
 !    if (adjacencydiff( atomperm, adjmat1, adjmat2) /= moldiff) then
