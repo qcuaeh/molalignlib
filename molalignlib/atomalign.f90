@@ -32,7 +32,7 @@ use biasing
 use pruning
 use remapping_free
 use molalignlib
-use registry
+use registration
 
 implicit none
 
@@ -48,7 +48,7 @@ logical :: remap_flag, pipe_flag, nrec_flag
 real(rk) :: rmsd
 type(strlist_type) :: posargs(2)
 type(mol_type) :: mol1, mol2, auxmol
-type(atomperm_registry) :: results
+type(registry_t) :: registry
 real(rk), dimension(:), allocatable :: weights1, weights2
 real(rk), dimension(:,:), allocatable :: coords1, coords2
 
@@ -175,21 +175,21 @@ allocate (auxmol%atoms(size(mol2%atoms)))
 if (remap_flag) then
 
    ! Remap atoms to minimize the MSD
-   call remap_free_atoms( mol1, mol2, results)
+   call remap_free_atoms( mol1, mol2, registry)
 
    ! Print optimization stats
    if (stats_flag) then
-      call registry_print( results)
+      call print_records( registry)
    end if
 
    if (.not. nrec_flag) then
       call writefile( write_unit, fmtout, mol1)
    end if
 
-   do i = 1, results%num_records
+   do i = 1, registry%num_records
 
-      atomperm = results%records(i)%atomperm
-      coords2 = results%records(i)%coords2
+      atomperm = registry%records(i)%atomperm
+      coords2 = registry%records(i)%coords2
       rmsd = sqrt(total_sqdist( atomperm, coords1, coords2))
       call unweight_coords( coords2, weights2)
 

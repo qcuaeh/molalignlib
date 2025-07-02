@@ -29,7 +29,7 @@ use tracking
 use lcrs_tree
 use eltype_compute
 use mna_compute
-use registry
+use registration
 
 implicit none
 
@@ -47,7 +47,7 @@ subroutine find_reactive_bonds( mol1, mol2, eltypes, atomperm)
    type(int_list), dimension(:), allocatable :: molfrags1, molfrags2
    type(int_matrix), dimension(:), allocatable :: biases
    type(real_matrix), dimension(:), allocatable :: minbiases
-   type(topoatomperm_registry), target :: results
+   type(registry_t), target :: registry
    integer, dimension(:), allocatable :: auxperm
    integer, dimension(:), allocatable :: elnums1, elnums2
    logical, dimension(:,:), allocatable :: adjmat1, adjmat2
@@ -98,21 +98,21 @@ subroutine find_reactive_bonds( mol1, mol2, eltypes, atomperm)
    call random_initialize()
 
    ! Initialize local minima registry
-   call registry_init( results, max_records, adjmat1)
+   call init_adjd_registry( registry, max_records, adjmat1)
 
    ! Optimize atom permutation
-   do while (results%records(1)%count < max_count .and. results%num_trials < max_trials)
+   do while (registry%records(1)%count < max_count .and. registry%num_trials < max_trials)
 
       ! Assign atoms with current orientation
       call assign_atoms_biased( eltypes, coords1, coords2, biases, atomperm)
       ! Reassign mismatches
       call minadjdiff( eltypes, mnatypes, molfrags1, mol1, mol2, coords1, coords2, atomperm)
       ! Update results
-      call registry_push( results, adjmat2, atomperm)
+      call push_record( registry, atomperm, adjmat2=adjmat2)
 
    end do
 
-   atomperm = results%records(1)%atomperm
+   atomperm = registry%records(1)%atomperm
 end subroutine
 
 subroutine remove_reactive_bonds( mol1, mol2, eltypes, atomperm)

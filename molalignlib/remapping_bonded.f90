@@ -34,16 +34,16 @@ use mna_precompute
 use mna_recompute
 use mna_recompute_arrays
 use reactivity
-use registry
+use registration
 use fileio
 
 implicit none
 
 contains
 
-subroutine remap_bonded_atoms(mol1, mol2, results)
+subroutine remap_bonded_atoms(mol1, mol2, registry)
    type(mol_type), intent(inout) :: mol1, mol2
-   type(bondatomperm_registry), target, intent(out) :: results
+   type(registry_t), target, intent(out) :: registry
 
    ! Local variables
    type(partition_t) :: eltypes
@@ -119,10 +119,10 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
    call random_initialize()
 
    ! Initialize local minima registry
-   call registry_init( results, max_records, coords1, adjmat1)
+   call init_dual_registry( registry, max_records, coords1, adjmat1)
 
    ! Optimize atom permutation
-   do while (results%records(1)%count < max_count .and. results%num_trials < max_trials)
+   do while (registry%records(1)%count < max_count .and. registry%num_trials < max_trials)
 
       num_trials = num_trials + 1
 
@@ -146,7 +146,7 @@ subroutine remap_bonded_atoms(mol1, mol2, results)
       end do
 
       ! Update results
-      call registry_push( results, coords2, adjmat2, atomperm, num_steps, total_rotation)
+      call push_record( registry, atomperm, coords2=coords2, adjmat2=adjmat2, num_steps=num_steps, rotation=total_rotation)
 
    end do
 end subroutine

@@ -26,7 +26,7 @@ mna_compute.f90
 mna_precompute.f90
 mna_recompute.f90
 mna_recompute_arrays.f90
-registry.f90
+registration.f90
 biasing.f90
 pruning.f90
 alignment.f90

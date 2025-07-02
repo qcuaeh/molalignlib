@@ -26,15 +26,15 @@ use lcrs_tree
 use mna_compute
 use eltype_compute
 use pruning
-use registry
+use registration
 
 implicit none
 
 contains
 
-subroutine remap_free_atoms(mol1, mol2, results)
+subroutine remap_free_atoms(mol1, mol2, registry)
    type(mol_type), intent(in) :: mol1, mol2
-   type(atomperm_registry), intent(out) :: results
+   type(registry_t), intent(out) :: registry
 
    ! Local variables
    type(partition_t) :: eltypes
@@ -98,10 +98,10 @@ subroutine remap_free_atoms(mol1, mol2, results)
    call random_initialize()
 
    ! Initialize local minima registry
-   call registry_init( results, max_records, coords1)
+   call init_rmsd_registry( registry, max_records, coords1)
 
    ! Optimize atom permutation
-   do while (results%records(1)%count < max_count .and. results%num_trials < max_trials)
+   do while (registry%records(1)%count < max_count .and. registry%num_trials < max_trials)
 
       ! Aply a random rotation to coords2
       call rotate_coords( coords2, randrotquat(), center1)
@@ -123,7 +123,7 @@ subroutine remap_free_atoms(mol1, mol2, results)
       end do
 
       ! Push local minimum to registry
-      call registry_push( results, coords2, atomperm, num_steps, total_rotation)
+      call push_record( registry, atomperm, coords2=coords2, num_steps=num_steps, rotation=total_rotation)
 
    end do
 
