@@ -286,25 +286,26 @@ subroutine optrotquat_perm_mol(atomperm, coords1, coords2, center, rotquat)
    rotquat = leasteigvec(residuals)
 end subroutine
 
-function leastotsqdist_perm_atoms(atomidcs, atomperm, coords1, coords2) result(leastotsqdist)
+function leastotsqdist_perm_atoms(atomidcs1, atomidcs2, coords1, coords2, center1, center2) result(leastotsqdist)
 ! Find the optimal rotation in quaternion representation by least squares minimization
 ! Reference: Acta Cryst. (1989). A45, 208-210
-   integer, dimension(:), intent(in) :: atomidcs, atomperm
+   integer, dimension(:), intent(in) :: atomidcs1, atomidcs2
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
+   real(rk), intent(in) :: center1(3), center2(3)
    ! Local variables
    real(rk) :: leastotsqdist
    integer :: i, num_atoms
    real(rk) :: residuals(4, 4)
    real(rk), dimension(:,:), allocatable :: coordsp, coordsm
 
-   num_atoms = size(atomidcs)
+   num_atoms = size(atomidcs1)
 
    allocate (coordsp(3, num_atoms))
    allocate (coordsm(3, num_atoms))
 
    do i = 1, num_atoms
-      coordsp(:, i) = coords1(:, atomidcs(i)) + coords2(:, atomperm(atomidcs(i)))
-      coordsm(:, i) = coords1(:, atomidcs(i)) - coords2(:, atomperm(atomidcs(i)))
+      coordsp(:, i) = coords1(:, atomidcs1(i)) + coords2(:, atomidcs2(i)) - center1(:) - center2(:)
+      coordsm(:, i) = coords1(:, atomidcs1(i)) - coords2(:, atomidcs2(i)) - center1(:) + center2(:)
    end do
 
    ! Compute residuals matrix using the common procedure

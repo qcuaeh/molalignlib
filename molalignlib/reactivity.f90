@@ -46,6 +46,7 @@ subroutine find_reactive_bonds( mol1, mol2, eltypes, atomperm)
    type(assigntree_node_t), pointer :: mnachain
    type(int_list), dimension(:), allocatable :: molfrags1, molfrags2
    type(int_matrix), dimension(:), allocatable :: biases
+   type(real_matrix), dimension(:), allocatable :: minbiases
    type(topoatomperm_registry), target :: results
    integer, dimension(:), allocatable :: auxperm
    integer, dimension(:), allocatable :: elnums1, elnums2
@@ -88,6 +89,10 @@ subroutine find_reactive_bonds( mol1, mol2, eltypes, atomperm)
 
    ! Find unfeasible assignments
    call compute_mna_biases( mol1, mol2, eltypes, biases)
+
+   call build_minbiases(eltypes, mol1, mol2, biases, minbiases)
+!CZGC: calcular min_rmsd_matrix usando 'minimum_rmsd' con vecinos en spatial.f90
+!CZGC: sumar min_rmsd_matrix a biases
 
    ! Initialize random number generator
    call random_initialize()
