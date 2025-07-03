@@ -1,2 +1,2 @@
 #!/bin/sh
-./build/molalign -remap -reac -pipe < "$1" 2>&1 >output
+./build/rmsd-conformer -align -remap -pipe xyz -stats -N 8 < "$1" 2>&1 >output

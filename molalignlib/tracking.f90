@@ -9,7 +9,7 @@ use adjacency
 use spatial_transforms
 use lcrs_tree
 use molecule
-use basetypes
+use derived_types
 implicit none
 private
 
@@ -20,9 +20,9 @@ public find_molfrags
 
 contains
 
-subroutine find_molfrags( mol, eltypes, molfrags)
+subroutine find_molfrags( mol, atomtypes, molfrags)
    type(mol_type), intent(in) :: mol
-   type(semipartition_t), intent(in) :: eltypes
+   type(semipartition_t), intent(in) :: atomtypes
    type(int_list), dimension(:), allocatable, intent(out) :: molfrags
    ! Local variables
    integer :: i, nfrag
@@ -56,7 +56,7 @@ subroutine find_molfrags( mol, eltypes, molfrags)
 
    ! Order molecular fragments
    do i = 1, nfrag
-      order = sorted_order(eltypes%parts(eltypes%itemdir(fragidcs(:fragszs(i), i)))%num_items)
+      order = sorted_order(atomtypes%parts(atomtypes%itemdir(fragidcs(:fragszs(i), i)))%num_items)
       fragidcs(:fragszs(i), i) = fragidcs(order, i)
 !      write (stderr, *) fragidcs1(:fragszs1(i), i)
 !      write (stderr, *)
@@ -91,14 +91,14 @@ recursive subroutine recrun( tracked, iatom, nfrag, fragszs, fragidcs)
 
 end subroutine
 
-subroutine minadjdiff( eltypes, mnatypes, molfrags, mol1, mol2, coords1, &
+subroutine minadjdiff( atomtypes, mnatypes, molfrags, mol1, mol2, coords1, &
                        coords2, atomperm)
 !
 ! Find best correspondence between points of graphs
 !
 
    ! Arguments
-   type(partition_t), intent(in) :: eltypes, mnatypes
+   type(partition_t), intent(in) :: atomtypes, mnatypes
    type(int_list), dimension(:), intent(in) :: molfrags
    type(mol_type), intent(in) :: mol1, mol2
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
@@ -145,8 +145,8 @@ subroutine minadjdiff( eltypes, mnatypes, molfrags, mol1, mol2, coords1, &
 
    ! set atoms block indices
 
-   blkidx1 = eltypes%itemdir1
-   blkidx2 = eltypes%itemdir2
+   blkidx1 = atomtypes%itemdir1
+   blkidx2 = atomtypes%itemdir2
 
    ! set atoms equivalence indices
 

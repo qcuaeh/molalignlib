@@ -17,39 +17,39 @@
 module biasing
 use parameters
 use globals
-use basetypes
+use derived_types
 use sorting
 use strutils
 use permutation
 use molecule
 use lcrs_tree
-use eltype_compute
-use mna_compute
+use atom_types
+use atom_mnas
 use spatial_transforms
 implicit none
 contains
 
-subroutine compute_mna_biases(mol1, mol2, eltypes, biases)
+subroutine compute_mna_biases(mol1, mol2, atomtypes, biases)
 ! Iteratively compute MNA types
    type(mol_type), intent(in) :: mol1, mol2
-   type(partition_t), intent(in) :: eltypes
+   type(partition_t), intent(in) :: atomtypes
    type(int_matrix), dimension(:), allocatable, intent(out) :: biases
    ! Local variables
-   type(partree_node_t), pointer :: root_part
+   type(partree_node_t), pointer :: part_tree
    type(assigntree_node_t), pointer :: mnachain
    integer :: h, i, j, iatom, jatom
    integer :: num_splits
 !   integer :: link_idx
 
-   allocate(biases(eltypes%num_parts))
+   allocate(biases(atomtypes%num_parts))
 
-   do h = 1, eltypes%num_parts
-      allocate(biases(h)%ee(eltypes%parts(h)%num_items1, eltypes%parts(h)%num_items2))
+   do h = 1, atomtypes%num_parts
+      allocate(biases(h)%ee(atomtypes%parts(h)%num_items1, atomtypes%parts(h)%num_items2))
       biases(h)%ee = 0
    end do
 
-   ! Initialize mna chain with element types
-   call init_chain_from_partition( eltypes, mnachain, root_part)
+   ! Initialize MNA chain with element types
+   call init_chain_from_partition( atomtypes, mnachain, part_tree)
 
 !   link_idx = 0
    do
@@ -64,11 +64,11 @@ subroutine compute_mna_biases(mol1, mol2, eltypes, biases)
       if (num_splits == 0) exit
 
       ! Update biases with MNAs at current level
-      do h = 1, eltypes%num_parts
-         do j = 1, eltypes%parts(h)%num_items2
-            jatom = eltypes%parts(h)%items2(j)
-            do i = 1, eltypes%parts(h)%num_items1
-               iatom = eltypes%parts(h)%items1(i)
+      do h = 1, atomtypes%num_parts
+         do j = 1, atomtypes%parts(h)%num_items2
+            jatom = atomtypes%parts(h)%items2(j)
+            do i = 1, atomtypes%parts(h)%num_items1
+               iatom = atomtypes%parts(h)%items1(i)
                if (associated( &
                   mnachain%last_link%itemdir1(iatom)%ptr, &
                   mnachain%last_link%itemdir2(jatom)%ptr) &
@@ -82,21 +82,21 @@ subroutine compute_mna_biases(mol1, mol2, eltypes, biases)
 !      link_idx = link_idx + 1
    end do
 
-!   do h = 1, eltypes%num_parts
+!   do h = 1, atomtypes%num_parts
 !      write(stderr, *)
-!      do j = 1, eltypes%parts(h)%num_items2
-!         write(stderr, '(*(i2))') biases(h)%ee(:eltypes%parts(h)%num_items1, j)
+!      do j = 1, atomtypes%parts(h)%num_items2
+!         write(stderr, '(*(i2))') biases(h)%ee(:atomtypes%parts(h)%num_items1, j)
 !      end do
 !   end do
 
    call delete_chain(mnachain)  ! Cleanup
-   call delete_part_tree(root_part)  ! Cleanup
+   call delete_part_tree(part_tree)  ! Cleanup
 end subroutine
 
 
 ! tests all permutations of the neighbors of a pair of atoms
-subroutine build_minbiases(eltypes, mol1, mol2, biases, minbiases)
-   type(partition_t), intent(in) :: eltypes
+subroutine build_minbiases(atomtypes, mol1, mol2, biases, minbiases)
+   type(partition_t), intent(in) :: atomtypes
    type(mol_type), intent(in) :: mol1, mol2
    type(int_matrix), dimension(:), intent(in) :: biases
    type(real_matrix), dimension(:), allocatable, intent(out) :: minbiases
@@ -112,21 +112,21 @@ subroutine build_minbiases(eltypes, mol1, mol2, biases, minbiases)
    integer :: rank, n
    real(rk) :: rmsd, min_rmsd, center1(3), center2(3)
 
-   allocate(minbiases(eltypes%num_parts))
+   allocate(minbiases(atomtypes%num_parts))
    coords1 = get_coords( mol1)
    coords2 = get_coords( mol2)
 
 
-   do h = 1, eltypes%num_parts   ! run over all eltype partitions
+   do h = 1, atomtypes%num_parts   ! run over all eltype partitions
 !write (stderr,*) "eltype: ", h
 
       ! initialize minbiases matrix elements
-      allocate(minbiases(h)%ee(eltypes%parts(h)%num_items1, eltypes%parts(h)%num_items2))
+      allocate(minbiases(h)%ee(atomtypes%parts(h)%num_items1, atomtypes%parts(h)%num_items2))
       minbiases(h)%ee = 0.5
       maxbias = maxval(biases(h)%ee)
 !write (stderr,*) "maxbias: ", maxbias
-      do i = 1, eltypes%parts(h)%num_items1   ! run over atoms in mol1
-         iatom = eltypes%parts(h)%items1(i)
+      do i = 1, atomtypes%parts(h)%num_items1   ! run over atoms in mol1
+         iatom = atomtypes%parts(h)%items1(i)
          center1(:) = coords1(:,iatom)
 !        center1(:) = 0
 
@@ -135,13 +135,13 @@ subroutine build_minbiases(eltypes, mol1, mol2, biases, minbiases)
          adjlistat1 = mol1%atoms(iatom)%adjlist
 !write (stderr,*) "adjlist1: ", adjlistat1
 
-         do j = 1, eltypes%parts(h)%num_items2   ! run over atoms in mol2
-            jatom = eltypes%parts(h)%items2(j)
+         do j = 1, atomtypes%parts(h)%num_items2   ! run over atoms in mol2
+            jatom = atomtypes%parts(h)%items2(j)
             center2(:) = coords2(:,jatom)
 !            center2(:) = 0
 
             if (biases(h)%ee(i,j) == maxbias .or. biases(h)%ee(i,j) >= 1) then   ! compatible neighbors
-!*** ¿el orden de los átomos en eltypes es el mismo que en biases?
+!*** ¿el orden de los átomos en atomtypes es el mismo que en biases?
                ! neighbors for jatom
                allocate(adjlistat2(size(mol2%atoms(jatom)%adjlist)))
                adjlistat2 = mol2%atoms(jatom)%adjlist
@@ -149,7 +149,7 @@ subroutine build_minbiases(eltypes, mol1, mol2, biases, minbiases)
 
                call set_eltypes(mol1%atoms(adjlistat1), mol2%atoms(adjlistat2), adjeltypes)   ! eltype for adjlists
 
-               ! run over adjlist's eltypes
+               ! run over adjlist's atomtypes
                do ha = 1, adjeltypes%num_parts
 !write (stderr, *) "adj part: ", ha
                   n = adjeltypes%parts(ha)%num_items1   ! same as num_items2?
@@ -191,10 +191,10 @@ subroutine build_minbiases(eltypes, mol1, mol2, biases, minbiases)
       end do
    end do
 
-!   do h = 1, eltypes%num_parts
+!   do h = 1, atomtypes%num_parts
 !      write(stderr, *)
-!      do j = 1, eltypes%parts(h)%num_items2
-!         write(stderr, '(*(f4.1,1X))') minbiases(h)%ee(:eltypes%parts(h)%num_items1, j)
+!      do j = 1, atomtypes%parts(h)%num_items2
+!         write(stderr, '(*(f4.1,1X))') minbiases(h)%ee(:atomtypes%parts(h)%num_items1, j)
 !      end do
 !   end do
 

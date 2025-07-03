@@ -17,7 +17,7 @@
 !> @defgroup atomalig AtomAlign
 !> @brief Program to align atomic clusters
 !> @{
-program atomalign
+program rmsd_cluster
 use parameters
 use globals
 use molecule
@@ -30,21 +30,21 @@ use fileio
 use argparse
 use biasing
 use pruning
-use remapping_free
+use assignment_cluster
 use molalignlib
 use registration
 
 implicit none
 
 integer :: i
-integer :: read_unit1, read_unit2, write_unit
+integer :: unitin1, unitin2, unitout
 integer, allocatable :: atomperm(:)
 character(:), allocatable :: arg
 character(:), allocatable :: fmtin1, fmtin2, fmtout
 character(:), allocatable :: optfmtin, optfmtout
 character(:), allocatable :: pathout
 logical :: fmtin_flag, fmtout_flag
-logical :: remap_flag, pipe_flag, nrec_flag
+logical :: align_flag, remap_flag, pipe_flag, nrec_flag
 real(rk) :: rmsd
 type(strlist_type) :: posargs(2)
 type(mol_type) :: mol1, mol2, auxmol
@@ -58,6 +58,7 @@ iter_flag = .true.
 test_flag = .false.
 stats_flag = .false.
 mirror_flag = .false.
+align_flag = .false.
 remap_flag = .false.
 pipe_flag = .false.
 fmtin_flag = .false.
@@ -81,10 +82,8 @@ call init_args()
 do while (get_arg(arg))
 
    select case (arg)
-   case ('-stats')
-      stats_flag = .true.
-   case ('-test')
-      test_flag = .true.
+   case ('-align')
+      align_flag = .true.
    case ('-remap')
       remap_flag = .true.
    case ('-near')
@@ -116,6 +115,10 @@ do while (get_arg(arg))
       call read_optarg(arg, optfmtout)
    case ('-pipe')
       pipe_flag = .true.
+   case ('-stats')
+      stats_flag = .true.
+   case ('-test')
+      test_flag = .true.
    case default
       call read_posarg(arg, posargs)
    end select
@@ -123,8 +126,8 @@ do while (get_arg(arg))
 end do
 
 if (pipe_flag) then
-   read_unit1 = stdin
-   read_unit2 = stdin
+   unitin1 = stdin
+   unitin2 = stdin
    fmtin1 = 'xyz'
    fmtin2 = 'xyz'
 else
@@ -136,8 +139,8 @@ else
       write (stderr, '(a)') 'Error: Too few file paths'
       stop
    case (2)
-      call open2read(posargs(1)%arg, read_unit1, fmtin1)
-      call open2read(posargs(2)%arg, read_unit2, fmtin2)
+      call open2read(posargs(1)%arg, unitin1, fmtin1)
+      call open2read(posargs(2)%arg, unitin2, fmtin2)
    case default
       write (stderr, '(a)') 'Error: Too many file paths'
       stop
@@ -150,15 +153,15 @@ if (fmtin_flag) then
 end if
 
 ! Read coordinates
-call readfile( read_unit1, fmtin1, mol1)
-call readfile( read_unit2, fmtin2, mol2)
+call read_file( unitin1, fmtin1, mol1)
+call read_file( unitin2, fmtin2, mol2)
 
 ! Allocate arrays
 if (pipe_flag) then
-   write_unit = stdout
+   unitout = stdout
    fmtout = 'xyz'
 else
-   call open2write( pathout, write_unit, fmtout)
+   call open2write( pathout, unitout, fmtout)
 end if
 
 if (fmtout_flag) then
@@ -175,7 +178,7 @@ allocate (auxmol%atoms(size(mol2%atoms)))
 if (remap_flag) then
 
    ! Remap atoms to minimize the MSD
-   call remap_free_atoms( mol1, mol2, registry)
+   call optimize_atomperm_atoms( mol1, mol2, registry)
 
    ! Print optimization stats
    if (stats_flag) then
@@ -183,7 +186,7 @@ if (remap_flag) then
    end if
 
    if (.not. nrec_flag) then
-      call writefile( write_unit, fmtout, mol1)
+      call write_file( unitout, fmtout, mol1)
    end if
 
    do i = 1, registry%num_records
@@ -198,14 +201,14 @@ if (remap_flag) then
       auxmol%atoms%elnum = mol2%atoms(atomperm)%elnum
       auxmol%atoms%label = mol2%atoms(atomperm)%label
       call set_coords( auxmol, coords2(:, atomperm))
-      call writefile( write_unit, fmtout, auxmol)
+      call write_file( unitout, fmtout, auxmol)
 
    end do
 
 else
 
    ! Align atoms
-   call molecule_align( mol1, mol2, coords2)
+   call align_atoms( mol1, mol2, coords2)
    rmsd = sqrt(total_sqdist( coords1, coords2))
    call unweight_coords( coords2, weights2)
 
@@ -214,7 +217,7 @@ else
    auxmol%atoms%elnum = mol2%atoms%elnum
    auxmol%atoms%label = mol2%atoms%label
    call set_coords( auxmol, coords2)
-   call writefile( write_unit, fmtout, mol2)
+   call write_file( unitout, fmtout, mol2)
 
 end if
 

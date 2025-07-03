@@ -57,7 +57,7 @@ subroutine open2write(filepath, unit, extension)
 
 end subroutine
 
-subroutine readfile(unit, fmtin, mol)
+subroutine read_file(unit, fmtin, mol)
    integer, intent(in) :: unit
    character(*), intent(in) :: fmtin
    type(mol_type), intent(out) :: mol
@@ -74,7 +74,7 @@ subroutine readfile(unit, fmtin, mol)
 
 end subroutine
 
-subroutine writefile(unit, fmtout, mol)
+subroutine write_file(unit, fmtout, mol)
    integer, intent(in) :: unit
    character(*), intent(in) :: fmtout
    type(mol_type), intent(in) :: mol

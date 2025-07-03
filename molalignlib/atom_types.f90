@@ -1,5 +1,6 @@
-module eltype_compute
+module atom_types
 use parameters
+use derived_types
 use chemdata
 use molecule
 use lcrs_tree
@@ -46,10 +47,10 @@ function find_atomtype(atomtypetable, atom) result(part_index)
    part_index = 0  ! Not found
 end function
 
-subroutine set_eltypes(atoms1, atoms2, eltypes)
+subroutine set_eltypes(atoms1, atoms2, atomtypes)
 ! Partition atoms by atomic number and label using arrays directly
    type(atom_type), dimension(:), intent(in) :: atoms1, atoms2
-   type(partition_t), intent(out) :: eltypes
+   type(partition_t), intent(out) :: atomtypes
    ! Local variables
    type(atomtype_table) :: atomtypetable
    integer :: i, num_atoms1, num_atoms2
@@ -114,31 +115,31 @@ subroutine set_eltypes(atoms1, atoms2, eltypes)
    end do
 
    ! Now build the final partition_t structure
-   eltypes%num_parts = current_part
-   allocate(eltypes%parts(eltypes%num_parts))
-   allocate(eltypes%itemdir1(num_atoms1))
-   allocate(eltypes%itemdir2(num_atoms2))
+   atomtypes%num_parts = current_part
+   allocate(atomtypes%parts(atomtypes%num_parts))
+   allocate(atomtypes%itemdir1(num_atoms1))
+   allocate(atomtypes%itemdir2(num_atoms2))
 
    ! Copy item directories
-   eltypes%itemdir1 = itemdir1_temp
-   eltypes%itemdir2 = itemdir2_temp
+   atomtypes%itemdir1 = itemdir1_temp
+   atomtypes%itemdir2 = itemdir2_temp
 
    ! Build each partition
-   do i = 1, eltypes%num_parts
+   do i = 1, atomtypes%num_parts
       ! Set sizes
-      eltypes%parts(i)%num_items1 = part_num_items1(i)
-      eltypes%parts(i)%num_items2 = part_num_items2(i)
-      eltypes%parts(i)%num_children = 0
+      atomtypes%parts(i)%num_items1 = part_num_items1(i)
+      atomtypes%parts(i)%num_items2 = part_num_items2(i)
+      atomtypes%parts(i)%num_children = 0
 
       ! Allocate and copy items
-      allocate(eltypes%parts(i)%items1(part_num_items1(i)))
-      allocate(eltypes%parts(i)%items2(part_num_items2(i)))
-      eltypes%parts(i)%items1 = part_items1(1:part_num_items1(i), i)
-      eltypes%parts(i)%items2 = part_items2(1:part_num_items2(i), i)
+      allocate(atomtypes%parts(i)%items1(part_num_items1(i)))
+      allocate(atomtypes%parts(i)%items2(part_num_items2(i)))
+      atomtypes%parts(i)%items1 = part_items1(1:part_num_items1(i), i)
+      atomtypes%parts(i)%items2 = part_items2(1:part_num_items2(i), i)
 
       ! Allocate empty arrays for neighbors and children
-      allocate(eltypes%parts(i)%signature(0))
-      allocate(eltypes%parts(i)%children(0))
+      allocate(atomtypes%parts(i)%signature(0))
+      allocate(atomtypes%parts(i)%children(0))
    end do
 
    ! Clean up temporary arrays

@@ -1,8 +1,8 @@
-module mna_precompute
+module assigntree_precompute
 use parameters
 use molecule
 use lcrs_tree
-use mna_compute
+use atom_mnas
 implicit none
 
 contains
@@ -258,6 +258,29 @@ recursive subroutine split_independent_parts(mol1, mol2, mnachain, branch, branc
       end if
       partref => partref%nextref
    end do
+end subroutine
+
+subroutine precompute_assignment_tree( mol1, mol2, part_tree, mnalink, assignment_tree)
+   type(mol_type), intent(in) :: mol1, mol2
+   type(partree_node_t), pointer, intent(inout) :: part_tree
+   type(chain_node_t), pointer, intent(in) :: mnalink
+   type(assigntree_node_t), pointer, intent(inout) :: assignment_tree
+   ! Local variables
+   type(assigntree_node_t), pointer :: mnachain
+   type(chain_node_t), pointer :: branch_parts
+   type(partree_node_t), pointer :: child_part
+
+   call init_chain_from_link( mnalink, mnachain, part_tree)
+   assignment_tree => new_root_chain( mnachain%tot_items1, mnachain%tot_items2)
+   branch_parts => new_bare_link()
+
+   child_part => part_tree%first_child_part
+   do while (associated(child_part))
+      call add_branch_part( branch_parts, child_part)
+      child_part => child_part%next_sibling_part
+   end do
+
+   call split_independent_parts( mol1, mol2, mnachain, assignment_tree, branch_parts)
 end subroutine
 
 end module

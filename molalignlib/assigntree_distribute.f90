@@ -1,12 +1,12 @@
-module mna_recompute_arrays
+module assigntree_distribute
 use parameters
+use array_trees
 use permutation
 use spatial_transforms
-use array_trees
 implicit none
 
 ! Maximum possible number of children for a part
-integer, parameter :: MAX_CHILDREN = 2
+integer, parameter :: MAX_CHILDREN = 8
 
 ! Module-level signature workspace to eliminate allocations
 integer :: signature_array(MAX_COORD)
@@ -107,20 +107,22 @@ function find_child_part_array(array_trees, parent_idx) result(child_relative_id
    ! OPTIMIZED: Assumes exactly 2 children - if signature doesn't match first, it must match second
    type(array_trees_t), intent(in) :: array_trees
    integer, intent(in) :: parent_idx
-   integer :: child_relative_idx, first_child_idx, second_child_idx
+   integer :: child_relative_idx
+   integer :: num_children, child_idx, i
 
    ! Get first child index directly
-   first_child_idx = array_trees%partree(parent_idx)%child_indices(1)
-   second_child_idx = array_trees%partree(parent_idx)%child_indices(2)
+   num_children = array_trees%partree(parent_idx)%num_children
 
    ! Check if signature matches first or second child
-   if (signature_equivalence_array(array_trees, first_child_idx)) then
-      child_relative_idx = 1
-   else if (signature_equivalence_array(array_trees, second_child_idx)) then
-      child_relative_idx = 2
-   else
-      error stop 'Part signature does not match any child'
-   end if
+   do i = 1, num_children
+      child_idx = array_trees%partree(parent_idx)%child_indices(i)
+      if (signature_equivalence_array(array_trees, child_idx)) then
+         child_relative_idx = i
+         return
+      end if
+   end do
+
+   error stop 'Part signature does not match any child'
 end function
 
 subroutine resplit_part_mna(array_trees, part_idx, read_link_idx, write_link_idx, assignment)
@@ -444,15 +446,15 @@ subroutine update_assignment(target, source)
    end do
 end subroutine
 
-subroutine redistribute_items_dfs(coords1, coords2, array_trees, optimal_permutation, total_distance)
+subroutine distribute_items_dfs(coords1, coords2, array_trees, optimal_permutation)
    ! DFS exploration wrapper - finds optimal assignment among all possibilities
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: array_trees
    integer, allocatable, intent(out) :: optimal_permutation(:)
-   real(rk), intent(out) :: total_distance
-
+   ! Local variables
    type(assignment_t) :: optimal_assignment
    integer :: num_atoms, assigned_count
+!   real(rk) :: total_distance
 
    num_atoms = array_trees%num_atoms1
 
@@ -465,8 +467,6 @@ subroutine redistribute_items_dfs(coords1, coords2, array_trees, optimal_permuta
    ! Initialize DFS exploration variables
    combination_count = 0
 
-   write(stderr, '(A)') "=== Starting DFS exploration of all assignment possibilities ==="
-
    ! Perform DFS exploration to find optimal assignment (starting from root chain at index 1)
    call redistribute_items_dfs_recursive(coords1, coords2, array_trees, 1, optimal_assignment)
 
@@ -474,65 +474,21 @@ subroutine redistribute_items_dfs(coords1, coords2, array_trees, optimal_permuta
    optimal_permutation = optimal_assignment%permutation
 
    ! Calculate distance from the optimal permutation array for verification
-   total_distance = total_sqdist(optimal_assignment%assigned_indices(1:optimal_assignment%num_assigned), &
-      optimal_assignment%permutation, coords1, coords2)
+!   total_distance = total_sqdist(optimal_assignment%assigned_indices(1:optimal_assignment%num_assigned), &
+!      optimal_assignment%permutation, coords1, coords2)
 
    ! Count assigned atoms
    assigned_count = optimal_assignment%num_assigned
 
    ! Report final results
-   write(stderr, '(A)') repeat("=", 60)
-   write(stderr, '(A,I0)') "Assignment combinations probed: ", combination_count
-   write(stderr, '(A,I0,A,I0,A)') "Atoms assigned: ", assigned_count, " out of ", num_atoms, " total atoms"
-   write(stderr, '(A,F10.4)') "Optimal total squared distance: ", total_distance
-   write(stderr, '(A)') repeat("=", 60)
+!   write(stderr, '(A)') repeat("=", 60)
+!   write(stderr, '(A,I0)') "Assignment combinations probed: ", combination_count
+!   write(stderr, '(A,I0,A,I0,A)') "Atoms assigned: ", assigned_count, " out of ", num_atoms, " total atoms"
+!   write(stderr, '(A,F10.4)') "Optimal total squared distance: ", total_distance
+!   write(stderr, '(A)') repeat("=", 60)
 
    ! Validate permutation consistency
    call validate_perm(optimal_permutation)
-end subroutine
-
-subroutine redistribute_items_random(coords1, coords2, array_trees, random_permutation, total_distance)
-   ! Random exploration wrapper - generates one random assignment
-   ! Similar to redistribute_items_dfs but generates random assignment instead of optimal
-   real(rk), intent(in) :: coords1(:,:), coords2(:,:)
-   type(array_trees_t), intent(inout) :: array_trees
-   integer, allocatable, intent(out) :: random_permutation(:)
-   real(rk), intent(out) :: total_distance
-
-   type(assignment_t) :: random_assignment
-   integer :: num_atoms, assigned_count
-
-   num_atoms = array_trees%num_atoms1
-
-   ! Initialize random assignment
-   call init_assignment(random_assignment, num_atoms)
-
-   ! Initialize assignment with preassigned pairs
-   call collect_leaf_assignments(array_trees, 1, random_assignment)
-
-   write(stderr, '(A)') "=== Starting random assignment generation ==="
-
-   ! Perform random exploration to generate one assignment (starting from root chain at index 1)
-   call redistribute_items_random_recursive(coords1, coords2, array_trees, 1, random_assignment)
-
-   ! Copy final permutation array from assignment
-   random_permutation = random_assignment%permutation
-
-   ! Calculate distance from the random permutation array
-   total_distance = total_sqdist(random_assignment%assigned_indices(1:random_assignment%num_assigned), &
-      random_assignment%permutation, coords1, coords2)
-
-   ! Count assigned atoms
-   assigned_count = random_assignment%num_assigned
-
-   ! Report final results
-   write(stderr, '(A)') repeat("=", 60)
-   write(stderr, '(A,I0,A,I0,A)') "Atoms assigned: ", assigned_count, " out of ", num_atoms, " total atoms"
-   write(stderr, '(A,F10.4)') "Random assignment total squared distance: ", total_distance
-   write(stderr, '(A)') repeat("=", 60)
-
-   ! Validate permutation consistency
-   call validate_perm(random_permutation)
 end subroutine
 
 end module

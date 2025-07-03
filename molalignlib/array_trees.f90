@@ -91,19 +91,19 @@ public print_chain_details_array
 
 contains
 
-subroutine convert_trees_to_arrays(root_part, root_chain, array_trees, mol1, mol2)
-   type(partree_node_t), pointer, intent(in) :: root_part
-   type(assigntree_node_t), pointer, intent(in) :: root_chain
+subroutine convert_trees_to_arrays(part_tree, assignment_tree, array_trees, mol1, mol2)
+   type(partree_node_t), pointer, intent(in) :: part_tree
+   type(assigntree_node_t), pointer, intent(in) :: assignment_tree
    type(array_trees_t), intent(out) :: array_trees
    type(mol_type), intent(in) :: mol1, mol2
 
    ! Get totals from the tree counters
-   array_trees%total_parts = root_part%total_parts
-   array_trees%total_items1 = root_part%total_items1
-   array_trees%total_items2 = root_part%total_items2
-   array_trees%total_chains = root_chain%total_chains
-   array_trees%total_links = root_chain%total_links
-   array_trees%total_partref_entries = root_chain%total_partrefs
+   array_trees%total_parts = part_tree%total_parts
+   array_trees%total_items1 = part_tree%total_items1
+   array_trees%total_items2 = part_tree%total_items2
+   array_trees%total_chains = assignment_tree%total_chains
+   array_trees%total_links = assignment_tree%total_links
+   array_trees%total_partref_entries = assignment_tree%total_partrefs
 
    ! Store molecule sizes
    array_trees%num_atoms1 = size(mol1%atoms)
@@ -146,7 +146,7 @@ subroutine convert_trees_to_arrays(root_part, root_chain, array_trees, mol1, mol
    call populate_adjacency_arrays(mol1, mol2, array_trees)
 
    ! Convert using global indices
-   call populate_arrays_direct(root_part, root_chain, array_trees)
+   call populate_arrays_direct(part_tree, assignment_tree, array_trees)
 end subroutine
 
 subroutine populate_adjacency_arrays(mol1, mol2, array_trees)
@@ -186,22 +186,22 @@ subroutine populate_adjacency_arrays(mol1, mol2, array_trees)
    end do
 end subroutine
 
-subroutine populate_arrays_direct(root_part, root_chain, array_trees)
-   type(partree_node_t), pointer, intent(in) :: root_part
-   type(assigntree_node_t), pointer, intent(in) :: root_chain
+subroutine populate_arrays_direct(part_tree, assignment_tree, array_trees)
+   type(partree_node_t), pointer, intent(in) :: part_tree
+   type(assigntree_node_t), pointer, intent(in) :: assignment_tree
    type(array_trees_t), intent(inout) :: array_trees
    integer :: partref_idx, link_idx, item1_idx, item2_idx
 
    ! Convert part tree starting from root with global item tracking
    item1_idx = 0
    item2_idx = 0
-   call convert_parts_recursive(root_part, array_trees, item1_idx, item2_idx)
+   call convert_parts_recursive(part_tree, array_trees, item1_idx, item2_idx)
 
    ! Convert chain tree starting from root with global tracking
    ! NOTE: itemdir_idx removed - no longer needed with 2D arrays
    partref_idx = 0
    link_idx = 0
-   call convert_chains_recursive(root_chain, array_trees, partref_idx, link_idx)
+   call convert_chains_recursive(assignment_tree, array_trees, partref_idx, link_idx)
 end subroutine
 
 subroutine convert_signature(part, array_trees, part_idx)
@@ -445,9 +445,9 @@ recursive subroutine convert_chains_recursive(chain, array_trees, partref_idx, l
    end do
 end subroutine
 
-subroutine validate_conversion(root_part, root_chain, array_trees)
-   type(partree_node_t), pointer, intent(in) :: root_part
-   type(assigntree_node_t), pointer, intent(in) :: root_chain
+subroutine validate_conversion(part_tree, assignment_tree, array_trees)
+   type(partree_node_t), pointer, intent(in) :: part_tree
+   type(assigntree_node_t), pointer, intent(in) :: assignment_tree
    type(array_trees_t), intent(in) :: array_trees
    logical :: validation_passed
 
@@ -456,39 +456,39 @@ subroutine validate_conversion(root_part, root_chain, array_trees)
    write(stderr, '(A)') "=== CONVERSION VALIDATION ==="
 
    ! Validate counts
-   if (array_trees%total_parts /= root_part%total_parts) then
+   if (array_trees%total_parts /= part_tree%total_parts) then
       write(stderr, '(A,I0,A,I0)') "ERROR: Part count mismatch: ", &
-         array_trees%total_parts, " vs ", root_part%total_parts
+         array_trees%total_parts, " vs ", part_tree%total_parts
       validation_passed = .false.
    end if
 
-   if (array_trees%total_items1 /= root_part%total_items1) then
+   if (array_trees%total_items1 /= part_tree%total_items1) then
       write(stderr, '(A,I0,A,I0)') "ERROR: Items1 count mismatch: ", &
-         array_trees%total_items1, " vs ", root_part%total_items1
+         array_trees%total_items1, " vs ", part_tree%total_items1
       validation_passed = .false.
    end if
 
-   if (array_trees%total_items2 /= root_part%total_items2) then
+   if (array_trees%total_items2 /= part_tree%total_items2) then
       write(stderr, '(A,I0,A,I0)') "ERROR: Items2 count mismatch: ", &
-         array_trees%total_items2, " vs ", root_part%total_items2
+         array_trees%total_items2, " vs ", part_tree%total_items2
       validation_passed = .false.
    end if
 
-   if (array_trees%total_chains /= root_chain%total_chains) then
+   if (array_trees%total_chains /= assignment_tree%total_chains) then
       write(stderr, '(A,I0,A,I0)') "ERROR: Chain count mismatch: ", &
-         array_trees%total_chains, " vs ", root_chain%total_chains
+         array_trees%total_chains, " vs ", assignment_tree%total_chains
       validation_passed = .false.
    end if
 
-   if (array_trees%total_links /= root_chain%total_links) then
+   if (array_trees%total_links /= assignment_tree%total_links) then
       write(stderr, '(A,I0,A,I0)') "ERROR: Link count mismatch: ", &
-         array_trees%total_links, " vs ", root_chain%total_links
+         array_trees%total_links, " vs ", assignment_tree%total_links
       validation_passed = .false.
    end if
 
-   if (array_trees%total_partref_entries /= root_chain%total_partrefs) then
+   if (array_trees%total_partref_entries /= assignment_tree%total_partrefs) then
       write(stderr, '(A,I0,A,I0)') "ERROR: Partref count mismatch: ", &
-         array_trees%total_partref_entries, " vs ", root_chain%total_partrefs
+         array_trees%total_partref_entries, " vs ", assignment_tree%total_partrefs
       validation_passed = .false.
    end if
 
@@ -534,7 +534,7 @@ subroutine print_tree_items_array(array_trees)
 
    write(stderr, *)
    write(stderr, '(A)') repeat("=", 25)
-   write(stderr, '(A)') "      Part Items (Array)"
+   write(stderr, '(A)') "      Part Items"
    write(stderr, '(A)') repeat("=", 25)
    write(stderr, *)
 
@@ -595,7 +595,7 @@ subroutine print_part_tree_array(array_trees)
 
    write(stderr, *)
    write(stderr, '(A)') repeat("=", 25)
-   write(stderr, '(A)') "    Part Tree (Array)"
+   write(stderr, '(A)') "    Part Tree"
    write(stderr, '(A)') repeat("=", 25)
    write(stderr, *)
 
@@ -664,13 +664,13 @@ subroutine print_chain_tree_array(array_trees)
    logical, dimension(:), allocatable :: is_last_child
 
    if (array_trees%total_chains == 0) then
-      write(stderr, '(A)') "Chain tree is empty"
+      write(stderr, '(A)') "Assignment tree is empty"
       return
    end if
 
    write(stderr, *)
    write(stderr, '(A)') repeat("=", 25)
-   write(stderr, '(A)') "   Chain Tree (Array)"
+   write(stderr, '(A)') "   Assignment Tree"
    write(stderr, '(A)') repeat("=", 25)
    write(stderr, *)
 
@@ -749,7 +749,7 @@ subroutine print_part_signatures_array(array_trees)
 
    write(stderr, *)
    write(stderr, '(A)') repeat("=", 25)
-   write(stderr, '(A)') "  Part Signatures (Array)"
+   write(stderr, '(A)') "  Part Signatures"
    write(stderr, '(A)') repeat("=", 25)
    write(stderr, *)
 
@@ -803,7 +803,7 @@ subroutine print_leaf_items_array(array_trees)
 
    write(stderr, *)
    write(stderr, '(A)') repeat("=", 25)
-   write(stderr, '(A)') "   Leaf Items (Array)"
+   write(stderr, '(A)') "   Leaf Items"
    write(stderr, '(A)') repeat("=", 25)
    write(stderr, *)
 
@@ -841,7 +841,7 @@ subroutine print_chain_details_array(array_trees)
 
    write(stderr, *)
    write(stderr, '(A)') repeat("=", 40)
-   write(stderr, '(A)') "        Chain Details (Array)"
+   write(stderr, '(A)') "        Chain Details"
    write(stderr, '(A)') repeat("=", 40)
    write(stderr, *)
 
@@ -886,7 +886,7 @@ subroutine print_first_level_items_array(array_trees)
 
    write(stderr, *)
    write(stderr, '(A)') repeat("=", 25)
-   write(stderr, '(A)') "  First Level Items (Array)"
+   write(stderr, '(A)') "  First Level Items"
    write(stderr, '(A)') repeat("=", 25)
    write(stderr, *)
 

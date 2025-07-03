@@ -7,7 +7,7 @@ to_array() {
 }
 
 build_library() {
-   local -a compile_list
+   srcdir=$PWD/molalignlib
    if $full_build; then
       full_build=false
       if test -d build; then
@@ -16,8 +16,8 @@ build_library() {
          done
       fi
    fi
-   if test ! -d "$libdir"; then
-      echo Error: $libdir does not exist
+   if test ! -d "$srcdir"; then
+      echo Error: $srcdir does not exist
       exit 1
    fi
    comp_flags=("${std_flag[@]}")
@@ -30,46 +30,42 @@ build_library() {
    else
       comp_flags+=("${optim_flags[@]}")
    fi
-   while IFS= read -r srcfile; do
-      objfile=${srcfile%.*}.o
-      if ! test -e "$buildir/$objfile" \
-      || ! test -e "$buildir/$srcfile" \
-      || ! diff -q "$buildir/$srcfile" "$libdir/$srcfile" >/dev/null
+   while read -r filename; do
+      srcfile=$srcdir/$filename
+      bldfile=$blddir/$filename
+      objfile=$blddir/${filename%.*}.o
+      if ! test -e "$objfile" \
+      || ! test -e "$bldfile" \
+      || ! diff -q "$bldfile" "$srcfile" >/dev/null
       then
-#         echo $srcfile added to compile list
-         cp -f "$libdir/$srcfile" "$buildir/$srcfile"
-         compile_list+=("$srcfile")
+         cp "$srcfile" "$bldfile"
+         echo Compiling $filename...
+         "$F90" "${comp_flags[@]}" -J "$blddir" -c "$bldfile" -o "$objfile"
       fi
       object_files+=("$objfile")
-   done < <(grep -v ^# "$libdir/source_files")
-   pushd "$buildir" >/dev/null
-   for srcfile in "${compile_list[@]}"; do
-      echo Recompiling $srcfile...
-      "$F90" "${comp_flags[@]}" -c "$srcfile"
-   done
-   ar r molalignlib.a "${object_files[@]}"
-   popd >/dev/null
+   done < <(grep -v ^\# "$srcdir/source_files")
+   ar r "$blddir/molalignlib.a" "${object_files[@]}"
 }
 
 build_programs() {
-   local -a compile_list
-   while IFS= read -r srcfile; do
-      cp "$libdir/$srcfile" "$buildir"
-      compile_list+=("$srcfile")
-   done < <(grep -v ^# "$libdir/program_files")
-   pushd "$buildir" >/dev/null
-   for srcfile in "${compile_list[@]}"; do
-      echo Building program ${srcfile%.*}...
-      "$F90" "${comp_flags[@]}" "${link_flags[@]}" "$srcfile" molalignlib.a -o "${srcfile%.*}"
-   done
-   popd >/dev/null
+   srcdir=$PWD/programs
+   molalignlib=$blddir/molalignlib.a
+   while read -r filename progname; do
+      srcfile=$srcdir/$filename
+      bldfile=$blddir/$filename
+      execfile=$blddir/$progname
+      cp "$srcfile" "$bldfile"
+      echo Building program $progname...
+      "$F90" "${comp_flags[@]}" "${link_flags[@]}" "$bldfile" "$molalignlib" -o "$execfile"
+   done < <(grep -v ^\# "$srcdir/program_files")
 }
 
 run_tests() {
    suffix=$1
    subdir=$2
    shift 2
-   executable=$buildir/atomalign
+   testdir=$PWD/tests
+   executable=$blddir/rmsd-cluster
    for file in "$testdir/$subdir"/*.xyz; do
       name=$(basename "$file" .xyz)_$suffix
       echo -n "Running test $subdir/$name... "
@@ -94,14 +90,12 @@ elif test ! -f ./build.env; then
    exit 1
 fi
 
-buildir=$PWD/build
-testdir=$PWD/tests
-libdir=$PWD/molalignlib
+blddir=$PWD/build
 
-if test ! -e "$buildir"; then
-   mkdir "$buildir"
-elif test ! -d "$buildir"; then
-   echo Error: $buildir does exist but is not a directory
+if test ! -e "$blddir"; then
+   mkdir "$blddir"
+elif test ! -d "$blddir"; then
+   echo Error: $blddir does exist but is not a directory
    exit 1
 fi
 

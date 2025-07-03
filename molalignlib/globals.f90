@@ -1,7 +1,6 @@
 module globals
 
 ! Flags
-logical :: reac_flag
 logical :: iter_flag
 logical :: test_flag
 logical :: stats_flag

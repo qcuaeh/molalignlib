@@ -23,20 +23,19 @@ use spatial_transforms
 use permutation
 use adjacency
 use lcrs_tree
-use eltype_compute
-!use remapping_bonded
+use atom_types
 !use writemol
 
 implicit none
 
 contains
 
-subroutine molecule_align( mol1, mol2, coords2)
+subroutine align_atoms( mol1, mol2, coords2)
 
    type(mol_type), intent(in) :: mol1, mol2
    real(rk), dimension(:,:), allocatable, intent(out) :: coords2
    ! Local variables
-   type(partition_t) :: eltypes
+   type(partition_t) :: atomtypes
    real(rk) :: center1(3), center2(3), rotquat(4)
    real(rk), dimension(:,:), allocatable :: coords1
    real(rk), dimension(:), allocatable :: weights1, weights2
@@ -55,10 +54,10 @@ subroutine molecule_align( mol1, mol2, coords2)
    end if
 
    ! Compute atomic types
-   call set_eltypes( mol1%atoms, mol2%atoms, eltypes)
+   call set_eltypes( mol1%atoms, mol2%atoms, atomtypes)
 
    ! Abort if there are conflicting atomic types
-   if (any(sorted(eltypes%itemdir1) /= sorted(eltypes%itemdir2))) then
+   if (any(sorted(atomtypes%itemdir1) /= sorted(atomtypes%itemdir2))) then
       write (stderr, '(a)') 'Error: There are conflicting atomic types'
       stop
    end if
@@ -70,7 +69,7 @@ subroutine molecule_align( mol1, mol2, coords2)
    end if
 
    ! Abort if atomic types are not ordered
-   if (any(eltypes%itemdir1 /= eltypes%itemdir2)) then
+   if (any(atomtypes%itemdir1 /= atomtypes%itemdir2)) then
       write (stderr, '(a)') 'Error: Atomic types are not in the same order'
       stop
    end if

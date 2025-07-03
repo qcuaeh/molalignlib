@@ -1,4 +1,4 @@
-module mna_compute
+module atom_mnas
 use parameters
 use molecule
 use lcrs_tree

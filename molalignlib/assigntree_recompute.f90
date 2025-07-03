@@ -1,4 +1,4 @@
-module mna_recompute
+module assigntree_recompute
 use parameters
 use molecule
 use lcrs_tree
@@ -235,7 +235,7 @@ subroutine resplit_part_random(part, link)
    end do
 end subroutine
 
-recursive subroutine redistribute_items(mol1, mol2, branch)
+recursive subroutine recompute_assignment_tree(mol1, mol2, branch)
    type(mol_type), intent(in) :: mol1, mol2
    type(assigntree_node_t), pointer, intent(inout) :: branch
    type(assigntree_node_t), pointer :: child_branch
@@ -254,7 +254,7 @@ recursive subroutine redistribute_items(mol1, mol2, branch)
       call recompute_consistent_mnas(mol1, mol2, child_branch)
 
       ! Recursively process this child's descendants (depth-first)
-      call redistribute_items(mol1, mol2, child_branch)
+      call recompute_assignment_tree(mol1, mol2, child_branch)
 
       ! Move to next sibling
       child_branch => child_branch%next_sibling_chain

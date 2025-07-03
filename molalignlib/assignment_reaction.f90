@@ -14,35 +14,41 @@
 ! You should have received a copy of the GNU General Public License
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-module reactivity
+module assignment_reaction
 use parameters
-use basetypes
 use globals
 use random
-use spatial_transforms
-use adjacency
-use permutation
-use assignment
-use biasing
 use molecule
-use tracking
+use strutils
+use chemdata
+use permutation
+use spatial_transforms
+use assignment
+use adjacency
+use biasing
+use pruning
 use lcrs_tree
-use eltype_compute
-use mna_compute
+use array_trees
+use atom_mnas
+use assigntree_precompute
+use assigntree_recompute
+use assigntree_distribute
 use registration
+use fileio
+use assignment_conformer
 
 implicit none
 
 contains
 
-subroutine find_reactive_bonds( mol1, mol2, eltypes, atomperm)
+subroutine find_reactive_bonds( mol1, mol2, atomtypes, atomperm)
    type(mol_type), intent(in) :: mol1, mol2
-   type(partition_t), intent(in) :: eltypes
+   type(partition_t), intent(in) :: atomtypes
    integer, dimension(:), intent(out) :: atomperm
 
    ! Local variables
    type(partition_t) :: mnatypes
-   type(partree_node_t), pointer :: root_part
+   type(partree_node_t), pointer :: part_tree
    type(assigntree_node_t), pointer :: mnachain
    type(int_list), dimension(:), allocatable :: molfrags1, molfrags2
    type(int_matrix), dimension(:), allocatable :: biases
@@ -79,18 +85,18 @@ subroutine find_reactive_bonds( mol1, mol2, eltypes, atomperm)
    call translate_coords( coords2, center1)
 
    ! Compute MNA types
-   call init_chain_from_partition( eltypes, mnachain, root_part)
+   call init_chain_from_partition( atomtypes, mnachain, part_tree)
    call compute_consistent_mnas( mol1, mol2, mnachain)
    call link_to_partition( mnachain%last_link, mnatypes)
 
    ! Find molecular fragments
-   call find_molfrags( mol1, first_partition(eltypes), molfrags1)
-   call find_molfrags( mol2, second_partition(eltypes), molfrags2)
+   call find_molfrags( mol1, first_partition(atomtypes), molfrags1)
+   call find_molfrags( mol2, second_partition(atomtypes), molfrags2)
 
    ! Find unfeasible assignments
-   call compute_mna_biases( mol1, mol2, eltypes, biases)
+   call compute_mna_biases( mol1, mol2, atomtypes, biases)
 
-   call build_minbiases(eltypes, mol1, mol2, biases, minbiases)
+   call build_minbiases(atomtypes, mol1, mol2, biases, minbiases)
 !CZGC: calcular min_rmsd_matrix usando 'minimum_rmsd' con vecinos en spatial.f90
 !CZGC: sumar min_rmsd_matrix a biases
 
@@ -104,9 +110,9 @@ subroutine find_reactive_bonds( mol1, mol2, eltypes, atomperm)
    do while (registry%records(1)%count < max_count .and. registry%num_trials < max_trials)
 
       ! Assign atoms with current orientation
-      call assign_atoms_biased( eltypes, coords1, coords2, biases, atomperm)
+      call assign_atoms_biased( atomtypes, coords1, coords2, biases, atomperm)
       ! Reassign mismatches
-      call minadjdiff( eltypes, mnatypes, molfrags1, mol1, mol2, coords1, coords2, atomperm)
+      call minadjdiff( atomtypes, mnatypes, molfrags1, mol1, mol2, coords1, coords2, atomperm)
       ! Update results
       call push_record( registry, atomperm, adjmat2=adjmat2)
 
@@ -115,10 +121,10 @@ subroutine find_reactive_bonds( mol1, mol2, eltypes, atomperm)
    atomperm = registry%records(1)%atomperm
 end subroutine
 
-subroutine remove_reactive_bonds( mol1, mol2, eltypes, atomperm)
+subroutine remove_reactive_bonds( mol1, mol2, atomtypes, atomperm)
    ! Remove reactive bonds
    type(mol_type), intent(inout) :: mol1, mol2
-   type(partition_t), intent(in) :: eltypes
+   type(partition_t), intent(in) :: atomtypes
    integer, dimension(:), intent(in) :: atomperm
    ! Local variables
    logical, dimension(:,:), allocatable :: adjmat1, adjmat2
@@ -189,6 +195,57 @@ subroutine remove_reactive_bonds( mol1, mol2, eltypes, atomperm)
 !         end do
 !      end if
 !   end do
+end subroutine
+
+subroutine optimize_atomperm_isomer( mol1, mol2, registry)
+   type(mol_type), intent(inout) :: mol1, mol2
+   type(registry_t), target, intent(out) :: registry
+
+   ! Local variables
+   type(partition_t) :: atomtypes
+   logical, dimension(:,:), allocatable :: adjmat1, adjmat2
+   integer, dimension(:), allocatable :: atomperm, auxperm
+   integer, dimension(:), allocatable :: elnums1, elnums2
+   real(rk), dimension(:,:), allocatable :: coords1, coords2
+
+   ! Abort if molecules have different number of atoms
+   if (size(mol1%atoms) /= size(mol2%atoms)) then
+      write (stderr, '(a)') 'Error: These molecules are not isomers'
+      stop
+   end if
+
+   ! Abort if molecules are not isomers
+   if (any(sorted(mol1%atoms%elnum) /= sorted(mol2%atoms%elnum))) then
+      write (stderr, '(a)') 'Error: These molecules are not isomers'
+      stop
+   end if
+
+   ! Compute atomic types
+   call set_eltypes( mol1%atoms, mol2%atoms, atomtypes)
+
+   ! Abort if there are conflicting atomic types
+   if (any(atomtypes%parts%num_items1 /= atomtypes%parts%num_items2)) then
+      write (stderr, '(a)') 'Error: There are conflicting atomic types'
+      stop
+   end if
+
+   allocate (atomperm(size(mol1%atoms)))
+   allocate (auxperm(size(mol1%atoms)))
+
+   elnums1 = mol1%atoms%elnum
+   elnums2 = mol2%atoms%elnum
+   coords1 = get_coords(mol1)
+   coords2 = get_coords(mol2)
+   adjmat1 = get_adjmat(mol1)
+   adjmat2 = get_adjmat(mol2)
+
+   call find_reactive_bonds( mol1, mol2, atomtypes, atomperm)
+   write (stderr, *) 'before', adjacencydiff( atomperm, adjmat1, adjmat2)
+   call remove_reactive_bonds( mol1, mol2, atomtypes, atomperm)
+   adjmat1 = get_adjmat( mol1)
+   adjmat2 = get_adjmat( mol2)
+   write (stderr, *) 'after ', adjacencydiff( atomperm, adjmat1, adjmat2)
+   call optimize_atomperm_conformer( mol1, mol2, registry)
 end subroutine
 
 end module
