@@ -22,7 +22,7 @@ use strutils
 implicit none
 
 private
-public split_tag
+public split_symbol
 public atomic_number
 
 contains
@@ -46,23 +46,23 @@ function atomic_number(elsym) result(z)
 
 end function
 
-subroutine split_tag( tag, elnum, label)
-   character(*), intent(in) :: tag
+subroutine split_symbol( elsym, elnum, label)
+   character(*), intent(in) :: elsym
    integer, intent(out) :: elnum, label
    ! Local variables
    integer :: m, n
 
-   n = len_trim(tag)
-   m = verify(uppercase(trim(tag)), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+   n = len_trim(elsym)
+   m = verify(uppercase(trim(elsym)), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ')
 
    if (m == 0) then
       label = 0
-      elnum = atomic_number(tag)
-   else if (verify(tag(m:n), '1234567890') == 0) then
-      read (tag(m:n), *) label
-      elnum = atomic_number(tag(1:m-1))
+      elnum = atomic_number(elsym)
+   else if (verify(elsym(m:n), '1234567890') == 0) then
+      read (elsym(m:n), *) label
+      elnum = atomic_number(elsym(1:m-1))
    else
-      write (stderr, '(a,1x,a)') 'Invalid atomic elsym/label:', tag
+      write (stderr, '(a,1x,a)') 'Invalid atomic elsym/label:', elsym
       stop
    end if
 

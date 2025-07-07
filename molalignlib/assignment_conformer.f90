@@ -40,110 +40,90 @@ implicit none
 
 contains
 
-subroutine optimize_atomperm_conformer( mol1, mol2, registry)
+subroutine optimize_atomperm_conformer( mol1, mol2, atomtypes, registry)
    type(mol_type), intent(inout) :: mol1, mol2
+   type(partition_t), intent(in) :: atomtypes
    type(registry_t), target, intent(out) :: registry
 
    ! Local variables
-   type(partition_t) :: atomtypes
    logical, dimension(:,:), allocatable :: adjmat1, adjmat2
    integer, dimension(:), allocatable :: atomperm, auxperm
-   integer, dimension(:), allocatable :: elnums1, elnums2
    type(partree_node_t), pointer :: part_tree, temp_part
    type(assigntree_node_t), pointer :: mnachain, assignment_tree
    type(array_trees_t) :: array_trees
-   real(rk), dimension(:,:), allocatable :: coords1, coords2
-   real(rk) :: step_rotation(4), total_rotation(4)
-   real(rk) :: center1(3), center2(3)
+   real(rk), dimension(:), allocatable :: weights1, weights2
+   real(rk), dimension(:,:), allocatable :: wcoords1, wcoords2, rcoords2
+   real(rk) :: rmsd, center1(3), center2(3), rotation_step(4), rotation(4)
    integer :: num_trials, num_steps
-
-   ! Abort if molecules have different number of atoms
-   if (size(mol1%atoms) /= size(mol2%atoms)) then
-      write (stderr, '(a)') 'Error: These molecules are not isomers'
-      stop
-   end if
-
-   ! Abort if molecules are not isomers
-   if (any(sorted(mol1%atoms%elnum) /= sorted(mol2%atoms%elnum))) then
-      write (stderr, '(a)') 'Error: These molecules are not isomers'
-      stop
-   end if
-
-   ! Compute atomic types
-   call set_eltypes( mol1%atoms, mol2%atoms, atomtypes)
-
-   ! Abort if there are conflicting atomic types
-   if (any(atomtypes%parts%num_items1 /= atomtypes%parts%num_items2)) then
-      write (stderr, '(a)') 'Error: There are conflicting atomic types'
-      stop
-   end if
 
    allocate (atomperm(size(mol1%atoms)))
    allocate (auxperm(size(mol1%atoms)))
+   weights1 = atomic_weights(mol1%atoms%elnum)
+   weights2 = atomic_weights(mol2%atoms%elnum)
+   wcoords1 = get_coords( mol1)
+   wcoords2 = get_coords( mol2)
+   adjmat1 = get_adjmat( mol1)
+   adjmat2 = get_adjmat( mol2)
 
-   elnums1 = mol1%atoms%elnum
-   elnums2 = mol2%atoms%elnum
-   coords1 = get_coords(mol1)
-   coords2 = get_coords(mol2)
-   adjmat1 = get_adjmat(mol1)
-   adjmat2 = get_adjmat(mol2)
+   ! Mirror coordinates
+   if (mirror_flag) then
+      call mirror_coords( wcoords2)
+   end if
 
+   ! Calculate centroids
+   center1 = centroid( wcoords1, weights1)
+   center2 = centroid( wcoords2, weights2)
+
+   ! Translate atoms to their centroids
+   call translate_coords( wcoords1, -center1)
+   call translate_coords( wcoords2, -center2)
+
+   ! Weight coordinates
+   call weight_coords( wcoords1, weights1)
+   call weight_coords( wcoords2, weights2)
+
+   ! Pre-compute assignment tree
    call init_chain_from_partition( atomtypes, mnachain, temp_part)
    call compute_consistent_mnas( mol1, mol2, mnachain)
    call precompute_assignment_tree( mol1, mol2, part_tree, mnachain%last_link, assignment_tree)
    call print_chain_tree( assignment_tree)
    call convert_trees_to_arrays( part_tree, assignment_tree, array_trees, mol1, mol2)
 
-   ! Mirror coordinates
-   if (mirror_flag) then
-      call mirror_coords( coords2)
-   end if
-
-   ! Mass weight coordinates
-   call weight_coords( coords1, atomic_weights(elnums1))
-   call weight_coords( coords2, atomic_weights(elnums2))
-
-   ! Translate atoms to their centroids
-   center1 = centroid( coords1)
-   center2 = centroid( coords2)
-   call translate_coords( coords2, -center2)
-   call translate_coords( coords2, center1)
-
    ! Initialize random number generator
    call random_initialize()
 
    ! Initialize local minima registry
-!   call init_rmsd_registry( registry, max_records, coords1)
-   call init_dual_registry( registry, max_records, coords1, adjmat1)
+   call init_rmsd_registry( registry, max_records)
 
    ! Optimize atom permutation
    do while (registry%records(1)%count < max_count .and. registry%num_trials < max_trials)
 
       num_trials = num_trials + 1
 
-      ! Aply a random rotation to coords2
-      call rotate_coords( coords2, randrotquat(), center1)
+      ! Get randomly rotated wcoords2
+      rotation = randrotquat()
+      rcoords2 = rotated_coords( wcoords2, rotation)
 
       ! Assign atoms with current orientation
-      call distribute_items_dfs( coords1, coords2, array_trees, atomperm)
-      call optimize_rotation( atomperm, coords1, coords2, center1, total_rotation)
-      call rotate_coords( coords2, total_rotation, center1)
+      call distribute_items_dfs( wcoords1, rcoords2, array_trees, atomperm)
+      call align_coords( atomperm, wcoords1, rcoords2, rotation_step)
+      rotation = quatmul( rotation, rotation_step)
       num_steps = 1
 
       do while (iter_flag)
-         call distribute_items_dfs( coords1, coords2, array_trees, auxperm)
-!         write (stderr, '(F8.4,F8.4,F8.4)') sqrt(total_sqdist(auxperm, coords1, coords2))
+         call distribute_items_dfs( wcoords1, rcoords2, array_trees, auxperm)
+!         write (stderr,'(F8.4)') sqrt( total_sqdist( auxperm, wcoords1, rcoords2))
          if (all(auxperm == atomperm)) exit
          atomperm = auxperm
-         call optimize_rotation( atomperm, coords1, coords2, center1, step_rotation)
-         call rotate_coords( coords2, step_rotation, center1)
-         total_rotation = quatmul( step_rotation, total_rotation)
+         call align_coords( atomperm, wcoords1, rcoords2, rotation_step)
+         rotation = quatmul( rotation, rotation_step)
          num_steps = num_steps + 1
       end do
 
       ! Update results
-!      call push_record( registry, atomperm, coords2=coords2, num_steps=num_steps, rotation=total_rotation)
-      call push_record( registry, atomperm, coords2=coords2, adjmat2=adjmat2, num_steps=num_steps, rotation=total_rotation)
+      rmsd = sqrt( total_sqdist( atomperm, wcoords1, rcoords2))
+      call push_record( registry, atomperm, num_steps, rmsd=rmsd, rotation=rotation)
+!      write (stderr,'(I0)') adjacencydiff( atomperm, adjmat1, adjmat2)
 
    end do
 end subroutine

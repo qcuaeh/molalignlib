@@ -147,7 +147,7 @@ subroutine build_minbiases(atomtypes, mol1, mol2, biases, minbiases)
                adjlistat2 = mol2%atoms(jatom)%adjlist
 !write (stderr,*) "adjlist2: ", adjlistat2
 
-               call set_eltypes(mol1%atoms(adjlistat1), mol2%atoms(adjlistat2), adjeltypes)   ! eltype for adjlists
+               call collect_atomtypes(mol1%atoms(adjlistat1), mol2%atoms(adjlistat2), adjeltypes)   ! eltype for adjlists
 
                ! run over adjlist's atomtypes
                do ha = 1, adjeltypes%num_parts

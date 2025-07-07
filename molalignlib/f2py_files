@@ -1,4 +1,3 @@
 parameters.f90
 globals.f90
 biasing.f90
-molalignlib.f90

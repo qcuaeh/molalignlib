@@ -54,35 +54,41 @@ subroutine find_reactive_bonds( mol1, mol2, atomtypes, atomperm)
    type(int_matrix), dimension(:), allocatable :: biases
    type(real_matrix), dimension(:), allocatable :: minbiases
    type(registry_t), target :: registry
+   integer :: adjd
    integer, dimension(:), allocatable :: auxperm
    integer, dimension(:), allocatable :: elnums1, elnums2
    logical, dimension(:,:), allocatable :: adjmat1, adjmat2
-   real(rk), dimension(:,:), allocatable :: coords1, coords2
+   real(rk), dimension(:), allocatable :: weights1, weights2
+   real(rk), dimension(:,:), allocatable :: wcoords1, wcoords2
    real(rk) :: center1(3), center2(3)
 
    allocate (auxperm, mold=atomperm)
 
    elnums1 = mol1%atoms%elnum
    elnums2 = mol2%atoms%elnum
-   coords1 = get_coords( mol1)
-   coords2 = get_coords( mol2)
+   weights1 = atomic_weights(elnums1)/sum(atomic_weights(elnums1))
+   weights2 = atomic_weights(elnums2)/sum(atomic_weights(elnums2))
+   wcoords1 = get_coords( mol1)
+   wcoords2 = get_coords( mol2)
    adjmat1 = get_adjmat( mol1)
    adjmat2 = get_adjmat( mol2)
 
    ! Mirror coordinates
    if (mirror_flag) then
-      call mirror_coords( coords2)
+      call mirror_coords( wcoords2)
    end if
 
    ! Mass weight coordinates
-   call weight_coords( coords1, atomic_weights(elnums1))
-   call weight_coords( coords2, atomic_weights(elnums2))
+   call weight_coords( wcoords1, weights1)
+   call weight_coords( wcoords2, weights2)
+
+   ! Calculate centroids
+   center1 = centroid( wcoords1, weights1)
+   center2 = centroid( wcoords2, weights2)
 
    ! Translate atoms to their centroids
-   center1 = centroid( coords1)
-   center2 = centroid( coords2)
-   call translate_coords( coords2, -center2)
-   call translate_coords( coords2, center1)
+   call translate_coords( wcoords2, -center2)
+   call translate_coords( wcoords2, center1)
 
    ! Compute MNA types
    call init_chain_from_partition( atomtypes, mnachain, part_tree)
@@ -104,17 +110,18 @@ subroutine find_reactive_bonds( mol1, mol2, atomtypes, atomperm)
    call random_initialize()
 
    ! Initialize local minima registry
-   call init_adjd_registry( registry, max_records, adjmat1)
+   call init_adjd_registry( registry, max_records)
 
    ! Optimize atom permutation
    do while (registry%records(1)%count < max_count .and. registry%num_trials < max_trials)
 
       ! Assign atoms with current orientation
-      call assign_atoms_biased( atomtypes, coords1, coords2, biases, atomperm)
+      call assign_atoms_biased( atomtypes, wcoords1, wcoords2, biases, atomperm)
       ! Reassign mismatches
-      call minadjdiff( atomtypes, mnatypes, molfrags1, mol1, mol2, coords1, coords2, atomperm)
+      call minadjdiff( atomtypes, mnatypes, molfrags1, mol1, mol2, wcoords1, wcoords2, atomperm)
       ! Update results
-      call push_record( registry, atomperm, adjmat2=adjmat2)
+      adjd = adjacencydiff( atomperm, adjmat1, adjmat2)
+      call push_record( registry, atomperm, 1, adjd=adjd)
 
    end do
 
@@ -206,7 +213,7 @@ subroutine optimize_atomperm_isomer( mol1, mol2, registry)
    logical, dimension(:,:), allocatable :: adjmat1, adjmat2
    integer, dimension(:), allocatable :: atomperm, auxperm
    integer, dimension(:), allocatable :: elnums1, elnums2
-   real(rk), dimension(:,:), allocatable :: coords1, coords2
+   real(rk), dimension(:,:), allocatable :: wcoords1, wcoords2
 
    ! Abort if molecules have different number of atoms
    if (size(mol1%atoms) /= size(mol2%atoms)) then
@@ -221,7 +228,7 @@ subroutine optimize_atomperm_isomer( mol1, mol2, registry)
    end if
 
    ! Compute atomic types
-   call set_eltypes( mol1%atoms, mol2%atoms, atomtypes)
+   call collect_atomtypes( mol1%atoms, mol2%atoms, atomtypes)
 
    ! Abort if there are conflicting atomic types
    if (any(atomtypes%parts%num_items1 /= atomtypes%parts%num_items2)) then
@@ -234,8 +241,8 @@ subroutine optimize_atomperm_isomer( mol1, mol2, registry)
 
    elnums1 = mol1%atoms%elnum
    elnums2 = mol2%atoms%elnum
-   coords1 = get_coords(mol1)
-   coords2 = get_coords(mol2)
+   wcoords1 = get_coords(mol1)
+   wcoords2 = get_coords(mol2)
    adjmat1 = get_adjmat(mol1)
    adjmat2 = get_adjmat(mol2)
 
@@ -245,7 +252,7 @@ subroutine optimize_atomperm_isomer( mol1, mol2, registry)
    adjmat1 = get_adjmat( mol1)
    adjmat2 = get_adjmat( mol2)
    write (stderr, *) 'after ', adjacencydiff( atomperm, adjmat1, adjmat2)
-   call optimize_atomperm_conformer( mol1, mol2, registry)
+   call optimize_atomperm_conformer( mol1, mol2, atomtypes, registry)
 end subroutine
 
 end module

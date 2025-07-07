@@ -47,7 +47,7 @@ function find_atomtype(atomtypetable, atom) result(part_index)
    part_index = 0  ! Not found
 end function
 
-subroutine set_eltypes(atoms1, atoms2, atomtypes)
+subroutine collect_atomtypes(atoms1, atoms2, atomtypes)
 ! Partition atoms by atomic number and label using arrays directly
    type(atom_type), dimension(:), intent(in) :: atoms1, atoms2
    type(partition_t), intent(out) :: atomtypes

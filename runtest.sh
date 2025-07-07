@@ -1,2 +1,2 @@
 #!/bin/sh
-./build/rmsd-conformer -align -remap -pipe xyz -stats -N 8 < "$1" 2>&1 >output
+./build/rmsd-conformer -align -remap -pipe xyz -stats -N 20 < "$1" 2>&1 >output

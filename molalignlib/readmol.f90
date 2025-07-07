@@ -31,7 +31,7 @@ subroutine readxyz(unit, mol)
    type(mol_type), intent(out) :: mol
    ! Local variables
    character(ll) :: buffer
-   character(wl) :: tag
+   character(wl) :: elsym
    integer :: i, num_atoms, elnum, label
    real(rk) :: coords(3)
 
@@ -41,8 +41,8 @@ subroutine readxyz(unit, mol)
    mol%title = trim(buffer)
 
    do i = 1, num_atoms
-      read (unit, *, end=99) tag, coords
-      call split_tag(tag, elnum, label)
+      read (unit, *, end=99) elsym, coords
+      call split_symbol(elsym, elnum, label)
       mol%atoms(i)%elnum = elnum
       mol%atoms(i)%weight = atomic_weights(elnum)
       mol%atoms(i)%label = label
@@ -62,8 +62,8 @@ subroutine readmol2(unit, mol)
    type(mol_type), intent(out) :: mol
    character(ll) :: buffer
    integer :: i, id, num_atoms, elnum, label
-   integer :: nbond, atom1, atom2, bondorder
-   character(wl) :: tag
+   integer :: nbond, atom1, atom2
+   character(wl) :: elsym, bondtype
    real(rk) :: coords(3)
    integer, dimension(:), allocatable :: nadjs
    integer, dimension(:,:), allocatable :: adjlists
@@ -87,8 +87,8 @@ subroutine readmol2(unit, mol)
    end do
 
    do i = 1, num_atoms
-      read (unit, *, end=99) id, tag, coords
-      call split_tag(tag, elnum, label)
+      read (unit, *, end=99) id, elsym, coords
+      call split_symbol(elsym, elnum, label)
       mol%atoms(i)%elnum = elnum
       mol%atoms%weight = atomic_weights(elnum)
       mol%atoms(i)%label = label
@@ -105,7 +105,7 @@ subroutine readmol2(unit, mol)
    adjlists(:, :) = 0
 
    do i = 1, nbond
-      read (unit, *, end=99) id, atom1, atom2, bondorder
+      read (unit, *, end=99) id, atom1, atom2, bondtype
       nadjs(atom1) = nadjs(atom1) + 1
       nadjs(atom2) = nadjs(atom2) + 1
       adjlists(nadjs(atom1), atom1) = atom2

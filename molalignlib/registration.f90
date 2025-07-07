@@ -33,11 +33,9 @@ type :: record_t
    integer :: count
    integer :: adjd                                      ! Used when use_adjacency=TRUE
    real(rk) :: rmsd                                     ! Used when use_position=TRUE
+   real(rk) :: rotation(4)
    real(rk) :: aver_steps                               ! Used when use_position=TRUE
-   real(rk) :: aver_rotangle                            ! Used when use_position=TRUE
    integer, dimension(:), allocatable :: atomperm
-   real(rk), dimension(:,:), allocatable :: coords2     ! Used when use_position=TRUE
-   logical, dimension(:,:), allocatable :: adjmat2      ! Used when use_adjacency=TRUE
 end type
 
 type :: registry_t
@@ -47,17 +45,14 @@ type :: registry_t
    integer :: total_steps                               ! Used when use_position=TRUE
    integer :: num_trials
    integer :: num_records
-   real(rk), dimension(:,:), allocatable :: coords1     ! Used when use_position=TRUE
-   logical, dimension(:,:), allocatable :: adjmat1      ! Used when use_adjacency=TRUE
    type(record_t), dimension(:), allocatable :: records
 end type
 
 contains
 
-subroutine init_rmsd_registry(self, max_records, coords1)
+subroutine init_rmsd_registry(self, max_records)
    class(registry_t), intent(inout) :: self
    integer, intent(in) :: max_records
-   real(rk), dimension(:,:), intent(in) :: coords1
 
    if (max_records < 1) then
       error stop 'max_records < 1'
@@ -69,7 +64,6 @@ subroutine init_rmsd_registry(self, max_records, coords1)
    self%num_trials = 0
    self%total_steps = 0
    self%overflow = .false.
-   self%coords1 = coords1
 
    allocate (self%records(max_records))
 
@@ -77,11 +71,9 @@ subroutine init_rmsd_registry(self, max_records, coords1)
    self%records%rmsd = huge(self%records(1)%rmsd)
 end subroutine
 
-subroutine init_dual_registry(self, max_records, coords1, adjmat1)
+subroutine init_dual_registry(self, max_records)
    class(registry_t), intent(inout) :: self
    integer, intent(in) :: max_records
-   real(rk), dimension(:,:), intent(in) :: coords1
-   logical, dimension(:,:), intent(in) :: adjmat1
 
    if (max_records < 1) then
       error stop 'max_records < 1'
@@ -93,8 +85,6 @@ subroutine init_dual_registry(self, max_records, coords1, adjmat1)
    self%num_trials = 0
    self%total_steps = 0
    self%overflow = .false.
-   self%coords1 = coords1
-   self%adjmat1 = adjmat1
 
    allocate (self%records(max_records))
 
@@ -102,10 +92,9 @@ subroutine init_dual_registry(self, max_records, coords1, adjmat1)
    self%records%adjd = huge(self%records(1)%adjd)
 end subroutine
 
-subroutine init_adjd_registry(self, max_records, adjmat1)
+subroutine init_adjd_registry(self, max_records)
    class(registry_t), intent(inout) :: self
    integer, intent(in) :: max_records
-   logical, dimension(:,:), intent(in) :: adjmat1
 
    if (max_records < 1) then
       error stop 'max_records < 1'
@@ -116,7 +105,6 @@ subroutine init_adjd_registry(self, max_records, adjmat1)
    self%num_records = 0
    self%num_trials = 0
    self%overflow = .false.
-   self%adjmat1 = adjmat1
 
    allocate (self%records(max_records))
 
@@ -124,64 +112,48 @@ subroutine init_adjd_registry(self, max_records, adjmat1)
    self%records%adjd = huge(self%records(1)%adjd)
 end subroutine
 
-subroutine push_record(self, atomperm, coords2, adjmat2, num_steps, rotation)
+subroutine push_record(self, atomperm, num_steps, adjd, rmsd, rotation)
    class(registry_t), target, intent(inout) :: self
    integer, dimension(:), intent(in) :: atomperm
-   real(rk), dimension(:,:), intent(in), optional :: coords2
-   logical, dimension(:,:), intent(in), optional :: adjmat2
-   integer, intent(in), optional :: num_steps
+   integer, intent(in) :: num_steps
+   integer, intent(in), optional :: adjd
+   real(rk), intent(in), optional :: rmsd
    real(rk), intent(in), optional :: rotation(4)
    ! Local variables
    type(record_t), pointer :: record
-   real(rk) :: rmsd
-   integer :: adjd, steps
-   real(rk) :: rot_angle
-   integer :: i, j
    logical :: should_insert
+   integer :: i, j
 
    ! Validate required parameters based on flags
    if (.not. self%use_position .and. .not. self%use_adjacency) then
       error stop 'Registry not properly initialized - no processing mode enabled'
    end if
 
-   self%num_trials = self%num_trials + 1
-   
    ! Handle position-based processing
    if (self%use_position) then
-      if (.not. present(num_steps)) error stop 'num_steps required when use_position=TRUE'
+      if (.not. present(rmsd)) error stop 'rmsd required when use_position=TRUE'
       if (.not. present(rotation)) error stop 'rotation required when use_position=TRUE'
-      if (.not. present(coords2)) error stop 'coords2 required when use_position=TRUE'
-      steps = num_steps
-      rot_angle = angle(rotation)
-      self%total_steps = self%total_steps + steps
    end if
    
    ! Handle adjacency-based processing
    if (self%use_adjacency) then
-      if (.not. present(adjmat2)) error stop 'adjmat2 required when use_adjacency=TRUE'
-      adjd = adjacencydiff(atomperm, self%adjmat1, adjmat2)
+      if (.not. present(adjd)) error stop 'adjd required when use_adjacency=TRUE'
    end if
 
-   ! Check for existing records to update (CRITICAL: topoatomperm has different logic!)
+   self%num_trials = self%num_trials + 1
+   self%total_steps = self%total_steps + num_steps
+   
+   ! Check for existing records to update
    do i = 1, self%num_records
       record => self%records(i)
       if (allocated(record%atomperm)) then
-         if ((self%use_adjacency .and. .not. self%use_position .and. adjd == record%adjd) .or. &
-             (.not. (self%use_adjacency .and. .not. self%use_position) .and. all(atomperm == record%atomperm))) then
+         if (all(atomperm == record%atomperm)) then
             record%count = record%count + 1
-            if (self%use_position) then
-               record%aver_steps = record%aver_steps + (steps - record%aver_steps) / record%count
-               record%aver_rotangle = record%aver_rotangle + (rot_angle - record%aver_rotangle) / record%count
-            end if
+            record%aver_steps = record%aver_steps + (num_steps - record%aver_steps) / record%count
             return
          end if
       end if
    end do
-
-   ! Calculate RMSD if needed (after the early return check)
-   if (self%use_position) then
-      rmsd = sqrt(total_sqdist(atomperm, self%coords1, coords2))
-   end if
 
    ! Find insertion point and insert new record
    do i = 1, size(self%records)
@@ -209,14 +181,12 @@ subroutine push_record(self, atomperm, coords2, adjmat2, num_steps, rotation)
          ! Set fields based on enabled processing modes
          if (self%use_position) then
             record%rmsd = rmsd
-            record%coords2 = coords2
-            record%aver_steps = steps
-            record%aver_rotangle = rot_angle
+            record%rotation = rotation
+            record%aver_steps = num_steps
          end if
          
          if (self%use_adjacency) then
             record%adjd = adjd
-            record%adjmat2 = adjmat2
          end if
          
          exit
@@ -248,24 +218,24 @@ subroutine print_records(registry)
    if (registry%use_position .and. .not. registry%use_adjacency) then
       ! Position only
       line = repeat('-', 42)
-      write (stdout, '(2x,a,4x,a,4x,a,4x,a,7x,a)') '#', 'Count', 'Steps', 'Rot-θ', 'RMSD'
+      write (stdout, '(2x,a,4x,a,5x,a,4x,a,7x,a)') '#', 'Count', 'Steps', 'Rotθ', 'RMSD'
       write (stdout, '(a)') line(1:42)
       do i = 1, registry%num_records
          record = registry%records(i)
          write (stdout, '(i3,4x,i4,4x,f5.1,5x,f5.1,4x,f8.4)') &
-            i, record%count, record%aver_steps, record%aver_rotangle, record%rmsd
+            i, record%count, record%aver_steps, angle(record%rotation), record%rmsd
       end do
       write (stdout, '(a)') line(1:42)
    
    else if (registry%use_position .and. registry%use_adjacency) then
       ! Both position and adjacency
       line = repeat('-', 49)
-      write (stdout, '(2x,a,4x,a,4x,a,4x,a,4x,a,6x,a)') '#', 'Count', 'Steps', 'Rot-θ', 'Δadj', 'RMSD'
+      write (stdout, '(2x,a,4x,a,5x,a,4x,a,4x,a,6x,a)') '#', 'Count', 'Steps', 'Rotθ', 'Δadj', 'RMSD'
       write (stdout, '(a)') line
       do i = 1, registry%num_records
          record = registry%records(i)
          write (stdout, '(i3,4x,i4,4x,f5.1,5x,f5.1,3x,i4,4x,f8.4)') &
-            i, record%count, record%aver_steps, record%aver_rotangle, record%adjd, record%rmsd
+            i, record%count, record%aver_steps, angle(record%rotation), record%adjd, record%rmsd
       end do
       write (stdout, '(a)') line
    

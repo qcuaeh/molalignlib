@@ -14,10 +14,10 @@
 ! You should have received a copy of the GNU General Public License
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-!> @defgroup atomalig AtomAlign
-!> @brief Program to align atomic clusters
+!> @defgroup program_rmsd_conformer Program RMSD Conformer
+!> @brief Program to calculate RMSD between conformers
 !> @{
-program rmsd_cluster
+program rmsd_conformer
 use parameters
 use globals
 use molecule
@@ -30,27 +30,26 @@ use fileio
 use argparse
 use biasing
 use pruning
-use assignment_cluster
-use molalignlib
 use registration
+use assignment_cluster
 
 implicit none
 
-integer :: i
-integer :: unitin1, unitin2, unitout
 integer, allocatable :: atomperm(:)
 character(:), allocatable :: arg
-character(:), allocatable :: fmtin1, fmtin2, fmtout
-character(:), allocatable :: optfmtin, optfmtout
 character(:), allocatable :: pathout
-logical :: fmtin_flag, fmtout_flag
-logical :: align_flag, remap_flag, pipe_flag, nrec_flag
-real(rk) :: rmsd
+character(:), allocatable :: fmtin1, fmtin2, fmtout, fmtpipe
+logical :: align_flag, remap_flag, write_flag, pipe_flag
 type(strlist_type) :: posargs(2)
 type(mol_type) :: mol1, mol2, auxmol
+type(partition_t) :: atomtypes
 type(registry_t) :: registry
+real(rk) :: rmsd
+real(rk) :: center1(3), center2(3), rotquat(4)
 real(rk), dimension(:), allocatable :: weights1, weights2
-real(rk), dimension(:,:), allocatable :: coords1, coords2
+real(rk), dimension(:,:), allocatable :: coords1, coords2, wcoords1, wcoords2, rcoords2
+integer :: unitin1, unitin2, unitout
+integer :: i
 
 ! Set default options
 
@@ -60,14 +59,12 @@ stats_flag = .false.
 mirror_flag = .false.
 align_flag = .false.
 remap_flag = .false.
+write_flag = .false.
 pipe_flag = .false.
-fmtin_flag = .false.
-fmtout_flag = .false.
-nrec_flag = .false.
 
 max_records = 1
 max_count = 10
-max_trials = huge(max_trials)
+max_trials = huge( max_trials)
 
 atomic_weights => ones
 pathout = 'aligned.xyz'
@@ -80,7 +77,6 @@ prune_procedure => prune_none
 call init_args()
 
 do while (get_arg(arg))
-
    select case (arg)
    case ('-align')
       align_flag = .true.
@@ -92,44 +88,40 @@ do while (get_arg(arg))
    case ('-prune')
       iter_flag = .true.
       prune_procedure => prune_rd
+   case ('-tol')
+      call read_optarg(arg, prune_tol)
    case ('-mass')
       atomic_weights => atomic_masses
    case ('-mirror')
       mirror_flag = .true.
    case ('-count')
-      call read_optarg(arg, max_count)
+      call read_optarg( arg, max_count)
    case ('-trials')
-      call read_optarg(arg, max_trials)
-   case ('-tol')
-      call read_optarg(arg, prune_tol)
+      call read_optarg( arg, max_trials)
    case ('-N')
-      nrec_flag = .true.
-      call read_optarg(arg, max_records)
-   case ('-out')
-      call read_optarg(arg, pathout)
-   case ('-fmtin')
-      fmtin_flag = .true.
-      call read_optarg(arg, optfmtin)
-   case ('-fmtout')
-      fmtout_flag = .true.
-      call read_optarg(arg, optfmtout)
+      call read_optarg( arg, max_records)
+   case ('-O')
+      write_flag = .true.
+      call read_optarg( arg, pathout)
    case ('-pipe')
       pipe_flag = .true.
+      call read_optarg( arg, fmtpipe)
    case ('-stats')
       stats_flag = .true.
    case ('-test')
       test_flag = .true.
    case default
-      call read_posarg(arg, posargs)
+      call read_posarg( arg, posargs)
    end select
-
 end do
 
 if (pipe_flag) then
    unitin1 = stdin
    unitin2 = stdin
-   fmtin1 = 'xyz'
-   fmtin2 = 'xyz'
+   unitout = stdout
+   fmtin1 = fmtpipe
+   fmtin2 = fmtpipe
+   fmtout = fmtpipe
 else
    select case (ipos)
    case (0)
@@ -139,85 +131,109 @@ else
       write (stderr, '(a)') 'Error: Too few file paths'
       stop
    case (2)
-      call open2read(posargs(1)%arg, unitin1, fmtin1)
-      call open2read(posargs(2)%arg, unitin2, fmtin2)
+      call open2read( posargs(1)%arg, unitin1, fmtin1)
+      call open2read( posargs(2)%arg, unitin2, fmtin2)
    case default
       write (stderr, '(a)') 'Error: Too many file paths'
       stop
    end select
-end if
-
-if (fmtin_flag) then
-   fmtin1 = optfmtin
-   fmtin2 = optfmtin
+   if (write_flag) then
+      call open2write( pathout, unitout, fmtout)
+   end if
 end if
 
 ! Read coordinates
 call read_file( unitin1, fmtin1, mol1)
 call read_file( unitin2, fmtin2, mol2)
 
-! Allocate arrays
-if (pipe_flag) then
-   unitout = stdout
-   fmtout = 'xyz'
-else
-   call open2write( pathout, unitout, fmtout)
+! Abort if molecules have different number of atoms
+if (size(mol1%atoms) /= size(mol2%atoms)) then
+   write (stderr, '(a)') 'Error: These molecules are not isomers'
+   stop
 end if
 
-if (fmtout_flag) then
-   fmtout = optfmtout
+! Abort if molecules are not isomers
+if (any(sorted(mol1%atoms%elnum) /= sorted(mol2%atoms%elnum))) then
+   write (stderr, '(a)') 'Error: These molecules are not isomers'
+   stop
 end if
 
-coords1 = get_coords(mol1)
+! Compute atomic types
+call collect_atomtypes( mol1%atoms, mol2%atoms, atomtypes)
+
+! Abort if there are conflicting atomic types
+if (any(atomtypes%parts%num_items1 /= atomtypes%parts%num_items2)) then
+   write (stderr, '(a)') 'Error: There are conflicting atomic types'
+   stop
+end if
+
+! Initialization
+coords1 = get_coords( mol1)
+coords2 = get_coords( mol2)
+wcoords1 = get_coords( mol1)
+wcoords2 = get_coords( mol2)
 weights1 = atomic_weights(mol1%atoms%elnum)
 weights2 = atomic_weights(mol2%atoms%elnum)
-call weight_coords( coords1, weights1)
-
+center1 = centroid( coords1, weights1)
+center2 = centroid( coords2, weights2)
+call translate_coords( coords2, center1 - center2)
+call translate_coords( wcoords1, -center1)
+call translate_coords( wcoords2, -center2)
+call weight_coords( wcoords1, weights1)
+call weight_coords( wcoords2, weights2)
 allocate (auxmol%atoms(size(mol2%atoms)))
 
-if (remap_flag) then
+if (align_flag .and. remap_flag) then
 
    ! Remap atoms to minimize the MSD
-   call optimize_atomperm_atoms( mol1, mol2, registry)
+   call optimize_atomperm_cluster( mol1, mol2, atomtypes, registry)
 
    ! Print optimization stats
    if (stats_flag) then
       call print_records( registry)
    end if
 
-   if (.not. nrec_flag) then
-      call write_file( unitout, fmtout, mol1)
+   do i = 1, registry%num_records
+      atomperm = registry%records(i)%atomperm
+!      rotquat = registry%records(i)%rotquat
+      rotquat = least_rotquat( atomperm, wcoords1, wcoords2)
+      rcoords2 = rotated_coords( coords2, rotquat, center1)
+      rmsd = sqrt( total_sqdist( atomperm, weights1, coords1, rcoords2))
+
+      write (stderr,'(a)') str( rmsd, 4)
+
+      if (write_flag .or. pipe_flag) then
+         auxmol%title = 'RMSD=' // str( rmsd, 4)
+         auxmol%atoms%elnum = mol2%atoms(atomperm)%elnum
+         auxmol%atoms%label = mol2%atoms(atomperm)%label
+         call set_coords( auxmol, rcoords2(:,atomperm))
+         call write_file( unitout, fmtout, auxmol)
+      end if
+   end do
+
+else if (align_flag) then
+
+   rotquat = least_rotquat( wcoords1, wcoords2)
+   rcoords2 = rotated_coords( coords2, rotquat, center1)
+   rmsd = sqrt( total_sqdist( weights1, coords1, rcoords2))
+
+   write (stderr,'(a)') str( rmsd, 4)
+
+   if (write_flag .or. pipe_flag) then
+      auxmol%title = 'RMSD=' // str( rmsd, 4)
+      auxmol%atoms%elnum = mol2%atoms%elnum
+      auxmol%atoms%label = mol2%atoms%label
+      call set_coords( auxmol, rcoords2)
+      call write_file( unitout, fmtout, auxmol)
    end if
 
-   do i = 1, registry%num_records
+else if (remap_flag) then
 
-      atomperm = registry%records(i)%atomperm
-      coords2 = registry%records(i)%coords2
-      rmsd = sqrt(total_sqdist( atomperm, coords1, coords2))
-      call unweight_coords( coords2, weights2)
-
-      write (stderr, "(a)") str(rmsd, 4)
-      auxmol%title = 'RMSD='//str(rmsd, 4)
-      auxmol%atoms%elnum = mol2%atoms(atomperm)%elnum
-      auxmol%atoms%label = mol2%atoms(atomperm)%label
-      call set_coords( auxmol, coords2(:, atomperm))
-      call write_file( unitout, fmtout, auxmol)
-
-   end do
+   ! Not implemented
 
 else
 
-   ! Align atoms
-   call align_atoms( mol1, mol2, coords2)
-   rmsd = sqrt(total_sqdist( coords1, coords2))
-   call unweight_coords( coords2, weights2)
-
-   write (stderr, "(a)") str(rmsd, 4)
-   auxmol%title = 'RMSD='//str(rmsd, 4)
-   auxmol%atoms%elnum = mol2%atoms%elnum
-   auxmol%atoms%label = mol2%atoms%label
-   call set_coords( auxmol, coords2)
-   call write_file( unitout, fmtout, mol2)
+   ! Not implemented
 
 end if
 

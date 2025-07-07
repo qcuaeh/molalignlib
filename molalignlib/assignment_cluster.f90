@@ -32,97 +32,77 @@ implicit none
 
 contains
 
-subroutine optimize_atomperm_atoms(mol1, mol2, registry)
+subroutine optimize_atomperm_cluster(mol1, mol2, atomtypes, registry)
    type(mol_type), intent(in) :: mol1, mol2
+   type(partition_t), intent(in) :: atomtypes
    type(registry_t), intent(out) :: registry
 
    ! Local variables
-   type(partition_t) :: atomtypes
    type(bool_matrix), dimension(:), allocatable :: prunes
    integer :: num_steps
    integer, dimension(:), allocatable :: atomperm, auxperm
-   integer, dimension(:), allocatable :: elnums1, elnums2
-   real(rk), dimension(:,:), allocatable :: coords1, coords2
-   real(rk) :: step_rotation(4), total_rotation(4)
-   real(rk) :: center1(3), center2(3)
-
-   ! Abort if molecules have different number of atoms
-   if (size(mol1%atoms) /= size(mol2%atoms)) then
-      write (stderr, '(a)') 'Error: These molecules are not isomers'
-      stop
-   end if
-
-   ! Abort if molecules are not isomers
-   if (any(sorted(mol1%atoms%elnum) /= sorted(mol2%atoms%elnum))) then
-      write (stderr, '(a)') 'Error: These molecules are not isomers'
-      stop
-   end if
-
-   ! Compute atomic types
-   call set_eltypes( mol1%atoms, mol2%atoms, atomtypes)
-
-   ! Abort if there are conflicting atomic types
-   if (any(atomtypes%parts%num_items1 /= atomtypes%parts%num_items2)) then
-      write (stderr, '(a)') 'Error: There are conflicting atomic types'
-      stop
-   end if
+   real(rk), dimension(:), allocatable :: weights1, weights2
+   real(rk), dimension(:,:), allocatable :: wcoords1, wcoords2, rcoords2
+   real(rk) :: rmsd, center1(3), center2(3), rotation_step(4), rotation(4)
 
    allocate (atomperm(size(mol1%atoms)))
    allocate (auxperm(size(mol1%atoms)))
-
-   elnums1 = mol1%atoms%elnum
-   elnums2 = mol2%atoms%elnum
-   coords1 = get_coords( mol1)
-   coords2 = get_coords( mol2)
+   weights1 = atomic_weights(mol1%atoms%elnum)
+   weights2 = atomic_weights(mol2%atoms%elnum)
+   wcoords1 = get_coords( mol1)
+   wcoords2 = get_coords( mol2)
 
    ! Mirror coordinates
    if (mirror_flag) then
-      call mirror_coords(coords2)
+      call mirror_coords(wcoords2)
    end if
-
-   ! Mass weight coordinates
-   call weight_coords( coords1, atomic_weights(elnums1))
-   call weight_coords( coords2, atomic_weights(elnums2))
-
-   ! Translate atoms to their centroids
-   center1 = centroid( coords1)
-   center2 = centroid( coords2)
-   call translate_coords( coords2, -center2)
-   call translate_coords( coords2, center1)
 
    ! Find unfeasible assignments
    call prune_procedure( atomtypes, mol1, mol2, prunes)
+
+   ! Calculate centroids
+   center1 = centroid( wcoords1, weights1)
+   center2 = centroid( wcoords2, weights2)
+
+   ! Translate atoms to their centroids
+   call translate_coords( wcoords1, -center1)
+   call translate_coords( wcoords2, -center2)
+
+   ! Weight coordinates
+   call weight_coords( wcoords1, weights1)
+   call weight_coords( wcoords2, weights2)
 
    ! Initialize random number generator
    call random_initialize()
 
    ! Initialize local minima registry
-   call init_rmsd_registry( registry, max_records, coords1)
+   call init_rmsd_registry( registry, max_records)
 
    ! Optimize atom permutation
    do while (registry%records(1)%count < max_count .and. registry%num_trials < max_trials)
 
-      ! Aply a random rotation to coords2
-      call rotate_coords( coords2, randrotquat(), center1)
+      ! Aply a random rotation to wcoords2
+      rotation = randrotquat()
+      rcoords2 = rotated_coords( wcoords2, rotation)
 
       ! Assign atoms with current orientation
-      call assign_atoms_pruned( atomtypes, coords1, coords2, prunes, atomperm)
-      call optimize_rotation( atomperm, coords1, coords2, center1, total_rotation)
-      call rotate_coords( coords2, total_rotation, center1)
+      call assign_atoms_pruned( atomtypes, wcoords1, rcoords2, prunes, atomperm)
+      call align_coords( atomperm, wcoords1, rcoords2, rotation_step)
+      rotation = quatmul( rotation, rotation_step)
       num_steps = 1
 
       do while (iter_flag)
-         call assign_atoms_pruned( atomtypes, coords1, coords2, prunes, auxperm)
+         call assign_atoms_pruned( atomtypes, wcoords1, rcoords2, prunes, auxperm)
          if (all(auxperm == atomperm)) exit
          atomperm = auxperm
-         call optimize_rotation( atomperm, coords1, coords2, center1, step_rotation)
-         call rotate_coords( coords2, step_rotation, center1)
-         total_rotation = quatmul( step_rotation, total_rotation)
+         call align_coords( atomperm, wcoords1, rcoords2, rotation_step)
+         rotation = quatmul( rotation, rotation_step)
          num_steps = num_steps + 1
       end do
 
       ! Push local minimum to registry
-      call push_record( registry, atomperm, coords2=coords2, num_steps=num_steps, rotation=total_rotation)
+      rmsd = sqrt( total_sqdist( atomperm, wcoords1, rcoords2))
+      call push_record( registry, atomperm, num_steps, rmsd=rmsd, rotation=rotation)
 
    end do
 

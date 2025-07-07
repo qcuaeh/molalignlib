@@ -30,9 +30,8 @@ use fileio
 use argparse
 use biasing
 use pruning
-use assignment_conformer
-use molalignlib
 use registration
+use assignment_conformer
 
 implicit none
 
@@ -40,16 +39,16 @@ integer, allocatable :: atomperm(:)
 character(:), allocatable :: arg
 character(:), allocatable :: pathout
 character(:), allocatable :: fmtin1, fmtin2, fmtout, fmtpipe
-logical :: align_flag, remap_flag, write_flag, pipe_flag, nrec_flag
-real(rk) :: center1(3)
-integer :: adjd
-real(rk) :: rmsd
+logical :: align_flag, remap_flag, write_flag, pipe_flag
 type(strlist_type) :: posargs(2)
 type(mol_type) :: mol1, mol2, auxmol
+type(partition_t) :: atomtypes
 type(registry_t) :: registry
+real(rk) :: rmsd
+real(rk) :: center1(3), center2(3), rotquat(4)
 real(rk), dimension(:), allocatable :: weights1, weights2
-real(rk), dimension(:,:), allocatable :: coords1, coords2
-logical, dimension(:,:), allocatable :: adjmat1, adjmat2
+real(rk), dimension(:,:), allocatable :: coords1, coords2, wcoords1, wcoords2, rcoords2
+!logical, dimension(:,:), allocatable :: adjmat1, adjmat2
 integer :: unitin1, unitin2, unitout
 integer :: i
 
@@ -63,7 +62,6 @@ align_flag = .false.
 remap_flag = .false.
 write_flag = .false.
 pipe_flag = .false.
-nrec_flag = .false.
 
 max_records = 1
 max_count = 10
@@ -91,9 +89,8 @@ do while (get_arg(arg))
    case ('-trials')
       call read_optarg( arg, max_trials)
    case ('-N')
-      nrec_flag = .true.
       call read_optarg( arg, max_records)
-   case ('-out')
+   case ('-O')
       write_flag = .true.
       call read_optarg( arg, pathout)
    case ('-pipe')
@@ -139,65 +136,95 @@ end if
 call read_file( unitin1, fmtin1, mol1)
 call read_file( unitin2, fmtin2, mol2)
 
+! Abort if molecules have different number of atoms
+if (size(mol1%atoms) /= size(mol2%atoms)) then
+   write (stderr, '(a)') 'Error: These molecules are not isomers'
+   stop
+end if
+
+! Abort if molecules are not isomers
+if (any(sorted(mol1%atoms%elnum) /= sorted(mol2%atoms%elnum))) then
+   write (stderr, '(a)') 'Error: These molecules are not isomers'
+   stop
+end if
+
+! Collect atom types in a partition
+call collect_atomtypes( mol1%atoms, mol2%atoms, atomtypes)
+
+! Abort if there are conflicting atomic types
+if (any(atomtypes%parts%num_items1 /= atomtypes%parts%num_items2)) then
+   write (stderr, '(a)') 'Error: There are conflicting atomic types'
+   stop
+end if
+
 ! Initialization
 call set_bonds( mol1)
 call set_bonds( mol2)
-adjmat1 = get_adjmat( mol1)
+!adjmat1 = get_adjmat( mol1)
+!adjmat2 = get_adjmat( mol2)
+allocate (auxmol%atoms(size(mol2%atoms)))
+
+! Set coordinates matrices
 coords1 = get_coords( mol1)
+coords2 = get_coords( mol2)
 weights1 = atomic_weights(mol1%atoms%elnum)
 weights2 = atomic_weights(mol2%atoms%elnum)
-call weight_coords( coords1, weights1)
-center1 = centroid( coords1)
-allocate (auxmol%atoms(size(mol2%atoms)))
+center1 = centroid( coords1, weights1)
+center2 = centroid( coords2, weights2)
+call translate_coords( coords2, center1 - center2)
+
+! Set weighted/centered coordinates matrices
+wcoords1 = get_coords( mol1)
+wcoords2 = get_coords( mol2)
+call translate_coords( wcoords1, -center1)
+call translate_coords( wcoords2, -center2)
+call weight_coords( wcoords1, weights1)
+call weight_coords( wcoords2, weights2)
 
 if (align_flag .and. remap_flag) then
 
    ! Remap atoms to minimize the MSD
-   call optimize_atomperm_conformer( mol1, mol2, registry)
+   call optimize_atomperm_conformer( mol1, mol2, atomtypes, registry)
 
    ! Print optimization stats
    if (stats_flag) then
       call print_records( registry)
    end if
 
-   if (write_flag .and. .not. nrec_flag) then
-      call write_file( unitout, fmtout, mol1)
-   end if
-
    do i = 1, registry%num_records
       atomperm = registry%records(i)%atomperm
-      adjmat2 = registry%records(i)%adjmat2
-      adjd = adjacencydiff( atomperm, adjmat1, adjmat2)
-      coords2 = registry%records(i)%coords2
-      rmsd = sqrt( total_sqdist( atomperm, coords1, coords2))
-      call unweight_coords( coords2, weights2)
+!      rotquat = registry%records(i)%rotquat
+      rotquat = least_rotquat( atomperm, wcoords1, wcoords2)
+      rcoords2 = rotated_coords( coords2, rotquat, center1)
+      rmsd = sqrt( total_sqdist( atomperm, weights1, coords1, rcoords2))
 
-      write (stderr, "(a,',',a)") str( adjd), str( rmsd, 4)
-      if (write_flag) then
+!      write (stderr,'(I0)') adjacencydiff( atomperm, adjmat1, adjmat2)
+      write (stderr,'(a)') str( rmsd, 4)
+
+      if (write_flag .or. pipe_flag) then
          auxmol%title = 'RMSD=' // str( rmsd, 4)
          auxmol%atoms%elnum = mol2%atoms(atomperm)%elnum
          auxmol%atoms%label = mol2%atoms(atomperm)%label
-         call set_coords( auxmol, coords2(:,atomperm))
+         call set_coords( auxmol, rcoords2(:,atomperm))
          call write_file( unitout, fmtout, auxmol)
       end if
    end do
 
 else if (align_flag) then
 
-   adjmat2 = get_adjmat( mol2)
-   adjd = adjacencydiff( atomperm, adjmat1, adjmat2)
-   call align_atoms( mol1, mol2, coords2)
-   call unweight_coords( coords2, weights2)
-   call translate_coords( coords2, center1)
-   rmsd = sqrt( total_sqdist( atomperm, coords1, coords2))
+   rotquat = least_rotquat( wcoords1, wcoords2)
+   rcoords2 = rotated_coords( coords2, rotquat, center1)
+   rmsd = sqrt( total_sqdist( weights1, coords1, coords2))
 
-   write (stderr, "(a,',',a)") str( adjd), str( rmsd, 4)
-   if (write_flag) then
+!   write (stderr,'(I0)') adjacencydiff( adjmat1, adjmat2)
+   write (stderr,'(a)') str( rmsd, 4)
+
+   if (write_flag .or. pipe_flag) then
       auxmol%title = 'RMSD=' // str( rmsd, 4)
       auxmol%atoms%elnum = mol2%atoms%elnum
       auxmol%atoms%label = mol2%atoms%label
-      call set_coords( auxmol, coords2)
-      call write_file( unitout, fmtout, mol2)
+      call set_coords( auxmol, rcoords2)
+      call write_file( unitout, fmtout, auxmol)
    end if
 
 else if (remap_flag) then
