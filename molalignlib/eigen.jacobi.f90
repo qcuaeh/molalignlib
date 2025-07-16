@@ -34,7 +34,7 @@ function leasteigval(A)
       end do
       off_diag_norm = sqrt(2.0_rk * off_diag_norm)
 
-      if (off_diag_norm < eps_tol) exit
+      if (off_diag_norm < CONV_TOL) exit
 
       threshold = off_diag_norm / (4.0_rk * sqrt(real(4, rk)))
 
@@ -79,7 +79,7 @@ function leasteigvec(A)
       end do
       off_diag_norm = sqrt(2.0_rk * off_diag_norm)
 
-      if (off_diag_norm < eps_tol) exit
+      if (off_diag_norm < CONV_TOL) exit
 
       threshold = off_diag_norm / (4.0_rk * sqrt(real(4, rk)))
 

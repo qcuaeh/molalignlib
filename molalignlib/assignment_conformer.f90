@@ -16,14 +16,14 @@
 
 module assignment_conformer
 use parameters
-use globals
+use options
 use random
 use molecule
 use strutils
-use chemdata
+use chemistry
 use permutation
 use spatial_transforms
-use assignment
+use assignment_atoms
 use adjacency
 use biasing
 use pruning
@@ -34,14 +34,13 @@ use assigntree_precompute
 use assigntree_recompute
 use assigntree_distribute
 use registration
-use fileio
 
 implicit none
 
 contains
 
-subroutine optimize_atomperm_conformer( mol1, mol2, atomtypes, registry)
-   type(mol_type), intent(inout) :: mol1, mol2
+subroutine optimize_atomperm_conformer( atoms1, atoms2, atomtypes, registry)
+   type(atom_t), dimension(:), intent(inout) :: atoms1, atoms2
    type(partition_t), intent(in) :: atomtypes
    type(registry_t), target, intent(out) :: registry
 
@@ -56,14 +55,14 @@ subroutine optimize_atomperm_conformer( mol1, mol2, atomtypes, registry)
    real(rk) :: rmsd, center1(3), center2(3), rotation_step(4), rotation(4)
    integer :: num_trials, num_steps
 
-   allocate (atomperm(size(mol1%atoms)))
-   allocate (auxperm(size(mol1%atoms)))
-   weights1 = atomic_weights(mol1%atoms%elnum)
-   weights2 = atomic_weights(mol2%atoms%elnum)
-   wcoords1 = get_coords( mol1)
-   wcoords2 = get_coords( mol2)
-   adjmat1 = get_adjmat( mol1)
-   adjmat2 = get_adjmat( mol2)
+   allocate (atomperm(size(atoms1)))
+   allocate (auxperm(size(atoms1)))
+   weights1 = atomic_weights(atoms1%elnum)
+   weights2 = atomic_weights(atoms2%elnum)
+   wcoords1 = get_coords( atoms1)
+   wcoords2 = get_coords( atoms2)
+   adjmat1 = get_adjmat( atoms1)
+   adjmat2 = get_adjmat( atoms2)
 
    ! Mirror coordinates
    if (mirror_flag) then
@@ -84,10 +83,10 @@ subroutine optimize_atomperm_conformer( mol1, mol2, atomtypes, registry)
 
    ! Pre-compute assignment tree
    call init_chain_from_partition( atomtypes, mnachain, temp_part)
-   call compute_consistent_mnas( mol1, mol2, mnachain)
-   call precompute_assignment_tree( mol1, mol2, part_tree, mnachain%last_link, assignment_tree)
+   call compute_consistent_mnas( atoms1, atoms2, mnachain)
+   call precompute_assignment_tree( atoms1, atoms2, part_tree, mnachain%last_link, assignment_tree)
    call print_chain_tree( assignment_tree)
-   call convert_trees_to_arrays( part_tree, assignment_tree, array_trees, mol1, mol2)
+   call convert_trees_to_arrays( part_tree, assignment_tree, array_trees, atoms1, atoms2)
 
    ! Initialize random number generator
    call random_initialize()

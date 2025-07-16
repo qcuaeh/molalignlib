@@ -16,7 +16,7 @@
 
 module biasing
 use parameters
-use globals
+use options
 use derived_types
 use sorting
 use strutils
@@ -29,9 +29,9 @@ use spatial_transforms
 implicit none
 contains
 
-subroutine compute_mna_biases(mol1, mol2, atomtypes, biases)
+subroutine compute_mna_biases(atoms1, atoms2, atomtypes, biases)
 ! Iteratively compute MNA types
-   type(mol_type), intent(in) :: mol1, mol2
+   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
    type(partition_t), intent(in) :: atomtypes
    type(int_matrix), dimension(:), allocatable, intent(out) :: biases
    ! Local variables
@@ -58,7 +58,7 @@ subroutine compute_mna_biases(mol1, mol2, atomtypes, biases)
 !      write(stderr, '(a)') repeat('-- link_idx '//str(link_idx)//' --', 6)
 
       ! Call compute_nextlevel_mnas and get the number of splits
-      call compute_nextlevel_mnas(mol1, mol2, mnachain, num_splits)
+      call compute_nextlevel_mnas(atoms1, atoms2, mnachain, num_splits)
 
       ! Exit loop if no splits occurred in the last iteration
       if (num_splits == 0) exit
@@ -95,9 +95,9 @@ end subroutine
 
 
 ! tests all permutations of the neighbors of a pair of atoms
-subroutine build_minbiases(atomtypes, mol1, mol2, biases, minbiases)
+subroutine build_minbiases(atomtypes, atoms1, atoms2, biases, minbiases)
    type(partition_t), intent(in) :: atomtypes
-   type(mol_type), intent(in) :: mol1, mol2
+   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
    type(int_matrix), dimension(:), intent(in) :: biases
    type(real_matrix), dimension(:), allocatable, intent(out) :: minbiases
 
@@ -113,8 +113,8 @@ subroutine build_minbiases(atomtypes, mol1, mol2, biases, minbiases)
    real(rk) :: rmsd, min_rmsd, center1(3), center2(3)
 
    allocate(minbiases(atomtypes%num_parts))
-   coords1 = get_coords( mol1)
-   coords2 = get_coords( mol2)
+   coords1 = get_coords( atoms1)
+   coords2 = get_coords( atoms2)
 
 
    do h = 1, atomtypes%num_parts   ! run over all eltype partitions
@@ -125,17 +125,17 @@ subroutine build_minbiases(atomtypes, mol1, mol2, biases, minbiases)
       minbiases(h)%ee = 0.5
       maxbias = maxval(biases(h)%ee)
 !write (stderr,*) "maxbias: ", maxbias
-      do i = 1, atomtypes%parts(h)%num_items1   ! run over atoms in mol1
+      do i = 1, atomtypes%parts(h)%num_items1   ! run over atoms in atoms1
          iatom = atomtypes%parts(h)%items1(i)
          center1(:) = coords1(:,iatom)
 !        center1(:) = 0
 
          ! neighbors for iatom
-         allocate(adjlistat1(size(mol1%atoms(iatom)%adjlist)))
-         adjlistat1 = mol1%atoms(iatom)%adjlist
+         allocate(adjlistat1(size(atoms1(iatom)%adjlist)))
+         adjlistat1 = atoms1(iatom)%adjlist
 !write (stderr,*) "adjlist1: ", adjlistat1
 
-         do j = 1, atomtypes%parts(h)%num_items2   ! run over atoms in mol2
+         do j = 1, atomtypes%parts(h)%num_items2   ! run over atoms in atoms2
             jatom = atomtypes%parts(h)%items2(j)
             center2(:) = coords2(:,jatom)
 !            center2(:) = 0
@@ -143,11 +143,11 @@ subroutine build_minbiases(atomtypes, mol1, mol2, biases, minbiases)
             if (biases(h)%ee(i,j) == maxbias .or. biases(h)%ee(i,j) >= 1) then   ! compatible neighbors
 !*** ¿el orden de los átomos en atomtypes es el mismo que en biases?
                ! neighbors for jatom
-               allocate(adjlistat2(size(mol2%atoms(jatom)%adjlist)))
-               adjlistat2 = mol2%atoms(jatom)%adjlist
+               allocate(adjlistat2(size(atoms2(jatom)%adjlist)))
+               adjlistat2 = atoms2(jatom)%adjlist
 !write (stderr,*) "adjlist2: ", adjlistat2
 
-               call collect_atomtypes(mol1%atoms(adjlistat1), mol2%atoms(adjlistat2), adjeltypes)   ! eltype for adjlists
+               call collect_atomtypes(atoms1(adjlistat1), atoms2(adjlistat2), adjeltypes)   ! eltype for adjlists
 
                ! run over adjlist's atomtypes
                do ha = 1, adjeltypes%num_parts

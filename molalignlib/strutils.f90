@@ -24,6 +24,7 @@ public int
 public str
 public lowercase
 public uppercase
+public split_path
 
 interface int
    module procedure str_int
@@ -90,5 +91,37 @@ function uppercase(str)
       if (i > 0) uppercase(j:j) = upperchars(i:i)
    end do
 end function
+
+subroutine split_path(filepath, dirname, filename, extension)
+   character(*), intent(in) :: filepath
+   character(:), allocatable, intent(out) :: dirname, filename, extension
+   ! Local variables
+   character(:), allocatable :: basename
+   integer :: pos
+   pos = index(filepath, '/', back=.true.)
+   if (pos /= 0) then
+      dirname = filepath(:pos-1)
+      basename = filepath(pos+1:)
+      if (len(basename) == 0) then
+         write (stderr, '(A,1X,A)') 'File name is missing'
+         stop
+      end if
+   else
+      dirname = '.'
+      basename = filepath
+   end if
+   pos = index(basename, '.', back=.true.)
+   if (pos /= 0) then
+      filename = basename(:pos-1)
+      extension = basename(pos+1:)
+      if (len(filename) == 0 .or. len(extension) == 0) then
+         write (stderr, '(A,1X,A)') 'Invalid file name', basename
+         stop
+      end if
+   else
+      write (stderr, '(A,1X,A)') 'File extension is missing', basename
+      stop
+   end if
+end subroutine
 
 end module

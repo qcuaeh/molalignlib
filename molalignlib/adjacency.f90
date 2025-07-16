@@ -1,7 +1,7 @@
 module adjacency
 use parameters
-use sorting
-use chemdata
+use chemistry
+use molecule
 implicit none
 
 interface adjacencydiff

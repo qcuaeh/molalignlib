@@ -13,15 +13,13 @@ use derived_types
 implicit none
 private
 
-type(atom_type), dimension(:), allocatable :: atoms
-
 public minadjdiff
 public find_molfrags
 
 contains
 
-subroutine find_molfrags( mol, atomtypes, molfrags)
-   type(mol_type), intent(in) :: mol
+subroutine find_molfrags( atoms, atomtypes, molfrags)
+   type(atom_t), dimension(:), intent(in) :: atoms
    type(semipartition_t), intent(in) :: atomtypes
    type(int_list), dimension(:), allocatable, intent(out) :: molfrags
    ! Local variables
@@ -31,10 +29,9 @@ subroutine find_molfrags( mol, atomtypes, molfrags)
    integer, dimension(:,:), allocatable :: fragidcs
    integer, dimension(:), allocatable :: order
 
-   allocate (fragszs(size(mol%atoms)))
-   allocate (fragidcs(size(mol%atoms), size(mol%atoms)))
-   allocate (tracked(size(mol%atoms)))
-   atoms = mol%atoms
+   allocate (fragszs(size(atoms)))
+   allocate (fragidcs(size(atoms), size(atoms)))
+   allocate (tracked(size(atoms)))
 
    ! initialization
 
@@ -44,12 +41,12 @@ subroutine find_molfrags( mol, atomtypes, molfrags)
 
    ! detect fragments and populate frag arrays
    i = 1
-   do while (i <= size(mol%atoms))
+   do while (i <= size(atoms))
       if (tracked(i)) then
          i = i + 1
       else
          nfrag = nfrag + 1
-         call recrun( tracked, i, nfrag, fragszs, fragidcs)
+         call recrun( atoms, tracked, i, nfrag, fragszs, fragidcs)
          i = 1
       end if
    end do
@@ -70,8 +67,9 @@ subroutine find_molfrags( mol, atomtypes, molfrags)
 
 end subroutine
 
-recursive subroutine recrun( tracked, iatom, nfrag, fragszs, fragidcs)
+recursive subroutine recrun( atoms, tracked, iatom, nfrag, fragszs, fragidcs)
 ! runs recursivelly over the structure and populates arrays
+   type(atom_t), dimension(:), intent(in) :: atoms
    logical, dimension(:), intent(inout) :: tracked
    integer, intent(in) :: iatom, nfrag
    integer, dimension(:), intent(inout) :: fragszs
@@ -86,12 +84,12 @@ recursive subroutine recrun( tracked, iatom, nfrag, fragszs, fragidcs)
    fragidcs(fragszs(nfrag), nfrag) = iatom
 
    do i = 1, size(atoms(iatom)%adjlist)
-      call recrun( tracked, atoms(iatom)%adjlist(i), nfrag, fragszs, fragidcs)
+      call recrun( atoms, tracked, atoms(iatom)%adjlist(i), nfrag, fragszs, fragidcs)
    end do
 
 end subroutine
 
-subroutine minadjdiff( atomtypes, mnatypes, molfrags, mol1, mol2, coords1, &
+subroutine minadjdiff( atomtypes, mnatypes, molfrags, atoms1, atoms2, coords1, &
                        coords2, atomperm)
 !
 ! Find best correspondence between points of graphs
@@ -100,7 +98,7 @@ subroutine minadjdiff( atomtypes, mnatypes, molfrags, mol1, mol2, coords1, &
    ! Arguments
    type(partition_t), intent(in) :: atomtypes, mnatypes
    type(int_list), dimension(:), intent(in) :: molfrags
-   type(mol_type), intent(in) :: mol1, mol2
+   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    integer, dimension(:), intent(inout) :: atomperm
 
@@ -114,13 +112,13 @@ subroutine minadjdiff( atomtypes, mnatypes, molfrags, mol1, mol2, coords1, &
    integer :: ntrack, moldiff
    integer, dimension(:), allocatable :: track
    logical, dimension(:), allocatable :: tracked
-   integer, dimension(:), allocatable :: invatomperm
+   integer, dimension(:), allocatable :: invperm
    logical, parameter :: print_info = .false.
    real(rk) :: moldist
    integer :: i
 
-   num_atoms1 = size(mol1%atoms)
-   num_atoms2 = size(mol2%atoms)
+   num_atoms1 = size(atoms1)
+   num_atoms2 = size(atoms2)
 
    allocate (nadjs1(num_atoms1))
    allocate (nadjs2(num_atoms2))
@@ -128,20 +126,20 @@ subroutine minadjdiff( atomtypes, mnatypes, molfrags, mol1, mol2, coords1, &
    allocate (adjlists2(num_atoms2, num_atoms1))
    allocate (track(num_atoms1))
    allocate (tracked(num_atoms1))
-   allocate (invatomperm(num_atoms1))
+   allocate (invperm(num_atoms1))
 
    do i = 1, num_atoms1
-      nadjs1(i) = size(mol1%atoms(i)%adjlist)
-      adjlists1(:nadjs1(i), i) = mol1%atoms(i)%adjlist
+      nadjs1(i) = size(atoms1(i)%adjlist)
+      adjlists1(:nadjs1(i), i) = atoms1(i)%adjlist
    end do
 
    do i = 1, num_atoms2
-      nadjs2(i) = size(mol2%atoms(i)%adjlist)
-      adjlists2(:nadjs2(i), i) = mol2%atoms(i)%adjlist
+      nadjs2(i) = size(atoms2(i)%adjlist)
+      adjlists2(:nadjs2(i), i) = atoms2(i)%adjlist
    end do
 
-   adjmat1 = get_adjmat(mol1)
-   adjmat2 = get_adjmat(mol2)
+   adjmat1 = get_adjmat(atoms1)
+   adjmat2 = get_adjmat(atoms2)
 
    ! set atoms block indices
 
@@ -157,7 +155,7 @@ subroutine minadjdiff( atomtypes, mnatypes, molfrags, mol1, mol2, coords1, &
 
    ntrack = 0
    tracked(:) = .false.
-   invatomperm = inverse_perm( atomperm)
+   invperm = inverse_permutation( atomperm)
    moldiff = adjacencydiff( atomperm, adjmat1, adjmat2)
    moldist = total_sqdist( atomperm, coords1, coords2)
 
@@ -167,7 +165,7 @@ subroutine minadjdiff( atomtypes, mnatypes, molfrags, mol1, mol2, coords1, &
    end if
 
    do i = 1, size(molfrags)
-      call recursive_backtrack( molfrags(i)%e(1), atomperm, invatomperm, tracked, &
+      call recursive_backtrack( molfrags(i)%e(1), atomperm, invperm, tracked, &
          moldiff, moldist, ntrack, track)
 !        print *, ntrack
    end do
@@ -221,10 +219,10 @@ subroutine minadjdiff( atomtypes, mnatypes, molfrags, mol1, mol2, coords1, &
    end subroutine nodematch
 
 ! backtracks structure to find assignments that minimize moldiff
-   recursive subroutine recursive_backtrack( node, atomperm, invatomperm, tracked, moldiff, moldist, &
+   recursive subroutine recursive_backtrack( node, atomperm, invperm, tracked, moldiff, moldist, &
                                   ntrack, track)
       integer, intent(in) :: node
-      integer, dimension(:), intent(inout) :: atomperm, invatomperm
+      integer, dimension(:), intent(inout) :: atomperm, invperm
       logical, dimension(:), intent(inout) :: tracked
       integer, intent(inout) :: moldiff, ntrack
       integer, dimension(:), intent(inout) :: track
@@ -266,7 +264,7 @@ subroutine minadjdiff( atomtypes, mnatypes, molfrags, mol1, mol2, coords1, &
       ! run over matches neighbors
       do i = 1, nmatch
          if (.not. tracked(matches(i))) then
-            call recursive_backtrack(matches(i), atomperm, invatomperm, tracked, moldiff, &
+            call recursive_backtrack(matches(i), atomperm, invperm, tracked, moldiff, &
                             moldist, ntrack, track)
          end if
       end do
@@ -285,26 +283,26 @@ subroutine minadjdiff( atomtypes, mnatypes, molfrags, mol1, mol2, coords1, &
                      track_branch(:) = track(:)
                      tracked_branch(:) = tracked(:)
                      mapping_branch(:) = atomperm(:)
-                     unmapping_branch(:) = invatomperm(:)
+                     unmapping_branch(:) = invperm(:)
 
                      ! Apply swap to atomperm branch 
                      mapping_branch(mismatches1(i)) = mismatches2(j)
-                     mapping_branch(invatomperm(mismatches2(j))) = atomperm(mismatches1(i))
+                     mapping_branch(invperm(mismatches2(j))) = atomperm(mismatches1(i))
 
-                     ! Apply swap to invatomperm branch 
+                     ! Apply swap to invperm branch 
                      unmapping_branch(mismatches2(j)) = mismatches1(i)
-                     unmapping_branch(atomperm(mismatches1(i))) = invatomperm(mismatches2(j))
+                     unmapping_branch(atomperm(mismatches1(i))) = invperm(mismatches2(j))
 
                      ! Update ssd with swap
                      moldist_branch = moldist + ( &
                         - sum((coords2(:, atomperm(mismatches1(i))) - coords1(:, mismatches1(i)))**2) &
-                        - sum((coords2(:, mismatches2(j)) - coords1(:, invatomperm(mismatches2(j))))**2) &
+                        - sum((coords2(:, mismatches2(j)) - coords1(:, invperm(mismatches2(j))))**2) &
                         + sum((coords2(:, mismatches2(j)) - coords1(:, mismatches1(i)))**2) &
-                        + sum((coords2(:, atomperm(mismatches1(i))) - coords1(:, invatomperm(mismatches2(j))))**2))
+                        + sum((coords2(:, atomperm(mismatches1(i))) - coords1(:, invperm(mismatches2(j))))**2))
 
                      ! Update adjd with swap
                      moldiff_branch = moldiff + adjacencydelta(nadjs1, adjlists1, adjmat2, &
-                                   atomperm, mismatches1(i), invatomperm(mismatches2(j)))
+                                   atomperm, mismatches1(i), invperm(mismatches2(j)))
 
                      ! backtrack swapped index
                      call recursive_backtrack(mismatches1(i), mapping_branch, unmapping_branch, &
@@ -313,7 +311,7 @@ subroutine minadjdiff( atomtypes, mnatypes, molfrags, mol1, mol2, coords1, &
                      if ( &
                         moldiff_branch < moldiff &
                         .and. ( &
-                           eqvidx1(mismatches1(i)) == eqvidx1(invatomperm(mismatches2(j))) &
+                           eqvidx1(mismatches1(i)) == eqvidx1(invperm(mismatches2(j))) &
                            .and. eqvidx2(atomperm(mismatches1(i))) == eqvidx2(mismatches2(j)) &
                         ) &
                      ) then
@@ -321,7 +319,7 @@ subroutine minadjdiff( atomtypes, mnatypes, molfrags, mol1, mol2, coords1, &
                         track(:) = track_branch(:)
                         tracked(:) = tracked_branch(:)
                         atomperm(:) = mapping_branch(:)
-                        invatomperm(:) = unmapping_branch(:)
+                        invperm(:) = unmapping_branch(:)
                         moldiff = moldiff_branch
                         moldist = moldist_branch
                         matched1(i) = .true.
@@ -338,7 +336,7 @@ subroutine minadjdiff( atomtypes, mnatypes, molfrags, mol1, mol2, coords1, &
       do i = 1, nmismatch1
          if (.not. matched1(i)) then
             if (.not. tracked(mismatches1(i))) then
-               call recursive_backtrack(mismatches1(i), atomperm, invatomperm, &
+               call recursive_backtrack(mismatches1(i), atomperm, invperm, &
                  tracked, moldiff, moldist, ntrack, track)
             end if
          end if

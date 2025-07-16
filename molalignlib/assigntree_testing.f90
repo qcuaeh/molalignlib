@@ -50,11 +50,11 @@ subroutine redistribute_items_random(coords1, coords2, array_trees, random_permu
    write(stderr, '(A)') repeat("=", 60)
 
    ! Validate permutation consistency
-   call validate_perm(random_permutation)
+   call check_permutation(random_permutation)
 end subroutine
 
-subroutine assign_conform_atoms( mol1, mol2, atomtypes)
-   type(mol_type), intent(in) :: mol1, mol2
+subroutine assign_conform_atoms( atoms1, atoms2, atomtypes)
+   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
    type(partition_t), intent(in) :: atomtypes
    ! Local variables
    type(partree_node_t), pointer :: part_tree, temp_part
@@ -66,15 +66,15 @@ subroutine assign_conform_atoms( mol1, mol2, atomtypes)
    integer, allocatable :: atomperm(:)
 !   integer :: unit1, unit2
 
-!   open(newunit=unit1, file='molec1.mol2', action='write', status='replace')
-!   open(newunit=unit2, file='molec2.mol2', action='write', status='replace')
-!   call write_file( unit1, 'mol2', mol1)
-!   call write_file( unit2, 'mol2', mol2)
-!   call print_atoms( mol1)
-!   call print_atoms( mol2)
+!   open(newunit=unit1, file='molec1.atoms2', action='write', status='replace')
+!   open(newunit=unit2, file='molec2.atoms2', action='write', status='replace')
+!   call writemol( unit1, 'atoms2', atoms1)
+!   call writemol( unit2, 'atoms2', atoms2)
+!   call print_atoms( atoms1)
+!   call print_atoms( atoms2)
 
-   coords1 = get_coords(mol1)
-   coords2 = get_coords(mol2)
+   coords1 = get_coords(atoms1)
+   coords2 = get_coords(atoms2)
 
 !   call init_chain_from_partition( atomtypes, mnachain, part_tree)
 !   assignment_tree => new_root_chain( mnachain%tot_items1, mnachain%tot_items2)
@@ -82,11 +82,11 @@ subroutine assign_conform_atoms( mol1, mol2, atomtypes)
 !   call update_itemdir_children( leaf_link, part_tree)
 !   branch_parts => new_bare_link()
 !   call update_branch_parts(branch_parts, part_tree)
-!   call precompute_consistent_mnas(mol1, mol2, mnachain, assignment_tree, branch_parts)
+!   call precompute_consistent_mnas(atoms1, atoms2, mnachain, assignment_tree, branch_parts)
 
    call init_chain_from_partition( atomtypes, mnachain, temp_part)
-   call compute_consistent_mnas( mol1, mol2, mnachain)
-   call precompute_assignment_tree( mol1, mol2, part_tree, mnachain%last_link, assignment_tree)
+   call compute_consistent_mnas( atoms1, atoms2, mnachain)
+   call precompute_assignment_tree( atoms1, atoms2, part_tree, mnachain%last_link, assignment_tree)
 
 !   call print_part_tree( part_tree)
 !   call print_part_indices( part_tree)
@@ -96,10 +96,10 @@ subroutine assign_conform_atoms( mol1, mol2, atomtypes)
 !   call print_chain_tree( assignment_tree)
 
 !   call random_init(.true., .true.)
-!   call recompute_assignment_tree( mol1, mol2, assignment_tree)
+!   call recompute_assignment_tree( atoms1, atoms2, assignment_tree)
 !   call print_tree_items( part_tree)
 
-   call convert_trees_to_arrays( part_tree, assignment_tree, array_trees, mol1, mol2)
+   call convert_trees_to_arrays( part_tree, assignment_tree, array_trees, atoms1, atoms2)
    call validate_conversion(part_tree, assignment_tree, array_trees)
 !   call print_part_tree_array( array_trees)
 !   call print_first_level_items_array( array_trees)

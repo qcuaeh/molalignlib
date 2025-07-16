@@ -1,7 +1,7 @@
 module atom_types
 use parameters
 use derived_types
-use chemdata
+use chemistry
 use molecule
 use lcrs_tree
 implicit none
@@ -21,7 +21,7 @@ contains
 
 subroutine add_atomtype(atomtypetable, atom, part_index)
    type(atomtype_table), intent(inout) :: atomtypetable
-   type(atom_type), intent(in) :: atom
+   type(atom_t), intent(in) :: atom
    integer, intent(in) :: part_index
 
    atomtypetable%num_items = atomtypetable%num_items + 1
@@ -32,7 +32,7 @@ end subroutine
 
 function find_atomtype(atomtypetable, atom) result(part_index)
    type(atomtype_table), intent(in) :: atomtypetable
-   type(atom_type), intent(in) :: atom
+   type(atom_t), intent(in) :: atom
    integer :: part_index
    integer :: i
 
@@ -49,7 +49,7 @@ end function
 
 subroutine collect_atomtypes(atoms1, atoms2, atomtypes)
 ! Partition atoms by atomic number and label using arrays directly
-   type(atom_type), dimension(:), intent(in) :: atoms1, atoms2
+   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
    type(partition_t), intent(out) :: atomtypes
    ! Local variables
    type(atomtype_table) :: atomtypetable

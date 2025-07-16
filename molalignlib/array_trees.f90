@@ -61,15 +61,15 @@ type, public :: array_trees_t
    type(assigntree_item_t), allocatable :: assigntree(:)
 
    ! Flattened variable-length data - all pure integer arrays!
-   integer, allocatable :: itemdir1_entries(:,:)  ! [link_idx, atom_idx] - mol1 itemdir 2D array
-   integer, allocatable :: itemdir2_entries(:,:)  ! [link_idx, atom_idx] - mol2 itemdir 2D array
+   integer, allocatable :: itemdir1_entries(:,:)  ! [link_idx, atom_idx] - atoms1 itemdir 2D array
+   integer, allocatable :: itemdir2_entries(:,:)  ! [link_idx, atom_idx] - atoms2 itemdir 2D array
    integer, allocatable :: partref_entries(:)     ! Part indices for partrefs
 
    ! NEW: Adjacency information stored directly for fastest access
-   integer, allocatable :: adj_lists1(:,:)     ! Direct 2D adjacency lists for mol1 [atom_idx, neighbor_idx]
-   integer, allocatable :: adj_lists2(:,:)     ! Direct 2D adjacency lists for mol2 [atom_idx, neighbor_idx]
-   integer, allocatable :: adj_counts1(:)      ! Count for each mol1 atom's adjacency list
-   integer, allocatable :: adj_counts2(:)      ! Count for each mol2 atom's adjacency list
+   integer, allocatable :: adj_lists1(:,:)     ! Direct 2D adjacency lists for atoms1 [atom_idx, neighbor_idx]
+   integer, allocatable :: adj_lists2(:,:)     ! Direct 2D adjacency lists for atoms2 [atom_idx, neighbor_idx]
+   integer, allocatable :: adj_counts1(:)      ! Count for each atoms1 atom's adjacency list
+   integer, allocatable :: adj_counts2(:)      ! Count for each atoms2 atom's adjacency list
 
    ! Metadata
    integer :: total_items1, total_items2, total_parts
@@ -91,11 +91,11 @@ public print_chain_details_array
 
 contains
 
-subroutine convert_trees_to_arrays(part_tree, assignment_tree, array_trees, mol1, mol2)
+subroutine convert_trees_to_arrays(part_tree, assignment_tree, array_trees, atoms1, atoms2)
    type(partree_node_t), pointer, intent(in) :: part_tree
    type(assigntree_node_t), pointer, intent(in) :: assignment_tree
    type(array_trees_t), intent(out) :: array_trees
-   type(mol_type), intent(in) :: mol1, mol2
+   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
 
    ! Get totals from the tree counters
    array_trees%total_parts = part_tree%total_parts
@@ -106,8 +106,8 @@ subroutine convert_trees_to_arrays(part_tree, assignment_tree, array_trees, mol1
    array_trees%total_partref_entries = assignment_tree%total_partrefs
 
    ! Store molecule sizes
-   array_trees%num_atoms1 = size(mol1%atoms)
-   array_trees%num_atoms2 = size(mol2%atoms)
+   array_trees%num_atoms1 = size(atoms1)
+   array_trees%num_atoms2 = size(atoms2)
 
    ! Allocate all arrays with exact sizes
    allocate(array_trees%item1_values(array_trees%total_items1))
@@ -143,44 +143,44 @@ subroutine convert_trees_to_arrays(part_tree, assignment_tree, array_trees, mol1
    array_trees%adj_counts2 = 0
 
    ! Populate adjacency information
-   call populate_adjacency_arrays(mol1, mol2, array_trees)
+   call populate_adjacency_arrays(atoms1, atoms2, array_trees)
 
    ! Convert using global indices
    call populate_arrays_direct(part_tree, assignment_tree, array_trees)
 end subroutine
 
-subroutine populate_adjacency_arrays(mol1, mol2, array_trees)
+subroutine populate_adjacency_arrays(atoms1, atoms2, array_trees)
    ! Populate the 2D adjacency arrays directly - each atom gets its own row
-   type(mol_type), intent(in) :: mol1, mol2
+   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
    type(array_trees_t), intent(inout) :: array_trees
    integer :: i, j
 
-   ! Populate mol1 adjacency information - direct 2D storage
+   ! Populate atoms1 adjacency information - direct 2D storage
    do i = 1, array_trees%num_atoms1
-      array_trees%adj_counts1(i) = size(mol1%atoms(i)%adjlist)
+      array_trees%adj_counts1(i) = size(atoms1(i)%adjlist)
 
       ! Copy adjacency list directly to 2D array
-      do j = 1, size(mol1%atoms(i)%adjlist)
-         array_trees%adj_lists1(i, j) = mol1%atoms(i)%adjlist(j)
+      do j = 1, size(atoms1(i)%adjlist)
+         array_trees%adj_lists1(i, j) = atoms1(i)%adjlist(j)
       end do
 
       ! Zero out unused entries (though not strictly necessary)
-      do j = size(mol1%atoms(i)%adjlist) + 1, MAX_COORD
+      do j = size(atoms1(i)%adjlist) + 1, MAX_COORD
          array_trees%adj_lists1(i, j) = 0
       end do
    end do
 
-   ! Populate mol2 adjacency information - direct 2D storage
+   ! Populate atoms2 adjacency information - direct 2D storage
    do i = 1, array_trees%num_atoms2
-      array_trees%adj_counts2(i) = size(mol2%atoms(i)%adjlist)
+      array_trees%adj_counts2(i) = size(atoms2(i)%adjlist)
 
       ! Copy adjacency list directly to 2D array
-      do j = 1, size(mol2%atoms(i)%adjlist)
-         array_trees%adj_lists2(i, j) = mol2%atoms(i)%adjlist(j)
+      do j = 1, size(atoms2(i)%adjlist)
+         array_trees%adj_lists2(i, j) = atoms2(i)%adjlist(j)
       end do
 
       ! Zero out unused entries (though not strictly necessary)
-      do j = size(mol2%atoms(i)%adjlist) + 1, MAX_COORD
+      do j = size(atoms2(i)%adjlist) + 1, MAX_COORD
          array_trees%adj_lists2(i, j) = 0
       end do
    end do

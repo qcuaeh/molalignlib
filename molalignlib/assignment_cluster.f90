@@ -16,12 +16,12 @@
 
 module assignment_cluster
 use parameters
-use globals
+use options
 use random
 use molecule
-use chemdata
+use chemistry
 use spatial_transforms
-use assignment
+use assignment_atoms
 use lcrs_tree
 use atom_mnas
 use atom_types
@@ -32,8 +32,8 @@ implicit none
 
 contains
 
-subroutine optimize_atomperm_cluster(mol1, mol2, atomtypes, registry)
-   type(mol_type), intent(in) :: mol1, mol2
+subroutine optimize_atomperm_cluster(atoms1, atoms2, atomtypes, registry)
+   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
    type(partition_t), intent(in) :: atomtypes
    type(registry_t), intent(out) :: registry
 
@@ -45,12 +45,12 @@ subroutine optimize_atomperm_cluster(mol1, mol2, atomtypes, registry)
    real(rk), dimension(:,:), allocatable :: wcoords1, wcoords2, rcoords2
    real(rk) :: rmsd, center1(3), center2(3), rotation_step(4), rotation(4)
 
-   allocate (atomperm(size(mol1%atoms)))
-   allocate (auxperm(size(mol1%atoms)))
-   weights1 = atomic_weights(mol1%atoms%elnum)
-   weights2 = atomic_weights(mol2%atoms%elnum)
-   wcoords1 = get_coords( mol1)
-   wcoords2 = get_coords( mol2)
+   allocate (atomperm(size(atoms1)))
+   allocate (auxperm(size(atoms1)))
+   weights1 = atomic_weights(atoms1%elnum)
+   weights2 = atomic_weights(atoms2%elnum)
+   wcoords1 = get_coords( atoms1)
+   wcoords2 = get_coords( atoms2)
 
    ! Mirror coordinates
    if (mirror_flag) then
@@ -58,7 +58,7 @@ subroutine optimize_atomperm_cluster(mol1, mol2, atomtypes, registry)
    end if
 
    ! Find unfeasible assignments
-   call prune_procedure( atomtypes, mol1, mol2, prunes)
+   call prune_procedure( atomtypes, atoms1, atoms2, prunes)
 
    ! Calculate centroids
    center1 = centroid( wcoords1, weights1)

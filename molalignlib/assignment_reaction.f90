@@ -16,14 +16,14 @@
 
 module assignment_reaction
 use parameters
-use globals
+use options
 use random
 use molecule
 use strutils
-use chemdata
+use chemistry
 use permutation
 use spatial_transforms
-use assignment
+use assignment_atoms
 use adjacency
 use biasing
 use pruning
@@ -34,15 +34,14 @@ use assigntree_precompute
 use assigntree_recompute
 use assigntree_distribute
 use registration
-use fileio
 use assignment_conformer
 
 implicit none
 
 contains
 
-subroutine find_reactive_bonds( mol1, mol2, atomtypes, atomperm)
-   type(mol_type), intent(in) :: mol1, mol2
+subroutine find_reactive_bonds( atoms1, atoms2, atomtypes, atomperm)
+   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
    type(partition_t), intent(in) :: atomtypes
    integer, dimension(:), intent(out) :: atomperm
 
@@ -64,14 +63,14 @@ subroutine find_reactive_bonds( mol1, mol2, atomtypes, atomperm)
 
    allocate (auxperm, mold=atomperm)
 
-   elnums1 = mol1%atoms%elnum
-   elnums2 = mol2%atoms%elnum
+   elnums1 = atoms1%elnum
+   elnums2 = atoms2%elnum
    weights1 = atomic_weights(elnums1)/sum(atomic_weights(elnums1))
    weights2 = atomic_weights(elnums2)/sum(atomic_weights(elnums2))
-   wcoords1 = get_coords( mol1)
-   wcoords2 = get_coords( mol2)
-   adjmat1 = get_adjmat( mol1)
-   adjmat2 = get_adjmat( mol2)
+   wcoords1 = get_coords( atoms1)
+   wcoords2 = get_coords( atoms2)
+   adjmat1 = get_adjmat( atoms1)
+   adjmat2 = get_adjmat( atoms2)
 
    ! Mirror coordinates
    if (mirror_flag) then
@@ -92,17 +91,17 @@ subroutine find_reactive_bonds( mol1, mol2, atomtypes, atomperm)
 
    ! Compute MNA types
    call init_chain_from_partition( atomtypes, mnachain, part_tree)
-   call compute_consistent_mnas( mol1, mol2, mnachain)
+   call compute_consistent_mnas( atoms1, atoms2, mnachain)
    call link_to_partition( mnachain%last_link, mnatypes)
 
    ! Find molecular fragments
-   call find_molfrags( mol1, first_partition(atomtypes), molfrags1)
-   call find_molfrags( mol2, second_partition(atomtypes), molfrags2)
+   call find_molfrags( atoms1, first_partition(atomtypes), molfrags1)
+   call find_molfrags( atoms2, second_partition(atomtypes), molfrags2)
 
    ! Find unfeasible assignments
-   call compute_mna_biases( mol1, mol2, atomtypes, biases)
+   call compute_mna_biases( atoms1, atoms2, atomtypes, biases)
 
-   call build_minbiases(atomtypes, mol1, mol2, biases, minbiases)
+   call build_minbiases(atomtypes, atoms1, atoms2, biases, minbiases)
 !CZGC: calcular min_rmsd_matrix usando 'minimum_rmsd' con vecinos en spatial.f90
 !CZGC: sumar min_rmsd_matrix a biases
 
@@ -118,7 +117,7 @@ subroutine find_reactive_bonds( mol1, mol2, atomtypes, atomperm)
       ! Assign atoms with current orientation
       call assign_atoms_biased( atomtypes, wcoords1, wcoords2, biases, atomperm)
       ! Reassign mismatches
-      call minadjdiff( atomtypes, mnatypes, molfrags1, mol1, mol2, wcoords1, wcoords2, atomperm)
+      call minadjdiff( atomtypes, mnatypes, molfrags1, atoms1, atoms2, wcoords1, wcoords2, atomperm)
       ! Update results
       adjd = adjacencydiff( atomperm, adjmat1, adjmat2)
       call push_record( registry, atomperm, 1, adjd=adjd)
@@ -128,50 +127,50 @@ subroutine find_reactive_bonds( mol1, mol2, atomtypes, atomperm)
    atomperm = registry%records(1)%atomperm
 end subroutine
 
-subroutine remove_reactive_bonds( mol1, mol2, atomtypes, atomperm)
+subroutine remove_reactive_bonds( atoms1, atoms2, atomtypes, atomperm)
    ! Remove reactive bonds
-   type(mol_type), intent(inout) :: mol1, mol2
+   type(atom_t), dimension(:), intent(inout) :: atoms1, atoms2
    type(partition_t), intent(in) :: atomtypes
    integer, dimension(:), intent(in) :: atomperm
    ! Local variables
    logical, dimension(:,:), allocatable :: adjmat1, adjmat2
-   integer, dimension(:), allocatable :: invatomperm
+   integer, dimension(:), allocatable :: invperm
    integer :: j, iatom, jatom
 !   integer, dimension(:), allocatable :: items1, items2
 !   integer :: k, katom
 
-   adjmat1 = get_adjmat(mol1)
-   adjmat2 = get_adjmat(mol2)
-   invatomperm = inverse_perm(atomperm)
+   adjmat1 = get_adjmat(atoms1)
+   adjmat2 = get_adjmat(atoms2)
+   invperm = inverse_permutation(atomperm)
 
    ! Remove mismatched bonds
-   do iatom = 1, size(mol1%atoms)
-      do j = 1, size(mol1%atoms(iatom)%adjlist)
-         jatom = mol1%atoms(iatom)%adjlist(j)
+   do iatom = 1, size(atoms1)
+      do j = 1, size(atoms1(iatom)%adjlist)
+         jatom = atoms1(iatom)%adjlist(j)
          if (.not. adjmat2(atomperm(iatom), atomperm(jatom))) then
-!            write (stderr, *) 'remove mol1 bond:', iatom, jatom
-            call remove_bond(mol1, iatom, jatom)
+!            write (stderr, *) 'remove atoms1 bond:', iatom, jatom
+            call remove_bond(atoms1, iatom, jatom)
 !            items1 = mnatypes%parts(mnatypes%itemdir1(jatom))%items1
 !            do k = 1, size(items1)
 !               katom = items1(k)
-!               call remove_bond(mol1, iatom, katom)
-!               call remove_bond(mol2, atomperm(iatom), atomperm(katom))
+!               call remove_bond(atoms1, iatom, katom)
+!               call remove_bond(atoms2, atomperm(iatom), atomperm(katom))
 !            end do
          end if
       end do
    end do
 
-   do iatom = 1, size(mol2%atoms)
-      do j = 1, size(mol2%atoms(iatom)%adjlist)
-         jatom = mol2%atoms(iatom)%adjlist(j)
-         if (.not. adjmat1(invatomperm(iatom), invatomperm(jatom))) then
-!            write (stderr, *) 'remove mol2 bond:', iatom, jatom
-            call remove_bond(mol2, iatom, jatom)
+   do iatom = 1, size(atoms2)
+      do j = 1, size(atoms2(iatom)%adjlist)
+         jatom = atoms2(iatom)%adjlist(j)
+         if (.not. adjmat1(invperm(iatom), invperm(jatom))) then
+!            write (stderr, *) 'remove atoms2 bond:', iatom, jatom
+            call remove_bond(atoms2, iatom, jatom)
 !            items2 = mnatypes%parts(mnatypes%itemdir2(jatom))%items2
 !            do k = 1, size(items2)
 !               katom = items2(k)
-!               call remove_bond(mol1, invatomperm(iatom), invatomperm(katom))
-!               call remove_bond(mol2, iatom, katom)
+!               call remove_bond(atoms1, invperm(iatom), invperm(katom))
+!               call remove_bond(atoms2, iatom, katom)
 !            end do
          end if
       end do
@@ -180,32 +179,32 @@ subroutine remove_reactive_bonds( mol1, mol2, atomtypes, atomperm)
    ! Dissociate water molecules
 !
 !   do iatom = 1, size(molfrags1)
-!      if (all(sorted(mol1%atoms(molfrags1(iatom)%e)%elnum) == [1, 1, 8])) then
+!      if (all(sorted(atoms1(molfrags1(iatom)%e)%elnum) == [1, 1, 8])) then
 !         do j = 1, size(molfrags1(iatom)%e)
 !            jatom = molfrags1(iatom)%e(j)
-!            do k = 1, size(mol1%atoms(jatom)%adjlist)
-!               katom = mol1%atoms(jatom)%adjlist(k)
-!               call remove_bond(mol1, jatom, katom)
+!            do k = 1, size(atoms1(jatom)%adjlist)
+!               katom = atoms1(jatom)%adjlist(k)
+!               call remove_bond(atoms1, jatom, katom)
 !            end do
 !         end do
 !      end if
 !   end do
 !
 !   do iatom = 1, size(molfrags2)
-!      if (all(sorted(mol2%atoms(molfrags2(iatom)%e)%elnum) == [1, 1, 8])) then
+!      if (all(sorted(atoms2(molfrags2(iatom)%e)%elnum) == [1, 1, 8])) then
 !         do j = 1, size(molfrags2(iatom)%e)
 !            jatom = molfrags2(iatom)%e(j)
-!            do k = 1, size(mol2%atoms(jatom)%adjlist)
-!               katom = mol2%atoms(jatom)%adjlist(k)
-!               call remove_bond(mol2, jatom, katom)
+!            do k = 1, size(atoms2(jatom)%adjlist)
+!               katom = atoms2(jatom)%adjlist(k)
+!               call remove_bond(atoms2, jatom, katom)
 !            end do
 !         end do
 !      end if
 !   end do
 end subroutine
 
-subroutine optimize_atomperm_isomer( mol1, mol2, registry)
-   type(mol_type), intent(inout) :: mol1, mol2
+subroutine optimize_atomperm_isomer( atoms1, atoms2, registry)
+   type(atom_t), dimension(:), intent(inout) :: atoms1, atoms2
    type(registry_t), target, intent(out) :: registry
 
    ! Local variables
@@ -216,19 +215,19 @@ subroutine optimize_atomperm_isomer( mol1, mol2, registry)
    real(rk), dimension(:,:), allocatable :: wcoords1, wcoords2
 
    ! Abort if molecules have different number of atoms
-   if (size(mol1%atoms) /= size(mol2%atoms)) then
+   if (size(atoms1) /= size(atoms2)) then
       write (stderr, '(a)') 'Error: These molecules are not isomers'
       stop
    end if
 
    ! Abort if molecules are not isomers
-   if (any(sorted(mol1%atoms%elnum) /= sorted(mol2%atoms%elnum))) then
+   if (any(sorted(atoms1%elnum) /= sorted(atoms2%elnum))) then
       write (stderr, '(a)') 'Error: These molecules are not isomers'
       stop
    end if
 
    ! Compute atomic types
-   call collect_atomtypes( mol1%atoms, mol2%atoms, atomtypes)
+   call collect_atomtypes( atoms1, atoms2, atomtypes)
 
    ! Abort if there are conflicting atomic types
    if (any(atomtypes%parts%num_items1 /= atomtypes%parts%num_items2)) then
@@ -236,23 +235,23 @@ subroutine optimize_atomperm_isomer( mol1, mol2, registry)
       stop
    end if
 
-   allocate (atomperm(size(mol1%atoms)))
-   allocate (auxperm(size(mol1%atoms)))
+   allocate (atomperm(size(atoms1)))
+   allocate (auxperm(size(atoms1)))
 
-   elnums1 = mol1%atoms%elnum
-   elnums2 = mol2%atoms%elnum
-   wcoords1 = get_coords(mol1)
-   wcoords2 = get_coords(mol2)
-   adjmat1 = get_adjmat(mol1)
-   adjmat2 = get_adjmat(mol2)
+   elnums1 = atoms1%elnum
+   elnums2 = atoms2%elnum
+   wcoords1 = get_coords(atoms1)
+   wcoords2 = get_coords(atoms2)
+   adjmat1 = get_adjmat(atoms1)
+   adjmat2 = get_adjmat(atoms2)
 
-   call find_reactive_bonds( mol1, mol2, atomtypes, atomperm)
+   call find_reactive_bonds( atoms1, atoms2, atomtypes, atomperm)
    write (stderr, *) 'before', adjacencydiff( atomperm, adjmat1, adjmat2)
-   call remove_reactive_bonds( mol1, mol2, atomtypes, atomperm)
-   adjmat1 = get_adjmat( mol1)
-   adjmat2 = get_adjmat( mol2)
+   call remove_reactive_bonds( atoms1, atoms2, atomtypes, atomperm)
+   adjmat1 = get_adjmat( atoms1)
+   adjmat2 = get_adjmat( atoms2)
    write (stderr, *) 'after ', adjacencydiff( atomperm, adjmat1, adjmat2)
-   call optimize_atomperm_conformer( mol1, mol2, atomtypes, registry)
+   call optimize_atomperm_conformer( atoms1, atoms2, atomtypes, registry)
 end subroutine
 
 end module

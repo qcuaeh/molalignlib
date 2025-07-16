@@ -19,14 +19,15 @@
 !> @{
 program rmsd_conformer
 use parameters
-use globals
+use options
 use molecule
 use spatial_transforms
 use strutils
-use chemutils
+use chemistry
 use adjacency
 use permutation
-use fileio
+use file_read
+use file_write
 use argparse
 use biasing
 use pruning
@@ -36,12 +37,12 @@ use assignment_conformer
 implicit none
 
 integer, allocatable :: atomperm(:)
-character(:), allocatable :: arg
-character(:), allocatable :: pathout
-character(:), allocatable :: fmtin1, fmtin2, fmtout, fmtpipe
+character(:), allocatable :: title1, title2
+character(:), allocatable :: arg, pathout, dummy
+character(:), allocatable :: extin1, extin2, extout, extpipe
 logical :: align_flag, remap_flag, write_flag, pipe_flag
 type(strlist_type) :: posargs(2)
-type(mol_type) :: mol1, mol2, auxmol
+type(atom_t), dimension(:), allocatable :: atoms1, atoms2
 type(partition_t) :: atomtypes
 type(registry_t) :: registry
 real(rk) :: rmsd
@@ -54,12 +55,14 @@ integer :: i
 
 ! Set default options
 
+adjacency_flag = .true.
 iter_flag = .true.
 test_flag = .false.
 stats_flag = .false.
 mirror_flag = .false.
 align_flag = .false.
 remap_flag = .false.
+bond_flag = .false.
 write_flag = .false.
 pipe_flag = .false.
 
@@ -76,6 +79,8 @@ call init_args()
 
 do while (get_arg(arg))
    select case (arg)
+   case ('-bond')
+      bond_flag = .true.
    case ('-align')
       align_flag = .true.
    case ('-remap')
@@ -95,7 +100,7 @@ do while (get_arg(arg))
       call read_optarg( arg, pathout)
    case ('-pipe')
       pipe_flag = .true.
-      call read_optarg( arg, fmtpipe)
+      call read_optarg( arg, extpipe)
    case ('-stats')
       stats_flag = .true.
    case ('-test')
@@ -106,76 +111,71 @@ do while (get_arg(arg))
 end do
 
 if (pipe_flag) then
+   extin1 = extpipe
+   extin2 = extpipe
+   extout = extpipe
    unitin1 = stdin
    unitin2 = stdin
    unitout = stdout
-   fmtin1 = fmtpipe
-   fmtin2 = fmtpipe
-   fmtout = fmtpipe
 else
    select case (ipos)
    case (0)
-      write (stderr, '(a)') 'Error: Missing file paths'
+      write (stderr, '(A)') 'Error: Missing file paths'
       stop
    case (1)
-      write (stderr, '(a)') 'Error: Too few file paths'
+      write (stderr, '(A)') 'Error: Too few file paths'
       stop
    case (2)
-      call open2read( posargs(1)%arg, unitin1, fmtin1)
-      call open2read( posargs(2)%arg, unitin2, fmtin2)
+      call split_path( posargs(1)%arg, dummy, dummy, extin1)
+      call split_path( posargs(2)%arg, dummy, dummy, extin2)
+      call open2read( posargs(1)%arg, unitin1)
+      call open2read( posargs(2)%arg, unitin2)
    case default
-      write (stderr, '(a)') 'Error: Too many file paths'
+      write (stderr, '(A)') 'Error: Too many file paths'
       stop
    end select
    if (write_flag) then
-      call open2write( pathout, unitout, fmtout)
+      call open2write( pathout, unitout)
    end if
 end if
 
 ! Read coordinates
-call read_file( unitin1, fmtin1, mol1)
-call read_file( unitin2, fmtin2, mol2)
+call readmol( unitin1, extin1, title1, atoms1)
+call readmol( unitin2, extin2, title2, atoms2)
 
 ! Abort if molecules have different number of atoms
-if (size(mol1%atoms) /= size(mol2%atoms)) then
-   write (stderr, '(a)') 'Error: These molecules are not isomers'
+if (size(atoms1) /= size(atoms2)) then
+   write (stderr, '(A)') 'Error: These molecules are not isomers'
    stop
 end if
 
 ! Abort if molecules are not isomers
-if (any(sorted(mol1%atoms%elnum) /= sorted(mol2%atoms%elnum))) then
-   write (stderr, '(a)') 'Error: These molecules are not isomers'
+if (any(sorted(atoms1%elnum) /= sorted(atoms2%elnum))) then
+   write (stderr, '(A)') 'Error: These molecules are not isomers'
    stop
 end if
 
 ! Collect atom types in a partition
-call collect_atomtypes( mol1%atoms, mol2%atoms, atomtypes)
+call collect_atomtypes( atoms1, atoms2, atomtypes)
 
 ! Abort if there are conflicting atomic types
 if (any(atomtypes%parts%num_items1 /= atomtypes%parts%num_items2)) then
-   write (stderr, '(a)') 'Error: There are conflicting atomic types'
+   write (stderr, '(A)') 'Error: There are conflicting atomic types'
    stop
 end if
 
-! Initialization
-call set_bonds( mol1)
-call set_bonds( mol2)
-!adjmat1 = get_adjmat( mol1)
-!adjmat2 = get_adjmat( mol2)
-allocate (auxmol%atoms(size(mol2%atoms)))
-
-! Set coordinates matrices
-coords1 = get_coords( mol1)
-coords2 = get_coords( mol2)
-weights1 = atomic_weights(mol1%atoms%elnum)
-weights2 = atomic_weights(mol2%atoms%elnum)
+! Get standard coordinates
+coords1 = get_coords( atoms1)
+coords2 = get_coords( atoms2)
+weights1 = atomic_weights(atoms1%elnum)
+weights2 = atomic_weights(atoms2%elnum)
 center1 = centroid( coords1, weights1)
 center2 = centroid( coords2, weights2)
 call translate_coords( coords2, center1 - center2)
 
-! Set weighted/centered coordinates matrices
-wcoords1 = get_coords( mol1)
-wcoords2 = get_coords( mol2)
+! Get normalized coordinates
+wcoords1 = get_coords( atoms1)
+wcoords2 = get_coords( atoms2)
 call translate_coords( wcoords1, -center1)
 call translate_coords( wcoords2, -center2)
 call weight_coords( wcoords1, weights1)
@@ -184,7 +184,7 @@ call weight_coords( wcoords2, weights2)
 if (align_flag .and. remap_flag) then
 
    ! Remap atoms to minimize the MSD
-   call optimize_atomperm_conformer( mol1, mol2, atomtypes, registry)
+   call optimize_atomperm_conformer( atoms1, atoms2, atomtypes, registry)
 
    ! Print optimization stats
    if (stats_flag) then
@@ -199,14 +199,12 @@ if (align_flag .and. remap_flag) then
       rmsd = sqrt( total_sqdist( atomperm, weights1, coords1, rcoords2))
 
 !      write (stderr,'(I0)') adjacencydiff( atomperm, adjmat1, adjmat2)
-      write (stderr,'(a)') str( rmsd, 4)
+      write (stderr,'(A)') str( rmsd, 4)
 
       if (write_flag .or. pipe_flag) then
-         auxmol%title = 'RMSD=' // str( rmsd, 4)
-         auxmol%atoms%elnum = mol2%atoms(atomperm)%elnum
-         auxmol%atoms%label = mol2%atoms(atomperm)%label
-         call set_coords( auxmol, rcoords2(:,atomperm))
-         call write_file( unitout, fmtout, auxmol)
+         title2 = 'RMSD=' // str( rmsd, 4)
+         call set_coords( atoms2, rcoords2)
+         call writemol( unitout, extout, title2, atoms2, atomperm)
       end if
    end do
 
@@ -217,14 +215,12 @@ else if (align_flag) then
    rmsd = sqrt( total_sqdist( weights1, coords1, coords2))
 
 !   write (stderr,'(I0)') adjacencydiff( adjmat1, adjmat2)
-   write (stderr,'(a)') str( rmsd, 4)
+   write (stderr,'(A)') str( rmsd, 4)
 
    if (write_flag .or. pipe_flag) then
-      auxmol%title = 'RMSD=' // str( rmsd, 4)
-      auxmol%atoms%elnum = mol2%atoms%elnum
-      auxmol%atoms%label = mol2%atoms%label
-      call set_coords( auxmol, rcoords2)
-      call write_file( unitout, fmtout, auxmol)
+      title2 = 'RMSD=' // str( rmsd, 4)
+      call set_coords( atoms2, rcoords2)
+      call writemol( unitout, extout, title2, atoms2)
    end if
 
 else if (remap_flag) then

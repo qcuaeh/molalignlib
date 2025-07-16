@@ -8,7 +8,7 @@ contains
 
 subroutine resplit_part_mna(atoms1, atoms2, itemdir1, itemdir2, part, link)
 ! Update item values of existing item nodes instead of adding new item nodes
-   type(atom_type), dimension(:), intent(in) :: atoms1, atoms2
+   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
    type(part_nodeptr_t), dimension(:), intent(in) :: itemdir1, itemdir2
    type(partree_node_t), pointer, intent(inout) :: part
    type(chain_node_t), pointer, intent(inout) :: link
@@ -64,9 +64,9 @@ subroutine resplit_part_mna(atoms1, atoms2, itemdir1, itemdir2, part, link)
    end do
 end subroutine
 
-subroutine recompute_nextlevel_mnas(mol1, mol2, link)
+subroutine recompute_nextlevel_mnas(atoms1, atoms2, link)
 ! Compute next level MNA types - always keeps all children (original behavior)
-   type(mol_type), intent(in) :: mol1, mol2
+   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
    type(chain_node_t), pointer, intent(inout) :: link
    ! Local variables
    type(partref_node_t), pointer :: partref
@@ -76,14 +76,14 @@ subroutine recompute_nextlevel_mnas(mol1, mol2, link)
    do while (associated(partref))
 !      write (stderr,'(A,1X,A)') 'Part', address(partref%part)
       ! Distribute items based on signatures
-      call resplit_part_mna(mol1%atoms, mol2%atoms, link%itemdir1, link%itemdir2, partref%part, link%next_link)
+      call resplit_part_mna(atoms1, atoms2, link%itemdir1, link%itemdir2, partref%part, link%next_link)
       partref => partref%nextref
    end do
 end subroutine
 
-subroutine recompute_consistent_mnas(mol1, mol2, branch)
+subroutine recompute_consistent_mnas(atoms1, atoms2, branch)
 ! Iteratively compute MNA types until convergence
-   type(mol_type), intent(in) :: mol1, mol2
+   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
    type(assigntree_node_t), pointer, intent(inout) :: branch
    ! Local variables
    type(chain_node_t), pointer :: link
@@ -95,7 +95,7 @@ subroutine recompute_consistent_mnas(mol1, mol2, branch)
       ! Recompute next level MNAs
 !      write (stderr,'(A,1X,I0)') 'Link', link_idx
 !      call print_link_itemdir(link)
-      call recompute_nextlevel_mnas(mol1, mol2, link)
+      call recompute_nextlevel_mnas(atoms1, atoms2, link)
       link_idx = link_idx + 1
       link => link%next_link
    end do
@@ -235,8 +235,8 @@ subroutine resplit_part_random(part, link)
    end do
 end subroutine
 
-recursive subroutine recompute_assignment_tree(mol1, mol2, branch)
-   type(mol_type), intent(in) :: mol1, mol2
+recursive subroutine recompute_assignment_tree(atoms1, atoms2, branch)
+   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
    type(assigntree_node_t), pointer, intent(inout) :: branch
    type(assigntree_node_t), pointer :: child_branch
    type(partree_node_t), pointer :: child_part
@@ -251,10 +251,10 @@ recursive subroutine recompute_assignment_tree(mol1, mol2, branch)
       call resplit_part_random(child_branch%split_part, child_branch%first_link)
       ! Add target part children to links
       child_part => child_branch%split_part%first_child_part
-      call recompute_consistent_mnas(mol1, mol2, child_branch)
+      call recompute_consistent_mnas(atoms1, atoms2, child_branch)
 
       ! Recursively process this child's descendants (depth-first)
-      call recompute_assignment_tree(mol1, mol2, child_branch)
+      call recompute_assignment_tree(atoms1, atoms2, child_branch)
 
       ! Move to next sibling
       child_branch => child_branch%next_sibling_chain

@@ -1,4 +1,4 @@
-module lap_jv
+module lap_jv_sparse
 use parameters
 implicit none
 contains

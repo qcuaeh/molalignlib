@@ -1,4 +1,4 @@
-module hungarian
+module lap_hungarian
 use parameters
 implicit none
 contains

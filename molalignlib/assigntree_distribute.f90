@@ -488,7 +488,7 @@ subroutine distribute_items_dfs(coords1, coords2, array_trees, optimal_permutati
 !   write(stderr, '(A)') repeat("=", 60)
 
    ! Validate permutation consistency
-   call validate_perm(optimal_permutation)
+   call check_permutation(optimal_permutation)
 end subroutine
 
 end module

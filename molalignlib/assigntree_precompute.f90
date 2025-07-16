@@ -9,7 +9,7 @@ contains
 
 function would_part_split(atoms1, atoms2, itemdir1, itemdir2, part) result(would_split)
 ! Check if a part would split by comparing signatures
-   type(atom_type), dimension(:), intent(in) :: atoms1, atoms2
+   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
    type(part_nodeptr_t), dimension(:), intent(in) :: itemdir1, itemdir2
    type(partree_node_t), pointer, intent(inout) :: part
    ! Local variables
@@ -53,9 +53,9 @@ function would_part_split(atoms1, atoms2, itemdir1, itemdir2, part) result(would
    end do
 end function
 
-subroutine precompute_nextlevel_mnas(mol1, mol2, mnachain, branch, branch_parts, num_splits)
+subroutine precompute_nextlevel_mnas(atoms1, atoms2, mnachain, branch, branch_parts, num_splits)
 ! Compute next level MNA types - only keeps children if real split occurred
-   type(mol_type), intent(in) :: mol1, mol2
+   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
    type(assigntree_node_t), pointer, intent(inout) :: mnachain
    type(assigntree_node_t), pointer, intent(inout) :: branch
    type(chain_node_t), pointer, intent(inout) :: branch_parts
@@ -80,7 +80,7 @@ subroutine precompute_nextlevel_mnas(mol1, mol2, mnachain, branch, branch_parts,
    ! Single pass: check which parts would split and cache results
    partref => level_link%first_partref
    do i = 1, level_link%num_parts
-      will_split(i) = would_part_split(mol1%atoms, mol2%atoms, level_link%itemdir1, level_link%itemdir2, partref%part)
+      will_split(i) = would_part_split(atoms1, atoms2, level_link%itemdir1, level_link%itemdir2, partref%part)
       if (will_split(i)) any_splits = .true.
       partref => partref%nextref
    end do
@@ -95,7 +95,7 @@ subroutine precompute_nextlevel_mnas(mol1, mol2, mnachain, branch, branch_parts,
       do i = 1, level_link%num_parts
          if (will_split(i)) then
             ! Create children based on signatures
-            call split_part_mna(mol1%atoms, mol2%atoms, level_link%itemdir1, level_link%itemdir2, partref%part, next_level_link)
+            call split_part_mna(atoms1, atoms2, level_link%itemdir1, level_link%itemdir2, partref%part, next_level_link)
             ! Link part to branch link
             call link_part(branch%last_link, partref%part)
             ! Add part children to branch part list
@@ -119,9 +119,9 @@ subroutine precompute_nextlevel_mnas(mol1, mol2, mnachain, branch, branch_parts,
    deallocate(will_split)
 end subroutine
 
-subroutine precompute_consistent_mnas(mol1, mol2, mnachain, branch, branch_parts)
+subroutine precompute_consistent_mnas(atoms1, atoms2, mnachain, branch, branch_parts)
 ! Iteratively compute MNA types until convergence
-   type(mol_type), intent(in) :: mol1, mol2
+   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
    type(assigntree_node_t), pointer, intent(inout) :: mnachain
    type(assigntree_node_t), pointer, intent(inout) :: branch
    type(chain_node_t), pointer, intent(inout) :: branch_parts
@@ -130,7 +130,7 @@ subroutine precompute_consistent_mnas(mol1, mol2, mnachain, branch, branch_parts
 
    do
       ! Call compute_nextlevel_mnas and get the number of splits
-      call precompute_nextlevel_mnas(mol1, mol2, mnachain, branch, branch_parts, num_splits)
+      call precompute_nextlevel_mnas(atoms1, atoms2, mnachain, branch, branch_parts, num_splits)
 
       ! Exit loop if no splits occurred
       if (num_splits == 0) exit
@@ -168,8 +168,8 @@ subroutine split_part_first(part, link)
 end subroutine
 
 ! Modified split_dependent_parts incorporating split_single_part functionality
-recursive subroutine split_dependent_parts(mol1, mol2, mnachain, branch, branch_parts, branching_part, part_to_split)
-   type(mol_type), intent(in) :: mol1, mol2
+recursive subroutine split_dependent_parts(atoms1, atoms2, mnachain, branch, branch_parts, branching_part, part_to_split)
+   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
    type(assigntree_node_t), pointer, intent(inout) :: mnachain
    type(assigntree_node_t), pointer, intent(inout) :: branch
    type(chain_node_t), pointer, intent(inout) :: branch_parts
@@ -212,7 +212,7 @@ recursive subroutine split_dependent_parts(mol1, mol2, mnachain, branch, branch_
    end do
 
    ! Compute consistent MNAs
-   call precompute_consistent_mnas(mol1, mol2, mnachain, branch, branch_parts)
+   call precompute_consistent_mnas(atoms1, atoms2, mnachain, branch, branch_parts)
 
    ! Find a degenerate descendant part to split
    next_part_to_split => null()
@@ -229,13 +229,13 @@ recursive subroutine split_dependent_parts(mol1, mol2, mnachain, branch, branch_
    ! Perform split if target found
    if (associated(next_part_to_split)) then
       ! Call itself again to split the next degenerate descendant part
-      call split_dependent_parts(mol1, mol2, mnachain, branch, branch_parts, branching_part, next_part_to_split)
+      call split_dependent_parts(atoms1, atoms2, mnachain, branch, branch_parts, branching_part, next_part_to_split)
    end if
 end subroutine
 
 ! Updated split_independent_parts to use the merged function signature
-recursive subroutine split_independent_parts(mol1, mol2, mnachain, branch, branch_parts)
-   type(mol_type), intent(in) :: mol1, mol2
+recursive subroutine split_independent_parts(atoms1, atoms2, mnachain, branch, branch_parts)
+   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
    type(assigntree_node_t), pointer, intent(inout) :: mnachain, branch
    type(chain_node_t), pointer, intent(in) :: branch_parts
    ! Local variables
@@ -252,16 +252,16 @@ recursive subroutine split_independent_parts(mol1, mol2, mnachain, branch, branc
          ! Create a new part registry for this branch part
          new_branch_parts => new_bare_link()
          ! Split the target part and continue splitting descendants until convergence
-         call split_dependent_parts(mol1, mol2, mnachain, new_branch, new_branch_parts, partref%part, partref%part)
+         call split_dependent_parts(atoms1, atoms2, mnachain, new_branch, new_branch_parts, partref%part, partref%part)
          ! Recursively process the resulting branch parts
-         call split_independent_parts(mol1, mol2, mnachain, new_branch, new_branch_parts)
+         call split_independent_parts(atoms1, atoms2, mnachain, new_branch, new_branch_parts)
       end if
       partref => partref%nextref
    end do
 end subroutine
 
-subroutine precompute_assignment_tree( mol1, mol2, part_tree, mnalink, assignment_tree)
-   type(mol_type), intent(in) :: mol1, mol2
+subroutine precompute_assignment_tree( atoms1, atoms2, part_tree, mnalink, assignment_tree)
+   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
    type(partree_node_t), pointer, intent(inout) :: part_tree
    type(chain_node_t), pointer, intent(in) :: mnalink
    type(assigntree_node_t), pointer, intent(inout) :: assignment_tree
@@ -280,7 +280,7 @@ subroutine precompute_assignment_tree( mol1, mol2, part_tree, mnalink, assignmen
       child_part => child_part%next_sibling_part
    end do
 
-   call split_independent_parts( mol1, mol2, mnachain, assignment_tree, branch_parts)
+   call split_independent_parts( atoms1, atoms2, mnachain, assignment_tree, branch_parts)
 end subroutine
 
 end module

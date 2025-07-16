@@ -14,21 +14,15 @@
 ! You should have received a copy of the GNU General Public License
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-module chemdata
-! Purpose: Definition of physical constants
+module chemistry
 use parameters
-
-! element_symbols: Element symbols
-! covalent_radii: Atomic covalent radii (Angstrom)
-! vdw_radii: Atomic van der Waals radii (Angstrom)
-! atomic_masses: Standard atomic masses
-! valencies: Element valenc
-
+use strutils
 implicit none
 
 integer, parameter :: num_elems = 103
 real(rk), dimension(:), pointer :: atomic_weights
 
+! Element symbols
 character(2), parameter :: element_symbols(num_elems) = [ &
 'H ',                                                                                                 'He', &
 'Li', 'Be',                                                             'B ', 'C ', 'N ', 'O ', 'F ', 'Ne', &
@@ -40,6 +34,7 @@ character(2), parameter :: element_symbols(num_elems) = [ &
 'Fr', 'Ra', 'Ac', 'Th', 'Pa', 'U ', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr'        &
 ]
 
+! Atomic covalent radii (Angstrom)
 ! Lit.: R.T. Sanderson, Inorganic Chemistry, Reinhold 1967
 real(rk), parameter :: covalent_radii(num_elems) = [ &
 0.31,                                                                                                 0.28, &
@@ -52,6 +47,7 @@ real(rk), parameter :: covalent_radii(num_elems) = [ &
 2.60, 2.21, 2.15, 2.06, 2.00, 1.96, 1.90, 1.87, 1.80, 1.69, 2.00, 2.00, 2.00, 2.00, 2.00, 2.00, 2.00        &
 ]
 
+! Atomic Van der Waals radii (Angstrom)
 ! Lit.: A. Bondi, J. Phys. Chem. 68, 441 (1964)         
 real(rk), parameter :: vdw_radii(num_elems) = [ &
 1.20,                                                                                                 1.40, &
@@ -64,6 +60,7 @@ real(rk), parameter :: vdw_radii(num_elems) = [ &
 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00        &
 ]
 
+! Standard atomic masses
 ! Lit.: CRC Handbook of Chemistry and Physics, 1989
 real(rk), target :: atomic_masses(num_elems) = [ &
 1.0,                                                                                                                     4.0, &
@@ -86,5 +83,48 @@ real(rk), target :: ones(num_elems) = [ &
          1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, &
 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1     &
 ]
+
+contains
+
+function atomic_number(elsym) result(z)
+   character(*), intent(in) :: elsym
+   integer :: z
+
+   do z = 1, num_elems
+      if (uppercase(elsym) == uppercase(element_symbols(z))) then
+         return
+      end if
+   end do
+
+   select case (uppercase(elsym))
+   case ('LJ')
+      z = 1001
+   case default
+      z = -1
+   end select
+
+end function
+
+subroutine split_symbol( elsym, elnum, label)
+   character(*), intent(in) :: elsym
+   integer, intent(out) :: elnum, label
+   ! Local variables
+   integer :: m, n
+
+   n = len_trim(elsym)
+   m = verify(uppercase(trim(elsym)), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+
+   if (m == 0) then
+      label = 0
+      elnum = atomic_number(elsym)
+   else if (verify(elsym(m:n), '1234567890') == 0) then
+      read (elsym(m:n), *) label
+      elnum = atomic_number(elsym(1:m-1))
+   else
+      write (stderr, '(a,1x,a)') 'Invalid atomic elsym/label:', elsym
+      stop
+   end if
+
+end subroutine
 
 end module

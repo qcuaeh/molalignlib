@@ -16,7 +16,7 @@
 
 module random
 use parameters
-use globals
+use options
 use randlib
 
 implicit none

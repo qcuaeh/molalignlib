@@ -14,14 +14,13 @@
 ! You should have received a copy of the GNU General Public License
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-module assignment
+module assignment_atoms
 use parameters
-use globals
+use options
 use derived_types
-use lcrs_tree
 use permutation
-use lap_jv
-use hungarian
+use lap_jv_sparse
+use lap_hungarian
 use random
 
 implicit none
@@ -160,7 +159,7 @@ subroutine solve_lap_biased(part, p, q, biases, perm, dist)
 
    do j = 1, part%num_items2
       do i = 1, part%num_items1
-!         costs(i, j) = maxbias - biases(i, j) + bias_scale*sum((p(:, part%items1(i)) - q(:, part%items2(j)))**2)
+!         costs(i, j) = maxbias - biases(i, j) + BIAS_SF*sum((p(:, part%items1(i)) - q(:, part%items2(j)))**2)
          costs(i, j) = maxbias - biases(i, j) + random_standard_real()
       end do
    end do
@@ -266,7 +265,7 @@ subroutine solve_lap_pruned(n, s1, s2, p, q, prun, perm, dist)
       end do
    end if
 
-   if (.not. is_perm(perm)) then
+   if (.not. is_permutation(perm)) then
       write (stderr, '(a)') 'Assignment is not a permutation'
       stop
    end if
@@ -470,7 +469,7 @@ subroutine solve_lap_nearest(n, s1, s2, p, q, perm, dist)
       end do
    end if
 
-   if (.not. is_perm(perm)) then
+   if (.not. is_permutation(perm)) then
       error stop 'Assignment is not a permutation'
    end if
 

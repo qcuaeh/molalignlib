@@ -20,68 +20,71 @@ implicit none
 contains
 
 ! Get an identity permutation
-function identity_perm(n) result(perm)
+function identity_permutation(n) result(perm)
    integer, intent(in) :: n
+   integer, allocatable :: perm(:)
    ! Local variables
    integer :: i
-   integer :: perm(n)
+
+   allocate (perm(n))
 
    do i = 1, n
       perm(i) = i
    end do
 end function
 
-! Get the inverse perm of perm
-function inverse_perm(perm)
+! Get the inverse permutation of perm
+function inverse_permutation(perm) result(invperm)
    integer, dimension(:), intent(in) :: perm
+   integer, dimension(:), allocatable :: invperm
    ! Local variables
-   integer :: i
-   integer, dimension(:), allocatable :: inverse_perm
+   integer :: n, i
 
-   allocate (inverse_perm(size(perm)))
+   n = size(perm)
+   allocate (invperm(n))
 
-   do i = 1, size(perm)
-      inverse_perm(perm(i)) = i
+   do i = 1, n
+      invperm(perm(i)) = i
    end do
 end function
 
-logical function is_perm(perm)
+logical function is_permutation(perm) result(isperm)
    implicit none
    integer, dimension(:), intent(in) :: perm
-   integer :: i, N
    logical :: seen(size(perm))
+   integer :: n, i
 
-   N = size(perm)
+   n = size(perm)
    seen = .false.
-   is_perm = .true.
+   isperm = .true.
 
-   do i = 1, N
-      if (perm(i) < 1 .or. perm(i) > N) then
-         is_perm = .false.
+   do i = 1, n
+      if (perm(i) < 1 .or. perm(i) > n) then
+         isperm = .false.
          return
       end if
       if (seen(perm(i))) then
-         is_perm = .false.
+         isperm = .false.
          return
       end if
       seen(perm(i)) = .true.
    end do
 end function
 
-subroutine validate_perm(perm)
+subroutine check_permutation(perm)
    implicit none
    integer, dimension(:), intent(in) :: perm
-   integer :: i, N
    logical :: seen(size(perm))
    logical :: has_errors
+   integer :: n, i
    
-   N = size(perm)
+   n = size(perm)
    seen = .false.
    has_errors = .false.
    
-   do i = 1, N
+   do i = 1, n
       ! Check if out of bounds
-      if (perm(i) < 1 .or. perm(i) > N) then
+      if (perm(i) < 1 .or. perm(i) > n) then
          write(0, '(A,I0,A,I0,A)') 'Index ', perm(i), ' at position ', i, ' is out of range'
          has_errors = .true.
       else
