@@ -1,6 +1,6 @@
-  #   Count    Steps     Rot-θ        RMSD
+  #    Count     Steps    Rotθ       RMSD
 ------------------------------------------
-  1      10      1.0     117.2      0.0490
+  1      10      1.0     180.0      0.0490
 ------------------------------------------
 Random trials = 10
 Minimization steps = 10
