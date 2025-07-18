@@ -2,6 +2,7 @@ module assigntree_precompute
 use parameters
 use molecule
 use lcrs_tree
+use array_trees
 use atom_mnas
 implicit none
 
@@ -260,27 +261,38 @@ recursive subroutine split_independent_parts(atoms1, atoms2, mnachain, branch, b
    end do
 end subroutine
 
-subroutine precompute_assignment_tree( atoms1, atoms2, part_tree, mnalink, assignment_tree)
+subroutine build_assignment_tree( atoms1, atoms2, mnalink, array_trees)
    type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
-   type(partree_node_t), pointer, intent(inout) :: part_tree
    type(chain_node_t), pointer, intent(in) :: mnalink
-   type(assigntree_node_t), pointer, intent(inout) :: assignment_tree
+   type(array_trees_t), intent(out) :: array_trees
    ! Local variables
+   type(partree_node_t), pointer :: part_tree
+   type(assigntree_node_t), pointer :: assignment_tree
    type(assigntree_node_t), pointer :: mnachain
    type(chain_node_t), pointer :: branch_parts
    type(partree_node_t), pointer :: child_part
+   type(chain_node_t), pointer :: first_link
+   type(partref_node_t), pointer :: partref
 
-   call init_chain_from_link( mnalink, mnachain, part_tree)
-   assignment_tree => new_root_chain( mnachain%tot_items1, mnachain%tot_items2)
+   part_tree => new_root_part()
    branch_parts => new_bare_link()
+   assignment_tree => new_root_chain( size(mnalink%itemdir1), size(mnalink%itemdir2))
+   mnachain => new_root_chain( size(mnalink%itemdir1), size(mnalink%itemdir2))
+   first_link => new_chain_link( mnachain)
 
-   child_part => part_tree%first_child_part
-   do while (associated(child_part))
+   partref => mnalink%first_partref
+   do while (associated( partref))
+      child_part => new_child_part( part_tree)
+      call link_part( first_link, child_part)
+      call copy_part_items( partref%part, child_part)
       call add_branch_part( branch_parts, child_part)
-      child_part => child_part%next_sibling_part
+      partref => partref%nextref
    end do
 
    call split_independent_parts( atoms1, atoms2, mnachain, assignment_tree, branch_parts)
+!   call recompute_assignment_tree( atoms1, atoms2, assignment_tree)
+   call convert_trees_to_arrays( atoms1, atoms2, part_tree, assignment_tree, array_trees)
+!   call validate_conversion(part_tree, assignment_tree, array_trees)
 end subroutine
 
 end module

@@ -25,7 +25,6 @@ atom_mnas.f90
 assigntree_precompute.f90
 assigntree_recompute.f90
 assigntree_distribute.f90
-assigntree_testing.f90
 registration.f90
 biasing.f90
 pruning.f90

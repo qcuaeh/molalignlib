@@ -3,6 +3,44 @@ use parameters
 use derived_types
 implicit none
 private
+! Public procedures 
+public address
+public isdescendant
+public new_root_part
+public new_child_part
+public new_bare_link
+public new_chain_link
+public new_root_chain
+public new_child_chain
+public chain_from_partition
+public link_part
+public update_itemdir
+public add_new_item1
+public add_new_item2
+public move_first_item1
+public move_first_item2
+public copy_part_items
+public move_part_items
+public delete_chain
+public print_part_tree
+public print_part_items
+public print_tree_items
+public print_leaf_items
+public print_link_itemdir
+public print_part_signature
+public print_tree_signatures
+public print_part_indices
+public print_chain_indices
+public link_to_partition
+public find_child_part
+public first_partition
+public second_partition
+public add_branch_part
+public print_chain_tree
+public delete_part_tree
+public delete_part
+public operator(==)
+public operator(.equiv.)
 
 ! Item node
 type, public :: item_node_t
@@ -87,45 +125,6 @@ interface operator (.equiv.)
    module procedure signature_equivalence
 end interface
 
-! Make types and procedures public
-public address
-public isdescendant
-public new_root_chain
-public new_child_chain
-public new_bare_link
-public new_chain_link
-public new_child_part
-public link_part
-public update_itemdir
-public add_new_item1
-public add_new_item2
-public init_chain_from_link
-public init_chain_from_partition
-public move_first_item1
-public move_first_item2
-public move_part_items
-public delete_chain
-public print_part_tree
-public print_part_items
-public print_tree_items
-public print_leaf_items
-public print_link_itemdir
-public print_part_signature
-public print_tree_signatures
-public print_part_indices
-public print_chain_indices
-public link_to_partition
-public find_child_part
-public first_partition
-public second_partition
-public add_branch_part
-public print_chain_tree
-public delete_part_tree
-public delete_part
-public operator(==)
-public operator(.equiv.)
-
-
 contains
 
 character(4) function address_part(nodeptr) result(address)
@@ -193,44 +192,75 @@ logical function isdescendant(part, top_part)
    end if
 end function
 
-function new_root_part() result(new_part)
-   type(partree_node_t), pointer :: new_part
+function new_bare_part() result(part)
+   type(partree_node_t), pointer :: part
 
-   new_part => new_bare_part()
-   new_part%depth = 0
-   new_part%global_index = 1
+   allocate (part)
 
-   ! Allocate counters for root and assign initial values
-   allocate(new_part%total_parts)
-   allocate(new_part%total_items1)
-   allocate(new_part%total_items2)
-
-   new_part%total_parts = 1
-   new_part%total_items1 = 0  ! No items initially
-   new_part%total_items2 = 0  ! No items initially
+   part%global_index = 0  ! Will be set when added to tree
+   part%num_items1 = 0
+   part%num_items2 = 0
+   part%num_children = 0
+   part%total_parts => null()
+   part%total_items1 => null()
+   part%total_items2 => null()
+   part%parent_part => null()
+   part%first_item1 => null()
+   part%last_item1 => null()
+   part%first_item2 => null()
+   part%last_item2 => null()
+   part%first_child_part => null()
+   part%last_child_part => null()
+   part%next_sibling_part => null()
+   part%signature = [part_nodeptr_t::]
 end function
 
-function new_bare_part() result(new_part)
-   type(partree_node_t), pointer :: new_part
+function new_root_part() result(part)
+   type(partree_node_t), pointer :: part
 
-   allocate (new_part)
+   part => new_bare_part()
+   part%depth = 0
+   part%global_index = 1
 
-   new_part%global_index = 0  ! Will be set when added to tree
-   new_part%num_items1 = 0
-   new_part%num_items2 = 0
-   new_part%num_children = 0
-   new_part%total_parts => null()
-   new_part%total_items1 => null()
-   new_part%total_items2 => null()
-   new_part%parent_part => null()
-   new_part%first_item1 => null()
-   new_part%last_item1 => null()
-   new_part%first_item2 => null()
-   new_part%last_item2 => null()
-   new_part%first_child_part => null()
-   new_part%last_child_part => null()
-   new_part%next_sibling_part => null()
-   new_part%signature = [part_nodeptr_t::]
+   ! Allocate counters for root and assign initial values
+   allocate(part%total_parts)
+   allocate(part%total_items1)
+   allocate(part%total_items2)
+
+   part%total_parts = 1
+   part%total_items1 = 0  ! No items initially
+   part%total_items2 = 0  ! No items initially
+end function
+
+function new_child_part(parent_part) result(child_part)
+   type(partree_node_t), pointer, intent(inout) :: parent_part
+   type(partree_node_t), pointer :: child_part
+
+   ! Create new part with correct depth
+   child_part => new_bare_part()
+   child_part%depth = parent_part%depth + 1
+
+   ! Set parent BEFORE setting up relationships
+   child_part%parent_part => parent_part
+   child_part%next_sibling_part => null()
+
+   ! Point to parent's counters
+   child_part%total_parts => parent_part%total_parts
+   child_part%total_items1 => parent_part%total_items1
+   child_part%total_items2 => parent_part%total_items2
+
+   ! Assign global index and increment counter
+   child_part%total_parts = child_part%total_parts + 1
+   child_part%global_index = child_part%total_parts
+
+   ! Set up parent-child relationships (NO link association)
+   if (.not. associated(parent_part%first_child_part)) then
+      parent_part%first_child_part => child_part
+   else
+      parent_part%last_child_part%next_sibling_part => child_part
+   end if
+   parent_part%last_child_part => child_part
+   parent_part%num_children = parent_part%num_children + 1
 end function
 
 subroutine link_part(link, part)
@@ -254,37 +284,6 @@ subroutine link_part(link, part)
    link%last_partref => newref
    link%num_parts = link%num_parts + 1
 end subroutine
-
-function new_child_part(parent_part) result(new_part)
-   type(partree_node_t), pointer, intent(inout) :: parent_part
-   type(partree_node_t), pointer :: new_part
-
-   ! Create new part with correct depth
-   new_part => new_bare_part()
-   new_part%depth = parent_part%depth + 1
-
-   ! Set parent BEFORE setting up relationships
-   new_part%parent_part => parent_part
-   new_part%next_sibling_part => null()
-
-   ! Point to parent's counters
-   new_part%total_parts => parent_part%total_parts
-   new_part%total_items1 => parent_part%total_items1
-   new_part%total_items2 => parent_part%total_items2
-
-   ! Assign global index and increment counter
-   new_part%total_parts = new_part%total_parts + 1
-   new_part%global_index = new_part%total_parts
-
-   ! Set up parent-child relationships (NO link association)
-   if (.not. associated(parent_part%first_child_part)) then
-      parent_part%first_child_part => new_part
-   else
-      parent_part%last_child_part%next_sibling_part => new_part
-   end if
-   parent_part%last_child_part => new_part
-   parent_part%num_children = parent_part%num_children + 1
-end function
 
 subroutine add_new_item1(part, value)
 ! Add item to part without updating link itemdir (for temporary children)
@@ -332,21 +331,39 @@ subroutine add_new_item2(part, value)
    part%num_items2 = part%num_items2 + 1
 end subroutine
 
-subroutine move_first_item1(src, dest)
-! Move first item from src to dest without updating link itemdir
-   type(partree_node_t), intent(inout) :: src
+subroutine copy_part_items(orig, dest)
+! Move all items from orig to dest without updating link itemdir
+   type(partree_node_t), intent(inout) :: orig, dest
+   type(item_node_t), pointer :: item
+
+   item => orig%first_item1
+   do while (associated(item))
+      call add_new_item1(dest, item%value)
+      item => item%next_item
+   end do
+
+   item => orig%first_item2
+   do while (associated(item))
+      call add_new_item2(dest, item%value)
+      item => item%next_item
+   end do
+end subroutine
+
+subroutine move_first_item1(orig, dest)
+! Move first item from orig to dest without updating link itemdir
+   type(partree_node_t), intent(inout) :: orig
    type(partree_node_t), target, intent(inout) :: dest
    type(item_node_t), pointer :: item_to_move
 
-   item_to_move => src%first_item1
+   item_to_move => orig%first_item1
    if ((.not. associated(item_to_move))) error stop
 
    ! Remove from source
-   src%first_item1 => item_to_move%next_item
-   if (.not. associated(src%first_item1)) then
-      src%last_item1 => null()
+   orig%first_item1 => item_to_move%next_item
+   if (.not. associated(orig%first_item1)) then
+      orig%last_item1 => null()
    end if
-   src%num_items1 = src%num_items1 - 1
+   orig%num_items1 = orig%num_items1 - 1
 
    ! Add to destination
    item_to_move%next_item => null()
@@ -360,21 +377,21 @@ subroutine move_first_item1(src, dest)
    dest%num_items1 = dest%num_items1 + 1
 end subroutine
 
-subroutine move_first_item2(src, dest)
-! Move first item from src to dest without updating link itemdir
-   type(partree_node_t), intent(inout) :: src
+subroutine move_first_item2(orig, dest)
+! Move first item from orig to dest without updating link itemdir
+   type(partree_node_t), intent(inout) :: orig
    type(partree_node_t), target, intent(inout) :: dest
    type(item_node_t), pointer :: item_to_move
 
-   item_to_move => src%first_item2
+   item_to_move => orig%first_item2
    if ((.not. associated(item_to_move))) error stop
 
    ! Remove from source
-   src%first_item2 => item_to_move%next_item
-   if (.not. associated(src%first_item2)) then
-      src%last_item2 => null()
+   orig%first_item2 => item_to_move%next_item
+   if (.not. associated(orig%first_item2)) then
+      orig%last_item2 => null()
    end if
-   src%num_items2 = src%num_items2 - 1
+   orig%num_items2 = orig%num_items2 - 1
 
    ! Add to destination
    item_to_move%next_item => null()
@@ -388,16 +405,16 @@ subroutine move_first_item2(src, dest)
    dest%num_items2 = dest%num_items2 + 1
 end subroutine
 
-subroutine move_part_items(src, dest)
-! Move all items from src to dest without updating link itemdir
-   type(partree_node_t), intent(inout) :: src, dest
+subroutine move_part_items(orig, dest)
+! Move all items from orig to dest without updating link itemdir
+   type(partree_node_t), intent(inout) :: orig, dest
 
-   do while (associated(src%first_item1))
-      call move_first_item1(src, dest)
+   do while (associated(orig%first_item1))
+      call move_first_item1(orig, dest)
    end do
 
-   do while (associated(src%first_item2))
-      call move_first_item2(src, dest)
+   do while (associated(orig%first_item2))
+      call move_first_item2(orig, dest)
    end do
 end subroutine
 
@@ -596,90 +613,90 @@ subroutine print_link_itemdir(link)
    end do
 end subroutine
 
-function new_bare_chain(tot_items1, tot_items2) result(new_chain)
+function new_bare_chain(tot_items1, tot_items2) result(chain)
    integer, intent(in) :: tot_items1, tot_items2
-   type(assigntree_node_t), pointer :: new_chain
+   type(assigntree_node_t), pointer :: chain
 
-   allocate(new_chain)
-   new_chain%num_links = 0
-   new_chain%num_children = 0
-   new_chain%global_index = 0  ! Will be set when added to tree
-   new_chain%tot_items1 = tot_items1
-   new_chain%tot_items2 = tot_items2
-   new_chain%total_chains => null()
-   new_chain%total_links => null()
-   new_chain%total_partrefs => null()
-   new_chain%first_child_chain => null()
-   new_chain%last_child_chain => null()
-   new_chain%next_sibling_chain => null()
-   new_chain%first_link => null()
-   new_chain%last_link => null()
+   allocate(chain)
+   chain%num_links = 0
+   chain%num_children = 0
+   chain%global_index = 0  ! Will be set when added to tree
+   chain%tot_items1 = tot_items1
+   chain%tot_items2 = tot_items2
+   chain%total_chains => null()
+   chain%total_links => null()
+   chain%total_partrefs => null()
+   chain%first_child_chain => null()
+   chain%last_child_chain => null()
+   chain%next_sibling_chain => null()
+   chain%first_link => null()
+   chain%last_link => null()
 end function
 
-function new_root_chain(tot_items1, tot_items2) result(new_chain)
+function new_root_chain(tot_items1, tot_items2) result(chain)
    integer, intent(in) :: tot_items1, tot_items2
-   type(assigntree_node_t), pointer :: new_chain
+   type(assigntree_node_t), pointer :: chain
 
-   new_chain => new_bare_chain(tot_items1, tot_items2)
-   new_chain%parent_chain => null()
-   new_chain%split_part => null()
-   new_chain%global_index = 1
+   chain => new_bare_chain(tot_items1, tot_items2)
+   chain%parent_chain => null()
+   chain%split_part => null()
+   chain%global_index = 1
 
    ! Allocate counters for root and assign initial values
-   allocate(new_chain%total_chains)
-   allocate(new_chain%total_links)
-   allocate(new_chain%total_partrefs)
-   new_chain%total_chains = 1
-   new_chain%total_links = 0    ! No links initially
-   new_chain%total_partrefs = 0 ! No partrefs initially
+   allocate(chain%total_chains)
+   allocate(chain%total_links)
+   allocate(chain%total_partrefs)
+   chain%total_chains = 1
+   chain%total_links = 0    ! No links initially
+   chain%total_partrefs = 0 ! No partrefs initially
 end function
 
-function new_bare_link() result(new_link)
-   type(chain_node_t), pointer :: new_link
+function new_bare_link() result(link)
+   type(chain_node_t), pointer :: link
 
-   allocate(new_link)
-   new_link%num_parts = 0
-   new_link%global_index = 0  ! Will be set when added to chain
-   new_link%total_partrefs => null()
-   new_link%first_partref => null()
-   new_link%last_partref => null()
-   new_link%next_link => null()
+   allocate(link)
+   link%num_parts = 0
+   link%global_index = 0  ! Will be set when added to chain
+   link%total_partrefs => null()
+   link%first_partref => null()
+   link%last_partref => null()
+   link%next_link => null()
 end function
 
-function new_chain_link(chain) result(new_link)
+function new_chain_link(chain) result(link)
    type(assigntree_node_t), target, intent(inout) :: chain
-   type(chain_node_t), pointer :: new_link
+   type(chain_node_t), pointer :: link
    integer :: i
 
    ! Use the initialization function
-   new_link => new_bare_link()
+   link => new_bare_link()
 
    ! Point to chain's partref counter
-   new_link%total_partrefs => chain%total_partrefs
+   link%total_partrefs => chain%total_partrefs
 
    ! Assign global index and increment counter
    chain%total_links = chain%total_links + 1
-   new_link%global_index = chain%total_links
+   link%global_index = chain%total_links
 
    ! Allocate item directories
-   allocate(new_link%itemdir1(chain%tot_items1))
-   allocate(new_link%itemdir2(chain%tot_items2))
+   allocate(link%itemdir1(chain%tot_items1))
+   allocate(link%itemdir2(chain%tot_items2))
 
    ! Initialize all pointers to null
    do i = 1, chain%tot_items1
-      new_link%itemdir1(i)%ptr => null()
+      link%itemdir1(i)%ptr => null()
    end do
    do i = 1, chain%tot_items2
-      new_link%itemdir2(i)%ptr => null()
+      link%itemdir2(i)%ptr => null()
    end do
 
    ! Add link to chain
    if (.not. associated(chain%first_link)) then
-      chain%first_link => new_link
+      chain%first_link => link
    else
-      chain%last_link%next_link => new_link
+      chain%last_link%next_link => link
    end if
-   chain%last_link => new_link
+   chain%last_link => link
    chain%num_links = chain%num_links + 1
 end function
 
@@ -776,54 +793,11 @@ recursive subroutine print_part_recursive(part, depth, is_last_child)
    end do
 end subroutine
 
-subroutine init_chain_from_link(input_link, chain_root, part_tree)
-   type(chain_node_t), intent(in) :: input_link
-   type(assigntree_node_t), pointer, intent(out) :: chain_root
-   type(partree_node_t), pointer, intent(out) :: part_tree
-   type(chain_node_t), pointer :: first_link
-   type(partree_node_t), pointer :: new_part
-   type(partref_node_t), pointer :: partref
-   type(item_node_t), pointer :: item
-
-   ! Create root part (decoupled from chain)
-   part_tree => new_root_part()
-
-   ! Create root chain using itemdir sizes from input link
-   chain_root => new_root_chain(size(input_link%itemdir1), size(input_link%itemdir2))
-
-   ! Create first link
-   first_link => new_chain_link(chain_root)
-
-   ! Process all parts referenced in the input link
-   partref => input_link%first_partref
-   do while (associated(partref))
-      ! Create new part as child of part_tree
-      new_part => new_child_part(part_tree)
-
-      ! Copy items from the existing part to the new part
-      item => partref%part%first_item1
-      do while (associated(item))
-         call add_new_item1(new_part, item%value)
-         item => item%next_item
-      end do
-
-      item => partref%part%first_item2
-      do while (associated(item))
-         call add_new_item2(new_part, item%value)
-         item => item%next_item
-      end do
-
-      ! Link new part to first link (bulk itemdir update)
-      call link_part(first_link, new_part)
-
-      partref => partref%nextref
-   end do
-end subroutine
-
-subroutine init_chain_from_partition(partition, chain_root, part_tree)
+function chain_from_partition(partition) result(chain)
    type(partition_t), intent(in) :: partition
-   type(assigntree_node_t), pointer, intent(out) :: chain_root
-   type(partree_node_t), pointer, intent(out) :: part_tree
+   ! Local variables
+   type(assigntree_node_t), pointer :: chain
+   type(partree_node_t), pointer :: part_tree
    type(chain_node_t), pointer :: first_link
    type(partree_node_t), pointer :: new_part
    integer :: i, j
@@ -831,11 +805,11 @@ subroutine init_chain_from_partition(partition, chain_root, part_tree)
    ! Create root part (decoupled from chain)
    part_tree => new_root_part()
 
-   ! Create root chain
-   chain_root => new_root_chain(size(partition%itemdir1), size(partition%itemdir2))
+   ! Create new chain
+   chain => new_root_chain(size(partition%itemdir1), size(partition%itemdir2))
 
    ! Create first link
-   first_link => new_chain_link(chain_root)
+   first_link => new_chain_link(chain)
 
    ! Create parts as children of part_tree and add them to the first link
    do i = 1, partition%num_parts
@@ -855,7 +829,7 @@ subroutine init_chain_from_partition(partition, chain_root, part_tree)
       call link_part(first_link, new_part)
       call update_itemdir(first_link, new_part)
    end do
-end subroutine
+end function
 
 function first_partition(partition) result(semipartition)
    type(partition_t), intent(in) :: partition

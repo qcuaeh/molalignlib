@@ -380,9 +380,10 @@ recursive subroutine redistribute_items_random_recursive(coords1, coords2, array
    integer, intent(in) :: branch_idx
    type(assignment_t), intent(inout) :: assignment
 
-   integer :: child_branch_idx, first_link_idx, split_part_idx, i, items1_count, items2_count
    integer :: random_choice1, random_choice2
    integer :: link_idx, branch_link_offset, branch_num_links
+   integer :: child_branch_idx, first_link_idx, split_part_idx
+   integer :: items1_count, items2_count, i
    real :: random_real
 
    ! Check if this is a leaf level (no more child branches)
@@ -444,6 +445,45 @@ subroutine update_assignment(target, source)
       target%assigned_indices(target%num_assigned) = atom1_idx
       target%permutation(atom1_idx) = atom2_idx
    end do
+end subroutine
+
+subroutine redistribute_items_random(coords1, coords2, array_trees, random_permutation)
+   ! Random exploration wrapper - generates one random assignment
+   ! Similar to distribute_items_dfs but generates random assignment instead of optimal
+   real(rk), intent(in) :: coords1(:,:), coords2(:,:)
+   type(array_trees_t), intent(inout) :: array_trees
+   integer, allocatable, intent(out) :: random_permutation(:)
+   ! Local variables
+   type(assignment_t) :: random_assignment
+   real(rk) :: total_distance
+
+!   call random_init(.true., .true.)
+
+   ! Initialize random assignment
+   call init_assignment(random_assignment, array_trees%num_atoms1)
+
+   ! Initialize assignment with preassigned pairs
+   call collect_leaf_assignments(array_trees, 1, random_assignment)
+
+   ! Perform random exploration to generate one assignment (starting from root chain at index 1)
+   call redistribute_items_random_recursive(coords1, coords2, array_trees, 1, random_assignment)
+
+   ! Copy final permutation array from assignment
+   random_permutation = random_assignment%permutation
+
+   ! Calculate distance from the random permutation array
+   total_distance = total_sqdist(random_assignment%assigned_indices(1:random_assignment%num_assigned), &
+      random_assignment%permutation, coords1, coords2)
+
+   ! Report final results
+   write(stderr, '(A)') repeat("=", 60)
+   write(stderr, '(A,I0,A,I0,A)') "Atoms assigned: ", random_assignment%num_assigned, " out of ", &
+         array_trees%num_atoms1, " total atoms"
+   write(stderr, '(A,F10.4)') "Random assignment total squared distance: ", total_distance
+   write(stderr, '(A)') repeat("=", 60)
+
+   ! Validate permutation consistency
+   call check_permutation(random_permutation)
 end subroutine
 
 subroutine distribute_items_dfs(coords1, coords2, array_trees, optimal_permutation)

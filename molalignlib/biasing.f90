@@ -35,7 +35,6 @@ subroutine compute_mna_biases(atoms1, atoms2, atomtypes, biases)
    type(partition_t), intent(in) :: atomtypes
    type(int_matrix), dimension(:), allocatable, intent(out) :: biases
    ! Local variables
-   type(partree_node_t), pointer :: part_tree
    type(assigntree_node_t), pointer :: mnachain
    integer :: h, i, j, iatom, jatom
    integer :: num_splits
@@ -49,7 +48,7 @@ subroutine compute_mna_biases(atoms1, atoms2, atomtypes, biases)
    end do
 
    ! Initialize MNA chain with element types
-   call init_chain_from_partition( atomtypes, mnachain, part_tree)
+   mnachain => chain_from_partition(atomtypes)
 
 !   link_idx = 0
    do
@@ -90,7 +89,6 @@ subroutine compute_mna_biases(atoms1, atoms2, atomtypes, biases)
 !   end do
 
    call delete_chain(mnachain)  ! Cleanup
-   call delete_part_tree(part_tree)  ! Cleanup
 end subroutine
 
 

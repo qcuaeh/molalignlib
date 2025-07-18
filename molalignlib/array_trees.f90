@@ -4,8 +4,15 @@ use lcrs_tree
 use molecule
 implicit none
 private
-
-! Arrays of derived types with scalar components
+public convert_trees_to_arrays
+public validate_conversion
+public print_tree_items_array
+public print_part_tree_array
+public print_leaf_items_array
+public print_first_level_items_array
+public print_chain_tree_array
+public print_part_signatures_array
+public print_chain_details_array
 
 type, public :: partree_item_t
    integer :: depth
@@ -79,23 +86,13 @@ type, public :: array_trees_t
    ! NOTE: total_itemdir_entries, itemdir_size1, itemdir_size2 REMOVED - no longer needed
 end type
 
-public convert_trees_to_arrays
-public validate_conversion
-public print_tree_items_array
-public print_part_tree_array
-public print_leaf_items_array
-public print_first_level_items_array
-public print_chain_tree_array
-public print_part_signatures_array
-public print_chain_details_array
-
 contains
 
-subroutine convert_trees_to_arrays(part_tree, assignment_tree, array_trees, atoms1, atoms2)
+subroutine convert_trees_to_arrays(atoms1, atoms2, part_tree, assignment_tree, array_trees)
+   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
    type(partree_node_t), pointer, intent(in) :: part_tree
    type(assigntree_node_t), pointer, intent(in) :: assignment_tree
    type(array_trees_t), intent(out) :: array_trees
-   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
 
    ! Get totals from the tree counters
    array_trees%total_parts = part_tree%total_parts
@@ -727,8 +724,8 @@ recursive subroutine print_chain_recursive_array(array_trees, chain_idx, depth, 
       ! Print the split part index with item counts
       split_part_idx = array_trees%assigntree(child_idx)%split_part_idx
       if (split_part_idx > 0) then
-         write(stderr, '(A,I0,1X,A,I0,A,I0,A)') prefix(1:pos-1), split_part_idx, &
-            '(', array_trees%partree(split_part_idx)%items1_count, '/', &
+         write(stderr, '(A,A,I0,A,I0,A)') prefix(1:pos-1), '* (', &
+            array_trees%partree(split_part_idx)%items1_count, '/', &
             array_trees%partree(split_part_idx)%items2_count, ')'
       else
          write(stderr, '(A,A)') prefix(1:pos-1), '(no split part)'

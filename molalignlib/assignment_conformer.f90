@@ -29,7 +29,6 @@ use biasing
 use pruning
 use lcrs_tree
 use array_trees
-use atom_mnas
 use assigntree_precompute
 use assigntree_recompute
 use assigntree_distribute
@@ -47,8 +46,7 @@ subroutine optimize_atomperm_conformer( atoms1, atoms2, atomtypes, registry)
    ! Local variables
    logical, dimension(:,:), allocatable :: adjmat1, adjmat2
    integer, dimension(:), allocatable :: atomperm, auxperm
-   type(partree_node_t), pointer :: part_tree, temp_part
-   type(assigntree_node_t), pointer :: mnachain, assignment_tree
+   type(assigntree_node_t), pointer :: mnachain
    type(array_trees_t) :: array_trees
    real(rk), dimension(:), allocatable :: weights1, weights2
    real(rk), dimension(:,:), allocatable :: wcoords1, wcoords2, rcoords2
@@ -82,11 +80,9 @@ subroutine optimize_atomperm_conformer( atoms1, atoms2, atomtypes, registry)
    call weight_coords( wcoords2, weights2)
 
    ! Pre-compute assignment tree
-   call init_chain_from_partition( atomtypes, mnachain, temp_part)
-   call compute_consistent_mnas( atoms1, atoms2, mnachain)
-   call precompute_assignment_tree( atoms1, atoms2, part_tree, mnachain%last_link, assignment_tree)
-   call print_chain_tree( assignment_tree)
-   call convert_trees_to_arrays( part_tree, assignment_tree, array_trees, atoms1, atoms2)
+   call compute_consistent_mnas( atoms1, atoms2, atomtypes, mnachain)
+   call build_assignment_tree( atoms1, atoms2, mnachain%last_link, array_trees)
+   call print_chain_tree_array( array_trees)
 
    ! Initialize random number generator
    call random_initialize()

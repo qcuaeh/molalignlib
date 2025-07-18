@@ -5,22 +5,24 @@ use chemistry
 use molecule
 use lcrs_tree
 implicit none
+private
+public collect_atomtypes
 
-type :: atomtype_item
+type :: atomtype_item_t
    integer :: elnum
    integer :: label
    integer :: part_index
 end type
 
-type :: atomtype_table
+type :: atomtype_table_t
    integer :: num_items
-   type(atomtype_item), dimension(:), allocatable :: items
+   type(atomtype_item_t), dimension(:), allocatable :: items
 end type
 
 contains
 
 subroutine add_atomtype(atomtypetable, atom, part_index)
-   type(atomtype_table), intent(inout) :: atomtypetable
+   type(atomtype_table_t), intent(inout) :: atomtypetable
    type(atom_t), intent(in) :: atom
    integer, intent(in) :: part_index
 
@@ -31,7 +33,7 @@ subroutine add_atomtype(atomtypetable, atom, part_index)
 end subroutine
 
 function find_atomtype(atomtypetable, atom) result(part_index)
-   type(atomtype_table), intent(in) :: atomtypetable
+   type(atomtype_table_t), intent(in) :: atomtypetable
    type(atom_t), intent(in) :: atom
    integer :: part_index
    integer :: i
@@ -52,7 +54,7 @@ subroutine collect_atomtypes(atoms1, atoms2, atomtypes)
    type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
    type(partition_t), intent(out) :: atomtypes
    ! Local variables
-   type(atomtype_table) :: atomtypetable
+   type(atomtype_table_t) :: atomtypetable
    integer :: i, num_atoms1, num_atoms2
    integer :: part_index, current_part
    integer :: max_parts

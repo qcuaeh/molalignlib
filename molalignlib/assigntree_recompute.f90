@@ -241,6 +241,8 @@ recursive subroutine recompute_assignment_tree(atoms1, atoms2, branch)
    type(assigntree_node_t), pointer :: child_branch
    type(partree_node_t), pointer :: child_part
 
+!   call random_init(.true., .true.)
+
    ! Process all children of this branch
    child_branch => branch%first_child_chain
    do while (associated(child_branch))

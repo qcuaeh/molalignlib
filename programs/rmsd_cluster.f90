@@ -171,70 +171,91 @@ if (any(atomtypes%parts%num_items1 /= atomtypes%parts%num_items2)) then
    stop
 end if
 
-! Get standard coordinates
-coords1 = get_coords( atoms1)
-coords2 = get_coords( atoms2)
-weights1 = atomic_weights(atoms1%elnum)
-weights2 = atomic_weights(atoms2%elnum)
-center1 = centroid( coords1, weights1)
-center2 = centroid( coords2, weights2)
-call translate_coords( coords2, center1 - center2)
+if (align_flag) then
 
-! Get normalized coordinates
-wcoords1 = get_coords( atoms1)
-wcoords2 = get_coords( atoms2)
-call translate_coords( wcoords1, -center1)
-call translate_coords( wcoords2, -center2)
-call weight_coords( wcoords1, weights1)
-call weight_coords( wcoords2, weights2)
+   ! Get standard coordinates
+   coords1 = get_coords( atoms1)
+   coords2 = get_coords( atoms2)
+   weights1 = atomic_weights(atoms1%elnum)
+   weights2 = atomic_weights(atoms2%elnum)
+   center1 = centroid( coords1, weights1)
+   center2 = centroid( coords2, weights2)
+   call translate_coords( coords2, center1 - center2)
 
-if (align_flag .and. remap_flag) then
+   ! Get normalized coordinates
+   wcoords1 = get_coords( atoms1)
+   wcoords2 = get_coords( atoms2)
+   call translate_coords( wcoords1, -center1)
+   call translate_coords( wcoords2, -center2)
+   call weight_coords( wcoords1, weights1)
+   call weight_coords( wcoords2, weights2)
 
-   ! Remap atoms to minimize the MSD
-   call optimize_atomperm_cluster( atoms1, atoms2, atomtypes, registry)
+   if (remap_flag) then
 
-   ! Print optimization stats
-   if (stats_flag) then
-      call print_records( registry)
-   end if
+      ! Remap atoms to minimize the MSD
+      call optimize_atomperm_cluster( atoms1, atoms2, atomtypes, registry)
 
-   do i = 1, registry%num_records
-      atomperm = registry%records(i)%atomperm
-!      rotquat = registry%records(i)%rotquat
-      rotquat = least_rotquat( atomperm, wcoords1, wcoords2)
-      rcoords2 = rotated_coords( coords2, rotquat, center1)
-      rmsd = sqrt( total_sqdist( atomperm, weights1, coords1, rcoords2))
+      ! Print optimization stats
+      if (stats_flag) then
+         call print_records( registry)
+      end if
+
+      do i = 1, registry%num_records
+         atomperm = registry%records(i)%atomperm
+!         rotquat = registry%records(i)%rotquat
+         rotquat = least_rotquat( atomperm, wcoords1, wcoords2)
+         rcoords2 = rotated_coords( wcoords2, rotquat)
+         rmsd = sqrt( total_sqdist( atomperm, wcoords1, rcoords2))
+
+         write (stderr,'(A)') str( rmsd, 4)
+
+         if (write_flag .or. pipe_flag) then
+            title2 = 'RMSD=' // str( rmsd, 4)
+            rcoords2 = rotated_coords( coords2, rotquat, center1)
+            call set_coords( atoms2, rcoords2)
+            call writemol( unitout, extout, title2, atoms2, atomperm)
+         end if
+      end do
+
+   else
+
+      rotquat = least_rotquat( wcoords1, wcoords2)
+      rcoords2 = rotated_coords( wcoords2, rotquat)
+      rmsd = sqrt( total_sqdist( wcoords1, rcoords2))
 
       write (stderr,'(A)') str( rmsd, 4)
 
       if (write_flag .or. pipe_flag) then
          title2 = 'RMSD=' // str( rmsd, 4)
+         rcoords2 = rotated_coords( coords2, rotquat, center1)
          call set_coords( atoms2, rcoords2)
-         call writemol( unitout, extout, title2, atoms2, atomperm)
+         call writemol( unitout, extout, title2, atoms2)
       end if
-   end do
 
-else if (align_flag) then
-
-   rotquat = least_rotquat( wcoords1, wcoords2)
-   rcoords2 = rotated_coords( coords2, rotquat, center1)
-   rmsd = sqrt( total_sqdist( weights1, coords1, rcoords2))
-
-   write (stderr,'(A)') str( rmsd, 4)
-
-   if (write_flag .or. pipe_flag) then
-      title2 = 'RMSD=' // str( rmsd, 4)
-      call set_coords( atoms2, rcoords2)
-      call writemol( unitout, extout, title2, atoms2)
    end if
-
-else if (remap_flag) then
-
-   ! Not implemented
 
 else
 
-   ! Not implemented
+   ! Get normalized coordinates
+   wcoords1 = get_coords( atoms1)
+   wcoords2 = get_coords( atoms2)
+   weights1 = atomic_weights(atoms1%elnum)
+   weights2 = atomic_weights(atoms2%elnum)
+   call weight_coords( wcoords1, weights1)
+   call weight_coords( wcoords2, weights2)
+
+   if (remap_flag) then
+   block
+      type(bool_matrix), dimension(:), allocatable :: prunes
+      call prune_procedure( atomtypes, atoms1, atoms2, prunes)
+      call assign_atoms_pruned( atomtypes, wcoords1, wcoords2, prunes, atomperm)
+      rmsd = sqrt( total_sqdist( atomperm, wcoords1, wcoords2))
+   end block
+   else
+      rmsd = sqrt( total_sqdist( wcoords1, wcoords2))
+   end if
+
+   write (stderr,'(A)') str( rmsd, 4)
 
 end if
 

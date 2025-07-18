@@ -40,8 +40,6 @@ public least_rotquat
 interface total_sqdist
    module procedure totsqdist_mol
    module procedure totsqdist_perm
-   module procedure totsqdist_weight
-   module procedure totsqdist_perm_weight
    module procedure totsqdist_perm_atoms
 end interface
 
@@ -277,21 +275,6 @@ real(rk) function totsqdist_perm(atomperm, coords1, coords2) result(total_sqdist
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
 
    total_sqdist = sum(sum((coords1 - coords2(:, atomperm))**2, dim=1))
-end function
-
-real(rk) function totsqdist_weight(weights, coords1, coords2) result(total_sqdist)
-   real(rk), dimension(:), intent(in) :: weights
-   real(rk), dimension(:,:), intent(in) :: coords1, coords2
-
-   total_sqdist = sum(weights(:)*sum((coords1 - coords2)**2, dim=1))/sum(weights)
-end function
-
-real(rk) function totsqdist_perm_weight(atomperm, weights, coords1, coords2) result(total_sqdist)
-   integer, dimension(:), intent(in) :: atomperm
-   real(rk), dimension(:), intent(in) :: weights
-   real(rk), dimension(:,:), intent(in) :: coords1, coords2
-
-   total_sqdist = sum(weights(:)*sum((coords1 - coords2(:, atomperm))**2, dim=1))/sum(weights)
 end function
 
 real(rk) function totsqdist_perm_atoms(atomidcs, atomperm, coords1, coords2) result(total_sqdist)
