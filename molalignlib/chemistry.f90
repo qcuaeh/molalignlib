@@ -16,11 +16,10 @@
 
 module chemistry
 use parameters
-use strutils
+use utils
 implicit none
 
 integer, parameter :: num_elems = 103
-real(rk), dimension(:), pointer :: atomic_weights
 
 ! Element symbols
 character(2), parameter :: element_symbols(num_elems) = [ &
@@ -73,17 +72,6 @@ real(rk), target :: atomic_masses(num_elems) = [ &
 223.0, 226.0, 227.0, 232.0, 231.0, 238.0, 237.0, 244.0, 243.0, 247.0, 247.0, 251.0, 252.0, 257.0, 258.0, 259.0, 262.0         &
 ]
 
-real(rk), target :: ones(num_elems) = [ &
-1,                                                 1, &
-1, 1,                               1, 1, 1, 1, 1, 1, &
-1, 1,                               1, 1, 1, 1, 1, 1, &
-1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, &
-1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, &
-1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,    &
-         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, &
-1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1     &
-]
-
 contains
 
 function atomic_number(elsym) result(z)
@@ -102,7 +90,6 @@ function atomic_number(elsym) result(z)
    case default
       z = -1
    end select
-
 end function
 
 subroutine split_symbol( elsym, elnum, label)
@@ -124,7 +111,6 @@ subroutine split_symbol( elsym, elnum, label)
       write (stderr, '(a,1x,a)') 'Invalid atomic elsym/label:', elsym
       stop
    end if
-
 end subroutine
 
 end module

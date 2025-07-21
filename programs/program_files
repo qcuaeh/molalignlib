@@ -1,2 +1,3 @@
-rmsd_cluster.f90 rmsd-cluster
-rmsd_conformer.f90 rmsd-conformer
+confrmsd.f90 ConfRMSD
+#clusrmsd.f90 ClusRMSD
+#rmsd_reaction.f90 ReacRMSD

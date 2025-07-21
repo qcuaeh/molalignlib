@@ -763,7 +763,7 @@ recursive subroutine print_part_recursive(part, depth, is_last_child)
       is_last_child(depth + 1) = .not. associated(next_child)
 
       ! Build prefix for this level
-      prefix = " "
+      prefix = ""
       pos = 2
       do i = 1, depth
          if (is_last_child(i)) then
@@ -978,11 +978,11 @@ subroutine update_itemdir(link, part)
    end do
 end subroutine
 
-subroutine print_chain_tree(assignment_tree)
-   type(assigntree_node_t), pointer, intent(in) :: assignment_tree
+subroutine print_chain_tree(assign_tree)
+   type(assigntree_node_t), pointer, intent(in) :: assign_tree
    logical, dimension(:), allocatable :: is_last_child
 
-   if (.not. associated(assignment_tree)) error stop
+   if (.not. associated(assign_tree)) error stop
 
    write(stderr, *)
    write(stderr, '(A)') repeat("=", 25)
@@ -996,7 +996,7 @@ subroutine print_chain_tree(assignment_tree)
 
    ! Print children recursively
    write(stderr, '(A)') 'ROOT'
-   call print_chain_recursive(assignment_tree, 0, is_last_child)
+   call print_chain_recursive(assign_tree, 0, is_last_child)
 
    deallocate(is_last_child)
    write(stderr, *)
@@ -1020,7 +1020,7 @@ recursive subroutine print_chain_recursive(chain, depth, is_last_child)
       is_last_child(depth + 1) = .not. associated(next_child)
 
       ! Build prefix for this level
-      prefix = " "
+      prefix = ""
       pos = 2
       do i = 1, depth
          if (is_last_child(i)) then
@@ -1244,10 +1244,10 @@ recursive subroutine print_part_indices_recursive(part)
 end subroutine
 
 ! New procedure to print global indices for chain tree
-subroutine print_chain_indices(assignment_tree)
-   type(assigntree_node_t), pointer, intent(in) :: assignment_tree
+subroutine print_chain_indices(assign_tree)
+   type(assigntree_node_t), pointer, intent(in) :: assign_tree
 
-   if (.not. associated(assignment_tree)) then
+   if (.not. associated(assign_tree)) then
       write(stderr, '(A)') "Chain tree is empty"
       return
    end if
@@ -1257,13 +1257,13 @@ subroutine print_chain_indices(assignment_tree)
    write(stderr, '(A)') "     Chain Indices"
    write(stderr, '(A)') repeat("=", 35)
    write(stderr, *)
-   write(stderr, '(A,I0)') "Total chains created: ", assignment_tree%total_chains
-   write(stderr, '(A,I0)') "Total links created: ", assignment_tree%total_links
-   write(stderr, '(A,I0)') "Total partrefs created: ", assignment_tree%total_partrefs
+   write(stderr, '(A,I0)') "Total chains created: ", assign_tree%total_chains
+   write(stderr, '(A,I0)') "Total links created: ", assign_tree%total_links
+   write(stderr, '(A,I0)') "Total partrefs created: ", assign_tree%total_partrefs
    write(stderr, *)
 
    ! Print children recursively
-   call print_chain_indices_recursive(assignment_tree)
+   call print_chain_indices_recursive(assign_tree)
 
    write(stderr, *)
 end subroutine

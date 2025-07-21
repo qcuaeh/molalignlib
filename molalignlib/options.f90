@@ -1,12 +1,9 @@
 module options
 
 ! Flags
-logical :: bond_flag
 logical :: iter_flag
 logical :: test_flag
-logical :: stats_flag
 logical :: mirror_flag
-logical :: adjacency_flag
 
 ! Bounds
 integer :: max_count

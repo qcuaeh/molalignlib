@@ -16,31 +16,28 @@
 
 module spatial_transforms
 use parameters
+use permutation
 use random
 use eigen
-
 implicit none
-
 private
+
 public angle
 public quatmul
 public quatrotmat
 public randrotquat
-public weight_coords
+public mean_sqdist
+public total_sqdist
 public rotate_coords
 public rotated_coords
-public mirror_coords
 public translate_coords
-public centroid
-public total_sqdist
-public least_total_sqdist
-public align_coords
 public least_rotquat
+public least_total_sqdist
 
 interface total_sqdist
-   module procedure totsqdist_mol
-   module procedure totsqdist_perm
-   module procedure totsqdist_perm_atoms
+   module procedure total_sqdist_base
+   module procedure total_sqdist_perm
+   module procedure total_sqdist_subperm
 end interface
 
 interface rotate_coords
@@ -54,12 +51,9 @@ interface rotated_coords
 end interface
 
 interface least_rotquat
-   module procedure least_rotquat_ord
+   module procedure least_rotquat_base
    module procedure least_rotquat_perm
-end interface
-
-interface least_total_sqdist
-   module procedure leastotsqdist_atoms
+   module procedure least_rotquat_subperm
 end interface
 
 contains
@@ -132,19 +126,6 @@ function randrotquat() result(rotquat)
    ! Unit quaternion (w, x, y, z)
    rotquat = [ c2*r2, s1*r1, c1*r1, s2*r2 ]
 end function
-
-subroutine weight_coords(coords, weights)
-   real(rk), dimension(:,:), intent(inout) :: coords
-   real(rk), dimension(:), intent(in) :: weights
-   ! Local variables
-   real(rk) :: total_weight
-   integer :: i
-
-   total_weight = sum(weights)
-   do i = 1, size(coords, dim=2)
-      coords(:, i) = sqrt(weights(i)/total_weight)*coords(:, i)
-   end do
-end subroutine
 
 subroutine translate_coords(coords, travec)
    real(rk), dimension(:,:), intent(inout) :: coords
@@ -243,50 +224,54 @@ function rotated_coords_center(coords, rotquat, center) result(rotated_coords)
    end do
 end function
 
-subroutine mirror_coords(coords)
-   real(rk), dimension(:,:), intent(inout) :: coords
-
-   coords(1, :) = -coords(1, :)
-end subroutine
-
-function centroid(coords, weights)
-! Calculate the coordinates of the center of mass
-   real(rk), dimension(:,:), intent(in) :: coords
-   real(rk), dimension(:), intent(in) :: weights
-   ! Local variables
-   real(rk) :: centroid(3)
-   integer :: i
-
-   centroid(:) = 0
-   do i = 1, size(coords, dim=2)
-      centroid(:) = centroid(:) + weights(i)*coords(:, i)
-   end do
-   centroid(:) = centroid(:)/sum(weights)
-end function
-
-real(rk) function totsqdist_mol(coords1, coords2) result(total_sqdist)
+real(rk) function total_sqdist_base(coords1, coords2) result(total_sqdist)
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
 
    total_sqdist = sum(sum((coords1 - coords2)**2, dim=1))
 end function
 
-real(rk) function totsqdist_perm(atomperm, coords1, coords2) result(total_sqdist)
+real(rk) function total_sqdist_perm(atomperm, coords1, coords2) result(total_sqdist)
    integer, dimension(:), intent(in) :: atomperm
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
 
    total_sqdist = sum(sum((coords1 - coords2(:, atomperm))**2, dim=1))
 end function
 
-real(rk) function totsqdist_perm_atoms(atomidcs, atomperm, coords1, coords2) result(total_sqdist)
-   integer, dimension(:), intent(in) :: atomidcs, atomperm
+real(rk) function total_sqdist_subperm(atomperm, coords1, coords2) result(total_sqdist)
+   type(subperm_t), target, intent(in) :: atomperm
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
+   ! Local variables
+   integer, dimension(:), pointer :: idx, perm
    integer :: i
 
-   total_sqdist = 0
+   idx => atomperm%subset
+   perm => atomperm%forward
 
-   do i = 1, size(atomidcs)
-      total_sqdist = total_sqdist + sum((coords1(:, atomidcs(i)) - coords2(:, atomperm(atomidcs(i))))**2, dim=1)
+   total_sqdist = 0
+   do i = 1, atomperm%size
+      total_sqdist = total_sqdist + sum((coords1(:, idx(i)) - coords2(:, perm(idx(i))))**2, dim=1)
    end do
+end function
+
+real(rk) function mean_sqdist(atomperm, weights, coords1, coords2)
+   type(subperm_t), target, intent(in) :: atomperm
+   real(rk), dimension(:), intent(in) :: weights
+   real(rk), dimension(:,:), intent(in) :: coords1, coords2
+   ! Local variables
+   real(rk) :: total_weight, total_sqdist
+   integer, dimension(:), pointer :: idx, perm
+   integer :: i
+
+   idx => atomperm%subset
+   perm => atomperm%forward
+
+   total_weight = 0
+   total_sqdist = 0
+   do i = 1, atomperm%size
+      total_weight = total_weight + weights(idx(i))
+      total_sqdist = total_sqdist + weights(idx(i))*sum((coords1(:, idx(i)) - coords2(:, perm(idx(i))))**2, dim=1)
+   end do
+   mean_sqdist = total_sqdist / total_weight
 end function
 
 subroutine compute_residuals_matrix(coordsp, coordsm, residuals)
@@ -324,35 +309,7 @@ subroutine compute_residuals_matrix(coordsp, coordsm, residuals)
    residuals(4, 3) = residuals(3, 4)
 end subroutine
 
-subroutine align_coords(atomperm, coords1, coords2, rotquat)
-! Find the optimal rotation in quaternion representation by least squares minimization
-! Reference: Acta Cryst. (1989). A45, 208-210
-   integer, dimension(:), intent(in) :: atomperm
-   real(rk), dimension(:,:), intent(in) :: coords1
-   real(rk), dimension(:,:), intent(inout) :: coords2
-   real(rk), intent(out) :: rotquat(4)
-   ! Local variables
-   real(rk), dimension(:,:), allocatable :: coordsp, coordsm
-   real(rk) :: residuals(4, 4)
-   integer :: i, num_atoms
-
-   num_atoms = size(atomperm)
-
-   allocate (coordsp(3, num_atoms))
-   allocate (coordsm(3, num_atoms))
-
-   do i = 1, num_atoms
-      coordsp(:, i) = coords1(:, i) + coords2(:, atomperm(i))
-      coordsm(:, i) = coords1(:, i) - coords2(:, atomperm(i))
-   end do
-
-   ! Compute residuals matrix using the common procedure
-   call compute_residuals_matrix(coordsp, coordsm, residuals)
-   rotquat = leasteigvec(residuals)
-   call rotate_coords_origin( coords2, rotquat)
-end subroutine
-
-function least_rotquat_ord(coords1, coords2) result(rotquat)
+function least_rotquat_base(coords1, coords2) result(rotquat)
 ! Find the optimal rotation in quaternion representation by least squares minimization
 ! Reference: Acta Cryst. (1989). A45, 208-210
    real(rk), dimension(:,:), intent(in) :: coords1
@@ -405,7 +362,36 @@ function least_rotquat_perm(atomperm, coords1, coords2) result(rotquat)
    rotquat = leasteigvec(residuals)
 end function
 
-function leastotsqdist_atoms(atomidcs1, atomidcs2, coords1, coords2, center1, center2) result(leastotsqdist)
+function least_rotquat_subperm(atomperm, coords1, coords2) result(rotquat)
+! Find the optimal rotation in quaternion representation by least squares minimization
+! Reference: Acta Cryst. (1989). A45, 208-210
+   type(subperm_t), target, intent(in) :: atomperm
+   real(rk), dimension(:,:), intent(in) :: coords1
+   real(rk), dimension(:,:), intent(inout) :: coords2
+   ! Local variables
+   real(rk), dimension(4) :: rotquat
+   integer, dimension(:), pointer :: idx, perm
+   real(rk), dimension(:,:), allocatable :: coordsp, coordsm
+   real(rk) :: residuals(4, 4)
+   integer :: i
+
+   idx => atomperm%subset
+   perm => atomperm%forward
+   allocate (coordsp(3, atomperm%size))
+   allocate (coordsm(3, atomperm%size))
+
+   do i = 1, atomperm%size
+      coordsp(:, i) = coords1(:, idx(i)) + coords2(:, perm(idx(i)))
+      coordsm(:, i) = coords1(:, idx(i)) - coords2(:, perm(idx(i)))
+   end do
+
+   ! Compute residuals matrix using the common procedure
+   call compute_residuals_matrix(coordsp, coordsm, residuals)
+!   total_sqdist = max(leasteigval(residuals), 0._rk)
+   rotquat = leasteigvec(residuals)
+end function
+
+function least_total_sqdist(atomidcs1, atomidcs2, coords1, coords2, center1, center2) result(leastotsqdist)
 ! Find the optimal rotation in quaternion representation by least squares minimization
 ! Reference: Acta Cryst. (1989). A45, 208-210
    integer, dimension(:), intent(in) :: atomidcs1, atomidcs2

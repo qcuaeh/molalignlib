@@ -14,15 +14,15 @@
 ! You should have received a copy of the GNU General Public License
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-!> @defgroup program_rmsd_conformer Program RMSD Conformer
-!> @brief Program to calculate RMSD between conformers
+!> @defgroup clusrmsd ClusRMSD
+!> @brief Program to calculate RMSDs between atom clusters
 !> @{
-program rmsd_conformer
+program clusrmsd
 use parameters
 use options
 use molecule
 use spatial_transforms
-use strutils
+use utils
 use chemistry
 use adjacency
 use permutation
@@ -32,7 +32,7 @@ use argparse
 use biasing
 use pruning
 use registration
-use assignment_conformer
+use assignment_cluster
 
 implicit none
 
@@ -40,29 +40,27 @@ integer, allocatable :: atomperm(:)
 character(:), allocatable :: title1, title2
 character(:), allocatable :: arg, pathout, dummy
 character(:), allocatable :: extin1, extin2, extout, extpipe
-logical :: align_flag, remap_flag, write_flag, pipe_flag
+logical :: align_flag, remap_flag, write_flag, pipe_flag, stats_flag
 type(strlist_type) :: posargs(2)
 type(atom_t), dimension(:), allocatable :: atoms1, atoms2
+type(bond_t), dimension(:), allocatable :: bonds1, bonds2
 type(partition_t) :: atomtypes
 type(registry_t) :: registry
 real(rk) :: rmsd
 real(rk) :: center1(3), center2(3), rotquat(4)
 real(rk), dimension(:), allocatable :: weights1, weights2
 real(rk), dimension(:,:), allocatable :: coords1, coords2, wcoords1, wcoords2, rcoords2
-!logical, dimension(:,:), allocatable :: adjmat1, adjmat2
 integer :: unitin1, unitin2, unitout
 integer :: i
 
 ! Set default options
 
-adjacency_flag = .true.
-iter_flag = .true.
+iter_flag = .false.
 test_flag = .false.
 stats_flag = .false.
 mirror_flag = .false.
 align_flag = .false.
 remap_flag = .false.
-bond_flag = .false.
 write_flag = .false.
 pipe_flag = .false.
 
@@ -73,18 +71,27 @@ max_trials = huge( max_trials)
 atomic_weights => ones
 pathout = 'aligned.xyz'
 
+prune_tol = 0.5
+prune_procedure => prune_none
+
 ! Get user options
 
 call init_args()
 
 do while (get_arg(arg))
    select case (arg)
-   case ('-bond')
-      bond_flag = .true.
    case ('-align')
       align_flag = .true.
    case ('-remap')
       remap_flag = .true.
+   case ('-near')
+!      iter_flag = .true.
+      prune_procedure => prune_none
+   case ('-prune')
+      iter_flag = .true.
+      prune_procedure => prune_rd
+   case ('-tol')
+      call read_optarg(arg, prune_tol)
    case ('-mass')
       atomic_weights => atomic_masses
    case ('-mirror')
@@ -140,8 +147,8 @@ else
 end if
 
 ! Read coordinates
-call readmol( unitin1, extin1, title1, atoms1)
-call readmol( unitin2, extin2, title2, atoms2)
+call readfile( unitin1, extin1, title1, atoms1, bonds1)
+call readfile( unitin2, extin2, title2, atoms2, bonds2)
 
 ! Abort if molecules have different number of atoms
 if (size(atoms1) /= size(atoms2)) then
@@ -155,7 +162,7 @@ if (any(sorted(atoms1%elnum) /= sorted(atoms2%elnum))) then
    stop
 end if
 
-! Collect atom types in a partition
+! Compute atomic types
 call collect_atomtypes( atoms1, atoms2, atomtypes)
 
 ! Abort if there are conflicting atomic types
@@ -186,7 +193,7 @@ if (align_flag) then
    if (remap_flag) then
 
       ! Remap atoms to minimize the MSD
-      call optimize_atomperm_conformer( atoms1, atoms2, atomtypes, registry)
+      call optimize_atomperm_cluster( atoms1, atoms2, atomtypes, registry)
 
       ! Print optimization stats
       if (stats_flag) then
@@ -195,19 +202,18 @@ if (align_flag) then
 
       do i = 1, registry%num_records
          atomperm = registry%records(i)%atomperm
-   !      rotquat = registry%records(i)%rotquat
+!         rotquat = registry%records(i)%rotquat
          rotquat = least_rotquat( atomperm, wcoords1, wcoords2)
          rcoords2 = rotated_coords( wcoords2, rotquat)
          rmsd = sqrt( total_sqdist( atomperm, wcoords1, rcoords2))
 
-   !      write (stderr,'(I0)') adjacencydiff( atomperm, adjmat1, adjmat2)
-         write (stderr,'(A)') str( rmsd, 4)
+         write (stderr,'(A)') str( rmsd)
 
          if (write_flag .or. pipe_flag) then
-            title2 = 'RMSD=' // str( rmsd, 4)
+            title2 = 'RMSD=' // str( rmsd)
             rcoords2 = rotated_coords( coords2, rotquat, center1)
             call set_coords( atoms2, rcoords2)
-            call writemol( unitout, extout, title2, atoms2, atomperm)
+            call writefile( unitout, extout, title2, atoms2, atomperm)
          end if
       end do
 
@@ -217,14 +223,13 @@ if (align_flag) then
       rcoords2 = rotated_coords( wcoords2, rotquat)
       rmsd = sqrt( total_sqdist( wcoords1, rcoords2))
 
-   !   write (stderr,'(I0)') adjacencydiff( adjmat1, adjmat2)
-      write (stderr,'(A)') str( rmsd, 4)
+      write (stderr,'(A)') str( rmsd)
 
       if (write_flag .or. pipe_flag) then
-         title2 = 'RMSD=' // str( rmsd, 4)
+         title2 = 'RMSD=' // str( rmsd)
          rcoords2 = rotated_coords( coords2, rotquat, center1)
          call set_coords( atoms2, rcoords2)
-         call writemol( unitout, extout, title2, atoms2)
+         call writefile( unitout, extout, title2, atoms2)
       end if
 
    end if
@@ -241,19 +246,16 @@ else
 
    if (remap_flag) then
    block
-      type(assigntree_node_t), pointer :: mnachain
-      type(array_trees_t) :: array_trees
-      call compute_consistent_mnas( atoms1, atoms2, atomtypes, mnachain)
-      call build_assignment_tree( atoms1, atoms2, mnachain%last_link, array_trees)
-      call print_chain_tree_array( array_trees)
-      call distribute_items_dfs( wcoords1, wcoords2, array_trees, atomperm)
+      type(bool_matrix), dimension(:), allocatable :: prunes
+      call prune_procedure( atomtypes, atoms1, atoms2, prunes)
+      call assign_atoms_pruned( atomtypes, wcoords1, wcoords2, prunes, atomperm)
       rmsd = sqrt( total_sqdist( atomperm, wcoords1, wcoords2))
    end block
    else
       rmsd = sqrt( total_sqdist( wcoords1, wcoords2))
    end if
 
-   write (stderr,'(A)') str( rmsd, 4)
+   write (stderr,'(A)') str( rmsd)
 
 end if
 

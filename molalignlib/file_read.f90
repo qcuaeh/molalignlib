@@ -36,233 +36,194 @@ subroutine open2read(filepath, unit)
    end if
 end subroutine
 
-subroutine readmol(unit, format, title, atoms)
+subroutine readfile(unit, exten, title, atoms, bonds)
    integer, intent(in) :: unit
-   character(*), intent(in) :: format
+   character(*), intent(in) :: exten
    character(:), allocatable, intent(out) :: title
    type(atom_t), dimension(:), allocatable, intent(out) :: atoms
+   type(bond_t), dimension(:), allocatable, intent(out) :: bonds
 
-   select case (format)
+   select case (exten)
    case ('xyz')
-      call readmol_xyz(unit, title, atoms)
+      call readfile_xyz(unit, title, atoms, bonds)
    case ('mol')
-      call readmol_mol(unit, title, atoms)
+      call readfile_mol(unit, title, atoms, bonds)
    case ('sdf')
-      call readmol_sdf(unit, title, atoms)
+      call readfile_sdf(unit, title, atoms, bonds)
    case ('mol2')
-      call readmol_mol2(unit, title, atoms)
+      call readfile_mol2(unit, title, atoms, bonds)
    case default
-      write (stderr, '(A,1X,A)') 'Invalid format:', format
+      write (stderr, '(A,1X,A)') 'Invalid file extension:', exten
       stop
    end select
 end subroutine
 
-subroutine readmol_xyz(unit, title, atoms)
+subroutine readfile_xyz(unit, title, atoms, bonds)
    integer, intent(in) :: unit
    character(:), allocatable, intent(out) :: title
    type(atom_t), dimension(:), allocatable, intent(out) :: atoms
+   type(bond_t), dimension(:), allocatable, intent(out) :: bonds
    ! Local variables
    character(ll) :: buffer
    character(wl) :: elsym
-   integer :: i, num_atoms, elnum, label, stat
+   integer :: i, num_atoms, elnum, typeidx, stat
    real(rk) :: coords(3)
 
    ! Read number of atoms
    read (unit, *, iostat=stat) num_atoms
    if (stat /= 0) then
-      write (stderr, '(A)') 'Invalid XYZ format'
+      write (stderr, '(A)') 'Invalid XYZ file'
       stop
    end if
 
    allocate (atoms(num_atoms))
+   allocate (bonds(0))
 
    ! Read title line
    read (unit, '(A)', iostat=stat) buffer
    if (stat /= 0) then
-      write (stderr, '(A)') 'Invalid XYZ format'
+      write (stderr, '(A)') 'Invalid XYZ file'
       stop
    end if
    title = trim(buffer)
 
-   ! Read atom lines
    do i = 1, num_atoms
       read (unit, *, iostat=stat) elsym, coords
       if (stat /= 0) then
-         write (stderr, '(A)') 'Invalid XYZ format'
+         write (stderr, '(A)') 'Invalid XYZ file'
          stop
       end if
 
-      call split_symbol(elsym, elnum, label)
+      call split_symbol(elsym, elnum, typeidx)
       atoms(i)%elnum = elnum
-      atoms(i)%weight = atomic_weights(elnum)
-      atoms(i)%label = label
+      atoms(i)%typeidx = typeidx
       atoms(i)%coords = coords
    end do
-
-   if (adjacency_flag) then
-      if (bond_flag) then
-         call bond_atoms(atoms)
-      else
-         write (stderr, '(A)') 'There are no bonds in this file, use the -bond option to use default bonds'
-         stop
-      end if
-   end if
 end subroutine
 
-subroutine readmol_mol(unit, title, atoms)
+subroutine readfile_mol(unit, title, atoms, bonds)
    integer, intent(in) :: unit
    character(:), allocatable, intent(out) :: title
    type(atom_t), dimension(:), allocatable, target, intent(out) :: atoms
+   type(bond_t), dimension(:), allocatable, intent(out) :: bonds
    ! Local variables
    real(rk) :: coords(3)
    character(3) :: elsym
    character(ll) :: buffer
-   integer :: num_atoms, num_bonds, elnum, label
-   integer :: i, idx1, idx2, bond_type, stat
+   integer :: elnum, atomidx1, atomidx2, typeidx
+   integer :: num_atoms, num_bonds, stat, i
 
    ! Read header block (3 lines)
    read (unit, '(A)', iostat=stat) buffer
    if (stat /= 0) then
-      write (stderr, '(A)') 'Invalid MOL format'
+      write (stderr, '(A)') 'Invalid MOL file'
       stop
    end if
    title = trim(buffer)
 
    read (unit, '(A)', iostat=stat) buffer
    if (stat /= 0) then
-      write (stderr, '(A)') 'Invalid MOL format'
+      write (stderr, '(A)') 'Invalid MOL file'
       stop
    end if
 
    read (unit, '(A)', iostat=stat) buffer
    if (stat /= 0) then
-      write (stderr, '(A)') 'Invalid MOL format'
+      write (stderr, '(A)') 'Invalid MOL file'
       stop
    end if
 
    ! Read counts line
    read (unit, '(A)', iostat=stat) buffer
    if (stat /= 0) then
-      write (stderr, '(A)') 'Invalid MOL format'
+      write (stderr, '(A)') 'Invalid MOL file'
       stop
    end if
 
    read (buffer(1:3), '(I3)', iostat=stat) num_atoms
    if (stat /= 0) then
-      write (stderr, '(A)') 'Invalid MOL format'
+      write (stderr, '(A)') 'Invalid MOL file'
       stop
    end if
    read (buffer(4:6), '(I3)', iostat=stat) num_bonds
    if (stat /= 0) then
-      write (stderr, '(A)') 'Invalid MOL format'
+      write (stderr, '(A)') 'Invalid MOL file'
       stop
    end if
 
    allocate (atoms(num_atoms))
-
    ! Read atom block
    do i = 1, num_atoms
       read (unit, '(A)', iostat=stat) buffer
       if (stat /= 0) then
-         write (stderr, '(A)') 'Invalid MOL format'
+         write (stderr, '(A)') 'Invalid MOL file'
          stop
       end if
-
       read (buffer(1:10), '(F10.4)', iostat=stat) coords(1)
       if (stat /= 0) then
-         write (stderr, '(A)') 'Invalid MOL format'
+         write (stderr, '(A)') 'Invalid MOL file'
          stop
       end if
       read (buffer(11:20), '(F10.4)', iostat=stat) coords(2)
       if (stat /= 0) then
-         write (stderr, '(A)') 'Invalid MOL format'
+         write (stderr, '(A)') 'Invalid MOL file'
          stop
       end if
       read (buffer(21:30), '(F10.4)', iostat=stat) coords(3)
       if (stat /= 0) then
-         write (stderr, '(A)') 'Invalid MOL format'
+         write (stderr, '(A)') 'Invalid MOL file'
          stop
       end if
 
       elsym = adjustl(buffer(32:34))
-
-      call split_symbol(elsym, elnum, label)
+      call split_symbol(elsym, elnum, typeidx)
       atoms(i)%elnum = elnum
-      atoms(i)%weight = atomic_weights(elnum)
-      atoms(i)%label = label
+      atoms(i)%typeidx = typeidx
       atoms(i)%coords = coords
    end do
 
-   ! Read bond block if adjacency is needed
-   if (adjacency_flag) then
-      if (bond_flag) then
-         call bond_atoms(atoms)
-      else
-         if (num_bonds > 0) then
-         block
-            integer, allocatable :: nadjs(:)
-            allocate (nadjs(num_atoms))
-
-            nadjs = 0
-            do i = 1, num_bonds
-               read (unit, '(A)', iostat=stat) buffer
-               if (stat /= 0) then
-                  write (stderr, '(A)') 'Invalid MOL format'
-                  stop
-               end if
-
-               read (buffer(1:3), '(I3)', iostat=stat) idx1
-               if (stat /= 0) then
-                  write (stderr, '(A)') 'Invalid MOL format'
-                  stop
-               end if
-               read (buffer(4:6), '(I3)', iostat=stat) idx2
-               if (stat /= 0) then
-                  write (stderr, '(A)') 'Invalid MOL format'
-                  stop
-               end if
-
-               ! Read bond type (characters 7-9)
-               if (len_trim(buffer) >= 9) then
-                  read (buffer(7:9), '(I3)', iostat=stat) bond_type
-                  if (stat /= 0) bond_type = 1
-               else
-                  bond_type = 1
-               end if
-               ! bond_type is now available in local variable for future use
-
-               nadjs(idx1) = nadjs(idx1) + 1
-               nadjs(idx2) = nadjs(idx2) + 1
-               atoms(idx1)%adjlist_allocation(nadjs(idx1)) = idx2
-               atoms(idx2)%adjlist_allocation(nadjs(idx2)) = idx1
-            end do
-
-            do i = 1, num_atoms
-               atoms(i)%adjlist => atoms(i)%adjlist_allocation(1:nadjs(i))
-            end do
-         end block
-         else if (num_bonds == 0) then
-            write (stderr, '(A)') 'There are no bonds in this file, use the -bond option to use default bonds'
-            stop
-         else
-            write (stderr, '(A)') 'Invalid MOL2 format'
-            stop
-         end if
+   ! Read bond block
+   allocate (bonds(num_bonds))
+   do i = 1, num_bonds
+      read (unit, '(A)', iostat=stat) buffer
+      if (stat /= 0) then
+         write (stderr, '(A)') 'Invalid MOL file'
+         stop
       end if
-   end if
+      read (buffer(1:3), '(I3)', iostat=stat) atomidx1
+      if (stat /= 0) then
+         write (stderr, '(A)') 'Invalid MOL file'
+         stop
+      end if
+      read (buffer(4:6), '(I3)', iostat=stat) atomidx2
+      if (stat /= 0) then
+         write (stderr, '(A)') 'Invalid MOL file'
+         stop
+      end if
+      read (buffer(7:9), '(I3)', iostat=stat) typeidx
+      if (stat /= 0) then
+         write (stderr, '(A)') 'Invalid MOL file'
+         stop
+      end if
+
+      bonds(i)%atomidx1 = atomidx1
+      bonds(i)%atomidx2 = atomidx2
+      bonds(i)%typeidx = typeidx
+   end do
 end subroutine
 
-subroutine readmol_sdf(unit, title, atoms)
+subroutine readfile_sdf(unit, title, atoms, bonds)
    integer, intent(in) :: unit
    character(:), allocatable, intent(out) :: title
    type(atom_t), dimension(:), allocatable, intent(out) :: atoms
+   type(bond_t), dimension(:), allocatable, intent(out) :: bonds
    ! Local variables
    character(ll) :: buffer
    logical :: end_of_molecule
    integer :: stat
 
    ! Read the MOL block (SDF files contain MOL blocks followed by data)
-   call readmol_mol(unit, title, atoms)
+   call readfile_mol(unit, title, atoms, bonds)
 
    ! Skip any property data until we reach $$ or end of file
    end_of_molecule = .false.
@@ -282,22 +243,23 @@ subroutine readmol_sdf(unit, title, atoms)
    end do
 end subroutine
 
-subroutine readmol_mol2(unit, title, atoms)
+subroutine readfile_mol2(unit, title, atoms, bonds)
    integer, intent(in) :: unit
    character(:), allocatable, intent(out) :: title
    type(atom_t), dimension(:), allocatable, target, intent(out) :: atoms
+   type(bond_t), dimension(:), allocatable, intent(out) :: bonds
    ! Local variables
    real(rk) :: coords(3)
-   character(wl) :: elsym, dummy, atom_type, bond_type
-   integer :: num_atoms, num_bonds, elnum, label, stat
+   character(wl) :: elsym, dummy, typestr
+   integer :: num_atoms, num_bonds, elnum, typeidx, stat
    character(ll) :: buffer
-   integer :: i, idx1, idx2
+   integer :: i, atomidx1, atomidx2
 
    ! Find @<TRIPOS>MOLECULE section
    do
       read (unit, '(A)', iostat=stat) buffer
       if (stat /= 0) then
-         write (stderr, '(A)') 'Invalid MOL2 format'
+         write (stderr, '(A)') 'Invalid MOL2 file'
          stop
       end if
       if (trim(buffer) == '@<TRIPOS>MOLECULE') exit
@@ -306,7 +268,7 @@ subroutine readmol_mol2(unit, title, atoms)
    ! Read molecule name
    read (unit, '(A)', iostat=stat) buffer
    if (stat /= 0) then
-      write (stderr, '(A)') 'Invalid MOL2 format'
+      write (stderr, '(A)') 'Invalid MOL2 file'
       stop
    end if
    title = trim(buffer)
@@ -314,7 +276,7 @@ subroutine readmol_mol2(unit, title, atoms)
    ! Read counts line
    read (unit, *, iostat=stat) num_atoms, num_bonds
    if (stat /= 0) then
-      write (stderr, '(A)') 'Invalid MOL2 format'
+      write (stderr, '(A)') 'Invalid MOL2 file'
       stop
    end if
 
@@ -324,78 +286,54 @@ subroutine readmol_mol2(unit, title, atoms)
    do
       read (unit, '(A)', iostat=stat) buffer
       if (stat /= 0) then
-         write (stderr, '(A)') 'Invalid MOL2 format'
+         write (stderr, '(A)') 'Invalid MOL2 file'
          stop
       end if
       if (trim(buffer) == '@<TRIPOS>ATOM') exit
    end do
 
-   ! Read atom data
-   ! Format: atom_id atom_name x y z atom_type [subst_id subst_name charge]
+   ! Read atom section
+   ! Format: atom_id atom_name x y z typestr [subst_id subst_name charge]
    do i = 1, num_atoms
-      read (unit, *, iostat=stat) dummy, elsym, coords, atom_type
+      read (unit, *, iostat=stat) dummy, elsym, coords, typestr
       if (stat /= 0) then
-         write (stderr, '(A)') 'Invalid MOL2 format'
+         write (stderr, '(A)') 'Invalid MOL2 file'
          stop
       end if
 
-      call split_symbol(elsym, elnum, label)
+      call split_symbol(elsym, elnum, typeidx)
       atoms(i)%elnum = elnum
-      atoms(i)%weight = atomic_weights(elnum)
-      atoms(i)%label = label
+      atoms(i)%typeidx = typeidx
       atoms(i)%coords = coords
-      ! atom_type is now available in local variable for future use
+      ! typestr is now available in local variable for future use
    end do
 
-   ! Handle bonds if needed
-   if (adjacency_flag) then
-      if (bond_flag) then
-         call bond_atoms(atoms)
-      else
-         if (num_bonds > 0) then
-         block
-            integer, allocatable :: nadjs(:)
-            allocate (nadjs(num_atoms))
-
-            ! Find @<TRIPOS>BOND section
-            do
-               read (unit, '(A)', iostat=stat) buffer
-               if (stat /= 0) then
-                  write (stderr, '(A)') 'Invalid MOL2 format'
-                  stop
-               end if
-               if (trim(buffer) == '@<TRIPOS>BOND') exit
-            end do
-
-            ! Read bond data
-            ! Format: bond_id origin_atom_id target_atom_id bond_type
-            nadjs = 0
-            do i = 1, num_bonds
-               read (unit, *, iostat=stat) dummy, idx1, idx2, bond_type
-               if (stat /= 0) then
-                  write (stderr, '(A)') 'Invalid MOL2 format'
-                  stop
-               end if
-
-               nadjs(idx1) = nadjs(idx1) + 1
-               nadjs(idx2) = nadjs(idx2) + 1
-               atoms(idx1)%adjlist_allocation(nadjs(idx1)) = idx2
-               atoms(idx2)%adjlist_allocation(nadjs(idx2)) = idx1
-               ! bond_type is now available in local variable for future use
-            end do
-
-            do i = 1, num_atoms
-               atoms(i)%adjlist => atoms(i)%adjlist_allocation(1:nadjs(i))
-            end do
-         end block
-         else if (num_bonds == 0) then
-            write (stderr, '(A)') 'There are no bonds in this file, use the -bond option to use default bonds'
-            stop
-         else
-            write (stderr, '(A)') 'Invalid MOL2 format'
+   ! Read bonds
+   allocate (bonds(num_bonds))
+   if (num_bonds > 0) then
+      ! Find @<TRIPOS>BOND section
+      do
+         read (unit, '(A)', iostat=stat) buffer
+         if (stat /= 0) then
+            write (stderr, '(A)') 'Invalid MOL2 file'
             stop
          end if
-      end if
+         if (trim(buffer) == '@<TRIPOS>BOND') exit
+      end do
+
+      ! Read bond section
+      ! Format: bond_id origin_atom_id target_atom_id typestr
+      do i = 1, num_bonds
+         read (unit, *, iostat=stat) dummy, atomidx1, atomidx2, typestr
+         if (stat /= 0) then
+            write (stderr, '(A)') 'Invalid MOL2 file'
+            stop
+         end if
+
+         bonds(i)%atomidx1 = atomidx1
+         bonds(i)%atomidx2 = atomidx2
+!         bonds(i)%typeidx = type_index(typestr)
+      end do
    end if
 end subroutine
 

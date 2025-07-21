@@ -15,9 +15,77 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module permutation
+use parameters
 implicit none
 
+! Derived type to store permutation subsets
+type :: subperm_t
+   integer :: size                    ! number of assigned entries
+   integer, allocatable :: subset(:)  ! indices of assigned entries in permutation
+   integer, allocatable :: forward(:)  ! forward(i) = j means atom i -> atom j
+   integer, allocatable :: backward(:)  ! backward(j) = i means atom i -> atom j
+end type
+
+interface operator(==)
+   module procedure subperm_equality
+end interface
+
 contains
+
+elemental function subperm_equality(left, right) result(equality)
+   type(subperm_t), intent(in) :: left, right
+   logical :: equality
+   equality = all(left%forward == right%forward)
+end function
+
+subroutine subperm_init(subperm, perm_size)
+   type(subperm_t), intent(out) :: subperm
+   integer, intent(in) :: perm_size
+
+   allocate(subperm%subset(perm_size))
+   allocate(subperm%forward(perm_size))
+   subperm%size = 0
+   subperm%forward = identity_permutation(perm_size)
+   subperm%backward = identity_permutation(perm_size)
+end subroutine
+
+subroutine subperm_add(subperm, i1, j1)
+   ! Merge source assignment into target assignment
+   type(subperm_t), intent(inout) :: subperm
+   integer, intent(in) :: i1, j1
+   ! Local variables
+   integer :: n, i2, j2
+
+   ! Check for conflicts in existing assignments
+   if (any(subperm%subset(1:subperm%size) == i1)) then
+      write(stderr, '(A,I0,A)') "ERROR: Attempting to overwrite permutation at position ", i1
+      error stop "Assignment merge conflict"
+   end if
+
+   n = subperm%size + 1
+   i2 = subperm%backward(j1)
+   j2 = subperm%forward(i1)
+
+   subperm%size = n
+   subperm%subset(n) = i1
+   subperm%forward(i1) = j1
+   subperm%backward(j1) = i1
+   subperm%forward(i2) = j2
+   subperm%backward(j2) = i2
+end subroutine
+
+subroutine subperm_merge(subperm, other_subperm)
+   ! Merge source assignment into target assignment
+   type(subperm_t), intent(inout) :: subperm
+   type(subperm_t), intent(in) :: other_subperm
+   integer :: i, i1, j1
+
+   do i = 1, other_subperm%size
+      i1 = other_subperm%subset(i)
+      j1 = other_subperm%forward(i1)
+      call subperm_add( subperm, i1, j1)
+   end do
+end subroutine
 
 ! Get an identity permutation
 function identity_permutation(n) result(perm)
@@ -85,12 +153,12 @@ subroutine check_permutation(perm)
    do i = 1, n
       ! Check if out of bounds
       if (perm(i) < 1 .or. perm(i) > n) then
-         write(0, '(A,I0,A,I0,A)') 'Index ', perm(i), ' at position ', i, ' is out of range'
+         write(stderr, '(A,I0,A,I0,A)') 'Index ', perm(i), ' at position ', i, ' is out of range'
          has_errors = .true.
       else
          ! Only check for repetition if within bounds
          if (seen(perm(i))) then
-            write(0, '(A,I0,A)') 'Index ', perm(i), ' appears multiple times in permutation'
+            write(stderr, '(A,I0,A)') 'Index ', perm(i), ' appears multiple times in permutation'
             has_errors = .true.
          else
             seen(perm(i)) = .true.
@@ -99,7 +167,9 @@ subroutine check_permutation(perm)
    end do
    
    if (has_errors) then
-      error stop 'Invalid permutation'
+      error stop 'Permutation is not valid'
+   else
+      write(stderr, '(A)') 'Permutation is valid'
    end if
 end subroutine
 

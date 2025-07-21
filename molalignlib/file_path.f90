@@ -1,0 +1,55 @@
+! MolAlignLib
+! Copyright (C) 2022 José M. Vásquez
+
+! This program is free software: you can redistribute it and/or modify
+! it under the terms of the GNU General Public License as published by
+! the Free Software Foundation, either version 3 of the License, or
+! (at your option) any later version.
+
+! This program is distributed in the hope that it will be useful,
+! but WITHOUT ANY WARRANTY; without even the implied warranty of
+! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+! GNU General Public License for more details.
+
+! You should have received a copy of the GNU General Public License
+! along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+module file_path
+use parameters
+implicit none
+
+contains
+
+subroutine split_path(filepath, dirname, filename, extension)
+   character(*), intent(in) :: filepath
+   character(:), allocatable, intent(out) :: dirname, filename, extension
+   ! Local variables
+   character(:), allocatable :: basename
+   integer :: pos
+   pos = index(filepath, '/', back=.true.)
+   if (pos /= 0) then
+      dirname = filepath(:pos-1)
+      basename = filepath(pos+1:)
+      if (len(basename) == 0) then
+         write (stderr, '(A,1X,A)') 'File name is missing'
+         stop
+      end if
+   else
+      dirname = '.'
+      basename = filepath
+   end if
+   pos = index(basename, '.', back=.true.)
+   if (pos /= 0) then
+      filename = basename(:pos-1)
+      extension = basename(pos+1:)
+      if (len(filename) == 0 .or. len(extension) == 0) then
+         write (stderr, '(A,1X,A)') 'Invalid file name', basename
+         stop
+      end if
+   else
+      write (stderr, '(A,1X,A)') 'File extension is missing', basename
+      stop
+   end if
+end subroutine
+
+end module

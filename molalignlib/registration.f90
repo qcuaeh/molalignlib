@@ -16,6 +16,7 @@
 
 module registration
 use parameters
+use permutation
 use adjacency
 use spatial_transforms
 implicit none
@@ -35,7 +36,7 @@ type :: record_t
    real(rk) :: rmsd                                     ! Used when use_position=TRUE
    real(rk) :: rotation(4)
    real(rk) :: aver_steps                               ! Used when use_position=TRUE
-   integer, dimension(:), allocatable :: atomperm
+   type(subperm_t) :: atomperm
 end type
 
 type :: registry_t
@@ -114,7 +115,7 @@ end subroutine
 
 subroutine push_record(self, atomperm, num_steps, adjd, rmsd, rotation)
    class(registry_t), target, intent(inout) :: self
-   integer, dimension(:), intent(in) :: atomperm
+   type(subperm_t), intent(in) :: atomperm
    integer, intent(in) :: num_steps
    integer, intent(in), optional :: adjd
    real(rk), intent(in), optional :: rmsd
@@ -146,12 +147,10 @@ subroutine push_record(self, atomperm, num_steps, adjd, rmsd, rotation)
    ! Check for existing records to update
    do i = 1, self%num_records
       record => self%records(i)
-      if (allocated(record%atomperm)) then
-         if (all(atomperm == record%atomperm)) then
-            record%count = record%count + 1
-            record%aver_steps = record%aver_steps + (num_steps - record%aver_steps) / record%count
-            return
-         end if
+      if (atomperm == record%atomperm) then
+         record%count = record%count + 1
+         record%aver_steps = record%aver_steps + (num_steps - record%aver_steps) / record%count
+         return
       end if
    end do
 

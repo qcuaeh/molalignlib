@@ -19,7 +19,7 @@ use parameters
 use options
 use random
 use molecule
-use strutils
+use utils
 use chemistry
 use permutation
 use spatial_transforms
@@ -28,10 +28,10 @@ use adjacency
 use biasing
 use pruning
 use lcrs_tree
-use array_trees
+use lcrs_frame
 use atom_mnas
-use assigntree_precompute
-use assigntree_recompute
+use assigntree_build
+use assigntree_distribute_linked
 use assigntree_distribute
 use registration
 use assignment_conformer
@@ -89,7 +89,7 @@ subroutine find_reactive_bonds( atoms1, atoms2, atomtypes, atomperm)
    call translate_coords( wcoords2, center1)
 
    ! Compute MNA types
-   call compute_consistent_mnas( atoms1, atoms2, atomtypes, mnachain)
+   call compute_scna_partition( atoms1, atoms2, atomtypes, mnachain)
    call link_to_partition( mnachain%last_link, mnatypes)
 
    ! Find molecular fragments
@@ -249,7 +249,7 @@ subroutine optimize_atomperm_isomer( atoms1, atoms2, registry)
    adjmat1 = get_adjmat( atoms1)
    adjmat2 = get_adjmat( atoms2)
    write (stderr, *) 'after ', adjacencydiff( atomperm, adjmat1, adjmat2)
-   call optimize_atomperm_conformer( atoms1, atoms2, atomtypes, registry)
+   call optimize_atomperm_conform( atoms1, atoms2, atomtypes, registry)
 end subroutine
 
 end module

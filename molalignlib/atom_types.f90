@@ -1,4 +1,5 @@
 module atom_types
+use options
 use parameters
 use derived_types
 use chemistry
@@ -10,8 +11,8 @@ public collect_atomtypes
 
 type :: atomtype_item_t
    integer :: elnum
-   integer :: label
-   integer :: part_index
+   integer :: typeidx
+   integer :: partidx
 end type
 
 type :: atomtype_table_t
@@ -21,32 +22,32 @@ end type
 
 contains
 
-subroutine add_atomtype(atomtypetable, atom, part_index)
+subroutine add_atomtype(atomtypetable, atom, partidx)
    type(atomtype_table_t), intent(inout) :: atomtypetable
    type(atom_t), intent(in) :: atom
-   integer, intent(in) :: part_index
+   integer, intent(in) :: partidx
 
    atomtypetable%num_items = atomtypetable%num_items + 1
    atomtypetable%items(atomtypetable%num_items)%elnum = atom%elnum
-   atomtypetable%items(atomtypetable%num_items)%label = atom%label
-   atomtypetable%items(atomtypetable%num_items)%part_index = part_index
+   atomtypetable%items(atomtypetable%num_items)%typeidx = atom%typeidx
+   atomtypetable%items(atomtypetable%num_items)%partidx = partidx
 end subroutine
 
-function find_atomtype(atomtypetable, atom) result(part_index)
+function find_atomtype(atomtypetable, atom) result(partidx)
    type(atomtype_table_t), intent(in) :: atomtypetable
    type(atom_t), intent(in) :: atom
-   integer :: part_index
+   integer :: partidx
    integer :: i
 
    do i = 1, atomtypetable%num_items
       if (atomtypetable%items(i)%elnum == atom%elnum .and. &
-          atomtypetable%items(i)%label == atom%label) then
-         part_index = atomtypetable%items(i)%part_index
+          atomtypetable%items(i)%typeidx == atom%typeidx) then
+         partidx = atomtypetable%items(i)%partidx
          return
       end if
    end do
 
-   part_index = 0  ! Not found
+   partidx = 0  ! Not found
 end function
 
 subroutine collect_atomtypes(atoms1, atoms2, atomtypes)
@@ -56,7 +57,7 @@ subroutine collect_atomtypes(atoms1, atoms2, atomtypes)
    ! Local variables
    type(atomtype_table_t) :: atomtypetable
    integer :: i, num_atoms1, num_atoms2
-   integer :: part_index, current_part
+   integer :: partidx, current_part
    integer :: max_parts
    ! Temporary arrays for building partitions
    integer, dimension(:), allocatable :: part_num_items1, part_num_items2
@@ -84,36 +85,36 @@ subroutine collect_atomtypes(atoms1, atoms2, atomtypes)
 
    ! First molecule
    do i = 1, num_atoms1
-      part_index = find_atomtype(atomtypetable, atoms1(i))
-
-      if (part_index == 0) then
-         ! Create new partition
-         current_part = current_part + 1
-         call add_atomtype(atomtypetable, atoms1(i), current_part)
-         part_index = current_part
+      if (atoms1(i)%mask) then
+         partidx = find_atomtype(atomtypetable, atoms1(i))
+         if (partidx == 0) then
+            ! Create new partition
+            current_part = current_part + 1
+            call add_atomtype(atomtypetable, atoms1(i), current_part)
+            partidx = current_part
+         end if
+         ! Add item to partition
+         part_num_items1(partidx) = part_num_items1(partidx) + 1
+         part_items1(part_num_items1(partidx), partidx) = i
+         itemdir1_temp(i) = partidx
       end if
-
-      ! Add item to partition
-      part_num_items1(part_index) = part_num_items1(part_index) + 1
-      part_items1(part_num_items1(part_index), part_index) = i
-      itemdir1_temp(i) = part_index
    end do
 
    ! Second molecule
    do i = 1, num_atoms2
-      part_index = find_atomtype(atomtypetable, atoms2(i))
-
-      if (part_index == 0) then
-         ! Create new partition
-         current_part = current_part + 1
-         call add_atomtype(atomtypetable, atoms2(i), current_part)
-         part_index = current_part
+      if (atoms2(i)%mask) then
+         partidx = find_atomtype(atomtypetable, atoms2(i))
+         if (partidx == 0) then
+            ! Create new partition
+            current_part = current_part + 1
+            call add_atomtype(atomtypetable, atoms2(i), current_part)
+            partidx = current_part
+         end if
+         ! Add item to partition
+         part_num_items2(partidx) = part_num_items2(partidx) + 1
+         part_items2(part_num_items2(partidx), partidx) = i
+         itemdir2_temp(i) = partidx
       end if
-
-      ! Add item to partition
-      part_num_items2(part_index) = part_num_items2(part_index) + 1
-      part_items2(part_num_items2(part_index), part_index) = i
-      itemdir2_temp(i) = part_index
    end do
 
    ! Now build the final partition_t structure

@@ -5,13 +5,13 @@ use molecule
 implicit none
 
 interface adjacencydiff
-   module procedure adjacencydiff_ord
+   module procedure adjacencydiff_base
    module procedure adjacencydiff_perm
 end interface
 
 contains
 
-function adjacencydiff_ord( adjmat1, adjmat2) result(diff)
+function adjacencydiff_base( adjmat1, adjmat2) result(diff)
 ! Purpose: Check if two graphs are equal.
 ! Return the number of differences between graphs.
    logical, dimension(:,:), intent(in) :: adjmat1, adjmat2

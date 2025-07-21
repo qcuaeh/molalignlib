@@ -1,10 +1,12 @@
-module assigntree_precompute
+module assigntree_build
 use parameters
 use molecule
 use lcrs_tree
-use array_trees
+use lcrs_frame
 use atom_mnas
 implicit none
+private
+public build_assignment_tree
 
 contains
 
@@ -54,7 +56,7 @@ function would_part_split(atoms1, atoms2, itemdir1, itemdir2, part) result(would
    end do
 end function
 
-subroutine precompute_nextlevel_mnas(atoms1, atoms2, mnachain, branch, branch_parts, num_splits)
+subroutine compute_mna_partition(atoms1, atoms2, mnachain, branch, branch_parts, num_splits)
 ! Compute next level MNA types - only keeps children if real split occurred
    type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
    type(assigntree_node_t), pointer, intent(inout) :: mnachain
@@ -120,24 +122,6 @@ subroutine precompute_nextlevel_mnas(atoms1, atoms2, mnachain, branch, branch_pa
    deallocate(will_split)
 end subroutine
 
-subroutine precompute_consistent_mnas(atoms1, atoms2, mnachain, branch, branch_parts)
-! Iteratively compute MNA types until convergence
-   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
-   type(assigntree_node_t), pointer, intent(inout) :: mnachain
-   type(assigntree_node_t), pointer, intent(inout) :: branch
-   type(chain_node_t), pointer, intent(inout) :: branch_parts
-   ! Local variables
-   integer :: num_splits
-
-   do
-      ! Call compute_nextlevel_mnas and get the number of splits
-      call precompute_nextlevel_mnas(atoms1, atoms2, mnachain, branch, branch_parts, num_splits)
-
-      ! Exit loop if no splits occurred
-      if (num_splits == 0) exit
-   end do
-end subroutine
-
 subroutine split_part_first(part, link)
    type(partree_node_t), pointer, intent(inout) :: part
    type(chain_node_t), pointer, intent(inout) :: link
@@ -176,13 +160,13 @@ recursive subroutine split_dependent_parts(atoms1, atoms2, mnachain, branch, bra
    type(chain_node_t), pointer, intent(inout) :: branch_parts
    type(partree_node_t), pointer, intent(in) :: branching_part
    type(partree_node_t), pointer, intent(inout) :: part_to_split
-   ! Local variables from original split_dependent_parts
+   ! Local variables
    type(partref_node_t), pointer :: partref
    type(partree_node_t), pointer :: next_part_to_split
-   ! Local variables from split_single_part
    type(chain_node_t), pointer :: level_link, next_level_link
    type(chain_node_t), pointer :: first_branch_link
    type(partree_node_t), pointer :: child_part
+   integer :: num_splits
 
    ! Incorporate split_single_part logic
    ! Save the last link before creating a new one
@@ -212,8 +196,14 @@ recursive subroutine split_dependent_parts(atoms1, atoms2, mnachain, branch, bra
       child_part => child_part%next_sibling_part
    end do
 
-   ! Compute consistent MNAs
-   call precompute_consistent_mnas(atoms1, atoms2, mnachain, branch, branch_parts)
+   ! Compute self-consistent MNAs
+   do
+      ! Call compute_mna_partition and get the number of splits
+      call compute_mna_partition(atoms1, atoms2, mnachain, branch, branch_parts, num_splits)
+
+      ! Exit loop if no splits occurred
+      if (num_splits == 0) exit
+   end do
 
    ! Find a degenerate descendant part to split
    next_part_to_split => null()
@@ -261,13 +251,13 @@ recursive subroutine split_independent_parts(atoms1, atoms2, mnachain, branch, b
    end do
 end subroutine
 
-subroutine build_assignment_tree( atoms1, atoms2, mnalink, array_trees)
+subroutine build_assignment_tree( atoms1, atoms2, mnalink, assign_frame)
    type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
    type(chain_node_t), pointer, intent(in) :: mnalink
-   type(array_trees_t), intent(out) :: array_trees
+   type(array_trees_t), intent(out) :: assign_frame
    ! Local variables
    type(partree_node_t), pointer :: part_tree
-   type(assigntree_node_t), pointer :: assignment_tree
+   type(assigntree_node_t), pointer :: assign_tree
    type(assigntree_node_t), pointer :: mnachain
    type(chain_node_t), pointer :: branch_parts
    type(partree_node_t), pointer :: child_part
@@ -276,7 +266,7 @@ subroutine build_assignment_tree( atoms1, atoms2, mnalink, array_trees)
 
    part_tree => new_root_part()
    branch_parts => new_bare_link()
-   assignment_tree => new_root_chain( size(mnalink%itemdir1), size(mnalink%itemdir2))
+   assign_tree => new_root_chain( size(mnalink%itemdir1), size(mnalink%itemdir2))
    mnachain => new_root_chain( size(mnalink%itemdir1), size(mnalink%itemdir2))
    first_link => new_chain_link( mnachain)
 
@@ -289,10 +279,13 @@ subroutine build_assignment_tree( atoms1, atoms2, mnalink, array_trees)
       partref => partref%nextref
    end do
 
-   call split_independent_parts( atoms1, atoms2, mnachain, assignment_tree, branch_parts)
-!   call recompute_assignment_tree( atoms1, atoms2, assignment_tree)
-   call convert_trees_to_arrays( atoms1, atoms2, part_tree, assignment_tree, array_trees)
-!   call validate_conversion(part_tree, assignment_tree, array_trees)
+   call split_independent_parts( atoms1, atoms2, mnachain, assign_tree, branch_parts)
+!block
+!   use assigntree_distribute_linked
+!   call distribute_items( atoms1, atoms2, assign_tree)
+!end block
+   call convert_trees_to_arrays( atoms1, atoms2, part_tree, assign_tree, assign_frame)
+!   call validate_conversion(part_tree, assign_tree, assign_frame)
 end subroutine
 
 end module

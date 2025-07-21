@@ -19,7 +19,7 @@ use parameters
 use options
 use derived_types
 use sorting
-use strutils
+use utils
 use permutation
 use molecule
 use lcrs_tree
@@ -56,8 +56,8 @@ subroutine compute_mna_biases(atoms1, atoms2, atomtypes, biases)
 !      write(stderr, *)
 !      write(stderr, '(a)') repeat('-- link_idx '//str(link_idx)//' --', 6)
 
-      ! Call compute_nextlevel_mnas and get the number of splits
-      call compute_nextlevel_mnas(atoms1, atoms2, mnachain, num_splits)
+      ! Call compute_mna_partition and get the number of splits
+      call compute_mna_partition(atoms1, atoms2, mnachain, num_splits)
 
       ! Exit loop if no splits occurred in the last iteration
       if (num_splits == 0) exit

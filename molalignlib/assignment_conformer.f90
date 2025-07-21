@@ -16,10 +16,11 @@
 
 module assignment_conformer
 use parameters
+use derived_types
 use options
 use random
 use molecule
-use strutils
+use utils
 use chemistry
 use permutation
 use spatial_transforms
@@ -28,9 +29,9 @@ use adjacency
 use biasing
 use pruning
 use lcrs_tree
-use array_trees
-use assigntree_precompute
-use assigntree_recompute
+use lcrs_frame
+use assigntree_build
+use assigntree_distribute_linked
 use assigntree_distribute
 use registration
 
@@ -38,87 +39,76 @@ implicit none
 
 contains
 
-subroutine optimize_atomperm_conformer( atoms1, atoms2, atomtypes, registry)
-   type(atom_t), dimension(:), intent(inout) :: atoms1, atoms2
-   type(partition_t), intent(in) :: atomtypes
+function diagonal_atomperm(atoms1, atoms2) result(subperm)
+   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
+   type(subperm_t), target :: subperm
+   integer, pointer :: n
+   integer :: i
+
+   call subperm_init( subperm, size(atoms1))
+   subperm%forward = identity_permutation( size(atoms1))
+   n => subperm%size
+   do i = 1, size(atoms1)
+      if (atoms1(i)%mask) then
+         if (atoms2(i)%mask) then
+            n = n + 1
+            subperm%subset(n) = i
+         else
+            write (stderr, '(A)') "Included atoms don't match"
+            stop
+         end if
+      end if
+   end do
+end function
+
+subroutine optimize_atomperm_conform( coords1, coords2, assign_frame, registry)
+   real(rk), dimension(:,:), intent(in) :: coords1, coords2
+   type(array_trees_t), intent(inout) :: assign_frame
    type(registry_t), target, intent(out) :: registry
 
    ! Local variables
-   logical, dimension(:,:), allocatable :: adjmat1, adjmat2
-   integer, dimension(:), allocatable :: atomperm, auxperm
-   type(assigntree_node_t), pointer :: mnachain
-   type(array_trees_t) :: array_trees
-   real(rk), dimension(:), allocatable :: weights1, weights2
-   real(rk), dimension(:,:), allocatable :: wcoords1, wcoords2, rcoords2
-   real(rk) :: rmsd, center1(3), center2(3), rotation_step(4), rotation(4)
-   integer :: num_trials, num_steps
-
-   allocate (atomperm(size(atoms1)))
-   allocate (auxperm(size(atoms1)))
-   weights1 = atomic_weights(atoms1%elnum)
-   weights2 = atomic_weights(atoms2%elnum)
-   wcoords1 = get_coords( atoms1)
-   wcoords2 = get_coords( atoms2)
-   adjmat1 = get_adjmat( atoms1)
-   adjmat2 = get_adjmat( atoms2)
-
-   ! Mirror coordinates
-   if (mirror_flag) then
-      call mirror_coords( wcoords2)
-   end if
-
-   ! Calculate centroids
-   center1 = centroid( wcoords1, weights1)
-   center2 = centroid( wcoords2, weights2)
-
-   ! Translate atoms to their centroids
-   call translate_coords( wcoords1, -center1)
-   call translate_coords( wcoords2, -center2)
-
-   ! Weight coordinates
-   call weight_coords( wcoords1, weights1)
-   call weight_coords( wcoords2, weights2)
-
-   ! Pre-compute assignment tree
-   call compute_consistent_mnas( atoms1, atoms2, atomtypes, mnachain)
-   call build_assignment_tree( atoms1, atoms2, mnachain%last_link, array_trees)
-   call print_chain_tree_array( array_trees)
+   type(subperm_t) :: atomperm, auxperm
+   real(rk), dimension(:,:), allocatable :: coords2r
+   real(rk) :: rmsd, rotation_step(4), rotation(4)
+   integer, pointer :: num_trials, lead_count
+   integer :: num_steps
 
    ! Initialize random number generator
    call random_initialize()
 
    ! Initialize local minima registry
    call init_rmsd_registry( registry, max_records)
+   num_trials => registry%num_trials
+   lead_count => registry%records(1)%count
 
    ! Optimize atom permutation
-   do while (registry%records(1)%count < max_count .and. registry%num_trials < max_trials)
+   do while (lead_count < max_count .and. num_trials < max_trials)
 
-      num_trials = num_trials + 1
-
-      ! Get randomly rotated wcoords2
+      ! Get randomly rotated coords2
       rotation = randrotquat()
-      rcoords2 = rotated_coords( wcoords2, rotation)
+      coords2r = rotated_coords( coords2, rotation)
 
       ! Assign atoms with current orientation
-      call distribute_items_dfs( wcoords1, rcoords2, array_trees, atomperm)
-      call align_coords( atomperm, wcoords1, rcoords2, rotation_step)
+      call distribute_items_dfs( coords1, coords2r, assign_frame, atomperm)
+      rotation_step = least_rotquat( atomperm, coords1, coords2r)
+      call rotate_coords( coords2r, rotation_step)
       rotation = quatmul( rotation, rotation_step)
       num_steps = 1
 
       do while (iter_flag)
-         call distribute_items_dfs( wcoords1, rcoords2, array_trees, auxperm)
-!         write (stderr,'(F8.4)') sqrt( total_sqdist( auxperm, wcoords1, rcoords2))
-         if (all(auxperm == atomperm)) exit
+         call distribute_items_dfs( coords1, coords2r, assign_frame, auxperm)
+!         write (stderr,'(F8.4)') sqrt( total_sqdist( auxperm, coords1, coords2r))
+         if (auxperm == atomperm) exit
          atomperm = auxperm
-         call align_coords( atomperm, wcoords1, rcoords2, rotation_step)
+         rotation_step = least_rotquat( atomperm, coords1, coords2r)
+         call rotate_coords( coords2r, rotation_step)
          rotation = quatmul( rotation, rotation_step)
          num_steps = num_steps + 1
       end do
 
       ! Update results
-      rmsd = sqrt( total_sqdist( atomperm, wcoords1, rcoords2))
+      rmsd = sqrt( total_sqdist( atomperm, coords1, coords2r))
       call push_record( registry, atomperm, num_steps, rmsd=rmsd, rotation=rotation)
-!      write (stderr,'(I0)') adjacencydiff( atomperm, adjmat1, adjmat2)
 
    end do
 end subroutine
