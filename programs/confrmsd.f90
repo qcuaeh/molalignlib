@@ -33,6 +33,7 @@ use argparse
 use biasing
 use pruning
 use registration
+use assigntree_distribute
 use assignment_conformer
 
 implicit none
@@ -40,7 +41,7 @@ implicit none
 character(:), allocatable :: title1, title2
 character(:), allocatable :: arg, pathout, dummy
 character(:), allocatable :: extin1, extin2, extout, extpipe
-logical :: heavy_flag, mass_flag, bond_flag, align_flag, remap_flag, write_flag, pipe_flag, stats_flag, tree_flag
+logical :: heavy_flag, mass_flag, bond_flag, align_flag, remap_flag, fast_flag, write_flag, pipe_flag, stats_flag, tree_flag
 type(strlist_type) :: posargs(2)
 type(atom_t), dimension(:), allocatable :: atoms1, atoms2
 type(bond_t), dimension(:), allocatable :: bonds1, bonds2
@@ -58,7 +59,7 @@ integer :: i
 
 ! Set default options
 
-iter_flag = .true.
+fast_flag = .false.
 test_flag = .false.
 stats_flag = .false.
 heavy_flag = .false.
@@ -89,6 +90,8 @@ do while (get_arg(arg))
       align_flag = .true.
    case ('-remap')
       remap_flag = .true.
+   case ('-fast')
+      fast_flag = .true.
    case ('-heavy')
       heavy_flag = .true.
    case ('-mass')
@@ -215,32 +218,43 @@ if (align_flag) then
          call print_chain_tree_array( assign_frame)
       end if
 
-      ! Remap atoms to minimize the MSD
-      call optimize_atomperm_conform( coords1w, coords2w, assign_frame, registry)
+      if (fast_flag) then
 
-      ! Print optimization stats
-      if (stats_flag) then
-         call print_records( registry)
-      end if
+         ! Remap atoms to minimize the MSD
+         call optimize_atomperm_conform( coords1w, coords2w, assign_frame, registry)
+         ! Print optimization stats
+         if (stats_flag) then
+            call print_records( registry)
+         end if
 
-      do i = 1, registry%num_records
-         atomperm = registry%records(i)%atomperm
-!         call check_permutation( atomperm%forward)
-!         rotquat = registry%records(i)%rotquat
+         do i = 1, registry%num_records
+            atomperm = registry%records(i)%atomperm
+   !         call check_permutation( atomperm%forward)
+   !         rotquat = registry%records(i)%rotquat
+            rotquat = least_rotquat( atomperm, coords1w, coords2w)
+            coords2r = rotated_coords( coords2, rotquat, center1)
+            rmsd = sqrt( mean_sqdist( atomperm, weights1, coords1, coords2r))
+
+            write (stderr,'(A)') str( rmsd)
+   !         write (stderr,'(I0)') adjacencydiff( atomperm, get_adjmat( atoms1), get_adjmat( atoms2))
+
+            if (write_flag .or. pipe_flag) then
+               title2 = 'RMSD=' // str( rmsd)
+               coords2r = rotated_coords( coords2, rotquat, center1)
+               call set_coords( atoms2, coords2r)
+               call writefile( unitout, extout, title2, atoms2, atomperm)
+            end if
+         end do
+
+      else
+
+         call distribute_items_dfs_full( coords1w, coords2w, assign_frame, atomperm)
          rotquat = least_rotquat( atomperm, coords1w, coords2w)
          coords2r = rotated_coords( coords2, rotquat, center1)
          rmsd = sqrt( mean_sqdist( atomperm, weights1, coords1, coords2r))
-
          write (stderr,'(A)') str( rmsd)
-!         write (stderr,'(I0)') adjacencydiff( atomperm, get_adjmat( atoms1), get_adjmat( atoms2))
 
-         if (write_flag .or. pipe_flag) then
-            title2 = 'RMSD=' // str( rmsd)
-            coords2r = rotated_coords( coords2, rotquat, center1)
-            call set_coords( atoms2, coords2r)
-            call writefile( unitout, extout, title2, atoms2, atomperm)
-         end if
-      end do
+      end if
 
    else
 
@@ -274,7 +288,7 @@ else
       if (tree_flag) then
          call print_chain_tree_array( assign_frame)
       end if
-      call distribute_items_dfs( coords1w, coords2w, assign_frame, atomperm)
+      call distribute_items_dfs_fast( coords1w, coords2w, assign_frame, atomperm)
 !      call check_permutation( atomperm%forward)
       rmsd = sqrt( mean_sqdist( atomperm, weights1, coords1, coords2))
    else

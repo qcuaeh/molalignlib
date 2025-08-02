@@ -40,6 +40,11 @@ interface total_sqdist
    module procedure total_sqdist_subperm
 end interface
 
+interface least_total_sqdist
+   module procedure least_total_sqdist_subperm
+   module procedure least_total_sqdist_subset
+end interface
+
 interface rotate_coords
    module procedure rotate_coords_center
    module procedure rotate_coords_origin
@@ -253,6 +258,58 @@ real(rk) function total_sqdist_subperm(atomperm, coords1, coords2) result(total_
    end do
 end function
 
+function least_total_sqdist_subperm(atomperm, coords1, coords2) result(leastotsqdist)
+   type(subperm_t), target, intent(in) :: atomperm
+   real(rk), dimension(:,:), intent(in) :: coords1, coords2
+   ! Local variables
+   real(rk) :: leastotsqdist
+   real(rk) :: residuals(4, 4)
+   real(rk), dimension(:,:), allocatable :: coordsp, coordsm
+   integer, dimension(:), pointer :: idx, perm
+   integer :: i
+
+   idx => atomperm%subset
+   perm => atomperm%forward
+   allocate (coordsp(3, atomperm%size))
+   allocate (coordsm(3, atomperm%size))
+
+   do i = 1, atomperm%size
+      coordsp(:, i) = coords1(:, idx(i)) + coords2(:, perm(idx(i)))
+      coordsm(:, i) = coords1(:, idx(i)) - coords2(:, perm(idx(i)))
+   end do
+
+   ! Compute residuals matrix using the common procedure
+   call compute_residuals_matrix(coordsp, coordsm, residuals)
+
+   leastotsqdist = max(leasteigval(residuals), 0._rk)
+end function
+
+function least_total_sqdist_subset(atomidcs1, atomidcs2, coords1, coords2, center1, center2) result(leastotsqdist)
+   integer, dimension(:), intent(in) :: atomidcs1, atomidcs2
+   real(rk), dimension(:,:), intent(in) :: coords1, coords2
+   real(rk), intent(in) :: center1(3), center2(3)
+   ! Local variables
+   real(rk) :: leastotsqdist
+   integer :: i, num_atoms
+   real(rk) :: residuals(4, 4)
+   real(rk), dimension(:,:), allocatable :: coordsp, coordsm
+
+   num_atoms = size(atomidcs1)
+
+   allocate (coordsp(3, num_atoms))
+   allocate (coordsm(3, num_atoms))
+
+   do i = 1, num_atoms
+      coordsp(:, i) = coords1(:, atomidcs1(i)) + coords2(:, atomidcs2(i)) - center1(:) - center2(:)
+      coordsm(:, i) = coords1(:, atomidcs1(i)) - coords2(:, atomidcs2(i)) - center1(:) + center2(:)
+   end do
+
+   ! Compute residuals matrix using the common procedure
+   call compute_residuals_matrix(coordsp, coordsm, residuals)
+
+   leastotsqdist = max(leasteigval(residuals), 0._rk)
+end function
+
 real(rk) function mean_sqdist(atomperm, weights, coords1, coords2)
    type(subperm_t), target, intent(in) :: atomperm
    real(rk), dimension(:), intent(in) :: weights
@@ -370,9 +427,9 @@ function least_rotquat_subperm(atomperm, coords1, coords2) result(rotquat)
    real(rk), dimension(:,:), intent(inout) :: coords2
    ! Local variables
    real(rk), dimension(4) :: rotquat
-   integer, dimension(:), pointer :: idx, perm
    real(rk), dimension(:,:), allocatable :: coordsp, coordsm
    real(rk) :: residuals(4, 4)
+   integer, dimension(:), pointer :: idx, perm
    integer :: i
 
    idx => atomperm%subset
@@ -389,34 +446,6 @@ function least_rotquat_subperm(atomperm, coords1, coords2) result(rotquat)
    call compute_residuals_matrix(coordsp, coordsm, residuals)
 !   total_sqdist = max(leasteigval(residuals), 0._rk)
    rotquat = leasteigvec(residuals)
-end function
-
-function least_total_sqdist(atomidcs1, atomidcs2, coords1, coords2, center1, center2) result(leastotsqdist)
-! Find the optimal rotation in quaternion representation by least squares minimization
-! Reference: Acta Cryst. (1989). A45, 208-210
-   integer, dimension(:), intent(in) :: atomidcs1, atomidcs2
-   real(rk), dimension(:,:), intent(in) :: coords1, coords2
-   real(rk), intent(in) :: center1(3), center2(3)
-   ! Local variables
-   real(rk) :: leastotsqdist
-   integer :: i, num_atoms
-   real(rk) :: residuals(4, 4)
-   real(rk), dimension(:,:), allocatable :: coordsp, coordsm
-
-   num_atoms = size(atomidcs1)
-
-   allocate (coordsp(3, num_atoms))
-   allocate (coordsm(3, num_atoms))
-
-   do i = 1, num_atoms
-      coordsp(:, i) = coords1(:, atomidcs1(i)) + coords2(:, atomidcs2(i)) - center1(:) - center2(:)
-      coordsm(:, i) = coords1(:, atomidcs1(i)) - coords2(:, atomidcs2(i)) - center1(:) + center2(:)
-   end do
-
-   ! Compute residuals matrix using the common procedure
-   call compute_residuals_matrix(coordsp, coordsm, residuals)
-
-   leastotsqdist = max(leasteigval(residuals), 0._rk)
 end function
 
 end module

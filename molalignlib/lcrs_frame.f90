@@ -66,24 +66,23 @@ type, public :: array_trees_t
    type(chain_item_t), allocatable :: chain(:)
    type(partree_item_t), allocatable :: partree(:)
    type(assigntree_item_t), allocatable :: assigntree(:)
-
    ! Flattened variable-length data - all pure integer arrays!
    integer, allocatable :: itemdir1_entries(:,:)  ! [link_idx, atom_idx] - atoms1 itemdir 2D array
    integer, allocatable :: itemdir2_entries(:,:)  ! [link_idx, atom_idx] - atoms2 itemdir 2D array
    integer, allocatable :: partref_entries(:)     ! Part indices for partrefs
-
-   ! NEW: Adjacency information stored directly for fastest access
+   ! Adjacency information stored directly for fastest access
    integer, allocatable :: adj_lists1(:,:)     ! Direct 2D adjacency lists for atoms1 [atom_idx, neighbor_idx]
    integer, allocatable :: adj_lists2(:,:)     ! Direct 2D adjacency lists for atoms2 [atom_idx, neighbor_idx]
    integer, allocatable :: adj_counts1(:)      ! Count for each atoms1 atom's adjacency list
    integer, allocatable :: adj_counts2(:)      ! Count for each atoms2 atom's adjacency list
-
    ! Metadata
+   integer :: num_atoms1, num_atoms2  ! number of atoms in each molecule
    integer :: total_items1, total_items2, total_parts
    integer :: total_links, total_chains
    integer :: total_partref_entries
-   integer :: num_atoms1, num_atoms2  ! number of atoms in each molecule
-   ! NOTE: total_itemdir_entries, itemdir_size1, itemdir_size2 REMOVED - no longer needed
+   ! Assignment statistics
+   integer(int64) :: combination_sum
+   integer(int64) :: combination_product
 end type
 
 contains
@@ -108,7 +107,7 @@ subroutine convert_trees_to_arrays(atoms1, atoms2, part_tree, assign_tree, assig
    assign_frame%num_atoms1 = size(atoms1)
    assign_frame%num_atoms2 = size(atoms2)
 
-   ! Allocate all arrays with exact sizes
+   ! Allocate all arrays with exact sizes (existing allocation code)
    allocate(assign_frame%item1_values(assign_frame%total_items1))
    allocate(assign_frame%item2_values(assign_frame%total_items2))
    allocate(assign_frame%partree(assign_frame%total_parts))
@@ -149,11 +148,11 @@ subroutine convert_trees_to_arrays(atoms1, atoms2, part_tree, assign_tree, assig
    item2_idx = 0
    call convert_parts_recursive(part_tree, assign_frame, item1_idx, item2_idx)
 
-   ! Convert chain tree starting from root with global tracking
-   ! NOTE: itemdir_idx removed - no longer needed with 2D arrays
+   ! Convert chain tree and count statistics in single traversal
    partref_idx = 0
    link_idx = 0
-   call convert_chains_recursive(assign_tree, assign_frame, partref_idx, link_idx)
+   call convert_chains_recursive(assign_tree, assign_frame, partref_idx, link_idx, &
+                               assign_frame%combination_sum, assign_frame%combination_product)
 end subroutine
 
 subroutine populate_adjacency_arrays(atoms1, atoms2, assign_frame)
@@ -334,18 +333,32 @@ recursive subroutine convert_parts_recursive(part, assign_frame, item1_idx, item
    end do
 end subroutine
 
-recursive subroutine convert_chains_recursive(chain, assign_frame, partref_idx, link_idx)
+recursive subroutine convert_chains_recursive(chain, assign_frame, partref_idx, link_idx, &
+                                            combination_sum, combination_product)
    type(assigntree_node_t), pointer, intent(in) :: chain
    type(array_trees_t), intent(inout) :: assign_frame
    integer, intent(inout) :: partref_idx, link_idx
+   integer(int64), intent(out) :: combination_sum, combination_product
    type(assigntree_node_t), pointer :: child_chain
    type(chain_node_t), pointer :: link
    type(partref_node_t), pointer :: partref
    integer :: chain_idx, current_link_idx, child_count
+   integer(int64) :: child_combinations, child_product
+   integer :: items2_count
 
    if (.not. associated(chain)) return
 
-   ! Convert this chain
+   ! If this is a leaf level (no children), both values are 1
+   if (chain%num_children == 0) then
+      combination_sum = 1_int64
+      combination_product = 1_int64
+   else
+      ! Initialize accumulators for non-leaf nodes
+      combination_sum = 0_int64
+      combination_product = 1_int64
+   end if
+
+   ! Convert this chain (existing conversion logic)
    chain_idx = chain%global_index
 
    assign_frame%assigntree(chain_idx)%tot_items1 = chain%tot_items1
@@ -420,16 +433,26 @@ recursive subroutine convert_chains_recursive(chain, assign_frame, partref_idx, 
          partref => partref%nextref
       end do
 
-      ! NOTE: itemdir offset calculations REMOVED - 2D arrays handle this automatically
-      ! Each link gets its own row in the 2D itemdir arrays
-
       link => link%next_link
    end do
 
-   ! Recursively convert child chains
+   ! Recursively convert child chains and accumulate statistics
    child_chain => chain%first_child_chain
    do while (associated(child_chain))
-      call convert_chains_recursive(child_chain, assign_frame, partref_idx, link_idx)
+      call convert_chains_recursive(child_chain, assign_frame, partref_idx, link_idx, &
+                                  child_combinations, child_product)
+
+      ! Count statistics if this is not a leaf
+      if (chain%num_children > 0) then
+         items2_count = child_chain%split_part%num_items2
+
+         ! Update combinations (sum): first item1 with each item2
+         combination_sum = combination_sum + (int(items2_count, int64) * child_combinations)
+
+         ! Update product (multiply): split sizes only
+         combination_product = combination_product * (int(items2_count, int64) * child_product)
+      end if
+
       child_chain => child_chain%next_sibling_chain
    end do
 end subroutine
@@ -663,6 +686,11 @@ subroutine print_chain_tree_array(assign_frame)
    write(stderr, '(A)') repeat("=", 25)
    write(stderr, *)
 
+   ! Print assignment statistics
+   write(stderr, '(A,I0)') "Combination sum: ", assign_frame%combination_sum
+   write(stderr, '(A,I0)') "Combination product: ", assign_frame%combination_product
+   write(stderr, *)
+
    ! Allocate tracking array for tree lines (max depth 100)
    allocate(is_last_child(100))
    is_last_child = .false.
@@ -672,9 +700,9 @@ subroutine print_chain_tree_array(assign_frame)
 
    ! Print children recursively (root is always at index 1)
    call print_chain_recursive_array(assign_frame, 1, 0, is_last_child)
+   write(stderr, *)
 
    deallocate(is_last_child)
-   write(stderr, *)
 end subroutine
 
 recursive subroutine print_chain_recursive_array(assign_frame, chain_idx, depth, is_last_child)

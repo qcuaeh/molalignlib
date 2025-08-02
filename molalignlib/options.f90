@@ -1,7 +1,6 @@
 module options
 
 ! Flags
-logical :: iter_flag
 logical :: test_flag
 logical :: mirror_flag
 

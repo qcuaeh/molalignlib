@@ -7,7 +7,8 @@ use permutation
 use spatial_transforms
 implicit none
 private
-public distribute_items_dfs
+public distribute_items_dfs_fast
+public distribute_items_dfs_full
 public distribute_items_random
 
 ! Maximum possible number of children for a part
@@ -287,7 +288,7 @@ subroutine distribute_part_items(assign_frame, split_part_idx, child_branch_idx,
    end do
 end subroutine
 
-recursive subroutine distribute_items_dfs_recursive(coords1, coords2, assign_frame, branch_idx, treeperm)
+recursive subroutine distribute_items_dfs_fast_recursive(coords1, coords2, assign_frame, branch_idx, treeperm)
    ! DFS exploration of all assignment possibilities - finds permutation that minimizes total distance
    ! OPTIMIZED: Reduces allocations by reusing arrays within branch scope, but maintains isolation between branches
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)  ! coordinates needed for distance calculation
@@ -333,7 +334,7 @@ recursive subroutine distribute_items_dfs_recursive(coords1, coords2, assign_fra
             branchperm)
 
          ! Recursively explore subtree and collect child permutation
-         call distribute_items_dfs_recursive(coords1, coords2, assign_frame, child_branch_idx, branchperm)
+         call distribute_items_dfs_fast_recursive(coords1, coords2, assign_frame, child_branch_idx, branchperm)
 
          ! Calculate partial distance for this branch
          branch_distance = total_sqdist(branchperm, coords1, coords2)
@@ -358,7 +359,7 @@ end subroutine
 
 recursive subroutine distribute_items_random_recursive(coords1, coords2, assign_frame, branch_idx, treeperm)
    ! Random exploration - generates one assignment randomly using same traversal order as random module
-   ! Similar to distribute_items_dfs_recursive but picks one random assignment instead of exploring all
+   ! Similar to distribute_items_dfs_fast_recursive but picks one random assignment instead of exploring all
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_frame
    integer, intent(in) :: branch_idx
@@ -406,7 +407,7 @@ end subroutine
 
 subroutine distribute_items_random(coords1, coords2, assign_frame, treeperm)
    ! Random exploration wrapper - generates one random assignment
-   ! Similar to distribute_items_dfs but generates random assignment instead of optimal
+   ! Similar to distribute_items_dfs_fast but generates random assignment instead of optimal
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_frame
    type(subperm_t), intent(out) :: treeperm
@@ -434,7 +435,7 @@ subroutine distribute_items_random(coords1, coords2, assign_frame, treeperm)
 !   call check_subperm(treeperm)
 end subroutine
 
-subroutine distribute_items_dfs(coords1, coords2, assign_frame, treeperm)
+subroutine distribute_items_dfs_fast(coords1, coords2, assign_frame, treeperm)
    ! DFS exploration wrapper - finds optimal assignment among all possibilities
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_frame
@@ -454,7 +455,7 @@ subroutine distribute_items_dfs(coords1, coords2, assign_frame, treeperm)
    combination_count = 0
 
    ! Perform DFS exploration to find optimal assignment (starting from root chain at index 1)
-   call distribute_items_dfs_recursive(coords1, coords2, assign_frame, 1, treeperm)
+   call distribute_items_dfs_fast_recursive(coords1, coords2, assign_frame, 1, treeperm)
 
 !block
 !   integer :: assigned_count
@@ -467,6 +468,163 @@ subroutine distribute_items_dfs(coords1, coords2, assign_frame, treeperm)
 !   write(stderr, '(A,F10.4)') "Optimal total squared distance: ", total_distance
 !   write(stderr, '(A)') repeat("=", 60)
 !end block
+end subroutine
+
+subroutine collect_all_split_parts(assign_frame, split_parts, num_split_parts)
+   ! Collect all parts that need assignments (have >= 2 items in both molecules)
+   type(array_trees_t), intent(in) :: assign_frame
+   integer, allocatable, intent(out) :: split_parts(:)
+   integer, intent(out) :: num_split_parts
+   integer :: i, count
+
+   ! First pass: count split parts
+   count = 0
+   do i = 1, assign_frame%total_chains
+      if (assign_frame%assigntree(i)%split_part_idx > 0) then
+         if (assign_frame%partree(assign_frame%assigntree(i)%split_part_idx)%items1_count >= 2 .and. &
+             assign_frame%partree(assign_frame%assigntree(i)%split_part_idx)%items2_count >= 2) then
+            count = count + 1
+         end if
+      end if
+   end do
+
+   num_split_parts = count
+   allocate(split_parts(num_split_parts))
+
+   ! Second pass: collect split part indices
+   count = 0
+   do i = 1, assign_frame%total_chains
+      if (assign_frame%assigntree(i)%split_part_idx > 0) then
+         if (assign_frame%partree(assign_frame%assigntree(i)%split_part_idx)%items1_count >= 2 .and. &
+             assign_frame%partree(assign_frame%assigntree(i)%split_part_idx)%items2_count >= 2) then
+            count = count + 1
+            split_parts(count) = assign_frame%assigntree(i)%split_part_idx
+         end if
+      end if
+   end do
+end subroutine
+
+recursive subroutine try_all_assignments(coords1, coords2, assign_frame, split_parts, num_split_parts, &
+                                       current_split_idx, current_treeperm, best_treeperm, best_distance)
+   ! Recursively try all assignments for all split parts
+   real(rk), intent(in) :: coords1(:,:), coords2(:,:)
+   type(array_trees_t), intent(inout) :: assign_frame
+   integer, intent(in) :: split_parts(:), num_split_parts, current_split_idx
+   type(subperm_t), intent(inout) :: current_treeperm, best_treeperm
+   real(rk), intent(inout) :: best_distance
+
+   integer :: split_part_idx, child_branch_idx, first_link_idx
+   integer :: items2_count, i, j
+   integer :: link_idx, branch_link_offset, branch_num_links
+   type(subperm_t) :: saved_treeperm
+   real(rk) :: total_distance
+
+   ! Base case: we've made assignments for all split parts - evaluate complete permutation
+   if (current_split_idx > num_split_parts) then
+      combination_count = combination_count + 1
+      total_distance = least_total_sqdist(current_treeperm, coords1, coords2)
+      
+      ! Update global best if this permutation is better
+      if (total_distance < best_distance) then
+         best_distance = total_distance
+         best_treeperm = current_treeperm
+      end if
+      return
+   end if
+
+   ! Get the current split part
+   split_part_idx = split_parts(current_split_idx)
+   
+   ! Find the child branch that uses this split part
+   child_branch_idx = 0
+   do i = 1, assign_frame%total_chains
+      if (assign_frame%assigntree(i)%split_part_idx == split_part_idx) then
+         child_branch_idx = i
+         exit
+      end if
+   end do
+
+   if (child_branch_idx == 0) then
+      error stop 'Could not find child branch for split part'
+   end if
+
+   first_link_idx = assign_frame%assigntree(child_branch_idx)%link_offset + 1
+   branch_link_offset = assign_frame%assigntree(child_branch_idx)%link_offset
+   branch_num_links = assign_frame%assigntree(child_branch_idx)%num_links
+
+   items2_count = assign_frame%partree(split_part_idx)%items2_count
+
+   ! Try all possible assignments for this split part (only vary item2, keep item1 at index 1)
+   do j = 1, items2_count
+      ! Save current permutation state
+      saved_treeperm = current_treeperm
+
+      ! Make assignment for this split part (always use first item1, index=1)
+      call distribute_part_items(assign_frame, split_part_idx, child_branch_idx, first_link_idx, 1, j, &
+         current_treeperm)
+
+      ! Recursively try assignments for remaining split parts
+      call try_all_assignments(coords1, coords2, assign_frame, split_parts, num_split_parts, &
+         current_split_idx + 1, current_treeperm, best_treeperm, best_distance)
+
+      ! Restore permutation state
+      current_treeperm = saved_treeperm
+
+      ! Reset itemdir state for this branch
+      do link_idx = branch_link_offset + 1, branch_link_offset + branch_num_links
+         assign_frame%itemdir1_entries(link_idx, :) = 0
+         assign_frame%itemdir2_entries(link_idx, :) = 0
+      end do
+   end do
+end subroutine
+
+subroutine distribute_items_dfs_full(coords1, coords2, assign_frame, treeperm)
+   ! DFS exploration of all permutations
+   real(rk), intent(in) :: coords1(:,:), coords2(:,:)
+   type(array_trees_t), intent(inout) :: assign_frame
+   type(subperm_t), intent(out) :: treeperm
+   ! Local variables
+   type(subperm_t) :: best_treeperm
+   real(rk) :: best_distance
+   integer, allocatable :: split_parts(:)
+   integer :: num_split_parts, num_atoms
+
+   num_atoms = assign_frame%num_atoms1
+
+   ! Initialize permutations
+   call subperm_init(treeperm, num_atoms)
+   call subperm_init(best_treeperm, num_atoms)
+
+   ! Initialize both permutations with preassigned pairs
+   call collect_leaf_assignments(assign_frame, 1, treeperm)
+   call collect_leaf_assignments(assign_frame, 1, best_treeperm)
+
+   ! Initialize global best distance
+   best_distance = huge(1.0_rk)
+
+   ! Initialize DFS exploration variables
+   combination_count = 0
+
+   ! Collect all split parts
+   call collect_all_split_parts(assign_frame, split_parts, num_split_parts)
+
+   ! Try all assignments for all split parts
+   call try_all_assignments(coords1, coords2, assign_frame, split_parts, num_split_parts, 1, &
+      treeperm, best_treeperm, best_distance)
+
+   ! Return the best permutation found
+   treeperm = best_treeperm
+
+   ! Output results
+!   write(stderr, '(A)') repeat("=", 60)
+!   write(stderr, '(A,I0)') "Split parts found: ", num_split_parts
+!   write(stderr, '(A,I0)') "Total permutations explored: ", combination_count
+!   write(stderr, '(A,I0,A,I0,A)') "Atoms assigned: ", treeperm%size, " out of ", num_atoms, " total atoms"
+!   write(stderr, '(A,F10.4)') "Optimal total squared distance: ", best_distance
+!   write(stderr, '(A)') repeat("=", 60)
+
+   ! Clean up
+   deallocate(split_parts)
 end subroutine
 
 end module
