@@ -12,7 +12,6 @@ public remove_bond
 public get_coords
 public get_mirrored_coords
 public get_weighted_coords
-public get_bonds
 public get_adjmat
 public get_centroid
 public print_atoms
@@ -223,28 +222,6 @@ function get_adjmat(atoms) result(adjmat)
    end do
 end function
 
-function get_bonds(atoms) result(bonds)
-   type(atom_t), dimension(:), intent(in) :: atoms
-   ! Local variables
-   logical, dimension(:,:), allocatable :: adjmat
-   type(bond_t), dimension(:), allocatable :: bonds
-   integer :: i, j, num_bonds
-
-   adjmat = get_adjmat(atoms)
-   allocate (bonds(count(adjmat)/2))
-
-   num_bonds = 0
-   do i = 1, size(atoms)
-      do j = i + 1, size(atoms)
-         if (adjmat(i, j)) then
-            num_bonds = num_bonds + 1
-            bonds(num_bonds)%atomidx1 = i
-            bonds(num_bonds)%atomidx2 = j
-         end if
-      end do
-   end do
-end function
-
 subroutine remove_bond(atoms, idx1, idx2)
    type(atom_t), dimension(:), intent(inout) :: atoms
    integer, intent(in) :: idx1, idx2
@@ -360,13 +337,10 @@ subroutine print_atoms(atoms)
    end do
 end subroutine
 
-subroutine print_bonds(atoms)
-   type(atom_t), dimension(:), intent(in) :: atoms
+subroutine print_bonds(bonds)
+   type(bond_t), dimension(:), intent(in) :: bonds
    ! Local variables
    integer :: i
-   type(bond_t), dimension(:), allocatable :: bonds
-
-   bonds = get_bonds(atoms)
 
    write (stderr, '(a)') "idx1 idx2"
 

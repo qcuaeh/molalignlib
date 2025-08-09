@@ -2,7 +2,7 @@ module assigntree_build
 use parameters
 use molecule
 use lcrs_tree
-use lcrs_frame
+use lcrs_tree_arrays
 use atom_mnas
 implicit none
 private
@@ -251,10 +251,10 @@ recursive subroutine split_independent_parts(atoms1, atoms2, mnachain, branch, b
    end do
 end subroutine
 
-subroutine build_assignment_tree( atoms1, atoms2, mnalink, assign_frame)
+subroutine build_assignment_tree( atoms1, atoms2, mnalink, assign_arrays)
    type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
    type(chain_node_t), pointer, intent(in) :: mnalink
-   type(array_trees_t), intent(out) :: assign_frame
+   type(array_trees_t), intent(out) :: assign_arrays
    ! Local variables
    type(partree_node_t), pointer :: part_tree
    type(assigntree_node_t), pointer :: assign_tree
@@ -284,8 +284,8 @@ subroutine build_assignment_tree( atoms1, atoms2, mnalink, assign_frame)
 !   use assigntree_distribute_linked
 !   call distribute_items( atoms1, atoms2, assign_tree)
 !end block
-   call convert_trees_to_arrays( atoms1, atoms2, part_tree, assign_tree, assign_frame)
-!   call validate_conversion(part_tree, assign_tree, assign_frame)
+   call convert_trees_to_arrays( atoms1, atoms2, part_tree, assign_tree, assign_arrays)
+!   call validate_conversion(part_tree, assign_tree, assign_arrays)
 end subroutine
 
 end module

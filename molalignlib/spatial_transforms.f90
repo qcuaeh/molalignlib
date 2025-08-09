@@ -246,15 +246,15 @@ real(rk) function total_sqdist_subperm(atomperm, coords1, coords2) result(total_
    type(subperm_t), target, intent(in) :: atomperm
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    ! Local variables
-   integer, dimension(:), pointer :: idx, perm
+   integer, dimension(:), pointer :: subs, perm
    integer :: i
 
-   idx => atomperm%subset
-   perm => atomperm%forward
+   subs => atomperm%subset
+   perm => atomperm%permut
 
    total_sqdist = 0
-   do i = 1, atomperm%size
-      total_sqdist = total_sqdist + sum((coords1(:, idx(i)) - coords2(:, perm(idx(i))))**2, dim=1)
+   do i = 1, atomperm%count
+      total_sqdist = total_sqdist + sum((coords1(:, subs(i)) - coords2(:, perm(i)))**2, dim=1)
    end do
 end function
 
@@ -265,17 +265,17 @@ function least_total_sqdist_subperm(atomperm, coords1, coords2) result(leastotsq
    real(rk) :: leastotsqdist
    real(rk) :: residuals(4, 4)
    real(rk), dimension(:,:), allocatable :: coordsp, coordsm
-   integer, dimension(:), pointer :: idx, perm
+   integer, dimension(:), pointer :: subs, perm
    integer :: i
 
-   idx => atomperm%subset
-   perm => atomperm%forward
-   allocate (coordsp(3, atomperm%size))
-   allocate (coordsm(3, atomperm%size))
+   subs => atomperm%subset
+   perm => atomperm%permut
+   allocate (coordsp(3, atomperm%count))
+   allocate (coordsm(3, atomperm%count))
 
-   do i = 1, atomperm%size
-      coordsp(:, i) = coords1(:, idx(i)) + coords2(:, perm(idx(i)))
-      coordsm(:, i) = coords1(:, idx(i)) - coords2(:, perm(idx(i)))
+   do i = 1, atomperm%count
+      coordsp(:, i) = coords1(:, subs(i)) + coords2(:, perm(i))
+      coordsm(:, i) = coords1(:, subs(i)) - coords2(:, perm(i))
    end do
 
    ! Compute residuals matrix using the common procedure
@@ -316,17 +316,17 @@ real(rk) function mean_sqdist(atomperm, weights, coords1, coords2)
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    ! Local variables
    real(rk) :: total_weight, total_sqdist
-   integer, dimension(:), pointer :: idx, perm
+   integer, dimension(:), pointer :: subs, perm
    integer :: i
 
-   idx => atomperm%subset
-   perm => atomperm%forward
+   subs => atomperm%subset
+   perm => atomperm%permut
 
    total_weight = 0
    total_sqdist = 0
-   do i = 1, atomperm%size
-      total_weight = total_weight + weights(idx(i))
-      total_sqdist = total_sqdist + weights(idx(i))*sum((coords1(:, idx(i)) - coords2(:, perm(idx(i))))**2, dim=1)
+   do i = 1, atomperm%count
+      total_weight = total_weight + weights(subs(i))
+      total_sqdist = total_sqdist + weights(subs(i))*sum((coords1(:, subs(i)) - coords2(:, perm(i)))**2, dim=1)
    end do
    mean_sqdist = total_sqdist / total_weight
 end function
@@ -429,17 +429,17 @@ function least_rotquat_subperm(atomperm, coords1, coords2) result(rotquat)
    real(rk), dimension(4) :: rotquat
    real(rk), dimension(:,:), allocatable :: coordsp, coordsm
    real(rk) :: residuals(4, 4)
-   integer, dimension(:), pointer :: idx, perm
+   integer, dimension(:), pointer :: subs, perm
    integer :: i
 
-   idx => atomperm%subset
-   perm => atomperm%forward
-   allocate (coordsp(3, atomperm%size))
-   allocate (coordsm(3, atomperm%size))
+   subs => atomperm%subset
+   perm => atomperm%permut
+   allocate (coordsp(3, atomperm%count))
+   allocate (coordsm(3, atomperm%count))
 
-   do i = 1, atomperm%size
-      coordsp(:, i) = coords1(:, idx(i)) + coords2(:, perm(idx(i)))
-      coordsm(:, i) = coords1(:, idx(i)) - coords2(:, perm(idx(i)))
+   do i = 1, atomperm%count
+      coordsp(:, i) = coords1(:, subs(i)) + coords2(:, perm(i))
+      coordsm(:, i) = coords1(:, subs(i)) - coords2(:, perm(i))
    end do
 
    ! Compute residuals matrix using the common procedure

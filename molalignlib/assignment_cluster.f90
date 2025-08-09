@@ -20,6 +20,7 @@ use options
 use random
 use molecule
 use chemistry
+use permutation
 use spatial_transforms
 use assignment_atoms
 use lcrs_tree
@@ -29,48 +30,21 @@ use pruning
 use registration
 
 implicit none
+logical, parameter :: iter_flag = .true.
 
 contains
 
-subroutine optimize_atomperm_cluster(atoms1, atoms2, atomtypes, registry)
-   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
+subroutine optimize_atomperm_cluster(coords1, coords2, atomtypes, prunes, registry)
+   real(rk), dimension(:,:), intent(in) :: coords1, coords2
    type(partition_t), intent(in) :: atomtypes
    type(registry_t), intent(out) :: registry
+   type(bool_matrix), dimension(:), intent(in) :: prunes
 
    ! Local variables
-   type(bool_matrix), dimension(:), allocatable :: prunes
    integer :: num_steps
-   integer, dimension(:), allocatable :: atomperm, auxperm
-   real(rk), dimension(:), allocatable :: weights1, weights2
-   real(rk), dimension(:,:), allocatable :: wcoords1, wcoords2, rcoords2
-   real(rk) :: rmsd, center1(3), center2(3), rotation_step(4), rotation(4)
-
-   allocate (atomperm(size(atoms1)))
-   allocate (auxperm(size(atoms1)))
-   weights1 = atomic_weights(atoms1%elnum)
-   weights2 = atomic_weights(atoms2%elnum)
-   wcoords1 = get_coords( atoms1)
-   wcoords2 = get_coords( atoms2)
-
-   ! Mirror coordinates
-   if (mirror_flag) then
-      call mirror_coords(wcoords2)
-   end if
-
-   ! Find unfeasible assignments
-   call prune_procedure( atomtypes, atoms1, atoms2, prunes)
-
-   ! Calculate centroids
-   center1 = centroid( wcoords1, weights1)
-   center2 = centroid( wcoords2, weights2)
-
-   ! Translate atoms to their centroids
-   call translate_coords( wcoords1, -center1)
-   call translate_coords( wcoords2, -center2)
-
-   ! Weight coordinates
-   call weight_coords( wcoords1, weights1)
-   call weight_coords( wcoords2, weights2)
+   type(subperm_t) :: atomperm, auxperm
+   real(rk), dimension(:,:), allocatable :: coords2r
+   real(rk) :: rmsd, rotation_step(4), rotation(4)
 
    ! Initialize random number generator
    call random_initialize()
@@ -81,27 +55,29 @@ subroutine optimize_atomperm_cluster(atoms1, atoms2, atomtypes, registry)
    ! Optimize atom permutation
    do while (registry%records(1)%count < max_count .and. registry%num_trials < max_trials)
 
-      ! Aply a random rotation to wcoords2
+      ! Aply a random rotation to coords2
       rotation = randrotquat()
-      rcoords2 = rotated_coords( wcoords2, rotation)
+      coords2r = rotated_coords( coords2, rotation)
 
       ! Assign atoms with current orientation
-      call assign_atoms_pruned( atomtypes, wcoords1, rcoords2, prunes, atomperm)
-      call align_coords( atomperm, wcoords1, rcoords2, rotation_step)
+      call assign_atoms_pruned( atomtypes, coords1, coords2r, prunes, atomperm)
+      rotation_step = least_rotquat( atomperm, coords1, coords2r)
+      call rotate_coords( coords2r, rotation_step)
       rotation = quatmul( rotation, rotation_step)
       num_steps = 1
 
       do while (iter_flag)
-         call assign_atoms_pruned( atomtypes, wcoords1, rcoords2, prunes, auxperm)
-         if (all(auxperm == atomperm)) exit
+         call assign_atoms_pruned( atomtypes, coords1, coords2r, prunes, auxperm)
+         if (auxperm == atomperm) exit
          atomperm = auxperm
-         call align_coords( atomperm, wcoords1, rcoords2, rotation_step)
+         rotation_step = least_rotquat( atomperm, coords1, coords2r)
+         call rotate_coords( coords2r, rotation_step)
          rotation = quatmul( rotation, rotation_step)
          num_steps = num_steps + 1
       end do
 
       ! Push local minimum to registry
-      rmsd = sqrt( total_sqdist( atomperm, wcoords1, rcoords2))
+      rmsd = sqrt( total_sqdist( atomperm, coords1, coords2r))
       call push_record( registry, atomperm, num_steps, rmsd=rmsd, rotation=rotation)
 
    end do

@@ -24,7 +24,6 @@ use molecule
 use spatial_transforms
 use utils
 use chemistry
-use adjacency
 use permutation
 use file_path
 use file_read
@@ -35,19 +34,20 @@ use pruning
 use registration
 use assigntree_distribute
 use assignment_conformer
+use assignment_default
 
 implicit none
 
 character(:), allocatable :: title1, title2
 character(:), allocatable :: arg, pathout, dummy
 character(:), allocatable :: extin1, extin2, extout, extpipe
-logical :: heavy_flag, mass_flag, bond_flag, align_flag, remap_flag, fast_flag, write_flag, pipe_flag, stats_flag, tree_flag
+logical :: heavy_flag, mass_flag, bond_flag, align_flag, remap_flag, serial_flag, write_flag, pipe_flag, stats_flag, tree_flag
 type(strlist_type) :: posargs(2)
 type(atom_t), dimension(:), allocatable :: atoms1, atoms2
 type(bond_t), dimension(:), allocatable :: bonds1, bonds2
 type(partition_t) :: atomtypes
 type(assigntree_node_t), pointer :: mnachain
-type(array_trees_t) :: assign_frame
+type(array_trees_t) :: assign_arrays
 type(registry_t) :: registry
 real(rk) :: rmsd
 real(rk) :: center1(3), center2(3), rotquat(4)
@@ -59,7 +59,7 @@ integer :: i
 
 ! Set default options
 
-fast_flag = .false.
+serial_flag = .false.
 test_flag = .false.
 stats_flag = .false.
 heavy_flag = .false.
@@ -76,9 +76,7 @@ max_records = 1
 max_count = 10
 max_trials = huge( max_trials)
 
-pathout = 'aligned.xyz'
-
-! Get user options
+! Read command options
 
 call init_args()
 
@@ -90,8 +88,8 @@ do while (get_arg(arg))
       align_flag = .true.
    case ('-remap')
       remap_flag = .true.
-   case ('-fast')
-      fast_flag = .true.
+   case ('-serial')
+      serial_flag = .true.
    case ('-heavy')
       heavy_flag = .true.
    case ('-mass')
@@ -109,6 +107,7 @@ do while (get_arg(arg))
       call read_optarg( arg, pathout)
    case ('-pipe')
       pipe_flag = .true.
+      write_flag = .true.
       call read_optarg( arg, extpipe)
    case ('-tree')
       tree_flag = .true.
@@ -156,9 +155,11 @@ call readfile( unitin1, extin1, title1, atoms1, bonds1)
 call readfile( unitin2, extin2, title2, atoms2, bonds2)
 
 if (heavy_flag) then
+   ! Include heavy atoms only
    call include_heavy_atoms( atoms1)
    call include_heavy_atoms( atoms2)
 else
+   ! Include all atoms
    atoms1%mask = .true.
    atoms2%mask = .true.
 end if
@@ -172,6 +173,7 @@ if (any(atomtypes%parts%num_items1 /= atomtypes%parts%num_items2)) then
    stop
 end if
 
+! Get user defined atom weights
 if (mass_flag) then
    weights1 = atomic_masses(atoms1%elnum)
    weights2 = atomic_masses(atoms2%elnum)
@@ -212,16 +214,32 @@ if (align_flag) then
 
       ! Pre-compute assignment tree
       call compute_scna_partition( atoms1, atoms2, atomtypes, mnachain)
-      call build_assignment_tree( atoms1, atoms2, mnachain%last_link, assign_frame)
+      call build_assignment_tree( atoms1, atoms2, mnachain%last_link, assign_arrays)
 
       if (tree_flag) then
-         call print_chain_tree_array( assign_frame)
+         call print_chain_tree_array( assign_arrays)
       end if
 
-      if (fast_flag) then
+      if (serial_flag) then
+
+         call distribute_items_serial( coords1w, coords2w, assign_arrays, atomperm)
+         rotquat = least_rotquat( atomperm, coords1w, coords2w)
+         coords2r = rotated_coords( coords2, rotquat, center1)
+         rmsd = sqrt( mean_sqdist( atomperm, weights1, coords1, coords2r))
+         write (stdout,'(A)') str( rmsd)
+
+         if (write_flag) then
+            title2 = 'RMSD=' // str( rmsd)
+            coords2r = rotated_coords( coords2, rotquat, center1)
+            call set_coords( atoms2, coords2r)
+            call writefile( unitout, extout, title2, atoms2, bonds2, atomperm)
+         end if
+
+      else
 
          ! Remap atoms to minimize the MSD
-         call optimize_atomperm_conform( coords1w, coords2w, assign_frame, registry)
+         call optimize_atomperm_conform( coords1w, coords2w, assign_arrays, registry)
+
          ! Print optimization stats
          if (stats_flag) then
             call print_records( registry)
@@ -229,49 +247,38 @@ if (align_flag) then
 
          do i = 1, registry%num_records
             atomperm = registry%records(i)%atomperm
-   !         call check_permutation( atomperm%forward)
-   !         rotquat = registry%records(i)%rotquat
+!            rotquat = registry%records(i)%rotquat
             rotquat = least_rotquat( atomperm, coords1w, coords2w)
             coords2r = rotated_coords( coords2, rotquat, center1)
             rmsd = sqrt( mean_sqdist( atomperm, weights1, coords1, coords2r))
 
-            write (stderr,'(A)') str( rmsd)
-   !         write (stderr,'(I0)') adjacencydiff( atomperm, get_adjmat( atoms1), get_adjmat( atoms2))
+            write (stdout,'(A)') str( rmsd)
 
-            if (write_flag .or. pipe_flag) then
+            if (write_flag) then
                title2 = 'RMSD=' // str( rmsd)
                coords2r = rotated_coords( coords2, rotquat, center1)
                call set_coords( atoms2, coords2r)
-               call writefile( unitout, extout, title2, atoms2, atomperm)
+               call writefile( unitout, extout, title2, atoms2, bonds2, atomperm)
             end if
+
          end do
-
-      else
-
-         call distribute_items_dfs_full( coords1w, coords2w, assign_frame, atomperm)
-         rotquat = least_rotquat( atomperm, coords1w, coords2w)
-         coords2r = rotated_coords( coords2, rotquat, center1)
-         rmsd = sqrt( mean_sqdist( atomperm, weights1, coords1, coords2r))
-         write (stderr,'(A)') str( rmsd)
 
       end if
 
    else
 
-      atomperm = diagonal_atomperm( atoms1, atoms2)
-!      call check_permutation( atomperm%forward)
+      atomperm = default_atomperm( atoms1, atoms2)
       rotquat = least_rotquat( atomperm, coords1w, coords2w)
       coords2r = rotated_coords( coords2, rotquat, center1)
       rmsd = sqrt( mean_sqdist( atomperm, weights1, coords1, coords2r))
 
-      write (stderr,'(A)') str( rmsd)
-!      write (stderr,'(I0)') adjacencydiff( atomperm, get_adjmat( atoms1), get_adjmat( atoms2))
+      write (stdout,'(A)') str( rmsd)
 
-      if (write_flag .or. pipe_flag) then
+      if (write_flag) then
          title2 = 'RMSD=' // str( rmsd)
          coords2r = rotated_coords( coords2, rotquat, center1)
          call set_coords( atoms2, coords2r)
-         call writefile( unitout, extout, title2, atoms2)
+         call writefile( unitout, extout, title2, atoms2, bonds2, atomperm)
       end if
 
    end if
@@ -284,20 +291,25 @@ else
 
    if (remap_flag) then
       call compute_scna_partition( atoms1, atoms2, atomtypes, mnachain)
-      call build_assignment_tree( atoms1, atoms2, mnachain%last_link, assign_frame)
+      call build_assignment_tree( atoms1, atoms2, mnachain%last_link, assign_arrays)
       if (tree_flag) then
-         call print_chain_tree_array( assign_frame)
+         call print_chain_tree_array( assign_arrays)
       end if
-      call distribute_items_dfs_fast( coords1w, coords2w, assign_frame, atomperm)
-!      call check_permutation( atomperm%forward)
+      call distribute_items_parallel( coords1w, coords2w, assign_arrays, atomperm)
       rmsd = sqrt( mean_sqdist( atomperm, weights1, coords1, coords2))
    else
-      atomperm = diagonal_atomperm( atoms1, atoms2)
-!      call check_permutation( atomperm%forward)
+      atomperm = default_atomperm( atoms1, atoms2)
       rmsd = sqrt( mean_sqdist( atomperm, weights1, coords1, coords2))
    end if
 
-   write (stderr,'(A)') str( rmsd)
+   write (stdout,'(A)') str( rmsd)
+
+   if (write_flag) then
+      title2 = 'RMSD=' // str( rmsd)
+      coords2r = rotated_coords( coords2, rotquat, center1)
+      call set_coords( atoms2, coords2r)
+      call writefile( unitout, extout, title2, atoms2, bonds2, atomperm)
+   end if
 
 end if
 

@@ -20,7 +20,7 @@ file_read.f90
 file_write.f90
 argparse.f90
 lcrs_tree.f90
-lcrs_frame.f90
+lcrs_tree_arrays.f90
 atom_types.f90
 atom_types_linked.f90
 atom_mnas.f90
@@ -31,6 +31,7 @@ registration.f90
 biasing.f90
 pruning.f90
 tracking.f90
-#assignment_cluster.f90
+assignment_default.f90
+assignment_cluster.f90
 assignment_conformer.f90
 #assignment_reaction.f90

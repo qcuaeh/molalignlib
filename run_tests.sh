@@ -6,8 +6,6 @@ run_tests() {
    suffix=$1
    subdir=$2
    shift 2
-   testdir=$PWD/tests
-   executable=$blddir/rmsd-cluster
    for file in "$testdir/$subdir"/*.xyz; do
       name=$(basename "$file" .xyz)_$suffix
       echo -n "Running test $subdir/$name... "
@@ -24,7 +22,10 @@ run_tests() {
    done
 }
 
+testdir=$PWD/tests
+executable=./build/ClusRMSD
 write_test=false
+
 while getopts ":w" opt; do
   case $opt in
     w)

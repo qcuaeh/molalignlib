@@ -20,9 +20,10 @@ implicit none
 
 ! Derived type to store permutation subsets
 type :: subperm_t
-   integer :: size                    ! number of assigned entries
+   integer :: perm_size  ! total permutation size 
+   integer :: count  ! partial permutation count
    integer, allocatable :: subset(:)  ! indices of assigned entries in permutation
-   integer, allocatable :: forward(:)  ! forward(i) = j means atom i -> atom j
+   integer, allocatable :: permut(:)  ! permut(i) = j means atom i -> atom j
    integer, allocatable :: backward(:)  ! backward(j) = i means atom i -> atom j
 end type
 
@@ -31,61 +32,6 @@ interface operator(==)
 end interface
 
 contains
-
-elemental function subperm_equality(left, right) result(equality)
-   type(subperm_t), intent(in) :: left, right
-   logical :: equality
-   equality = all(left%forward == right%forward)
-end function
-
-subroutine subperm_init(subperm, perm_size)
-   type(subperm_t), intent(out) :: subperm
-   integer, intent(in) :: perm_size
-
-   allocate(subperm%subset(perm_size))
-   allocate(subperm%forward(perm_size))
-   subperm%size = 0
-   subperm%forward = identity_permutation(perm_size)
-   subperm%backward = identity_permutation(perm_size)
-end subroutine
-
-subroutine subperm_add(subperm, i1, j1)
-   ! Merge source assignment into target assignment
-   type(subperm_t), intent(inout) :: subperm
-   integer, intent(in) :: i1, j1
-   ! Local variables
-   integer :: n, i2, j2
-
-   ! Check for conflicts in existing assignments
-   if (any(subperm%subset(1:subperm%size) == i1)) then
-      write(stderr, '(A,I0,A)') "ERROR: Attempting to overwrite permutation at position ", i1
-      error stop "Assignment merge conflict"
-   end if
-
-   n = subperm%size + 1
-   i2 = subperm%backward(j1)
-   j2 = subperm%forward(i1)
-
-   subperm%size = n
-   subperm%subset(n) = i1
-   subperm%forward(i1) = j1
-   subperm%backward(j1) = i1
-   subperm%forward(i2) = j2
-   subperm%backward(j2) = i2
-end subroutine
-
-subroutine subperm_merge(subperm, other_subperm)
-   ! Merge source assignment into target assignment
-   type(subperm_t), intent(inout) :: subperm
-   type(subperm_t), intent(in) :: other_subperm
-   integer :: i, i1, j1
-
-   do i = 1, other_subperm%size
-      i1 = other_subperm%subset(i)
-      j1 = other_subperm%forward(i1)
-      call subperm_add( subperm, i1, j1)
-   end do
-end subroutine
 
 ! Get an identity permutation
 function identity_permutation(n) result(perm)
@@ -139,37 +85,166 @@ logical function is_permutation(perm) result(isperm)
    end do
 end function
 
-subroutine check_permutation(perm)
+elemental function subperm_equality(left, right) result(equality)
+   type(subperm_t), intent(in) :: left, right
+   logical :: equality
+   integer :: i
+
+   if (left%count /= right%count) then
+      equality = .false.
+      return
+   end if
+
+!   do i = 1, left%count
+!      if (left%subset(i) /= right%subset(i)) then
+!         equality = .false.
+!         return
+!      end if
+!   end do
+
+   do i = 1, left%count
+      if (left%permut(i) /= right%permut(i)) then
+         equality = .false.
+         return
+      end if
+   end do
+
+   equality = .true.
+end function
+
+subroutine subperm_init(subperm, perm_size)
+   type(subperm_t), intent(out) :: subperm
+   integer, intent(in) :: perm_size
+
+   allocate(subperm%subset(perm_size))
+   allocate(subperm%permut(perm_size))
+   subperm%perm_size = perm_size
+   subperm%count = 0
+end subroutine
+
+subroutine subperm_add(subperm, i1, i2)
+   ! Merge source assignment into target assignment
+   type(subperm_t), intent(inout) :: subperm
+   integer, intent(in) :: i1, i2
+   ! Local variables
+   integer :: n
+
+block
+   ! Check for merge conflicts
+   integer :: i
+   do i = 1, subperm%count
+      if (subperm%subset(i) == i1) then
+         error stop "Merge conflict in subset"
+      end if
+      if (subperm%permut(i) == i2) then
+         error stop "Merge conflict in permut"
+      end if
+   end do
+end block
+
+   n = subperm%count + 1
+   subperm%subset(n) = i1
+   subperm%permut(n) = i2
+   subperm%count = n
+end subroutine
+
+subroutine subperm_merge(subperm, other_subperm)
+   ! Merge source assignment into target assignment
+   type(subperm_t), intent(inout) :: subperm
+   type(subperm_t), intent(in) :: other_subperm
+   integer :: i, i1, i2
+
+   do i = 1, other_subperm%count
+      i1 = other_subperm%subset(i)
+      i2 = other_subperm%permut(i)
+      call subperm_add( subperm, i1, i2)
+   end do
+end subroutine
+
+subroutine subperm_to_perm(subperm, perm, invperm)
+   ! Merge source assignment into target assignment
+   type(subperm_t), intent(in) :: subperm
+   integer, dimension(:), allocatable, intent(out) :: perm, invperm
+   ! Local variables
+   integer :: i, i1, i2, j1, j2
+
+   perm = identity_permutation(subperm%perm_size)
+   invperm = identity_permutation(subperm%perm_size)
+
+   do i = 1, subperm%count
+      i1 = subperm%subset(i)
+      i2 = subperm%permut(i)
+      j1 = invperm(i2)
+      j2 = perm(i1)
+      perm(i1) = i2
+      invperm(i2) = i1
+      perm(j1) = j2
+      invperm(j2) = j1
+   end do
+end subroutine
+
+subroutine check_subperm(subperm)
    implicit none
-   integer, dimension(:), intent(in) :: perm
-   logical :: seen(size(perm))
+   type(subperm_t), intent(in) :: subperm
+   logical :: subset_seen(subperm%perm_size)
+   logical :: permut_seen(subperm%perm_size)
    logical :: has_errors
-   integer :: n, i
+   integer :: i, src_idx, tgt_idx
    
-   n = size(perm)
-   seen = .false.
    has_errors = .false.
+   subset_seen = .false.
+   permut_seen = .false.
    
-   do i = 1, n
-      ! Check if out of bounds
-      if (perm(i) < 1 .or. perm(i) > n) then
-         write(stderr, '(A,I0,A,I0,A)') 'Index ', perm(i), ' at position ', i, ' is out of range'
+   ! Check if count is within valid bounds
+   if (subperm%count < 0 .or. subperm%count > subperm%perm_size) then
+      write(stderr, '(A,I0,A,I0,A)') 'Count ', subperm%count, &
+         ' is out of range [0,', subperm%perm_size, ']'
+      has_errors = .true.
+   end if
+   
+   ! Check each pair in the partial permutation
+   do i = 1, subperm%count
+      src_idx = subperm%subset(i)
+      tgt_idx = subperm%permut(i)
+      
+      ! Check if source index is out of bounds
+      if (src_idx < 1 .or. src_idx > subperm%perm_size) then
+         write(stderr, '(A,I0,A,I0,A,I0,A)') 'Source index ', src_idx, &
+            ' at position ', i, ' is out of range [1,', subperm%perm_size, ']'
          has_errors = .true.
       else
          ! Only check for repetition if within bounds
-         if (seen(perm(i))) then
-            write(stderr, '(A,I0,A)') 'Index ', perm(i), ' appears multiple times in permutation'
+         if (subset_seen(src_idx)) then
+            write(stderr, '(A,I0,A)') 'Source index ', src_idx, &
+               ' appears multiple times in subset'
             has_errors = .true.
          else
-            seen(perm(i)) = .true.
+            subset_seen(src_idx) = .true.
+         end if
+      end if
+      
+      ! Check if target index is out of bounds
+      if (tgt_idx < 1 .or. tgt_idx > subperm%perm_size) then
+         write(stderr, '(A,I0,A,I0,A,I0,A)') 'Target index ', tgt_idx, &
+            ' at position ', i, ' is out of range [1,', subperm%perm_size, ']'
+         has_errors = .true.
+      else
+         ! Only check for repetition if within bounds
+         if (permut_seen(tgt_idx)) then
+            write(stderr, '(A,I0,A)') 'Target index ', tgt_idx, &
+               ' appears multiple times in permutation'
+            has_errors = .true.
+         else
+            permut_seen(tgt_idx) = .true.
          end if
       end if
    end do
    
    if (has_errors) then
-      error stop 'Permutation is not valid'
+      error stop 'Sub-permutation is not valid'
    else
-      write(stderr, '(A)') 'Permutation is valid'
+      write(stderr, '(A,I0,A,I0,A)') 'Sub-permutation is valid (', &
+         subperm%count, '/', subperm%perm_size, ' assignments)'
    end if
 end subroutine
 

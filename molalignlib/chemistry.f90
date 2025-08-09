@@ -22,7 +22,7 @@ implicit none
 integer, parameter :: num_elems = 103
 
 ! Element symbols
-character(2), parameter :: element_symbols(num_elems) = [ &
+character(3), parameter :: element_symbols(num_elems) = [ &
 'H ',                                                                                                 'He', &
 'Li', 'Be',                                                             'B ', 'C ', 'N ', 'O ', 'F ', 'Ne', &
 'Na', 'Mg',                                                             'Al', 'Si', 'P ', 'S ', 'Cl', 'Ar', &

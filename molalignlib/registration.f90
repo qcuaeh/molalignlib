@@ -135,7 +135,7 @@ subroutine push_record(self, atomperm, num_steps, adjd, rmsd, rotation)
       if (.not. present(rmsd)) error stop 'rmsd required when use_position=TRUE'
       if (.not. present(rotation)) error stop 'rotation required when use_position=TRUE'
    end if
-   
+
    ! Handle adjacency-based processing
    if (self%use_adjacency) then
       if (.not. present(adjd)) error stop 'adjd required when use_adjacency=TRUE'
@@ -143,7 +143,7 @@ subroutine push_record(self, atomperm, num_steps, adjd, rmsd, rotation)
 
    self%num_trials = self%num_trials + 1
    self%total_steps = self%total_steps + num_steps
-   
+
    ! Check for existing records to update
    do i = 1, self%num_records
       record => self%records(i)
@@ -157,7 +157,7 @@ subroutine push_record(self, atomperm, num_steps, adjd, rmsd, rotation)
    ! Find insertion point and insert new record
    do i = 1, size(self%records)
       record => self%records(i)
-      
+
       ! Determine insertion criteria based on mode
       if (self%use_adjacency .and. self%use_position) then
          should_insert = (adjd < record%adjd .or. (adjd == record%adjd .and. rmsd < record%rmsd))
@@ -166,28 +166,28 @@ subroutine push_record(self, atomperm, num_steps, adjd, rmsd, rotation)
       else
          should_insert = (adjd < record%adjd)
       end if
-      
+
       if (should_insert) then
          ! Shift records to make room
          do j = size(self%records), i + 1, -1
             self%records(j) = self%records(j - 1)
          end do
-         
+
          ! Initialize new record
          record%atomperm = atomperm
          record%count = 1
-         
+
          ! Set fields based on enabled processing modes
          if (self%use_position) then
             record%rmsd = rmsd
             record%rotation = rotation
             record%aver_steps = num_steps
          end if
-         
+
          if (self%use_adjacency) then
             record%adjd = adjd
          end if
-         
+
          exit
       end if
    end do
@@ -214,54 +214,53 @@ subroutine print_records(registry)
       error stop 'Registry not properly initialized - no processing mode enabled'
    end if
 
+   write (stderr, *)
    if (registry%use_position .and. .not. registry%use_adjacency) then
       ! Position only
       line = repeat('-', 42)
-      write (stdout, '(2x,a,4x,a,5x,a,4x,a,7x,a)') '#', 'Count', 'Steps', 'Rotθ', 'RMSD'
-      write (stdout, '(a)') line(1:42)
+      write (stderr, '(2x,a,4x,a,5x,a,4x,a,7x,a)') '#', 'Count', 'Steps', 'Rotθ', 'RMSD'
+      write (stderr, '(a)') line(1:42)
       do i = 1, registry%num_records
          record = registry%records(i)
-         write (stdout, '(i3,4x,i4,4x,f5.1,5x,f5.1,4x,f8.4)') &
+         write (stderr, '(i3,4x,i4,4x,f5.1,5x,f5.1,4x,f8.4)') &
             i, record%count, record%aver_steps, angle(record%rotation), record%rmsd
       end do
-      write (stdout, '(a)') line(1:42)
-   
+      write (stderr, '(a)') line(1:42)
    else if (registry%use_position .and. registry%use_adjacency) then
       ! Both position and adjacency
       line = repeat('-', 49)
-      write (stdout, '(2x,a,4x,a,5x,a,4x,a,4x,a,6x,a)') '#', 'Count', 'Steps', 'Rotθ', 'Δadj', 'RMSD'
-      write (stdout, '(a)') line
+      write (stderr, '(2x,a,4x,a,5x,a,4x,a,4x,a,6x,a)') '#', 'Count', 'Steps', 'Rotθ', 'Δadj', 'RMSD'
+      write (stderr, '(a)') line
       do i = 1, registry%num_records
          record = registry%records(i)
-         write (stdout, '(i3,4x,i4,4x,f5.1,5x,f5.1,3x,i4,4x,f8.4)') &
+         write (stderr, '(i3,4x,i4,4x,f5.1,5x,f5.1,3x,i4,4x,f8.4)') &
             i, record%count, record%aver_steps, angle(record%rotation), record%adjd, record%rmsd
       end do
-      write (stdout, '(a)') line
-   
+      write (stderr, '(a)') line
    else if (registry%use_adjacency .and. .not. registry%use_position) then
       ! Adjacency only
       line = repeat('-', 25)
-      write (stdout, '(2x,a,4x,a,4x,a)') '#', 'Count', 'Δadj'
-      write (stdout, '(a)') line(1:25)
+      write (stderr, '(2x,a,4x,a,4x,a)') '#', 'Count', 'Δadj'
+      write (stderr, '(a)') line(1:25)
       do i = 1, registry%num_records
          record = registry%records(i)
-         write (stdout, '(i3,4x,i4,4x,i4)') i, record%count, record%adjd
+         write (stderr, '(i3,4x,i4,4x,i4)') i, record%count, record%adjd
       end do
-      write (stdout, '(a)') line(1:25)
+      write (stderr, '(a)') line(1:25)
    end if
 
-   write (stdout, '(a,1x,i0)') 'Random trials =', registry%num_trials
-   
+   write (stderr, *)
+   write (stderr, '(a,1x,i0)') 'Random trials =', registry%num_trials
    if (registry%use_position) then
-      write (stdout, '(a,1x,i0)') 'Minimization steps =', registry%total_steps
+      write (stderr, '(a,1x,i0)') 'Minimization steps =', registry%total_steps
    end if
-   
    if (registry%overflow) then
-      write (stdout, '(a,1x,i0)') 'Visited local minima >', registry%num_records
+      write (stderr, '(a,1x,i0)') 'Visited local minima >', registry%num_records
    else
-      write (stdout, '(a,1x,i0)') 'Visited local minima =', registry%num_records
+      write (stderr, '(a,1x,i0)') 'Visited local minima =', registry%num_records
    end if
-   flush(stdout)
+
+   flush(stderr)
 end subroutine
 
 end module

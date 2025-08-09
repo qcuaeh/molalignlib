@@ -46,10 +46,8 @@ subroutine readfile(unit, exten, title, atoms, bonds)
    select case (exten)
    case ('xyz')
       call readfile_xyz(unit, title, atoms, bonds)
-   case ('mol')
-      call readfile_mol(unit, title, atoms, bonds)
-   case ('sdf')
-      call readfile_sdf(unit, title, atoms, bonds)
+   case ('mol', 'sdf')
+      call readfile_mol_sdf(unit, title, atoms, bonds)
    case ('mol2')
       call readfile_mol2(unit, title, atoms, bonds)
    case default
@@ -101,7 +99,7 @@ subroutine readfile_xyz(unit, title, atoms, bonds)
    end do
 end subroutine
 
-subroutine readfile_mol(unit, title, atoms, bonds)
+subroutine readfile_mol_sdf(unit, title, atoms, bonds)
    integer, intent(in) :: unit
    character(:), allocatable, intent(out) :: title
    type(atom_t), dimension(:), allocatable, target, intent(out) :: atoms
@@ -112,42 +110,43 @@ subroutine readfile_mol(unit, title, atoms, bonds)
    character(ll) :: buffer
    integer :: elnum, atomidx1, atomidx2, typeidx
    integer :: num_atoms, num_bonds, stat, i
+   logical :: end_of_molecule
 
    ! Read header block (3 lines)
    read (unit, '(A)', iostat=stat) buffer
    if (stat /= 0) then
-      write (stderr, '(A)') 'Invalid MOL file'
+      write (stderr, '(A)') 'Invalid MOL/SDF file'
       stop
    end if
    title = trim(buffer)
 
    read (unit, '(A)', iostat=stat) buffer
    if (stat /= 0) then
-      write (stderr, '(A)') 'Invalid MOL file'
+      write (stderr, '(A)') 'Invalid MOL/SDF file'
       stop
    end if
 
    read (unit, '(A)', iostat=stat) buffer
    if (stat /= 0) then
-      write (stderr, '(A)') 'Invalid MOL file'
+      write (stderr, '(A)') 'Invalid MOL/SDF file'
       stop
    end if
 
    ! Read counts line
    read (unit, '(A)', iostat=stat) buffer
    if (stat /= 0) then
-      write (stderr, '(A)') 'Invalid MOL file'
+      write (stderr, '(A)') 'Invalid MOL/SDF file'
       stop
    end if
 
    read (buffer(1:3), '(I3)', iostat=stat) num_atoms
    if (stat /= 0) then
-      write (stderr, '(A)') 'Invalid MOL file'
+      write (stderr, '(A)') 'Invalid MOL/SDF file'
       stop
    end if
    read (buffer(4:6), '(I3)', iostat=stat) num_bonds
    if (stat /= 0) then
-      write (stderr, '(A)') 'Invalid MOL file'
+      write (stderr, '(A)') 'Invalid MOL/SDF file'
       stop
    end if
 
@@ -156,22 +155,22 @@ subroutine readfile_mol(unit, title, atoms, bonds)
    do i = 1, num_atoms
       read (unit, '(A)', iostat=stat) buffer
       if (stat /= 0) then
-         write (stderr, '(A)') 'Invalid MOL file'
+         write (stderr, '(A)') 'Invalid MOL/SDF file'
          stop
       end if
       read (buffer(1:10), '(F10.4)', iostat=stat) coords(1)
       if (stat /= 0) then
-         write (stderr, '(A)') 'Invalid MOL file'
+         write (stderr, '(A)') 'Invalid MOL/SDF file'
          stop
       end if
       read (buffer(11:20), '(F10.4)', iostat=stat) coords(2)
       if (stat /= 0) then
-         write (stderr, '(A)') 'Invalid MOL file'
+         write (stderr, '(A)') 'Invalid MOL/SDF file'
          stop
       end if
       read (buffer(21:30), '(F10.4)', iostat=stat) coords(3)
       if (stat /= 0) then
-         write (stderr, '(A)') 'Invalid MOL file'
+         write (stderr, '(A)') 'Invalid MOL/SDF file'
          stop
       end if
 
@@ -187,22 +186,22 @@ subroutine readfile_mol(unit, title, atoms, bonds)
    do i = 1, num_bonds
       read (unit, '(A)', iostat=stat) buffer
       if (stat /= 0) then
-         write (stderr, '(A)') 'Invalid MOL file'
+         write (stderr, '(A)') 'Invalid MOL/SDF file'
          stop
       end if
       read (buffer(1:3), '(I3)', iostat=stat) atomidx1
       if (stat /= 0) then
-         write (stderr, '(A)') 'Invalid MOL file'
+         write (stderr, '(A)') 'Invalid MOL/SDF file'
          stop
       end if
       read (buffer(4:6), '(I3)', iostat=stat) atomidx2
       if (stat /= 0) then
-         write (stderr, '(A)') 'Invalid MOL file'
+         write (stderr, '(A)') 'Invalid MOL/SDF file'
          stop
       end if
       read (buffer(7:9), '(I3)', iostat=stat) typeidx
       if (stat /= 0) then
-         write (stderr, '(A)') 'Invalid MOL file'
+         write (stderr, '(A)') 'Invalid MOL/SDF file'
          stop
       end if
 
@@ -210,30 +209,17 @@ subroutine readfile_mol(unit, title, atoms, bonds)
       bonds(i)%atomidx2 = atomidx2
       bonds(i)%typeidx = typeidx
    end do
-end subroutine
 
-subroutine readfile_sdf(unit, title, atoms, bonds)
-   integer, intent(in) :: unit
-   character(:), allocatable, intent(out) :: title
-   type(atom_t), dimension(:), allocatable, intent(out) :: atoms
-   type(bond_t), dimension(:), allocatable, intent(out) :: bonds
-   ! Local variables
-   character(ll) :: buffer
-   logical :: end_of_molecule
-   integer :: stat
-
-   ! Read the MOL block (SDF files contain MOL blocks followed by data)
-   call readfile_mol(unit, title, atoms, bonds)
-
+   ! Handle potential SDF property data
    ! Skip any property data until we reach $$ or end of file
    end_of_molecule = .false.
    do while (.not. end_of_molecule)
       read (unit, '(A)', iostat=stat) buffer
       if (stat < 0) then
-         ! End of file reached - this is acceptable for SDF files
+         ! End of file reached - this is acceptable (pure MOL file or end of SDF)
          exit
       else if (stat > 0) then
-         write (stderr, '(A)') 'Error reading SDF property data!'
+         write (stderr, '(A)') 'Error reading MOL/SDF property data!'
          stop
       end if
 

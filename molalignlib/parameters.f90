@@ -14,8 +14,8 @@ integer, parameter :: wl = 32 ! Word length
 integer, parameter :: ll = 256 ! Line length
 
 ! Integer parameters
-integer, parameter :: DEC_PREC = 6
 integer, parameter :: MAX_COORD = 10
+integer, parameter :: PRINTED_DECIMALS = 6
 
 ! Real parameters
 real(rk), parameter :: BIAS_SF = 0.001

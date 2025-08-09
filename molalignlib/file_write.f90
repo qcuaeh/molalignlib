@@ -36,68 +36,66 @@ subroutine open2write(filepath, unit)
    end if
 end subroutine
 
-subroutine writefile(unit, extout, title, atoms, atomperm)
+subroutine writefile(unit, extout, title, atoms, bonds, atomperm)
    integer, intent(in) :: unit
    character(*), intent(in) :: extout
    character(*), intent(in) :: title
    type(atom_t), dimension(:), intent(in) :: atoms
-   type(subperm_t), intent(in), optional :: atomperm
-   ! Local varibles
-   integer, dimension(:), allocatable :: perm
-
-   if (present(atomperm)) then
-      perm = atomperm%forward
-   else
-      perm = identity_permutation(size(atoms))
-   end if
+   type(bond_t), dimension(:), intent(in) :: bonds
+   type(subperm_t), intent(in) :: atomperm
 
    select case (extout)
    case ('xyz')
-      call writefile_xyz(unit, title, atoms, perm)
+      call writefile_xyz(unit, title, atoms, bonds, atomperm)
    case ('mol2')
-      call writefile_mol2(unit, title, atoms, perm)
-   case ('mol', 'sdf')
-      call writefile_sdf(unit, title, atoms, perm)
+      call writefile_mol2(unit, title, atoms, bonds, atomperm)
+   case ('mol','sdf')
+      call writefile_sdf(unit, title, atoms, bonds, atomperm)
    case default
-      write (stderr, '(A,1X,A)') 'Invalid format:', extout
+      write (stderr, '(A,1X,A)') 'Unsupported format:', extout
       stop
    end select
 
    flush(stderr)
 end subroutine
 
-subroutine writefile_xyz(unit, title, atoms, perm)
+subroutine writefile_xyz(unit, title, atoms, bonds, atomperm)
    integer, intent(in) :: unit
    character(*), intent(in) :: title
    type(atom_t), dimension(:), intent(in) :: atoms
-   integer, dimension(:), intent(in) :: perm
+   type(bond_t), dimension(:), intent(in) :: bonds
+   type(subperm_t), intent(in) :: atomperm
    ! Local varibles
+   integer, dimension(:), allocatable :: perm, invperm
    type(atom_t) :: iatom
-   integer :: i
+   integer :: num_atoms, i
 
-   write (unit, '(I0)') size(atoms)
+   call subperm_to_perm(atomperm, perm, invperm)
+   num_atoms = size(atoms)
+
+   write (unit, '(I0)') num_atoms
    write (unit, '(A)') title
 
-   do i = 1, size(perm)
+   do i = 1, num_atoms
       iatom = atoms(perm(i))
       write (unit, '(A,3(2X,F12.6))') element_symbols(iatom%elnum), iatom%coords
    end do
 end subroutine
 
-subroutine writefile_mol2(unit, title, atoms, perm)
+subroutine writefile_mol2(unit, title, atoms, bonds, atomperm)
 ! Write SYBYL MOL2 files
    integer, intent(in) :: unit
    character(*), intent(in) :: title
    type(atom_t), dimension(:), intent(in) :: atoms
-   integer, dimension(:), intent(in) :: perm
+   type(bond_t), dimension(:), intent(in) :: bonds
+   type(subperm_t), intent(in) :: atomperm
    ! Local variables
    type(atom_t) :: iatom
-   type(bond_t), allocatable :: bonds(:)
-   integer, allocatable :: invperm(:)
-   integer :: num_atoms, num_bonds, i
+   integer, dimension(:), allocatable :: perm, invperm
+   integer :: num_atoms, num_bonds, atomidx1, atomidx2, i
+   character(4) :: atom_type
 
-   bonds = get_bonds(atoms)
-   invperm = inverse_permutation(perm)
+   call subperm_to_perm(atomperm, perm, invperm)
 
    num_atoms = size(atoms)
    num_bonds = size(bonds)
@@ -115,30 +113,36 @@ subroutine writefile_mol2(unit, title, atoms, perm)
    write (unit, '(A)') '@<TRIPOS>ATOM'
    do i = 1, num_atoms
       iatom = atoms(perm(i))
+      if (iatom%elnum > 1) then
+         atom_type = 'Hev'
+      else
+         atom_type = 'H'
+      end if
       write (unit, '(I4,2X,A2,3(1X,F12.6),2X,A4,1X,I2,1X,A4,1X,F7.3)') &
-         i, element_symbols(iatom%elnum), iatom%coords, 'Any', 1, 'MOL1', 0.
+         i, element_symbols(iatom%elnum), iatom%coords, atom_type, 1, 'MOL1', 0.
    end do
 
    write (unit, '(A)') '@<TRIPOS>BOND'
    do i = 1, num_bonds
-      write (unit, '(I4,1X,2(1X,I4),1X,A2)') i, invperm(bonds(i)%atomidx1), invperm(bonds(i)%atomidx2), 'un'
+      atomidx1 = invperm(bonds(i)%atomidx1)
+      atomidx2 = invperm(bonds(i)%atomidx2)
+      write (unit, '(I4,1X,2(1X,I4),1X,A2)') i, atomidx1, atomidx2, 'un'
    end do
 end subroutine
 
-subroutine writefile_sdf(unit, title, atoms, perm)
+subroutine writefile_sdf(unit, title, atoms, bonds, atomperm)
 ! Write SDF (Structure Data Format) files
    integer, intent(in) :: unit
    character(*), intent(in) :: title
    type(atom_t), dimension(:), intent(in) :: atoms
-   integer, dimension(:), intent(in) :: perm
+   type(bond_t), dimension(:), intent(in) :: bonds
+   type(subperm_t), intent(in) :: atomperm
    ! Local variables
    type(atom_t) :: iatom
-   type(bond_t), dimension(:), allocatable :: bonds
-   integer, dimension(:), allocatable :: invperm
-   integer :: i, num_atoms, num_bonds
+   integer, dimension(:), allocatable :: perm, invperm
+   integer :: num_atoms, num_bonds, atomidx1, atomidx2, i
 
-   bonds = get_bonds(atoms)
-   invperm = inverse_permutation(perm)
+   call subperm_to_perm(atomperm, perm, invperm)
 
    num_atoms = size(atoms)
    num_bonds = size(bonds)
@@ -161,15 +165,16 @@ subroutine writefile_sdf(unit, title, atoms, perm)
    ! Format: xxxxx.xxxxyyyyy.yyyyzzzzz.zzzz aaaddcccssshhhbbbvvvHHHrrriiimmmnnneee
    do i = 1, num_atoms
       iatom = atoms(perm(i))
-      write (unit, '(3F10.4,1X,A3,I2,3I3,3I3,2I3,2I3,2I3)') &
-         iatom%coords, element_symbols(iatom%elnum), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+      write (unit, '(3F10.4,1X,A3,I2,11I3)') &
+         iatom%coords, element_symbols(iatom%elnum), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
    end do
 
    ! Bond block
    ! Format: 111222tttsssxxxrrrccc
    do i = 1, num_bonds
-      ! Map original atom indices to permuted indices
-      write (unit, '(I3,I3,I3,I3,I3,I3)') invperm(bonds(i)%atomidx1), invperm(bonds(i)%atomidx2), 1, 0, 0, 0
+      atomidx1 = invperm(bonds(i)%atomidx1)
+      atomidx2 = invperm(bonds(i)%atomidx2)
+      write (unit, '(I3,I3,I3,I3,I3,I3,I3)') atomidx1, atomidx2, 1, 0, 0, 0, 0
    end do
 
    ! Properties block (none for now)

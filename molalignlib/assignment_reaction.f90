@@ -28,7 +28,7 @@ use adjacency
 use biasing
 use pruning
 use lcrs_tree
-use lcrs_frame
+use lcrs_tree_arrays
 use atom_mnas
 use assigntree_build
 use assigntree_distribute_linked

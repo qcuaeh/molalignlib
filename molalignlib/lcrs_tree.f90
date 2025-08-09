@@ -739,13 +739,13 @@ subroutine print_part_tree(part_tree)
    write(stderr, '(A)') 'ROOT'
 
    ! Print children recursively
-   call print_part_recursive(part_tree, 0, is_last_child)
+   call print_part_recurse(part_tree, 0, is_last_child)
 
    deallocate(is_last_child)
    write(stderr, *)
 end subroutine
 
-recursive subroutine print_part_recursive(part, depth, is_last_child)
+recursive subroutine print_part_recurse(part, depth, is_last_child)
    type(partree_node_t), pointer, intent(in) :: part
    integer, intent(in) :: depth
    logical, dimension(:), intent(inout) :: is_last_child
@@ -787,7 +787,7 @@ recursive subroutine print_part_recursive(part, depth, is_last_child)
          '(', child_part%num_items1, '/', child_part%num_items2, ')'
 
       ! Recursively print this child's children
-      call print_part_recursive(child_part, depth + 1, is_last_child)
+      call print_part_recurse(child_part, depth + 1, is_last_child)
 
       child_part => next_child
    end do
@@ -996,13 +996,13 @@ subroutine print_chain_tree(assign_tree)
 
    ! Print children recursively
    write(stderr, '(A)') 'ROOT'
-   call print_chain_recursive(assign_tree, 0, is_last_child)
+   call print_chain_recurse(assign_tree, 0, is_last_child)
 
    deallocate(is_last_child)
    write(stderr, *)
 end subroutine
 
-recursive subroutine print_chain_recursive(chain, depth, is_last_child)
+recursive subroutine print_chain_recurse(chain, depth, is_last_child)
    type(assigntree_node_t), pointer, intent(in) :: chain
    integer, intent(in) :: depth
    logical, dimension(:), intent(inout) :: is_last_child
@@ -1044,7 +1044,7 @@ recursive subroutine print_chain_recursive(chain, depth, is_last_child)
          '(', child_chain%split_part%num_items1, '/', child_chain%split_part%num_items2, ')'
 
       ! Recursively print this child's children
-      call print_chain_recursive(child_chain, depth + 1, is_last_child)
+      call print_chain_recurse(child_chain, depth + 1, is_last_child)
 
       child_chain => next_child
    end do
@@ -1076,13 +1076,13 @@ subroutine print_tree_signatures(part_tree)
    write(stderr, *)
 
    ! Print children recursively
-   call print_signature_recursive(part_tree)
+   call print_signature_recurse(part_tree)
 
    write(stderr, *)
 end subroutine
 
 ! Helper recursive procedure for print_tree_signatures
-recursive subroutine print_signature_recursive(part)
+recursive subroutine print_signature_recurse(part)
    type(partree_node_t), pointer, intent(in) :: part
    type(partree_node_t), pointer :: child_part
 
@@ -1096,7 +1096,7 @@ recursive subroutine print_signature_recursive(part)
       call print_part_signature(child_part%signature)
 
       ! Recursively print this child's children
-      call print_signature_recursive(child_part)
+      call print_signature_recurse(child_part)
 
       child_part => child_part%next_sibling_part
    end do
@@ -1117,12 +1117,12 @@ subroutine print_tree_items(part_tree)
    write(stderr, *)
 
    ! Print children recursively
-   call print_items_recursive(part_tree)
+   call print_items_recurse(part_tree)
 
    write(stderr, *)
 end subroutine
 
-recursive subroutine print_items_recursive(part)
+recursive subroutine print_items_recurse(part)
    type(partree_node_t), pointer, intent(in) :: part
    type(partree_node_t), pointer :: child_part
 
@@ -1136,7 +1136,7 @@ recursive subroutine print_items_recursive(part)
       call print_part_items(child_part)
 
       ! Recursively print this child's children
-      call print_items_recursive(child_part)
+      call print_items_recurse(child_part)
 
       child_part => child_part%next_sibling_part
    end do
@@ -1157,12 +1157,12 @@ subroutine print_leaf_items(part_tree)
    write(stderr, *)
 
    ! Print children recursively
-   call print_leaf_items_recursive(part_tree)
+   call print_leaf_items_recurse(part_tree)
 
    write(stderr, *)
 end subroutine
 
-recursive subroutine print_leaf_items_recursive(part)
+recursive subroutine print_leaf_items_recurse(part)
    type(partree_node_t), pointer, intent(in) :: part
    type(partree_node_t), pointer :: child_part
 
@@ -1178,7 +1178,7 @@ recursive subroutine print_leaf_items_recursive(part)
       end if
 
       ! Recursively traverse this child's children to find more leaves
-      call print_leaf_items_recursive(child_part)
+      call print_leaf_items_recurse(child_part)
 
       child_part => child_part%next_sibling_part
    end do
@@ -1204,13 +1204,13 @@ subroutine print_part_indices(part_tree)
    write(stderr, *)
 
    ! Print children recursively
-   call print_part_indices_recursive(part_tree)
+   call print_part_indices_recurse(part_tree)
 
    write(stderr, *)
 end subroutine
 
 ! Helper recursive procedure for print_part_indices
-recursive subroutine print_part_indices_recursive(part)
+recursive subroutine print_part_indices_recurse(part)
    type(partree_node_t), pointer, intent(in) :: part
    type(partree_node_t), pointer :: child_part
    type(item_node_t), pointer :: item
@@ -1237,7 +1237,7 @@ recursive subroutine print_part_indices_recursive(part)
       end do
 
       ! Recursively print this child's children
-      call print_part_indices_recursive(child_part)
+      call print_part_indices_recurse(child_part)
 
       child_part => child_part%next_sibling_part
    end do
@@ -1263,13 +1263,13 @@ subroutine print_chain_indices(assign_tree)
    write(stderr, *)
 
    ! Print children recursively
-   call print_chain_indices_recursive(assign_tree)
+   call print_chain_indices_recurse(assign_tree)
 
    write(stderr, *)
 end subroutine
 
 ! Helper recursive procedure for print_chain_indices
-recursive subroutine print_chain_indices_recursive(chain)
+recursive subroutine print_chain_indices_recurse(chain)
    type(assigntree_node_t), pointer, intent(in) :: chain
    type(assigntree_node_t), pointer :: child_chain
    type(chain_node_t), pointer :: link
@@ -1299,7 +1299,7 @@ recursive subroutine print_chain_indices_recursive(chain)
       write(stderr, '(A,I0,A,A,A)') "Chain ", child_chain%global_index, " (split part: ", address(child_chain%split_part), ")"
 
       ! Recursively print this child's content and children
-      call print_chain_indices_recursive(child_chain)
+      call print_chain_indices_recurse(child_chain)
 
       child_chain => child_chain%next_sibling_chain
    end do

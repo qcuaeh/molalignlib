@@ -17,7 +17,7 @@ ConfRMSD file1 file2 [options]
 ### Options
 `-align` Align atoms to minimize the RMSD.  
 `-remap` Remap atoms to minimize the RMSD.  
-`-fast` Use stochastic remapping method.  
+`-serial` Search assignment combinations serially.  
 `-heavy` Ignore hydrogen atoms.  
 `-mass` Use mass weighted coordinates.  
 `-mirror` Reflect the aligned coordinates.  

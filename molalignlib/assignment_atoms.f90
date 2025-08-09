@@ -64,22 +64,31 @@ subroutine assign_atoms_pruned( atomtypes, coords1, coords2, prunes, atomperm)
    type(partition_t), target, intent(in) :: atomtypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    type(bool_matrix), dimension(:), intent(in) :: prunes
-   integer, dimension(:), intent(out) :: atomperm
+   type(subperm_t), intent(out) :: atomperm
    ! Local variables
    integer :: h, num_items1
    integer, dimension(:), allocatable :: auxperm
    integer, dimension(:), pointer :: items1, items2
    real(rk) :: dist
+   integer :: i, j
 
+   call subperm_init(atomperm, size(coords1, dim=2))
+   atomperm%count = size(coords1, dim=2)
    allocate (auxperm(maxval(atomtypes%parts%num_items1)))
 
    ! Optimize atomperm for each block
+   i = 0
    do h = 1, atomtypes%num_parts
       num_items1 = atomtypes%parts(h)%num_items1
       items1 => atomtypes%parts(h)%items1
       items2 => atomtypes%parts(h)%items2
       call solve_lap_pruned(num_items1, items1, items2, coords1, coords2, prunes(h)%ee, auxperm, dist)
-      atomperm(items1) = items2(auxperm(:num_items1))
+!      atomperm(items1) = items2(auxperm(:num_items1))
+      do j = 1, num_items1
+         i = i + 1
+         atomperm%subset(i) = items1(j)
+         atomperm%permut(items1(j)) = items2(auxperm(j))
+      end do
    end do
 end subroutine
 
