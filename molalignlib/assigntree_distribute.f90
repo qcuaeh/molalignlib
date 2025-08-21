@@ -101,8 +101,8 @@ subroutine collect_leaf_assignments(assign_arrays, part_idx, subperm)
              assign_arrays%partree(child_idx)%items2_count == 1) then
 
             ! Get the assigned items
-            item1_idx = assign_arrays%item1_values(assign_arrays%partree(child_idx)%items1_offset + 1)
-            item2_idx = assign_arrays%item2_values(assign_arrays%partree(child_idx)%items2_offset + 1)
+            item1_idx = assign_arrays%vertidcs1(assign_arrays%partree(child_idx)%items1_offset + 1)
+            item2_idx = assign_arrays%vertidcs2(assign_arrays%partree(child_idx)%items2_offset + 1)
 
             ! Add item pair to assignment
             call subperm_add(subperm, item1_idx, item2_idx)
@@ -118,7 +118,7 @@ subroutine resplit_part_mna(assign_arrays, part_idx, read_link_idx, write_link_i
    integer, intent(in) :: part_idx, read_link_idx, write_link_idx
    type(subperm_t), intent(inout) :: subperm
    integer, dimension(MAX_CHILDREN) :: items1_trackers, items2_trackers
-   integer :: i, j, target_relative_idx, target_part_idx, item_value, target_idx, part_ref_idx, adj_atom
+   integer :: i, j, target_relative_idx, target_part_idx, item_vertidx, target_idx, part_ref_idx, adj_atom
    integer :: items1_offset, items1_count, items2_offset, items2_count
    integer :: num_children
 
@@ -137,12 +137,12 @@ subroutine resplit_part_mna(assign_arrays, part_idx, read_link_idx, write_link_i
 
    ! Process first molecule items with ULTRA-OPTIMIZED signature generation using direct 2D adjacency
    do i = 1, items1_count
-      item_value = assign_arrays%item1_values(items1_offset + i)
+      item_vertidx = assign_arrays%vertidcs1(items1_offset + i)
 
       ! ULTRA-OPTIMIZED: Generate compact signature using direct 2D adjacency access
       signature_length = 0
-      do j = 1, assign_arrays%adj_counts1(item_value)
-         adj_atom = assign_arrays%adj_lists1(item_value, j)
+      do j = 1, assign_arrays%adj_counts1(item_vertidx)
+         adj_atom = assign_arrays%adj_lists1(item_vertidx, j)
          part_ref_idx = assign_arrays%itemdir1_entries(read_link_idx, adj_atom)
          if (part_ref_idx /= 0) then
             signature_length = signature_length + 1
@@ -159,20 +159,20 @@ subroutine resplit_part_mna(assign_arrays, part_idx, read_link_idx, write_link_i
       ! Add item to target child using relative index directly
       items1_trackers(target_relative_idx) = items1_trackers(target_relative_idx) + 1
       target_idx = assign_arrays%partree(target_part_idx)%items1_offset + items1_trackers(target_relative_idx)
-      assign_arrays%item1_values(target_idx) = item_value
+      assign_arrays%vertidcs1(target_idx) = item_vertidx
 
       ! Update itemdir using 2D array - no offset calculation needed
-      assign_arrays%itemdir1_entries(write_link_idx, item_value) = target_part_idx
+      assign_arrays%itemdir1_entries(write_link_idx, item_vertidx) = target_part_idx
    end do
 
    ! Process second molecule items with ULTRA-OPTIMIZED signature generation using direct 2D adjacency
    do i = 1, items2_count
-      item_value = assign_arrays%item2_values(items2_offset + i)
+      item_vertidx = assign_arrays%vertidcs2(items2_offset + i)
 
       ! ULTRA-OPTIMIZED: Generate compact signature using direct 2D adjacency access
       signature_length = 0
-      do j = 1, assign_arrays%adj_counts2(item_value)
-         adj_atom = assign_arrays%adj_lists2(item_value, j)
+      do j = 1, assign_arrays%adj_counts2(item_vertidx)
+         adj_atom = assign_arrays%adj_lists2(item_vertidx, j)
          part_ref_idx = assign_arrays%itemdir2_entries(read_link_idx, adj_atom)
          if (part_ref_idx /= 0) then
             signature_length = signature_length + 1
@@ -189,10 +189,10 @@ subroutine resplit_part_mna(assign_arrays, part_idx, read_link_idx, write_link_i
       ! Add item to target child using relative index directly
       items2_trackers(target_relative_idx) = items2_trackers(target_relative_idx) + 1
       target_idx = assign_arrays%partree(target_part_idx)%items2_offset + items2_trackers(target_relative_idx)
-      assign_arrays%item2_values(target_idx) = item_value
+      assign_arrays%vertidcs2(target_idx) = item_vertidx
 
       ! Update itemdir using 2D array - no offset calculation needed
-      assign_arrays%itemdir2_entries(write_link_idx, item_value) = target_part_idx
+      assign_arrays%itemdir2_entries(write_link_idx, item_vertidx) = target_part_idx
    end do
 
    ! Collect assignment pairs from newly created leaf parts into subperm
@@ -224,7 +224,7 @@ subroutine distribute_part_items(assign_arrays, split_part_idx, child_branch_idx
    type(array_trees_t), intent(inout) :: assign_arrays
    integer, intent(in) :: split_part_idx, child_branch_idx, first_link_idx, chosen_item1_idx, chosen_item2_idx
    type(subperm_t), intent(inout) :: subperm
-   integer :: child_part1, child_part2, chosen_item1, chosen_item2, i, item_value, target_idx
+   integer :: child_part1, child_part2, chosen_item1, chosen_item2, i, item_vertidx, target_idx
    integer :: items1_offset, items1_count, items2_offset, items2_count
    integer :: link_idx, num_links, link_offset
 
@@ -241,12 +241,12 @@ subroutine distribute_part_items(assign_arrays, split_part_idx, child_branch_idx
    child_part2 = assign_arrays%partree(split_part_idx)%child_indices(2)
 
    ! Get chosen items based on provided indices
-   chosen_item1 = assign_arrays%item1_values(items1_offset + chosen_item1_idx)
-   chosen_item2 = assign_arrays%item2_values(items2_offset + chosen_item2_idx)
+   chosen_item1 = assign_arrays%vertidcs1(items1_offset + chosen_item1_idx)
+   chosen_item2 = assign_arrays%vertidcs2(items2_offset + chosen_item2_idx)
 
    ! Assign chosen items to first child (direct placement)
-   assign_arrays%item1_values(assign_arrays%partree(child_part1)%items1_offset + 1) = chosen_item1
-   assign_arrays%item2_values(assign_arrays%partree(child_part1)%items2_offset + 1) = chosen_item2
+   assign_arrays%vertidcs1(assign_arrays%partree(child_part1)%items1_offset + 1) = chosen_item1
+   assign_arrays%vertidcs2(assign_arrays%partree(child_part1)%items2_offset + 1) = chosen_item2
 
    ! Update itemdir using 2D arrays - no offset calculation needed
    assign_arrays%itemdir1_entries(first_link_idx, chosen_item1) = child_part1
@@ -256,10 +256,10 @@ subroutine distribute_part_items(assign_arrays, split_part_idx, child_branch_idx
    target_idx = assign_arrays%partree(child_part2)%items1_offset
    do i = 1, items1_count
       if (i /= chosen_item1_idx) then
-         item_value = assign_arrays%item1_values(items1_offset + i)
+         item_vertidx = assign_arrays%vertidcs1(items1_offset + i)
          target_idx = target_idx + 1
-         assign_arrays%item1_values(target_idx) = item_value
-         assign_arrays%itemdir1_entries(first_link_idx, item_value) = child_part2
+         assign_arrays%vertidcs1(target_idx) = item_vertidx
+         assign_arrays%itemdir1_entries(first_link_idx, item_vertidx) = child_part2
       end if
    end do
 
@@ -267,10 +267,10 @@ subroutine distribute_part_items(assign_arrays, split_part_idx, child_branch_idx
    target_idx = assign_arrays%partree(child_part2)%items2_offset
    do i = 1, items2_count
       if (i /= chosen_item2_idx) then
-         item_value = assign_arrays%item2_values(items2_offset + i)
+         item_vertidx = assign_arrays%vertidcs2(items2_offset + i)
          target_idx = target_idx + 1
-         assign_arrays%item2_values(target_idx) = item_value
-         assign_arrays%itemdir2_entries(first_link_idx, item_value) = child_part2
+         assign_arrays%vertidcs2(target_idx) = item_vertidx
+         assign_arrays%itemdir2_entries(first_link_idx, item_vertidx) = child_part2
       end if
    end do
 

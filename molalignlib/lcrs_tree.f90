@@ -44,7 +44,7 @@ public operator(.equiv.)
 
 ! Item node
 type, public :: item_node_t
-   integer :: value
+   integer :: vertidx
    integer :: global_index
    type(item_node_t), pointer :: next_item
 end type
@@ -57,8 +57,8 @@ type, public :: chain_node_t
    type(chain_node_t), pointer :: next_link
    type(partref_node_t), pointer :: first_partref
    type(partref_node_t), pointer :: last_partref
-   type(part_nodeptr_t), dimension(:), allocatable :: itemdir1
-   type(part_nodeptr_t), dimension(:), allocatable :: itemdir2
+   type(part_nodeptr_t), dimension(:), pointer :: itemdir1
+   type(part_nodeptr_t), dimension(:), pointer :: itemdir2
 end type
 
 ! Assignment tree node
@@ -98,7 +98,7 @@ type, public :: partree_node_t
    type(partree_node_t), pointer :: first_child_part
    type(partree_node_t), pointer :: last_child_part
    type(partree_node_t), pointer :: next_sibling_part
-   type(part_nodeptr_t), dimension(:), allocatable :: signature
+   type(part_nodeptr_t), dimension(:), pointer :: signature
 end type
 
 ! Part reference node
@@ -216,7 +216,7 @@ function new_bare_part() result(part)
    part%first_child_part => null()
    part%last_child_part => null()
    part%next_sibling_part => null()
-   part%signature = [part_nodeptr_t::]
+   allocate (part%signature(0))
 end function
 
 function new_root_part() result(part)
@@ -289,14 +289,14 @@ subroutine link_part(link, part)
    link%num_parts = link%num_parts + 1
 end subroutine
 
-subroutine add_new_item1(part, value)
+subroutine add_new_item1(part, vertidx)
 ! Add item to part without updating link itemdir (for temporary children)
    type(partree_node_t), target, intent(inout) :: part
-   integer, intent(in) :: value
+   integer, intent(in) :: vertidx
    type(item_node_t), pointer :: new_item
 
    allocate(new_item)
-   new_item%value = value
+   new_item%vertidx = vertidx
    new_item%next_item => null()
 
    ! Assign global index and increment counter
@@ -312,14 +312,14 @@ subroutine add_new_item1(part, value)
    part%num_items1 = part%num_items1 + 1
 end subroutine
 
-subroutine add_new_item2(part, value)
+subroutine add_new_item2(part, vertidx)
 ! Add item to part without updating link itemdir (for temporary children)
    type(partree_node_t), target, intent(inout) :: part
-   integer, intent(in) :: value
+   integer, intent(in) :: vertidx
    type(item_node_t), pointer :: new_item
 
    allocate(new_item)
-   new_item%value = value
+   new_item%vertidx = vertidx
    new_item%next_item => null()
 
    ! Assign global index and increment counter
@@ -342,13 +342,13 @@ subroutine copy_part_items(orig, dest)
 
    item => orig%first_item1
    do while (associated(item))
-      call add_new_item1(dest, item%value)
+      call add_new_item1(dest, item%vertidx)
       item => item%next_item
    end do
 
    item => orig%first_item2
    do while (associated(item))
-      call add_new_item2(dest, item%value)
+      call add_new_item2(dest, item%vertidx)
       item => item%next_item
    end do
 end subroutine
@@ -515,7 +515,7 @@ subroutine delete_part(part_node)
    call deallocate_items(part_node%first_item2)
 
    ! Deallocate signature array if allocated
-   if (allocated(part_node%signature)) then
+   if (associated(part_node%signature)) then
       deallocate(part_node%signature)
    end if
 
@@ -562,15 +562,15 @@ subroutine link_to_partition(link, partition)
 
       item => partref%part%first_item1
       do j = 1, partref%part%num_items1
-         partition%parts(i)%items1(j) = item%value
-         partition%itemdir1(item%value) = i
+         partition%parts(i)%items1(j) = item%vertidx
+         partition%itemdir1(item%vertidx) = i
          item => item%next_item
       end do
 
       item => partref%part%first_item2
       do j = 1, partref%part%num_items2
-         partition%parts(i)%items2(j) = item%value
-         partition%itemdir2(item%value) = i
+         partition%parts(i)%items2(j) = item%vertidx
+         partition%itemdir2(item%vertidx) = i
          item => item%next_item
       end do
 
@@ -585,7 +585,7 @@ subroutine print_part_items(part)
 
    item => part%first_item1
    do while (associated(item))
-      write(stderr, '(1X,I0)', advance='no') item%value
+      write(stderr, '(1X,I0)', advance='no') item%vertidx
       item => item%next_item
    end do
 
@@ -593,7 +593,7 @@ subroutine print_part_items(part)
 
    item => part%first_item2
    do while (associated(item))
-      write(stderr, '(1X,I0)', advance='no') item%value
+      write(stderr, '(1X,I0)', advance='no') item%vertidx
       item => item%next_item
    end do
 
@@ -970,14 +970,14 @@ subroutine update_itemdir(link, part)
    ! Register all items from molecule 1
    item => part%first_item1
    do while (associated(item))
-      link%itemdir1(item%value)%ptr => part
+      link%itemdir1(item%vertidx)%ptr => part
       item => item%next_item
    end do
 
    ! Register all items from molecule 2
    item => part%first_item2
    do while (associated(item))
-      link%itemdir2(item%value)%ptr => part
+      link%itemdir2(item%vertidx)%ptr => part
       item => item%next_item
    end do
 end subroutine
@@ -1230,13 +1230,13 @@ recursive subroutine print_part_indices_recurse(part)
       ! Print items in this part
       item => child_part%first_item1
       do while (associated(item))
-         write(stderr, '(A,I0,A,I0,A)') "  Item1 ", item%global_index, " (value: ", item%value, ")"
+         write(stderr, '(A,I0,A,I0,A)') "  Item1 ", item%global_index, " (vertidx: ", item%vertidx, ")"
          item => item%next_item
       end do
 
       item => child_part%first_item2
       do while (associated(item))
-         write(stderr, '(A,I0,A,I0,A)') "  Item2 ", item%global_index, " (value: ", item%value, ")"
+         write(stderr, '(A,I0,A,I0,A)') "  Item2 ", item%global_index, " (vertidx: ", item%vertidx, ")"
          item => item%next_item
       end do
 

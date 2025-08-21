@@ -10,9 +10,9 @@ public build_assignment_tree
 
 contains
 
-function would_part_split(atoms1, atoms2, itemdir1, itemdir2, part) result(would_split)
+function would_part_split(vertices1, vertices2, itemdir1, itemdir2, part) result(would_split)
 ! Check if a part would split by comparing signatures
-   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
+   type(vertex_t), dimension(:), intent(in) :: vertices1, vertices2
    type(part_nodeptr_t), dimension(:), intent(in) :: itemdir1, itemdir2
    type(partree_node_t), pointer, intent(inout) :: part
    ! Local variables
@@ -26,10 +26,10 @@ function would_part_split(atoms1, atoms2, itemdir1, itemdir2, part) result(would
 
    ! Set first signature from first available item
    if (associated(item1)) then
-      first_signature = itemdir1(atoms1(item1%value)%adjlist)
+      first_signature = itemdir1(vertices1(item1%vertidx)%adjlist)
       item1 => item1%next_item
    else if (associated(item2)) then
-      first_signature = itemdir2(atoms2(item2%value)%adjlist)
+      first_signature = itemdir2(vertices2(item2%vertidx)%adjlist)
       item2 => item2%next_item
    else
       return  ! No items to process
@@ -37,7 +37,7 @@ function would_part_split(atoms1, atoms2, itemdir1, itemdir2, part) result(would
 
    ! Check remaining items in first molecule
    do while (associated(item1))
-      signature = itemdir1(atoms1(item1%value)%adjlist)
+      signature = itemdir1(vertices1(item1%vertidx)%adjlist)
       if (.not. (signature .equiv. first_signature)) then
          would_split = .true.
          return
@@ -47,7 +47,7 @@ function would_part_split(atoms1, atoms2, itemdir1, itemdir2, part) result(would
 
    ! Check remaining items in second molecule
    do while (associated(item2))
-      signature = itemdir2(atoms2(item2%value)%adjlist)
+      signature = itemdir2(vertices2(item2%vertidx)%adjlist)
       if (.not. (signature .equiv. first_signature)) then
          would_split = .true.
          return
@@ -56,9 +56,9 @@ function would_part_split(atoms1, atoms2, itemdir1, itemdir2, part) result(would
    end do
 end function
 
-subroutine compute_mna_partition(atoms1, atoms2, mnachain, branch, branch_parts, num_splits)
+subroutine compute_mna_partition(vertices1, vertices2, mnachain, branch, branch_parts, num_splits)
 ! Compute next level MNA types - only keeps children if real split occurred
-   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
+   type(vertex_t), dimension(:), intent(in) :: vertices1, vertices2
    type(assigntree_node_t), pointer, intent(inout) :: mnachain
    type(assigntree_node_t), pointer, intent(inout) :: branch
    type(chain_node_t), pointer, intent(inout) :: branch_parts
@@ -83,7 +83,7 @@ subroutine compute_mna_partition(atoms1, atoms2, mnachain, branch, branch_parts,
    ! Single pass: check which parts would split and cache results
    partref => level_link%first_partref
    do i = 1, level_link%num_parts
-      will_split(i) = would_part_split(atoms1, atoms2, level_link%itemdir1, level_link%itemdir2, partref%part)
+      will_split(i) = would_part_split(vertices1, vertices2, level_link%itemdir1, level_link%itemdir2, partref%part)
       if (will_split(i)) any_splits = .true.
       partref => partref%nextref
    end do
@@ -98,7 +98,7 @@ subroutine compute_mna_partition(atoms1, atoms2, mnachain, branch, branch_parts,
       do i = 1, level_link%num_parts
          if (will_split(i)) then
             ! Create children based on signatures
-            call split_part_mna(atoms1, atoms2, level_link%itemdir1, level_link%itemdir2, partref%part, next_level_link)
+            call split_part_mna(vertices1, vertices2, level_link%itemdir1, level_link%itemdir2, partref%part, next_level_link)
             ! Link part to branch link
             call link_part(branch%last_link, partref%part)
             ! Add part children to branch part list
@@ -132,10 +132,10 @@ subroutine split_part_first(part, link)
    ! Create first child and add first item from each molecule
    child_part => new_child_part(part)
    call link_part(link, child_part)
-   call add_new_item1(child_part, part%first_item1%value)
-   call add_new_item2(child_part, part%first_item2%value)
-   link%itemdir1(part%first_item1%value)%ptr => child_part
-   link%itemdir2(part%first_item2%value)%ptr => child_part
+   call add_new_item1(child_part, part%first_item1%vertidx)
+   call add_new_item2(child_part, part%first_item2%vertidx)
+   link%itemdir1(part%first_item1%vertidx)%ptr => child_part
+   link%itemdir2(part%first_item2%vertidx)%ptr => child_part
 
    ! Create second child and add remaining items
    child_part => new_child_part(part)
@@ -143,18 +143,18 @@ subroutine split_part_first(part, link)
    item1 => part%first_item1%next_item
    item2 => part%first_item2%next_item
    do while (associated(item1))
-      call add_new_item1(child_part, item1%value)
-      call add_new_item2(child_part, item2%value)
-      link%itemdir1(item1%value)%ptr => child_part
-      link%itemdir2(item2%value)%ptr => child_part
+      call add_new_item1(child_part, item1%vertidx)
+      call add_new_item2(child_part, item2%vertidx)
+      link%itemdir1(item1%vertidx)%ptr => child_part
+      link%itemdir2(item2%vertidx)%ptr => child_part
       item1 => item1%next_item
       item2 => item2%next_item
    end do
 end subroutine
 
 ! Modified split_dependent_parts incorporating split_single_part functionality
-recursive subroutine split_dependent_parts(atoms1, atoms2, mnachain, branch, branch_parts, branching_part, part_to_split)
-   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
+recursive subroutine split_dependent_parts(vertices1, vertices2, mnachain, branch, branch_parts, branching_part, part_to_split)
+   type(vertex_t), dimension(:), intent(in) :: vertices1, vertices2
    type(assigntree_node_t), pointer, intent(inout) :: mnachain
    type(assigntree_node_t), pointer, intent(inout) :: branch
    type(chain_node_t), pointer, intent(inout) :: branch_parts
@@ -199,7 +199,7 @@ recursive subroutine split_dependent_parts(atoms1, atoms2, mnachain, branch, bra
    ! Compute self-consistent MNAs
    do
       ! Call compute_mna_partition and get the number of splits
-      call compute_mna_partition(atoms1, atoms2, mnachain, branch, branch_parts, num_splits)
+      call compute_mna_partition(vertices1, vertices2, mnachain, branch, branch_parts, num_splits)
 
       ! Exit loop if no splits occurred
       if (num_splits == 0) exit
@@ -220,13 +220,13 @@ recursive subroutine split_dependent_parts(atoms1, atoms2, mnachain, branch, bra
    ! Perform split if target found
    if (associated(next_part_to_split)) then
       ! Call itself again to split the next degenerate descendant part
-      call split_dependent_parts(atoms1, atoms2, mnachain, branch, branch_parts, branching_part, next_part_to_split)
+      call split_dependent_parts(vertices1, vertices2, mnachain, branch, branch_parts, branching_part, next_part_to_split)
    end if
 end subroutine
 
 ! Updated split_independent_parts to use the merged function signature
-recursive subroutine split_independent_parts(atoms1, atoms2, mnachain, branch, branch_parts)
-   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
+recursive subroutine split_independent_parts(vertices1, vertices2, mnachain, branch, branch_parts)
+   type(vertex_t), dimension(:), intent(in) :: vertices1, vertices2
    type(assigntree_node_t), pointer, intent(inout) :: mnachain, branch
    type(chain_node_t), pointer, intent(in) :: branch_parts
    ! Local variables
@@ -243,16 +243,16 @@ recursive subroutine split_independent_parts(atoms1, atoms2, mnachain, branch, b
          ! Create a new part registry for this branch part
          new_branch_parts => new_bare_link()
          ! Split the target part and continue splitting descendants until convergence
-         call split_dependent_parts(atoms1, atoms2, mnachain, new_branch, new_branch_parts, partref%part, partref%part)
+         call split_dependent_parts(vertices1, vertices2, mnachain, new_branch, new_branch_parts, partref%part, partref%part)
          ! Recursively process the resulting branch parts
-         call split_independent_parts(atoms1, atoms2, mnachain, new_branch, new_branch_parts)
+         call split_independent_parts(vertices1, vertices2, mnachain, new_branch, new_branch_parts)
       end if
       partref => partref%nextref
    end do
 end subroutine
 
-subroutine build_assignment_tree( atoms1, atoms2, mnalink, assign_arrays)
-   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
+subroutine build_assignment_tree( vertices1, vertices2, mnalink, assign_arrays)
+   type(vertex_t), dimension(:), intent(in) :: vertices1, vertices2
    type(chain_node_t), pointer, intent(in) :: mnalink
    type(array_trees_t), intent(out) :: assign_arrays
    ! Local variables
@@ -279,12 +279,12 @@ subroutine build_assignment_tree( atoms1, atoms2, mnalink, assign_arrays)
       partref => partref%nextref
    end do
 
-   call split_independent_parts( atoms1, atoms2, mnachain, assign_tree, branch_parts)
+   call split_independent_parts( vertices1, vertices2, mnachain, assign_tree, branch_parts)
 !block
 !   use assigntree_distribute_linked
-!   call distribute_items( atoms1, atoms2, assign_tree)
+!   call distribute_items( vertices1, vertices2, assign_tree)
 !end block
-   call convert_trees_to_arrays( atoms1, atoms2, part_tree, assign_tree, assign_arrays)
+   call convert_trees_to_arrays( vertices1, vertices2, part_tree, assign_tree, assign_arrays)
 !   call validate_conversion(part_tree, assign_tree, assign_arrays)
 end subroutine
 

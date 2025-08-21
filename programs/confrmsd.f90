@@ -46,6 +46,7 @@ logical :: heavy_flag, mass_flag, align_flag, remap_flag, naive_flag, write_flag
 type(strlist_type) :: posargs(2)
 type(atom_t), dimension(:), allocatable :: atoms1, atoms2
 type(bond_t), dimension(:), allocatable :: bonds1, bonds2
+type(vertex_t), dimension(:), allocatable :: vertices1, vertices2
 type(partition_t) :: atomtypes
 type(assigntree_node_t), pointer :: mnachain
 type(array_trees_t) :: assign_arrays
@@ -187,11 +188,11 @@ else
 end if
 
 if (rebond_flag) then
-   call set_adjacency_from_coords( atoms1)
-   call set_adjacency_from_coords( atoms2)
+   call get_graph_from_distances( atoms1, vertices1)
+   call get_graph_from_distances( atoms2, vertices2)
 else
-   call set_adjacency_from_bonds( atoms1, bonds1)
-   call set_adjacency_from_bonds( atoms2, bonds2)
+   call get_graph_from_bonds( atoms1, bonds1, vertices1)
+   call get_graph_from_bonds( atoms2, bonds2, vertices2)
 end if
 
 ! Get mol1 coordinates
@@ -217,8 +218,8 @@ if (align_flag) then
    if (remap_flag) then
 
       ! Pre-compute assignment tree
-      call compute_scna_partition( atoms1, atoms2, atomtypes, mnachain)
-      call build_assignment_tree( atoms1, atoms2, mnachain%last_link, assign_arrays)
+      call compute_scna_partition( vertices1, vertices2, atomtypes, mnachain)
+      call build_assignment_tree( vertices1, vertices2, mnachain%last_link, assign_arrays)
 
       if (tree_flag) then
          call print_chain_tree_array( assign_arrays)
@@ -307,8 +308,8 @@ else
    coords2w = get_weighted_coords( atoms2, weights2)
 
    if (remap_flag) then
-      call compute_scna_partition( atoms1, atoms2, atomtypes, mnachain)
-      call build_assignment_tree( atoms1, atoms2, mnachain%last_link, assign_arrays)
+      call compute_scna_partition( vertices1, vertices2, atomtypes, mnachain)
+      call build_assignment_tree( vertices1, vertices2, mnachain%last_link, assign_arrays)
       if (tree_flag) then
          call print_chain_tree_array( assign_arrays)
       end if
