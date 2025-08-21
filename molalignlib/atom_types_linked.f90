@@ -9,7 +9,7 @@ public collect_atomtypes_linked
 
 type :: atomtype_item_t
    integer :: elnum
-   integer :: typeidx
+   integer :: typeid
    type(partree_node_t), pointer :: part
 end type
 
@@ -27,7 +27,7 @@ subroutine add_atomtype(atomtypetable, atom, part)
 
    atomtypetable%num_items = atomtypetable%num_items + 1
    atomtypetable%items(atomtypetable%num_items)%elnum = atom%elnum
-   atomtypetable%items(atomtypetable%num_items)%typeidx = atom%typeidx
+   atomtypetable%items(atomtypetable%num_items)%typeid = atom%typeid
    atomtypetable%items(atomtypetable%num_items)%part => part
 end subroutine
 
@@ -39,7 +39,7 @@ function find_atomtype(atomtypetable, atom) result(part)
 
    do i = 1, atomtypetable%num_items
       if (atomtypetable%items(i)%elnum == atom%elnum .and. &
-          atomtypetable%items(i)%typeidx == atom%typeidx) then
+          atomtypetable%items(i)%typeid == atom%typeid) then
          part => atomtypetable%items(i)%part
          return
       end if

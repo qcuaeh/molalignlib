@@ -102,7 +102,7 @@ do while (get_arg(arg))
       call read_optarg( arg, max_trials)
    case ('-N')
       call read_optarg( arg, max_records)
-   case ('-O')
+   case ('-out')
       write_flag = .true.
       call read_optarg( arg, pathout)
    case ('-pipe')

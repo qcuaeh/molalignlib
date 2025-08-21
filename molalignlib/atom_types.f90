@@ -11,7 +11,7 @@ public collect_atomtypes
 
 type :: atomtype_item_t
    integer :: elnum
-   integer :: typeidx
+   integer :: typeid
    integer :: partidx
 end type
 
@@ -29,7 +29,7 @@ subroutine add_atomtype(atomtypetable, atom, partidx)
 
    atomtypetable%num_items = atomtypetable%num_items + 1
    atomtypetable%items(atomtypetable%num_items)%elnum = atom%elnum
-   atomtypetable%items(atomtypetable%num_items)%typeidx = atom%typeidx
+   atomtypetable%items(atomtypetable%num_items)%typeid = atom%typeid
    atomtypetable%items(atomtypetable%num_items)%partidx = partidx
 end subroutine
 
@@ -41,7 +41,7 @@ function find_atomtype(atomtypetable, atom) result(partidx)
 
    do i = 1, atomtypetable%num_items
       if (atomtypetable%items(i)%elnum == atom%elnum .and. &
-          atomtypetable%items(i)%typeidx == atom%typeidx) then
+          atomtypetable%items(i)%typeid == atom%typeid) then
          partidx = atomtypetable%items(i)%partidx
          return
       end if

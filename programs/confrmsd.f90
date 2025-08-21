@@ -41,7 +41,8 @@ implicit none
 character(:), allocatable :: title1, title2
 character(:), allocatable :: arg, pathout, dummy
 character(:), allocatable :: extin1, extin2, extout, extpipe
-logical :: heavy_flag, mass_flag, bond_flag, align_flag, remap_flag, serial_flag, write_flag, pipe_flag, stats_flag, tree_flag
+logical :: heavy_flag, mass_flag, align_flag, remap_flag, naive_flag, write_flag, &
+   pipe_flag, stats_flag, tree_flag, rebond_flag, mapping_flag
 type(strlist_type) :: posargs(2)
 type(atom_t), dimension(:), allocatable :: atoms1, atoms2
 type(bond_t), dimension(:), allocatable :: bonds1, bonds2
@@ -55,11 +56,10 @@ real(rk), dimension(:), allocatable :: weights1, weights2
 real(rk), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, coords2r
 integer :: unitin1, unitin2, unitout
 type(subperm_t) :: atomperm
-integer :: i
+integer :: i, j
 
 ! Set default options
 
-serial_flag = .false.
 test_flag = .false.
 stats_flag = .false.
 heavy_flag = .false.
@@ -69,8 +69,10 @@ remap_flag = .false.
 write_flag = .false.
 pipe_flag = .false.
 tree_flag = .false.
-bond_flag = .false.
 mass_flag = .false.
+naive_flag = .false.
+rebond_flag = .false.
+mapping_flag = .false.
 
 max_records = 1
 max_count = 10
@@ -82,14 +84,14 @@ call init_args()
 
 do while (get_arg(arg))
    select case (lowercase(arg))
-   case ('-bond')
-      bond_flag = .true.
    case ('-align')
       align_flag = .true.
    case ('-remap')
       remap_flag = .true.
-   case ('-serial')
-      serial_flag = .true.
+   case ('-mapping')
+      mapping_flag = .true.
+   case ('-naive')
+      naive_flag = .true.
    case ('-heavy')
       heavy_flag = .true.
    case ('-mass')
@@ -102,7 +104,7 @@ do while (get_arg(arg))
       call read_optarg( arg, max_trials)
    case ('-n')
       call read_optarg( arg, max_records)
-   case ('-o')
+   case ('-aligned')
       write_flag = .true.
       call read_optarg( arg, pathout)
    case ('-pipe')
@@ -115,6 +117,8 @@ do while (get_arg(arg))
       stats_flag = .true.
    case ('-test')
       test_flag = .true.
+   case ('-rebond')
+      rebond_flag = .true.
    case default
       call read_posarg( arg, posargs)
    end select
@@ -182,7 +186,7 @@ else
    weights2 = uniform_weights( 1._rk, size(atoms2))
 end if
 
-if (bond_flag) then
+if (rebond_flag) then
    call set_adjacency_from_coords( atoms1)
    call set_adjacency_from_coords( atoms2)
 else
@@ -220,13 +224,20 @@ if (align_flag) then
          call print_chain_tree_array( assign_arrays)
       end if
 
-      if (serial_flag) then
+      if (naive_flag) then
 
          call distribute_items_serial( coords1w, coords2w, assign_arrays, atomperm)
          rotquat = least_rotquat( atomperm, coords1w, coords2w)
          coords2r = rotated_coords( coords2, rotquat, center1)
          rmsd = sqrt( mean_sqdist( atomperm, weights1, coords1, coords2r))
+
          write (stdout,'(A)') str( rmsd)
+
+         if (mapping_flag) then
+            do j = 1, atomperm%count
+               write (stdout,'(I0," -> ",I0)') atomperm%subset(j), atomperm%permut(j)
+            end do
+         end if
 
          if (write_flag) then
             title2 = 'RMSD=' // str( rmsd)
@@ -253,6 +264,12 @@ if (align_flag) then
             rmsd = sqrt( mean_sqdist( atomperm, weights1, coords1, coords2r))
 
             write (stdout,'(A)') str( rmsd)
+
+            if (mapping_flag) then
+               do j = 1, atomperm%count
+                  write (stdout,'(I0," -> ",I0)') atomperm%subset(j), atomperm%permut(j)
+               end do
+            end if
 
             if (write_flag) then
                title2 = 'RMSD=' // str( rmsd)

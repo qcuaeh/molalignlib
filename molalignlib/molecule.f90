@@ -20,16 +20,16 @@ public print_bonds
 type, public :: atom_t
    logical :: mask
    integer :: elnum
-   integer :: typeidx
+   integer :: typeid
    real(rk) :: coords(3)
    integer, pointer :: adjlist(:)
    integer :: adjlist_allocation(MAX_COORD)
 end type
 
 type, public :: bond_t
+   integer :: typeid
    integer :: atomidx1
    integer :: atomidx2
-   integer :: typeidx
 end type
 
 interface get_weighted_coords
@@ -69,19 +69,19 @@ subroutine set_adjacency_from_bonds(atoms, bonds)
    type(bond_t), dimension(:), intent(in), optional :: bonds
    ! Local variables
    integer, allocatable ::  nadjs(:)
-   integer :: i, i1, i2
+   integer :: i, idx1, idx2
 
    allocate (nadjs(size(atoms)))
 
    nadjs = 0
    do i = 1, size(bonds)
-      i1 = bonds(i)%atomidx1
-      i2 = bonds(i)%atomidx2
-      if (atoms(i1)%mask .and. atoms(i2)%mask) then
-         nadjs(i1) = nadjs(i1) + 1
-         nadjs(i2) = nadjs(i2) + 1
-         atoms(i1)%adjlist_allocation(nadjs(i1)) = i2
-         atoms(i2)%adjlist_allocation(nadjs(i2)) = i1
+      idx1 = bonds(i)%atomidx1
+      idx2 = bonds(i)%atomidx2
+      if (atoms(idx1)%mask .and. atoms(idx2)%mask) then
+         nadjs(idx1) = nadjs(idx1) + 1
+         nadjs(idx2) = nadjs(idx2) + 1
+         atoms(idx1)%adjlist_allocation(nadjs(idx1)) = idx2
+         atoms(idx2)%adjlist_allocation(nadjs(idx2)) = idx1
       end if
    end do
 
@@ -332,7 +332,7 @@ subroutine print_atoms(atoms)
       atom = atoms(i)
       fmtstr = '(I3,3X,A2,1X,I3,3(1X,f8.4),2X,"["' // &
             repeat(',1X,I0', size(atom%adjlist)) // ',1X,"]")'
-      write (stderr, fmtstr) i, element_symbols(atom%elnum), atom%typeidx, &
+      write (stderr, fmtstr) i, element_symbols(atom%elnum), atom%typeid, &
             atom%coords, atom%adjlist
    end do
 end subroutine

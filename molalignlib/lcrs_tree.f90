@@ -143,28 +143,32 @@ elemental function part_nodeptr_equality(left, right) result(equality)
    equality = associated(left%ptr, right%ptr)
 end function
 
-function signature_equivalence(array1, array2) result(equiv)
-   type(part_nodeptr_t), dimension(:), intent(in) :: array1, array2
+function signature_equivalence(signature1, signature2) result(equiv)
+   type(part_nodeptr_t), dimension(:), intent(in) :: signature1, signature2
    logical :: equiv
    integer :: matches1, matches2
    integer :: i, j
 
-   if (size(array1) /= size(array2)) then
+   if (size(signature1) /= size(signature2)) then
       equiv = .false.
       return
    end if
 
-   do i = 1, size(array1)
-       matches1 = 0
-       matches2 = 0
-       do j = 1, size(array1)
-           if (associated(array1(i)%ptr, array2(j)%ptr)) matches1 = matches1 + 1
-           if (associated(array1(i)%ptr, array1(j)%ptr)) matches2 = matches2 + 1
-       end do
-       if (matches1 /= matches2) then
-           equiv = .false.
-           return
-       end if
+   do i = 1, size(signature1)
+      matches1 = 0
+      matches2 = 0
+      do j = 1, size(signature1)
+         if (associated(signature1(i)%ptr, signature2(j)%ptr)) then
+            matches1 = matches1 + 1
+         end if
+         if (associated(signature1(i)%ptr, signature1(j)%ptr)) then
+            matches2 = matches2 + 1
+         end if
+      end do
+      if (matches1 /= matches2) then
+         equiv = .false.
+         return
+      end if
    end do
 
    equiv = .true.

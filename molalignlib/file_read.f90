@@ -64,7 +64,7 @@ subroutine readfile_xyz(unit, title, atoms, bonds)
    ! Local variables
    character(ll) :: buffer
    character(wl) :: elsym
-   integer :: i, num_atoms, elnum, typeidx, stat
+   integer :: i, num_atoms, elnum, typeid, stat
    real(rk) :: coords(3)
 
    ! Read number of atoms
@@ -92,9 +92,9 @@ subroutine readfile_xyz(unit, title, atoms, bonds)
          stop
       end if
 
-      call split_symbol(elsym, elnum, typeidx)
+      call split_symbol(elsym, elnum, typeid)
       atoms(i)%elnum = elnum
-      atoms(i)%typeidx = typeidx
+      atoms(i)%typeid = typeid
       atoms(i)%coords = coords
    end do
 end subroutine
@@ -108,7 +108,7 @@ subroutine readfile_mol_sdf(unit, title, atoms, bonds)
    real(rk) :: coords(3)
    character(3) :: elsym
    character(ll) :: buffer
-   integer :: elnum, atomidx1, atomidx2, typeidx
+   integer :: elnum, atomidx1, atomidx2, typeid
    integer :: num_atoms, num_bonds, stat, i
    logical :: end_of_molecule
 
@@ -175,9 +175,9 @@ subroutine readfile_mol_sdf(unit, title, atoms, bonds)
       end if
 
       elsym = adjustl(buffer(32:34))
-      call split_symbol(elsym, elnum, typeidx)
+      call split_symbol(elsym, elnum, typeid)
       atoms(i)%elnum = elnum
-      atoms(i)%typeidx = typeidx
+      atoms(i)%typeid = typeid
       atoms(i)%coords = coords
    end do
 
@@ -199,7 +199,7 @@ subroutine readfile_mol_sdf(unit, title, atoms, bonds)
          write (stderr, '(A)') 'Invalid MOL/SDF file'
          stop
       end if
-      read (buffer(7:9), '(I3)', iostat=stat) typeidx
+      read (buffer(7:9), '(I3)', iostat=stat) typeid
       if (stat /= 0) then
          write (stderr, '(A)') 'Invalid MOL/SDF file'
          stop
@@ -207,7 +207,7 @@ subroutine readfile_mol_sdf(unit, title, atoms, bonds)
 
       bonds(i)%atomidx1 = atomidx1
       bonds(i)%atomidx2 = atomidx2
-      bonds(i)%typeidx = typeidx
+      bonds(i)%typeid = typeid
    end do
 
    ! Handle potential SDF property data
@@ -237,7 +237,7 @@ subroutine readfile_mol2(unit, title, atoms, bonds)
    ! Local variables
    real(rk) :: coords(3)
    character(wl) :: elsym, dummy, typestr
-   integer :: num_atoms, num_bonds, elnum, typeidx, stat
+   integer :: num_atoms, num_bonds, elnum, typeid, stat
    character(ll) :: buffer
    integer :: i, atomidx1, atomidx2
 
@@ -287,9 +287,9 @@ subroutine readfile_mol2(unit, title, atoms, bonds)
          stop
       end if
 
-      call split_symbol(elsym, elnum, typeidx)
+      call split_symbol(elsym, elnum, typeid)
       atoms(i)%elnum = elnum
-      atoms(i)%typeidx = typeidx
+      atoms(i)%typeid = typeid
       atoms(i)%coords = coords
       ! typestr is now available in local variable for future use
    end do
@@ -318,7 +318,7 @@ subroutine readfile_mol2(unit, title, atoms, bonds)
 
          bonds(i)%atomidx1 = atomidx1
          bonds(i)%atomidx2 = atomidx2
-!         bonds(i)%typeidx = type_index(typestr)
+!         bonds(i)%typeid = type_index(typestr)
       end do
    end if
 end subroutine
