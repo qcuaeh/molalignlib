@@ -36,8 +36,8 @@ function default_atomperm(atoms1, atoms2) result(subperm)
             subperm%subset(n) = i
             subperm%permut(n) = i
          else
-            write (stderr, '(A)') "Included atoms don't match"
-            stop
+            write (stderr, '(A)') "Error: Aligning atoms don't match"
+            stop 1
          end if
       end if
    end do

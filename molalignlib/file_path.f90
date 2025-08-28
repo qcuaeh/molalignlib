@@ -31,8 +31,8 @@ subroutine split_path(filepath, dirname, filename, extension)
       dirname = filepath(:pos-1)
       basename = filepath(pos+1:)
       if (len(basename) == 0) then
-         write (stderr, '(A,1X,A)') 'File name is missing'
-         stop
+         write (stderr, '(A,1X,A)') 'Error: File name is missing'
+         stop 1
       end if
    else
       dirname = '.'
@@ -43,12 +43,12 @@ subroutine split_path(filepath, dirname, filename, extension)
       filename = basename(:pos-1)
       extension = basename(pos+1:)
       if (len(filename) == 0 .or. len(extension) == 0) then
-         write (stderr, '(A,1X,A)') 'Invalid file name', basename
-         stop
+         write (stderr, '(A,1X,A)') 'Error: Invalid file name', basename
+         stop 1
       end if
    else
-      write (stderr, '(A,1X,A)') 'File extension is missing', basename
-      stop
+      write (stderr, '(A,1X,A)') 'Error: File extension is missing', basename
+      stop 1
    end if
 end subroutine
 

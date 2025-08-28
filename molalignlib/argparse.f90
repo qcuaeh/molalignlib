@@ -40,10 +40,8 @@ end interface
 contains
 
 subroutine init_args()
-
    iarg = 0
    ipos = 0
-
 end subroutine
 
 subroutine read_posarg(arg, posargs)
@@ -51,19 +49,18 @@ subroutine read_posarg(arg, posargs)
    type(strlist_type), dimension(:), intent(inout) :: posargs
 
    if (arg(1:1) == '-') then
-      write (stderr, '(a,1x,a)') 'Unknown option:', arg
-      stop
+      write (stderr, '(a,1x,a)') 'Error: Unknown option:', arg
+      stop 1
    end if
 
    ipos = ipos + 1
 
    if (ipos > size(posargs)) then
-      write (stderr, '(a)') 'Too many arguments'
-      stop
+      write (stderr, '(a)') 'Error: Too many arguments'
+      stop 1
    end if
 
    posargs(ipos)%arg = arg
-
 end subroutine
 
 logical function get_arg(arg) result(success)
@@ -80,7 +77,6 @@ logical function get_arg(arg) result(success)
    else
       success = .false.
    end if
-
 end function
 
 subroutine get_optarg(option, optarg)
@@ -91,18 +87,17 @@ subroutine get_optarg(option, optarg)
    iarg = iarg + 1
 
    if (iarg > command_argument_count()) then
-      write (stderr, '(a,1x,a,1x,a)') 'Option', option, 'requires an argument'
-      stop
+      write (stderr, '(a,1x,a,1x,a)') 'Error: Option', option, 'requires an argument'
+      stop 1
    else
       call get_command_argument(iarg, length=arglen)
       allocate (character(arglen) :: optarg)
       call get_command_argument(iarg, optarg)
       if (optarg(1:1) == '-') then
-         write (stderr, '(a,1x,a,1x,a)') 'Option', option, 'requires an argument'
-         stop
+         write (stderr, '(a,1x,a,1x,a)') 'Error: Option', option, 'requires an argument'
+         stop 1
       end if
    end if
-
 end subroutine
 
 subroutine char_read_optarg(option, optarg)
@@ -110,7 +105,6 @@ subroutine char_read_optarg(option, optarg)
    character(:), allocatable, intent(out) :: optarg
 
    call get_optarg(option, optarg)
-
 end subroutine
 
 subroutine int_read_optarg(option, optarg)
@@ -122,10 +116,9 @@ subroutine int_read_optarg(option, optarg)
    call get_optarg(option, chararg)
    read (chararg, *, iostat=stat) optarg
    if (stat /= 0) then
-      write (stderr, '(a,1x,a,1x,a)') 'Option', option, 'requires an integer argument'
-      stop
+      write (stderr, '(a,1x,a,1x,a)') 'Error: Option', option, 'requires an integer argument'
+      stop 1
    end if
-
 end subroutine
 
 subroutine real_read_optarg(option, optarg)
@@ -137,10 +130,9 @@ subroutine real_read_optarg(option, optarg)
    call get_optarg(option, chararg)
    read (chararg, *, iostat=stat) optarg
    if (stat /= 0) then
-      write (stderr, '(a,1x,a,1x,a)') 'Option', option, 'requires a numeric argument'
-      stop
+      write (stderr, '(a,1x,a,1x,a)') 'Error: Option', option, 'requires a numeric argument'
+      stop 1
    end if
-
 end subroutine
 
 end module

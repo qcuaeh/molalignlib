@@ -31,8 +31,8 @@ subroutine open2write(filepath, unit)
 
    open(newunit=unit, file=filepath, action='write', status='replace', iostat=stat)
    if (stat /= 0) then
-      write (stderr, '(A,1X,A,1X,A)') 'Error opening', filepath, 'for writing'
-      stop
+      write (stderr, '(A,1X,A,1X,A)') "Error: Can't open", filepath, 'for writing'
+      stop 1
    end if
 end subroutine
 
@@ -52,8 +52,8 @@ subroutine writefile(unit, extout, title, atoms, bonds, atomperm)
    case ('mol','sdf')
       call writefile_sdf(unit, title, atoms, bonds, atomperm)
    case default
-      write (stderr, '(A,1X,A)') 'Unsupported format:', extout
-      stop
+      write (stderr, '(A,A,A)') 'Error: File format "', extout, '" is not supported'
+      stop 1
    end select
 
    flush(stderr)

@@ -264,7 +264,7 @@ subroutine solve_lap_pruned(n, s1, s2, p, q, prun, perm, dist)
          j = first(i)
 30       if (j > sz) then
             write (stderr, '(a)') 'Error: Assignment failed'
-            stop
+            stop 1
          end if
          if (kk(j) /= perm(i)) then
             j = j + 1
@@ -275,8 +275,7 @@ subroutine solve_lap_pruned(n, s1, s2, p, q, prun, perm, dist)
    end if
 
    if (.not. is_permutation(perm)) then
-      write (stderr, '(a)') 'Assignment is not a permutation'
-      stop
+      error stop 'Assignment is not a permutation'
    end if
 
    dist = real(h, rk) / scale
@@ -468,7 +467,7 @@ subroutine solve_lap_nearest(n, s1, s2, p, q, perm, dist)
          j = first(i)
 30       if (j > sz) then
             write (stderr, '(a)') 'Error: Assignment failed'
-            stop
+            stop 1
          end if
          if (kk(j) /= perm(i)) then
             j = j + 1

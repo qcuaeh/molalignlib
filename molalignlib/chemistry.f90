@@ -108,8 +108,8 @@ subroutine split_symbol( elsym, elnum, label)
       read (elsym(m:n), *) label
       elnum = atomic_number(elsym(1:m-1))
    else
-      write (stderr, '(a,1x,a)') 'Invalid atomic elsym/label:', elsym
-      stop
+      write (stderr, '(a,1x,a)') 'Error: Invalid atomic elsym/label:', elsym
+      stop 1
    end if
 end subroutine
 

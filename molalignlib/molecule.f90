@@ -127,8 +127,8 @@ subroutine get_graph_from_distances(atoms, graph)
                   nadjs(i) = nadjs(i) + 1
                   nadjs(j) = nadjs(j) + 1
                   if (nadjs(i) > MAX_COORD .or. nadjs(j) > MAX_COORD) then
-                     write (stderr, '("Maximum coordination number exceeded!")')
-                     stop
+                     write (stderr, '(A)') 'Error: Maximum coordination number exceeded'
+                     stop 1
                   end if
                   adjlist(nadjs(i), i) = j
                   adjlist(nadjs(j), j) = i

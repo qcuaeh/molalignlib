@@ -136,10 +136,10 @@ else
    select case (ipos)
    case (0)
       write (stderr, '(A)') 'Error: Missing file paths'
-      stop
+      stop 1
    case (1)
       write (stderr, '(A)') 'Error: Too few file paths'
-      stop
+      stop 1
    case (2)
       call split_path( posargs(1)%arg, dummy, dummy, extin1)
       call split_path( posargs(2)%arg, dummy, dummy, extin2)
@@ -147,7 +147,7 @@ else
       call open2read( posargs(2)%arg, unitin2)
    case default
       write (stderr, '(A)') 'Error: Too many file paths'
-      stop
+      stop 1
    end select
    if (write_flag) then
       call split_path( pathout, dummy, dummy, extout)
@@ -175,7 +175,7 @@ call collect_atomtypes( atoms1, atoms2, atomtypes)
 ! Abort if there are conflicting atomic types
 if (any(atomtypes%parts%num_items1 /= atomtypes%parts%num_items2)) then
    write (stderr, '(A)') 'Error: These molecules are not isomers'
-   stop
+   stop 1
 end if
 
 ! Get user defined atom weights
