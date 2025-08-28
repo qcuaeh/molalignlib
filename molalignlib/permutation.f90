@@ -20,7 +20,7 @@ implicit none
 
 ! Derived type to store permutation subsets
 type :: subperm_t
-   integer :: perm_size  ! total permutation size 
+   integer :: perm_size  ! total permutation size
    integer :: count  ! partial permutation count
    integer, allocatable :: subset(:)  ! indices of assigned entries in permutation
    integer, allocatable :: permut(:)  ! permut(i) = j means atom i -> atom j
@@ -129,18 +129,17 @@ subroutine subperm_add(subperm, i1, i2)
    ! Local variables
    integer :: n
 
-block
-   ! Check for merge conflicts
-   integer :: i
-   do i = 1, subperm%count
-      if (subperm%subset(i) == i1) then
-         error stop "Merge conflict in subset"
-      end if
-      if (subperm%permut(i) == i2) then
-         error stop "Merge conflict in permut"
-      end if
-   end do
-end block
+   if (DEBUGGING) then
+   block
+      ! Check for conflicts
+      integer :: i
+      do i = 1, subperm%count
+         if (subperm%subset(i) == i1 .or. subperm%permut(i) == i2) then
+            error stop "subperm index conflict"
+         end if
+      end do
+   end block
+   end if
 
    n = subperm%count + 1
    subperm%subset(n) = i1
@@ -190,23 +189,23 @@ subroutine check_subperm(subperm)
    logical :: permut_seen(subperm%perm_size)
    logical :: has_errors
    integer :: i, src_idx, tgt_idx
-   
+
    has_errors = .false.
    subset_seen = .false.
    permut_seen = .false.
-   
+
    ! Check if count is within valid bounds
    if (subperm%count < 0 .or. subperm%count > subperm%perm_size) then
       write(stderr, '(A,I0,A,I0,A)') 'Count ', subperm%count, &
          ' is out of range [0,', subperm%perm_size, ']'
       has_errors = .true.
    end if
-   
+
    ! Check each pair in the partial permutation
    do i = 1, subperm%count
       src_idx = subperm%subset(i)
       tgt_idx = subperm%permut(i)
-      
+
       ! Check if source index is out of bounds
       if (src_idx < 1 .or. src_idx > subperm%perm_size) then
          write(stderr, '(A,I0,A,I0,A,I0,A)') 'Source index ', src_idx, &
@@ -222,7 +221,7 @@ subroutine check_subperm(subperm)
             subset_seen(src_idx) = .true.
          end if
       end if
-      
+
       ! Check if target index is out of bounds
       if (tgt_idx < 1 .or. tgt_idx > subperm%perm_size) then
          write(stderr, '(A,I0,A,I0,A,I0,A)') 'Target index ', tgt_idx, &
@@ -239,7 +238,7 @@ subroutine check_subperm(subperm)
          end if
       end if
    end do
-   
+
    if (has_errors) then
       error stop 'Sub-permutation is not valid'
    else

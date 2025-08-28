@@ -51,52 +51,50 @@ function find_atomtype(atomtypetable, atom) result(partidx)
 end function
 
 subroutine collect_atomtypes(atoms1, atoms2, atomtypes)
-! Partition atoms by atomic number and label using arrays directly
+! Single-pass approach using reverse mapping - no large 2D arrays needed
    type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
    type(partition_t), intent(out) :: atomtypes
+
    ! Local variables
    type(atomtype_table_t) :: atomtypetable
    integer :: i, num_atoms1, num_atoms2
    integer :: partidx, current_part
    integer :: max_parts
-   ! Temporary arrays for building partitions
-   integer, dimension(:), allocatable :: part_num_items1, part_num_items2
-   integer, dimension(:,:), allocatable :: part_items1, part_items2
+   ! Small temporary arrays - only O(max_parts) size
+   integer, dimension(:), allocatable :: part_count1, part_count2
+   integer, dimension(:), allocatable :: part_fill1, part_fill2
+   ! Item directories - O(num_atoms) size, unavoidable
    integer, dimension(:), allocatable :: itemdir1_temp, itemdir2_temp
 
    num_atoms1 = size(atoms1)
    num_atoms2 = size(atoms2)
    max_parts = num_atoms1 + num_atoms2  ! Maximum possible partitions
 
-   ! Allocate temporary arrays
+   ! Allocate temporary storage
+   allocate(part_count1(max_parts))
+   allocate(part_count2(max_parts))
    allocate(atomtypetable%items(max_parts))
-   allocate(part_num_items1(max_parts))
-   allocate(part_num_items2(max_parts))
-   allocate(part_items1(num_atoms1, max_parts))
-   allocate(part_items2(num_atoms2, max_parts))
    allocate(itemdir1_temp(num_atoms1))
    allocate(itemdir2_temp(num_atoms2))
 
    ! Initialize
+   part_count1 = 0
+   part_count2 = 0
    atomtypetable%num_items = 0
-   part_num_items1 = 0
-   part_num_items2 = 0
    current_part = 0
 
+   ! SINGLE PASS: Process all atoms, build assignments AND count sizes
    ! First molecule
    do i = 1, num_atoms1
       if (atoms1(i)%mask) then
          partidx = find_atomtype(atomtypetable, atoms1(i))
          if (partidx == 0) then
-            ! Create new partition
             current_part = current_part + 1
             call add_atomtype(atomtypetable, atoms1(i), current_part)
             partidx = current_part
          end if
-         ! Add item to partition
-         part_num_items1(partidx) = part_num_items1(partidx) + 1
-         part_items1(part_num_items1(partidx), partidx) = i
          itemdir1_temp(i) = partidx
+         part_count1(partidx) = part_count1(partidx) + 1
       end if
    end do
 
@@ -105,19 +103,16 @@ subroutine collect_atomtypes(atoms1, atoms2, atomtypes)
       if (atoms2(i)%mask) then
          partidx = find_atomtype(atomtypetable, atoms2(i))
          if (partidx == 0) then
-            ! Create new partition
             current_part = current_part + 1
             call add_atomtype(atomtypetable, atoms2(i), current_part)
             partidx = current_part
          end if
-         ! Add item to partition
-         part_num_items2(partidx) = part_num_items2(partidx) + 1
-         part_items2(part_num_items2(partidx), partidx) = i
          itemdir2_temp(i) = partidx
+         part_count2(partidx) = part_count2(partidx) + 1
       end if
    end do
 
-   ! Now build the final partition_t structure
+   ! Now allocate final structure with exact sizes (no waste!)
    atomtypes%num_parts = current_part
    allocate(atomtypes%parts(atomtypes%num_parts))
    allocate(atomtypes%itemdir1(num_atoms1))
@@ -127,31 +122,46 @@ subroutine collect_atomtypes(atoms1, atoms2, atomtypes)
    atomtypes%itemdir1 = itemdir1_temp
    atomtypes%itemdir2 = itemdir2_temp
 
-   ! Build each partition
+   ! Allocate each partition with exact size
    do i = 1, atomtypes%num_parts
-      ! Set sizes
-      atomtypes%parts(i)%num_items1 = part_num_items1(i)
-      atomtypes%parts(i)%num_items2 = part_num_items2(i)
+      atomtypes%parts(i)%num_items1 = part_count1(i)
+      atomtypes%parts(i)%num_items2 = part_count2(i)
       atomtypes%parts(i)%num_children = 0
 
-      ! Allocate and copy items
-      allocate(atomtypes%parts(i)%items1(part_num_items1(i)))
-      allocate(atomtypes%parts(i)%items2(part_num_items2(i)))
-      atomtypes%parts(i)%items1 = part_items1(1:part_num_items1(i), i)
-      atomtypes%parts(i)%items2 = part_items2(1:part_num_items2(i), i)
-
-      ! Allocate empty arrays for neighbors and children
+      allocate(atomtypes%parts(i)%items1(part_count1(i)))
+      allocate(atomtypes%parts(i)%items2(part_count2(i)))
       allocate(atomtypes%parts(i)%signature(0))
       allocate(atomtypes%parts(i)%children(0))
    end do
 
-   ! Clean up temporary arrays
-   deallocate(part_num_items1)
-   deallocate(part_num_items2)
-   deallocate(part_items1)
-   deallocate(part_items2)
-   deallocate(itemdir1_temp)
-   deallocate(itemdir2_temp)
+   ! FAST FILL: Use assignments to populate final arrays efficiently
+   allocate(part_fill1(current_part))
+   allocate(part_fill2(current_part))
+   part_fill1 = 0  ! Current fill position for each partition
+   part_fill2 = 0
+
+   ! Fill first molecule using reverse mapping
+   do i = 1, num_atoms1
+      if (atoms1(i)%mask) then
+         partidx = itemdir1_temp(i)
+         part_fill1(partidx) = part_fill1(partidx) + 1
+         atomtypes%parts(partidx)%items1(part_fill1(partidx)) = i
+      end if
+   end do
+
+   ! Fill second molecule using reverse mapping
+   do i = 1, num_atoms2
+      if (atoms2(i)%mask) then
+         partidx = itemdir2_temp(i)
+         part_fill2(partidx) = part_fill2(partidx) + 1
+         atomtypes%parts(partidx)%items2(part_fill2(partidx)) = i
+      end if
+   end do
+
+   ! Clean up small temporary arrays
+   deallocate(part_count1, part_count2)
+   deallocate(itemdir1_temp, itemdir2_temp)
+   deallocate(part_fill1, part_fill2)
 end subroutine
 
 end module

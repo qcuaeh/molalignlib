@@ -62,7 +62,6 @@ function signature_equivalence_array(assign_arrays, part_idx) result(equiv)
 end function
 
 function find_child_part_array(assign_arrays, parent_idx) result(child_relative_idx)
-   ! OPTIMIZED: Assumes exactly 2 children - if signature doesn't match first, it must match second
    type(array_trees_t), intent(in) :: assign_arrays
    integer, intent(in) :: parent_idx
    integer :: child_relative_idx
@@ -71,7 +70,7 @@ function find_child_part_array(assign_arrays, parent_idx) result(child_relative_
    ! Get first child index directly
    num_children = assign_arrays%partree(parent_idx)%num_children
 
-   ! Check if signature matches first or second child
+   ! Find the child that matches the signature
    do i = 1, num_children
       child_idx = assign_arrays%partree(parent_idx)%child_indices(i)
       if (signature_equivalence_array(assign_arrays, child_idx)) then
@@ -80,7 +79,8 @@ function find_child_part_array(assign_arrays, parent_idx) result(child_relative_
       end if
    end do
 
-   error stop 'Part signature does not match any child'
+   ! If the signature did not match any child it is a bug
+   error stop 'Part signature did not match any child'
 end function
 
 subroutine collect_leaf_assignments(assign_arrays, part_idx, subperm)

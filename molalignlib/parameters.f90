@@ -21,4 +21,7 @@ integer, parameter :: PRINTED_DECIMALS = 6
 real(rk), parameter :: BIAS_SF = 0.001
 real(rk), parameter :: CONV_TOL = max(100*epsilon(1.0_rk), 1.0e-10_rk)
 
+! Flags
+logical, parameter :: DEBUGGING = .false.
+
 end module

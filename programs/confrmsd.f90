@@ -225,7 +225,7 @@ if (align_flag) then
          call print_chain_tree_array( assign_arrays)
       end if
 
-      if (naive_flag) then
+      if (naive_flag .or. assign_arrays%global_combinations < max_count*assign_arrays%local_combinations) then
 
          call distribute_items_serial( coords1w, coords2w, assign_arrays, atomperm)
          rotquat = least_rotquat( atomperm, coords1w, coords2w)

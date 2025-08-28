@@ -477,8 +477,10 @@ subroutine solve_lap_nearest(n, s1, s2, p, q, perm, dist)
       end do
    end if
 
-   if (.not. is_permutation(perm)) then
-      error stop 'Assignment is not a permutation'
+   if (DEBUGGING) then
+      if (.not. is_permutation(perm)) then
+         error stop 'Assignment is not a permutation'
+      end if
    end if
 
    dist = real(h, rk) / scale

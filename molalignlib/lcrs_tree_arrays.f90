@@ -81,8 +81,8 @@ type, public :: array_trees_t
    integer :: total_links, total_chains
    integer :: total_partref_entries
    ! Assignment statistics
-   integer(int64) :: local_combinations
-   integer(int64) :: global_combinations
+   real(rk) :: local_combinations
+   real(rk) :: global_combinations
 end type
 
 contains
@@ -338,24 +338,24 @@ recursive subroutine convert_chains_recurse(chain, assign_arrays, partref_idx, l
    type(assigntree_node_t), pointer, intent(in) :: chain
    type(array_trees_t), intent(inout) :: assign_arrays
    integer, intent(inout) :: partref_idx, link_idx
-   integer(int64), intent(out) :: local_combinations, global_combinations
+   real(rk), intent(out) :: local_combinations, global_combinations
    type(assigntree_node_t), pointer :: child_chain
    type(chain_node_t), pointer :: link
    type(partref_node_t), pointer :: partref
    integer :: chain_idx, current_link_idx, child_count
-   integer(int64) :: child_combinations, child_product
+   real(rk) :: child_combinations, child_product
    integer :: items2_count
 
    if (.not. associated(chain)) return
 
    ! If this is a leaf level (no children), both values are 1
    if (chain%num_children == 0) then
-      local_combinations = 1_int64
-      global_combinations = 1_int64
+      local_combinations = 1
+      global_combinations = 1
    else
       ! Initialize accumulators for non-leaf nodes
-      local_combinations = 0_int64
-      global_combinations = 1_int64
+      local_combinations = 0
+      global_combinations = 1
    end if
 
    ! Convert this chain (existing conversion logic)
@@ -447,10 +447,10 @@ recursive subroutine convert_chains_recurse(chain, assign_arrays, partref_idx, l
          items2_count = child_chain%split_part%num_items2
 
          ! Update combinations (sum): first item1 with each item2
-         local_combinations = local_combinations + (int(items2_count, int64) * child_combinations)
+         local_combinations = local_combinations + (items2_count * child_combinations)
 
          ! Update product (multiply): split sizes only
-         global_combinations = global_combinations * (int(items2_count, int64) * child_product)
+         global_combinations = global_combinations * (items2_count * child_product)
       end if
 
       child_chain => child_chain%next_sibling_chain
@@ -692,8 +692,16 @@ subroutine print_chain_tree_array(assign_arrays)
    write(stderr, *)
 
    ! Print assignment statistics
-   write(stderr, '(A,I0)') "Global combinations: ", assign_arrays%global_combinations
-   write(stderr, '(A,I0)') "Total local combinations: ", assign_arrays%local_combinations
+   if (assign_arrays%global_combinations > 2**24) then
+      write(stderr, '(A,ES8.2)') "Global combinations: ", assign_arrays%global_combinations
+   else
+      write(stderr, '(A,I0)') "Global combinations: ", int(assign_arrays%global_combinations)
+   end if
+   if (assign_arrays%local_combinations > 2**24) then
+      write(stderr, '(A,ES8.2)') "Total local combinations: ", assign_arrays%local_combinations
+   else
+      write(stderr, '(A,I0)') "Total local combinations: ", int(assign_arrays%local_combinations)
+   end if
 
    deallocate(is_last_child)
 end subroutine
