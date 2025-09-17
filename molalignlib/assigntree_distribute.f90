@@ -7,8 +7,8 @@ use permutation
 use spatial_transforms
 implicit none
 private
-public distribute_items_parallel
-public distribute_items_serial
+public distribute_items_branch
+public distribute_items_tree
 public distribute_items_random
 
 ! Maximum possible number of children for a part
@@ -288,9 +288,9 @@ subroutine distribute_part_items(assign_arrays, split_part_idx, child_branch_idx
    end do
 end subroutine
 
-recursive subroutine distribute_items_random_recurse(coords1, coords2, assign_arrays, branch_idx, best_perm)
+recursive subroutine recurse_distribute_items_random(coords1, coords2, assign_arrays, branch_idx, best_perm)
    ! Random exploration - generates one assignment randomly using same traversal order as random module
-   ! Similar to distribute_items_parallel_recurse but picks one random assignment instead of exploring all
+   ! Similar to recurse_distribute_items_branch but picks one random assignment instead of exploring all
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_arrays
    integer, intent(in) :: branch_idx
@@ -326,7 +326,7 @@ recursive subroutine distribute_items_random_recurse(coords1, coords2, assign_ar
          rand_idx1, rand_idx2, best_perm)
 
       ! Recursively explore child branch
-      call distribute_items_random_recurse(coords1, coords2, assign_arrays, child_branch_idx, best_perm)
+      call recurse_distribute_items_random(coords1, coords2, assign_arrays, child_branch_idx, best_perm)
 
       ! Reset state for next iteration - only reset links used by this branch
       do link_idx = branch_link_offset + 1, branch_link_offset + branch_num_links
@@ -338,7 +338,7 @@ end subroutine
 
 subroutine distribute_items_random(coords1, coords2, assign_arrays, best_perm)
    ! Random exploration wrapper - generates one random assignment
-   ! Similar to distribute_items_parallel but generates random assignment instead of optimal
+   ! Similar to distribute_items_branch but generates random assignment instead of optimal
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_arrays
    type(subperm_t), intent(out) :: best_perm
@@ -354,7 +354,7 @@ subroutine distribute_items_random(coords1, coords2, assign_arrays, best_perm)
    call collect_leaf_assignments(assign_arrays, 1, best_perm)
 
    ! Perform random exploration to generate one assignment (starting from root chain at index 1)
-   call distribute_items_random_recurse(coords1, coords2, assign_arrays, 1, best_perm)
+   call recurse_distribute_items_random(coords1, coords2, assign_arrays, 1, best_perm)
 
    ! Calculate distance from the random permutation array
    total_dist = total_sqdist(best_perm, coords1, coords2)
@@ -366,7 +366,7 @@ subroutine distribute_items_random(coords1, coords2, assign_arrays, best_perm)
    call check_subperm(best_perm)
 end subroutine
 
-subroutine serialize_assignment_tree(assign_arrays, split_parts, num_split_parts)
+subroutine collect_split_parts(assign_arrays, split_parts, num_split_parts)
    ! Collect all parts that need assignments (have >= 2 items in both molecules)
    type(array_trees_t), intent(in) :: assign_arrays
    integer, allocatable, intent(out) :: split_parts(:)
@@ -400,8 +400,8 @@ subroutine serialize_assignment_tree(assign_arrays, split_parts, num_split_parts
    end do
 end subroutine
 
-recursive subroutine distribute_items_serial_recurse(coords1, coords2, assign_arrays, split_parts, num_split_parts, &
-                                       current_split_idx, this_perm, best_perm, min_dist)
+recursive subroutine recurse_distribute_items_tree(coords1, coords2, assign_arrays, split_parts, &
+                                num_split_parts, current_split_idx, this_perm, best_perm, min_dist)
    ! Recursively try all assignments for all split parts
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_arrays
@@ -460,7 +460,7 @@ recursive subroutine distribute_items_serial_recurse(coords1, coords2, assign_ar
          this_perm)
 
       ! Recursively try assignments for remaining split parts
-      call distribute_items_serial_recurse(coords1, coords2, assign_arrays, split_parts, num_split_parts, &
+      call recurse_distribute_items_tree(coords1, coords2, assign_arrays, split_parts, num_split_parts, &
          current_split_idx + 1, this_perm, best_perm, min_dist)
 
       ! Restore permutation state
@@ -474,7 +474,7 @@ recursive subroutine distribute_items_serial_recurse(coords1, coords2, assign_ar
    end do
 end subroutine
 
-subroutine distribute_items_serial(coords1, coords2, assign_arrays, best_perm)
+subroutine distribute_items_tree(coords1, coords2, assign_arrays, best_perm)
    ! DFS exploration of all permutations
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_arrays
@@ -502,10 +502,10 @@ subroutine distribute_items_serial(coords1, coords2, assign_arrays, best_perm)
    combination_count = 0
 
    ! Collect all split parts
-   call serialize_assignment_tree(assign_arrays, split_parts, num_split_parts)
+   call collect_split_parts(assign_arrays, split_parts, num_split_parts)
 
    ! Try all assignments for all split parts
-   call distribute_items_serial_recurse(coords1, coords2, assign_arrays, split_parts, num_split_parts, 1, &
+   call recurse_distribute_items_tree(coords1, coords2, assign_arrays, split_parts, num_split_parts, 1, &
       this_perm, best_perm, min_dist)
 
    ! Clean up
@@ -521,7 +521,7 @@ subroutine distribute_items_serial(coords1, coords2, assign_arrays, best_perm)
 !   call check_subperm(best_perm)
 end subroutine
 
-recursive subroutine distribute_items_parallel_recurse(coords1, coords2, assign_arrays, branch_idx, best_perm)
+recursive subroutine recurse_distribute_items_branch(coords1, coords2, assign_arrays, branch_idx, best_perm)
    ! DFS exploration of all assignment possibilities - finds permutation that minimizes total distance
    ! OPTIMIZED: Reduces allocations by reusing arrays within branch scope, but maintains isolation between branches
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)  ! coordinates needed for distance calculation
@@ -567,7 +567,7 @@ recursive subroutine distribute_items_parallel_recurse(coords1, coords2, assign_
             branch_perm)
 
          ! Recursively explore subtree and collect child permutation
-         call distribute_items_parallel_recurse(coords1, coords2, assign_arrays, child_branch_idx, branch_perm)
+         call recurse_distribute_items_branch(coords1, coords2, assign_arrays, child_branch_idx, branch_perm)
 
          ! Calculate partial distance for this branch
          branch_dist = total_sqdist(branch_perm, coords1, coords2)
@@ -590,7 +590,7 @@ recursive subroutine distribute_items_parallel_recurse(coords1, coords2, assign_
    end do
 end subroutine
 
-subroutine distribute_items_parallel(coords1, coords2, assign_arrays, best_perm)
+subroutine distribute_items_branch(coords1, coords2, assign_arrays, best_perm)
    ! DFS exploration wrapper - finds optimal assignment among all possibilities
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_arrays
@@ -610,7 +610,7 @@ subroutine distribute_items_parallel(coords1, coords2, assign_arrays, best_perm)
    combination_count = 0
 
    ! Perform DFS exploration to find optimal assignment (starting from root chain at index 1)
-   call distribute_items_parallel_recurse(coords1, coords2, assign_arrays, 1, best_perm)
+   call recurse_distribute_items_branch(coords1, coords2, assign_arrays, 1, best_perm)
 
 !block
 !   integer :: assigned_count

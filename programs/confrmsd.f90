@@ -41,8 +41,8 @@ implicit none
 character(:), allocatable :: title1, title2
 character(:), allocatable :: arg, pathout, dummy
 character(:), allocatable :: extin1, extin2, extout, extpipe
-logical :: heavy_flag, mass_flag, align_flag, remap_flag, naive_flag, write_flag, &
-   pipe_flag, stats_flag, tree_flag, rebond_flag, mapping_flag
+logical :: heavy_flag, mass_flag, align_flag, remap_flag, stoch_flag, count_flag, &
+   write_flag, pipe_flag, stats_flag, tree_flag, rebond_flag, mapping_flag
 type(strlist_type) :: posargs(2)
 type(atom_t), dimension(:), allocatable :: atoms1, atoms2
 type(bond_t), dimension(:), allocatable :: bonds1, bonds2
@@ -71,12 +71,14 @@ write_flag = .false.
 pipe_flag = .false.
 tree_flag = .false.
 mass_flag = .false.
-naive_flag = .false.
+stoch_flag = .true.
+count_flag = .true.
 rebond_flag = .false.
 mapping_flag = .false.
+label_flag = .false.
 
 max_records = 1
-max_count = 10
+count_thres = 10
 max_trials = huge( max_trials)
 
 ! Read command options
@@ -91,16 +93,21 @@ do while (get_arg(arg))
       remap_flag = .true.
    case ('-mapping')
       mapping_flag = .true.
-   case ('-naive')
-      naive_flag = .true.
+   case ('-exhaustive')
+      stoch_flag = .false.
+   case ('-stochastic')
+      stoch_flag = .true.
+      count_flag = .false.
+   case ('-label')
+      label_flag = .true.
    case ('-heavy')
       heavy_flag = .true.
    case ('-mass')
       mass_flag = .true.
    case ('-mirror')
       mirror_flag = .true.
-   case ('-count')
-      call read_optarg( arg, max_count)
+   case ('-thres')
+      call read_optarg( arg, count_thres)
    case ('-trials')
       call read_optarg( arg, max_trials)
    case ('-n')
@@ -225,29 +232,8 @@ if (align_flag) then
          call print_chain_tree_array( assign_arrays)
       end if
 
-      if (naive_flag .or. assign_arrays%global_combinations < max_count*assign_arrays%local_combinations) then
-
-         call distribute_items_serial( coords1w, coords2w, assign_arrays, atomperm)
-         rotquat = least_rotquat( atomperm, coords1w, coords2w)
-         coords2r = rotated_coords( coords2, rotquat, center1)
-         rmsd = sqrt( mean_sqdist( atomperm, weights1, coords1, coords2r))
-
-         write (stdout,'(A)') str( rmsd)
-
-         if (mapping_flag) then
-            do j = 1, atomperm%count
-               write (stdout,'(I0," -> ",I0)') atomperm%subset(j), atomperm%permut(j)
-            end do
-         end if
-
-         if (write_flag) then
-            title2 = 'RMSD=' // str( rmsd)
-            coords2r = rotated_coords( coords2, rotquat, center1)
-            call set_coords( atoms2, coords2r)
-            call writefile( unitout, extout, title2, atoms2, bonds2, atomperm)
-         end if
-
-      else
+      if ((stoch_flag .and. .not. count_flag) .or. (stoch_flag .and. count_flag .and. &
+            assign_arrays%global_combinations > count_thres*assign_arrays%local_combinations)) then
 
          ! Remap atoms to minimize the MSD
          call optimize_atomperm_conform( coords1w, coords2w, assign_arrays, registry)
@@ -281,6 +267,28 @@ if (align_flag) then
 
          end do
 
+      else
+
+         call distribute_items_tree( coords1w, coords2w, assign_arrays, atomperm)
+         rotquat = least_rotquat( atomperm, coords1w, coords2w)
+         coords2r = rotated_coords( coords2, rotquat, center1)
+         rmsd = sqrt( mean_sqdist( atomperm, weights1, coords1, coords2r))
+
+         write (stdout,'(A)') str( rmsd)
+
+         if (mapping_flag) then
+            do j = 1, atomperm%count
+               write (stdout,'(I0," -> ",I0)') atomperm%subset(j), atomperm%permut(j)
+            end do
+         end if
+
+         if (write_flag) then
+            title2 = 'RMSD=' // str( rmsd)
+            coords2r = rotated_coords( coords2, rotquat, center1)
+            call set_coords( atoms2, coords2r)
+            call writefile( unitout, extout, title2, atoms2, bonds2, atomperm)
+         end if
+
       end if
 
    else
@@ -313,7 +321,7 @@ else
       if (tree_flag) then
          call print_chain_tree_array( assign_arrays)
       end if
-      call distribute_items_parallel( coords1w, coords2w, assign_arrays, atomperm)
+      call distribute_items_branch( coords1w, coords2w, assign_arrays, atomperm)
       rmsd = sqrt( mean_sqdist( atomperm, weights1, coords1, coords2))
    else
       atomperm = default_atomperm( atoms1, atoms2)

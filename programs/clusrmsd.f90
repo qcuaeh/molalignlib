@@ -66,9 +66,10 @@ remap_flag = .false.
 write_flag = .false.
 pipe_flag = .false.
 mass_flag = .false.
+label_flag = .false.
 
 max_records = 1
-max_count = 10
+count_thres = 10
 max_trials = huge( max_trials)
 
 prune_tol = 0.5
@@ -90,6 +91,8 @@ do while (get_arg(arg))
       prune_procedure => prune_rd
    case ('-tol')
       call read_optarg(arg, prune_tol)
+   case ('-label')
+      label_flag = .true.
    case ('-heavy')
       heavy_flag = .true.
    case ('-mass')
@@ -97,7 +100,7 @@ do while (get_arg(arg))
    case ('-mirror')
       mirror_flag = .true.
    case ('-count')
-      call read_optarg( arg, max_count)
+      call read_optarg( arg, count_thres)
    case ('-trials')
       call read_optarg( arg, max_trials)
    case ('-N')

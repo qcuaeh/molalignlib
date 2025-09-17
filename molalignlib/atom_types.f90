@@ -20,28 +20,57 @@ type :: atomtype_table_t
    type(atomtype_item_t), dimension(:), allocatable :: items
 end type
 
+abstract interface
+   logical function compare_atoms_interface(item, elnum, typeid)
+      import atomtype_item_t
+      type(atomtype_item_t), intent(in) :: item
+      integer, intent(in) :: elnum, typeid
+   end function
+end interface
+
+procedure(compare_atoms_interface), pointer :: compare_atoms
+
 contains
 
-subroutine add_atomtype(atomtypetable, atom, partidx)
+logical function compare_atoms_simple(item, elnum, typeid) result(equal)
+   type(atomtype_item_t), intent(in) :: item
+   integer, intent(in) :: elnum, typeid
+
+   equal = item%elnum == elnum
+end function
+
+logical function compare_atoms_labeled(item, elnum, typeid) result(equal)
+   type(atomtype_item_t), intent(in) :: item
+   integer, intent(in) :: elnum, typeid
+
+   if (item%elnum == elnum) then
+      if (item%typeid == typeid) then
+         equal = .true.
+         return
+      end if
+   end if
+
+   equal = .false.
+end function
+
+subroutine add_atomtype(atomtypetable, elnum, typeid, partidx)
    type(atomtype_table_t), intent(inout) :: atomtypetable
-   type(atom_t), intent(in) :: atom
-   integer, intent(in) :: partidx
+   integer, intent(in) :: elnum, typeid, partidx
 
    atomtypetable%num_items = atomtypetable%num_items + 1
-   atomtypetable%items(atomtypetable%num_items)%elnum = atom%elnum
-   atomtypetable%items(atomtypetable%num_items)%typeid = atom%typeid
+   atomtypetable%items(atomtypetable%num_items)%elnum = elnum
+   atomtypetable%items(atomtypetable%num_items)%typeid = typeid
    atomtypetable%items(atomtypetable%num_items)%partidx = partidx
 end subroutine
 
-function find_atomtype(atomtypetable, atom) result(partidx)
+function find_atomtype(atomtypetable, elnum, typeid) result(partidx)
    type(atomtype_table_t), intent(in) :: atomtypetable
-   type(atom_t), intent(in) :: atom
+   integer, intent(in) :: elnum, typeid
    integer :: partidx
    integer :: i
 
    do i = 1, atomtypetable%num_items
-      if (atomtypetable%items(i)%elnum == atom%elnum .and. &
-          atomtypetable%items(i)%typeid == atom%typeid) then
+      if (compare_atoms(atomtypetable%items(i), elnum, typeid)) then
          partidx = atomtypetable%items(i)%partidx
          return
       end if
@@ -66,6 +95,12 @@ subroutine collect_atomtypes(atoms1, atoms2, atomtypes)
    ! Item directories - O(num_atoms) size, unavoidable
    integer, dimension(:), allocatable :: itemdir1_temp, itemdir2_temp
 
+   if (label_flag) then
+      compare_atoms => compare_atoms_labeled
+   else
+      compare_atoms => compare_atoms_simple
+   end if
+
    num_atoms1 = size(atoms1)
    num_atoms2 = size(atoms2)
    max_parts = num_atoms1 + num_atoms2  ! Maximum possible partitions
@@ -87,10 +122,10 @@ subroutine collect_atomtypes(atoms1, atoms2, atomtypes)
    ! First molecule
    do i = 1, num_atoms1
       if (atoms1(i)%mask) then
-         partidx = find_atomtype(atomtypetable, atoms1(i))
+         partidx = find_atomtype(atomtypetable, atoms1(i)%elnum, atoms1(i)%typeid)
          if (partidx == 0) then
             current_part = current_part + 1
-            call add_atomtype(atomtypetable, atoms1(i), current_part)
+            call add_atomtype(atomtypetable, atoms1(i)%elnum, atoms1(i)%typeid, current_part)
             partidx = current_part
          end if
          itemdir1_temp(i) = partidx
@@ -101,10 +136,10 @@ subroutine collect_atomtypes(atoms1, atoms2, atomtypes)
    ! Second molecule
    do i = 1, num_atoms2
       if (atoms2(i)%mask) then
-         partidx = find_atomtype(atomtypetable, atoms2(i))
+         partidx = find_atomtype(atomtypetable, atoms2(i)%elnum, atoms2(i)%typeid)
          if (partidx == 0) then
             current_part = current_part + 1
-            call add_atomtype(atomtypetable, atoms2(i), current_part)
+            call add_atomtype(atomtypetable, atoms2(i)%elnum, atoms2(i)%typeid, current_part)
             partidx = current_part
          end if
          itemdir2_temp(i) = partidx

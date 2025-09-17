@@ -64,7 +64,8 @@ subroutine readfile_xyz(unit, title, atoms, bonds)
    ! Local variables
    character(ll) :: buffer
    character(wl) :: elsym
-   integer :: i, num_atoms, elnum, typeid, stat
+   character(:), allocatable :: label
+   integer :: i, num_atoms, elnum, stat
    real(rk) :: coords(3)
 
    ! Read number of atoms
@@ -84,7 +85,7 @@ subroutine readfile_xyz(unit, title, atoms, bonds)
    allocate (bonds(0))
 
    ! Read title line
-   read (unit, '(A)', iostat=stat) buffer
+   read (unit,'(A)',iostat=stat) buffer
    if (stat /= 0) then
       write (stderr, '(A)') 'Error: Invalid XYZ format'
       stop 1
@@ -92,16 +93,22 @@ subroutine readfile_xyz(unit, title, atoms, bonds)
    title = trim(buffer)
 
    do i = 1, num_atoms
-      read (unit, *, iostat=stat) elsym, coords
+      read (unit,*,iostat=stat) elsym, coords
       if (stat /= 0) then
          write (stderr, '(A)') 'Error: Invalid XYZ format'
          stop 1
       end if
 
-      call split_symbol(elsym, elnum, typeid)
+      call split_symbol(elsym, elnum, label)
       atoms(i)%elnum = elnum
-      atoms(i)%typeid = typeid
       atoms(i)%coords = coords
+      if (label_flag .and. label /= '') then
+         read (label,*,iostat=stat) atoms(i)%typeid
+         if (stat /= 0) then
+            write (stderr, '(A,A)') 'Error: Invalid label', label
+            stop 1
+         end if
+      end if
    end do
 end subroutine
 
@@ -112,8 +119,8 @@ subroutine readfile_mol_sdf(unit, title, atoms, bonds)
    type(bond_t), dimension(:), allocatable, intent(out) :: bonds
    ! Local variables
    character(ll) :: buffer
-   integer :: num_atoms, num_bonds, stat
    logical :: is_v3000
+   integer :: stat
 
    ! Read header block (3 lines)
    read (unit, '(A)', iostat=stat) buffer
@@ -170,6 +177,7 @@ subroutine read_v2000_format(unit, counts_line, atoms, bonds)
    real(rk) :: coords(3)
    character(3) :: elsym
    character(ll) :: buffer
+   character(:), allocatable :: label
    integer :: elnum, atomidx1, atomidx2, typeid
    integer :: num_atoms, num_bonds, stat, i
 
@@ -188,7 +196,7 @@ subroutine read_v2000_format(unit, counts_line, atoms, bonds)
    allocate (atoms(num_atoms))
    ! Read atom block
    do i = 1, num_atoms
-      read (unit, '(A)', iostat=stat) buffer
+      read (unit,'(A)',iostat=stat) buffer
       if (stat /= 0) then
          write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
          stop 1
@@ -210,9 +218,8 @@ subroutine read_v2000_format(unit, counts_line, atoms, bonds)
       end if
 
       elsym = adjustl(buffer(32:34))
-      call split_symbol(elsym, elnum, typeid)
+      call split_symbol(elsym, elnum, label)
       atoms(i)%elnum = elnum
-      atoms(i)%typeid = typeid
       atoms(i)%coords = coords
    end do
 
@@ -253,7 +260,7 @@ subroutine read_v3000_format(unit, counts_line, atoms, bonds)
    type(bond_t), dimension(:), allocatable, intent(out) :: bonds
    ! Local variables
    character(ll) :: buffer
-   character(20) :: token
+   character(:), allocatable :: label
    real(rk) :: coords(3)
    integer :: num_atoms, num_bonds, stat, i, pos
    integer :: elnum, typeid, atomidx1, atomidx2, dummy_int
@@ -315,10 +322,16 @@ subroutine read_v3000_format(unit, counts_line, atoms, bonds)
          stop 1
       end if
 
-      call split_symbol(elsym, elnum, typeid)
+      call split_symbol(elsym, elnum, label)
       atoms(i)%elnum = elnum
-      atoms(i)%typeid = typeid
       atoms(i)%coords = coords
+      if (label_flag .and. label /= '') then
+         read (label,*,iostat=stat) atoms(i)%typeid
+         if (stat /= 0) then
+            write (stderr, '(A,A)') 'Error: Invalid label', label
+            stop 1
+         end if
+      end if
    end do
 
    ! Find END ATOM
@@ -417,8 +430,9 @@ subroutine readfile_mol2(unit, title, atoms, bonds)
    ! Local variables
    real(rk) :: coords(3)
    character(wl) :: elsym, dummy, typestr
-   integer :: num_atoms, num_bonds, elnum, typeid, stat
    character(ll) :: buffer
+   character(:), allocatable :: label
+   integer :: num_atoms, num_bonds, elnum, stat
    integer :: i, atomidx1, atomidx2
 
    ! Find @<TRIPOS>MOLECULE section
@@ -467,17 +481,22 @@ subroutine readfile_mol2(unit, title, atoms, bonds)
    ! Read atom section
    ! Format: atom_id atom_name x y z typestr [subst_id subst_name charge]
    do i = 1, num_atoms
-      read (unit, *, iostat=stat) dummy, elsym, coords, typestr
+      read (unit,*,iostat=stat) dummy, elsym, coords, typestr
       if (stat /= 0) then
          write (stderr, '(A)') 'Error: Invalid MOL2 format'
          stop 1
       end if
 
-      call split_symbol(elsym, elnum, typeid)
+      call split_symbol(elsym, elnum, label)
       atoms(i)%elnum = elnum
-      atoms(i)%typeid = typeid
       atoms(i)%coords = coords
-      ! typestr is now available in local variable for future use
+      if (label_flag .and. label /= '') then
+         read (label,*,iostat=stat) atoms(i)%typeid
+         if (stat /= 0) then
+            write (stderr, '(A,A)') 'Error: Invalid label', label
+            stop 1
+         end if
+      end if
    end do
 
    ! Read bonds

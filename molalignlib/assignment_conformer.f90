@@ -61,21 +61,21 @@ subroutine optimize_atomperm_conform( coords1, coords2, assign_arrays, registry)
    lead_count => registry%records(1)%count
 
    ! Optimize atom permutation
-   do while (lead_count < max_count .and. num_trials < max_trials)
+   do while (lead_count < count_thres .and. num_trials < max_trials)
 
       ! Get randomly rotated coords2
       rotation = randrotquat()
       coords2r = rotated_coords( coords2, rotation)
 
       ! Assign atoms with current orientation
-      call distribute_items_parallel( coords1, coords2r, assign_arrays, atomperm)
+      call distribute_items_branch( coords1, coords2r, assign_arrays, atomperm)
       rotation_step = least_rotquat( atomperm, coords1, coords2r)
       call rotate_coords( coords2r, rotation_step)
       rotation = quatmul( rotation, rotation_step)
       num_steps = 1
 
       do while (iter_flag)
-         call distribute_items_parallel( coords1, coords2r, assign_arrays, auxperm)
+         call distribute_items_branch( coords1, coords2r, assign_arrays, auxperm)
 !         write (stderr,'(F8.4)') sqrt( total_sqdist( auxperm, coords1, coords2r))
          if (auxperm == atomperm) exit
          atomperm = auxperm

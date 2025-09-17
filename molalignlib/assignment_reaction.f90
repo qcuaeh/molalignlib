@@ -110,7 +110,7 @@ subroutine find_reactive_bonds( atoms1, atoms2, atomtypes, atomperm)
    call init_adjd_registry( registry, max_records)
 
    ! Optimize atom permutation
-   do while (registry%records(1)%count < max_count .and. registry%num_trials < max_trials)
+   do while (registry%records(1)%count < count_thres .and. registry%num_trials < max_trials)
 
       ! Assign atoms with current orientation
       call assign_atoms_biased( atomtypes, wcoords1, wcoords2, biases, atomperm)

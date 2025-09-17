@@ -53,7 +53,7 @@ subroutine optimize_atomperm_cluster(coords1, coords2, atomtypes, prunes, regist
    call init_rmsd_registry( registry, max_records)
 
    ! Optimize atom permutation
-   do while (registry%records(1)%count < max_count .and. registry%num_trials < max_trials)
+   do while (registry%records(1)%count < count_thres .and. registry%num_trials < max_trials)
 
       ! Aply a random rotation to coords2
       rotation = randrotquat()

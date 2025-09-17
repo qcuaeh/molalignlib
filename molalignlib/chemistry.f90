@@ -94,7 +94,8 @@ end function
 
 subroutine split_symbol( elsym, elnum, label)
    character(*), intent(in) :: elsym
-   integer, intent(out) :: elnum, label
+   integer, intent(out) :: elnum
+   character(:), intent(out), allocatable :: label
    ! Local variables
    integer :: m, n
 
@@ -102,11 +103,11 @@ subroutine split_symbol( elsym, elnum, label)
    m = verify(uppercase(trim(elsym)), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ')
 
    if (m == 0) then
-      label = 0
+      label = ''
       elnum = atomic_number(elsym)
    else if (verify(elsym(m:n), '1234567890') == 0) then
-      read (elsym(m:n), *) label
       elnum = atomic_number(elsym(1:m-1))
+      label = elsym(m:n)
    else
       write (stderr, '(a,1x,a)') 'Error: Invalid atomic elsym/label:', elsym
       stop 1
