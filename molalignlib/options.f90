@@ -4,6 +4,7 @@ module options
 logical :: test_flag
 logical :: mirror_flag
 logical :: label_flag
+logical :: iterate_flag
 
 ! Bounds
 integer :: count_thres

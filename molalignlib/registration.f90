@@ -33,14 +33,14 @@ public init_dual_registry
 type :: record_t
    integer :: count
    integer :: adjd                                      ! Used when use_adjacency=TRUE
-   real(rk) :: rmsd                                     ! Used when use_position=TRUE
+   real(rk) :: permdist                                 ! Used when use_position=TRUE
    real(rk) :: rotation(4)
    real(rk) :: aver_steps                               ! Used when use_position=TRUE
    type(subperm_t) :: atomperm
 end type
 
 type :: registry_t
-   logical :: use_position                              ! Enable position-based processing (RMSD, steps, rotation)
+   logical :: use_position                              ! Enable position-based processing (steps, permdist, rotation)
    logical :: use_adjacency                             ! Enable adjacency-based processing (adjacency differences)
    logical :: overflow
    integer :: total_steps                               ! Used when use_position=TRUE
@@ -69,7 +69,7 @@ subroutine init_rmsd_registry(self, max_records)
    allocate (self%records(max_records))
 
    self%records%count = 0
-   self%records%rmsd = huge(self%records(1)%rmsd)
+   self%records%permdist = huge(self%records(1)%permdist)
 end subroutine
 
 subroutine init_dual_registry(self, max_records)
@@ -113,12 +113,12 @@ subroutine init_adjd_registry(self, max_records)
    self%records%adjd = huge(self%records(1)%adjd)
 end subroutine
 
-subroutine push_record(self, atomperm, num_steps, adjd, rmsd, rotation)
+subroutine push_record(self, atomperm, num_steps, adjd, permdist, rotation)
    class(registry_t), target, intent(inout) :: self
    type(subperm_t), intent(in) :: atomperm
    integer, intent(in) :: num_steps
    integer, intent(in), optional :: adjd
-   real(rk), intent(in), optional :: rmsd
+   real(rk), intent(in), optional :: permdist
    real(rk), intent(in), optional :: rotation(4)
    ! Local variables
    type(record_t), pointer :: record
@@ -132,7 +132,7 @@ subroutine push_record(self, atomperm, num_steps, adjd, rmsd, rotation)
 
    ! Handle position-based processing
    if (self%use_position) then
-      if (.not. present(rmsd)) error stop 'rmsd required when use_position=TRUE'
+      if (.not. present(permdist)) error stop 'permdist required when use_position=TRUE'
       if (.not. present(rotation)) error stop 'rotation required when use_position=TRUE'
    end if
 
@@ -160,9 +160,9 @@ subroutine push_record(self, atomperm, num_steps, adjd, rmsd, rotation)
 
       ! Determine insertion criteria based on mode
       if (self%use_adjacency .and. self%use_position) then
-         should_insert = (adjd < record%adjd .or. (adjd == record%adjd .and. rmsd < record%rmsd))
+         should_insert = (adjd < record%adjd .or. (adjd == record%adjd .and. permdist < record%permdist))
       else if (self%use_position) then
-         should_insert = (rmsd < record%rmsd)
+         should_insert = (permdist < record%permdist)
       else
          should_insert = (adjd < record%adjd)
       end if
@@ -179,7 +179,7 @@ subroutine push_record(self, atomperm, num_steps, adjd, rmsd, rotation)
 
          ! Set fields based on enabled processing modes
          if (self%use_position) then
-            record%rmsd = rmsd
+            record%permdist = permdist
             record%rotation = rotation
             record%aver_steps = num_steps
          end if
@@ -218,23 +218,23 @@ subroutine print_records(registry)
    if (registry%use_position .and. .not. registry%use_adjacency) then
       ! Position only
       line = repeat('-', 42)
-      write (stderr, '(2x,a,4x,a,5x,a,4x,a,7x,a)') '#', 'Count', 'Steps', 'Rotθ', 'RMSD'
+      write (stderr, '(2x,a,4x,a,5x,a,5x,a,7x,a)') '#', 'Count', 'Steps', 'Rotθ', 'Δxyz'
       write (stderr, '(a)') line(1:42)
       do i = 1, registry%num_records
          record = registry%records(i)
          write (stderr, '(i3,4x,i4,4x,f5.1,5x,f5.1,4x,f8.4)') &
-            i, record%count, record%aver_steps, angle(record%rotation), record%rmsd
+            i, record%count, record%aver_steps, angle(record%rotation), record%permdist
       end do
       write (stderr, '(a)') line(1:42)
    else if (registry%use_position .and. registry%use_adjacency) then
       ! Both position and adjacency
       line = repeat('-', 49)
-      write (stderr, '(2x,a,4x,a,5x,a,4x,a,4x,a,6x,a)') '#', 'Count', 'Steps', 'Rotθ', 'Δadj', 'RMSD'
+      write (stderr, '(2x,a,4x,a,5x,a,4x,a,5x,a,6x,a)') '#', 'Count', 'Steps', 'Rotθ', 'Δadj', 'Δxyz'
       write (stderr, '(a)') line
       do i = 1, registry%num_records
          record = registry%records(i)
          write (stderr, '(i3,4x,i4,4x,f5.1,5x,f5.1,3x,i4,4x,f8.4)') &
-            i, record%count, record%aver_steps, angle(record%rotation), record%adjd, record%rmsd
+            i, record%count, record%aver_steps, angle(record%rotation), record%adjd, record%permdist
       end do
       write (stderr, '(a)') line
    else if (registry%use_adjacency .and. .not. registry%use_position) then

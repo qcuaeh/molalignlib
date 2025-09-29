@@ -7,9 +7,10 @@ use permutation
 use spatial_transforms
 implicit none
 private
-public distribute_items_branch
-public distribute_items_tree
-public distribute_items_random
+public distribute_items_greedy
+public distribute_items_global
+public distribute_items_local
+public distribute_items_local_pruned
 
 ! Maximum possible number of children for a part
 integer, parameter :: MAX_CHILDREN = 8
@@ -199,36 +200,14 @@ subroutine resplit_part_mna(assign_arrays, part_idx, read_link_idx, write_link_i
    call collect_leaf_assignments(assign_arrays, part_idx, subperm)
 end subroutine
 
-subroutine recompute_mna_partition(assign_arrays, link_idx, subperm)
+subroutine assign_pair_to_children(assign_arrays, split_part_idx, first_link_idx, &
+      chosen_item1_idx, chosen_item2_idx, subperm)
+   ! Assigns chosen items to first child and remaining items to second child
    type(array_trees_t), intent(inout) :: assign_arrays
-   integer, intent(in) :: link_idx
-   type(subperm_t), intent(inout) :: subperm
-   integer :: next_link_idx, i, part_idx
-   integer :: num_parts, partref_offset
-
-   next_link_idx = link_idx + 1
-   num_parts = assign_arrays%chain(link_idx)%num_parts
-   partref_offset = assign_arrays%chain(link_idx)%partref_offset
-
-   do i = 1, num_parts
-      part_idx = assign_arrays%partref_entries(partref_offset + i)
-      call resplit_part_mna(assign_arrays, part_idx, link_idx, next_link_idx, subperm)
-   end do
-end subroutine
-
-subroutine distribute_part_items(assign_arrays, split_part_idx, child_branch_idx, &
-      first_link_idx, chosen_item1_idx, chosen_item2_idx, subperm)
-   ! Combined procedure: assignment + MNA recomputation
-   ! Makes assignment (chosen_item1_idx-th item1 with chosen_item2_idx-th item2) then recomputes MNAs for the branch
-   ! UPDATED: Now accepts both item1 and item2 indices to match original random assignment behavior
-   type(array_trees_t), intent(inout) :: assign_arrays
-   integer, intent(in) :: split_part_idx, child_branch_idx, first_link_idx, chosen_item1_idx, chosen_item2_idx
+   integer, intent(in) :: split_part_idx, first_link_idx, chosen_item1_idx, chosen_item2_idx
    type(subperm_t), intent(inout) :: subperm
    integer :: child_part1, child_part2, chosen_item1, chosen_item2, i, item_vertidx, target_idx
    integer :: items1_offset, items1_count, items2_offset, items2_count
-   integer :: link_idx, num_links, link_offset
-
-   ! === PART 1: PAIR ASSIGNMENT ===
 
    ! Extract commonly used offsets and values
    items1_offset = assign_arrays%partree(split_part_idx)%items1_offset
@@ -276,30 +255,91 @@ subroutine distribute_part_items(assign_arrays, split_part_idx, child_branch_idx
 
    ! Collect assignment pairs from assignment (leaf parts created by the split)
    call collect_leaf_assignments(assign_arrays, split_part_idx, subperm)
+end subroutine
 
-   ! === PART 2: SCNA RECOMPUTATION ===
+subroutine distribute_part_items(assign_arrays, split_part_idx, child_branch_idx, &
+      first_link_idx, chosen_item1_idx, chosen_item2_idx, subperm)
+   ! Combined procedure: assignment + MNA recomputation
+   ! Makes assignment (chosen_item1_idx-th item1 with chosen_item2_idx-th item2) then recomputes MNAs for the branch
+   type(array_trees_t), intent(inout) :: assign_arrays
+   integer, intent(in) :: split_part_idx, child_branch_idx, first_link_idx, chosen_item1_idx, chosen_item2_idx
+   type(subperm_t), intent(inout) :: subperm
+   integer :: i, link_idx, part_idx
+   integer :: num_links, link_offset, next_link_idx
+   integer :: num_parts, partref_offset
 
+   ! === PART 1: PAIR ASSIGNMENT ===
+   call assign_pair_to_children(assign_arrays, split_part_idx, first_link_idx, &
+         chosen_item1_idx, chosen_item2_idx, subperm)
+
+   ! === PART 2: SCNA RECOMPUTATION (inlined recompute_mna_partition) ===
    num_links = assign_arrays%assigntree(child_branch_idx)%num_links
    link_offset = assign_arrays%assigntree(child_branch_idx)%link_offset
 
    do i = 1, num_links
       link_idx = link_offset + i
-      call recompute_mna_partition(assign_arrays, link_idx, subperm)
+      next_link_idx = link_idx + 1
+      num_parts = assign_arrays%chain(link_idx)%num_parts
+      partref_offset = assign_arrays%chain(link_idx)%partref_offset
+
+      do part_idx = 1, num_parts
+         call resplit_part_mna(assign_arrays, &
+               assign_arrays%partref_entries(partref_offset + part_idx), &
+               link_idx, next_link_idx, subperm)
+      end do
    end do
 end subroutine
 
-recursive subroutine recurse_distribute_items_random(coords1, coords2, assign_arrays, branch_idx, best_perm)
-   ! Random exploration - generates one assignment randomly using same traversal order as random module
-   ! Similar to recurse_distribute_items_branch but picks one random assignment instead of exploring all
+subroutine collect_split_parts(assign_arrays, split_parts, num_split_parts)
+   ! Collect all parts that need assignments (have > 1 items in both molecules)
+   type(array_trees_t), intent(in) :: assign_arrays
+   integer, allocatable, intent(out) :: split_parts(:)
+   integer, intent(out) :: num_split_parts
+   integer :: i, count
+
+   ! First pass: count split parts
+   count = 0
+   do i = 1, assign_arrays%total_chains
+      if (assign_arrays%assigntree(i)%split_part_idx > 0) then
+         if (assign_arrays%partree(assign_arrays%assigntree(i)%split_part_idx)%items1_count > 1 .and. &
+             assign_arrays%partree(assign_arrays%assigntree(i)%split_part_idx)%items2_count > 1) then
+            count = count + 1
+         end if
+      end if
+   end do
+
+   num_split_parts = count
+   allocate(split_parts(num_split_parts))
+
+   ! Second pass: collect split part indices
+   count = 0
+   do i = 1, assign_arrays%total_chains
+      if (assign_arrays%assigntree(i)%split_part_idx > 0) then
+         if (assign_arrays%partree(assign_arrays%assigntree(i)%split_part_idx)%items1_count > 1 .and. &
+             assign_arrays%partree(assign_arrays%assigntree(i)%split_part_idx)%items2_count > 1) then
+            count = count + 1
+            split_parts(count) = assign_arrays%assigntree(i)%split_part_idx
+         end if
+      end if
+   end do
+end subroutine
+
+recursive subroutine recurse_distribute_items_greedy(coords1, coords2, assign_arrays, branch_idx, greedy_perm)
+   ! Greedy exploration - always picks the closest pair at each split
+   ! Similar to recurse_distribute_items_random but chooses minimum distance instead of random
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_arrays
    integer, intent(in) :: branch_idx
-   type(subperm_t), intent(inout) :: best_perm
+   type(subperm_t), intent(inout) :: greedy_perm
 
-   integer :: rand_idx1, rand_idx2
+   integer :: i, idx1, idx2
    integer :: link_idx, branch_link_offset, branch_num_links
    integer :: child_branch_idx, first_link_idx, split_part_idx
-   integer :: items1_count, items2_count, i
+   integer :: items1_count, items2_count
+   real(rk) :: min_dist, current_dist
+   integer :: greedy_idx1, greedy_idx2
+   integer :: item1_vertidx, item2_vertidx
+   integer :: items1_offset, items2_offset
 
    ! Check if this is a leaf level (no more child branches)
    if (assign_arrays%assigntree(branch_idx)%num_children == 0) then
@@ -316,17 +356,36 @@ recursive subroutine recurse_distribute_items_random(coords1, coords2, assign_ar
 
       items1_count = assign_arrays%partree(split_part_idx)%items1_count
       items2_count = assign_arrays%partree(split_part_idx)%items2_count
+      items1_offset = assign_arrays%partree(split_part_idx)%items1_offset
+      items2_offset = assign_arrays%partree(split_part_idx)%items2_offset
 
-      ! Generate random choices for both item1 and item2 indices (matching original random module)
-      rand_idx1 = random_uniform_integer(1, items1_count)
-      rand_idx2 = random_uniform_integer(1, items2_count)
+      ! Find the closest pair (greedy choice)
+      min_dist = huge(1.0_rk)
+      greedy_idx1 = 1
+      greedy_idx2 = 1
 
-      ! Make random assignment and recompute MNAs using existing procedure
+      do idx1 = 1, items1_count
+         item1_vertidx = assign_arrays%vertidcs1(items1_offset + idx1)
+         do idx2 = 1, items2_count
+            item2_vertidx = assign_arrays%vertidcs2(items2_offset + idx2)
+
+            ! Calculate squared distance between atoms
+            current_dist = sum((coords1(:, item1_vertidx) - coords2(:, item2_vertidx))**2)
+
+            if (current_dist < min_dist) then
+               min_dist = current_dist
+               greedy_idx1 = idx1
+               greedy_idx2 = idx2
+            end if
+         end do
+      end do
+
+      ! Make greedy assignment (closest pair)
       call distribute_part_items(assign_arrays, split_part_idx, child_branch_idx, first_link_idx, &
-         rand_idx1, rand_idx2, best_perm)
+         greedy_idx1, greedy_idx2, greedy_perm)
 
       ! Recursively explore child branch
-      call recurse_distribute_items_random(coords1, coords2, assign_arrays, child_branch_idx, best_perm)
+      call recurse_distribute_items_greedy(coords1, coords2, assign_arrays, child_branch_idx, greedy_perm)
 
       ! Reset state for next iteration - only reset links used by this branch
       do link_idx = branch_link_offset + 1, branch_link_offset + branch_num_links
@@ -336,71 +395,37 @@ recursive subroutine recurse_distribute_items_random(coords1, coords2, assign_ar
    end do
 end subroutine
 
-subroutine distribute_items_random(coords1, coords2, assign_arrays, best_perm)
-   ! Random exploration wrapper - generates one random assignment
-   ! Similar to distribute_items_branch but generates random assignment instead of optimal
+subroutine distribute_items_greedy(coords1, coords2, assign_arrays, greedy_perm, perm_dist)
+   ! Greedy exploration wrapper - generates assignment by always choosing closest pairs
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_arrays
-   type(subperm_t), intent(out) :: best_perm
+   type(subperm_t), intent(out) :: greedy_perm
+   real(rk), intent(out) :: perm_dist
    ! Local variables
-   real(rk) :: total_dist
 
-!   call random_init(.true., .true.)
-
-   ! Initialize random assignment
-   call subperm_init(best_perm, assign_arrays%num_atoms1)
+   ! Initialize greedy assignment
+   call subperm_init(greedy_perm, assign_arrays%num_atoms1)
 
    ! Initialize assignment with preassigned pairs
-   call collect_leaf_assignments(assign_arrays, 1, best_perm)
+   call collect_leaf_assignments(assign_arrays, 1, greedy_perm)
 
-   ! Perform random exploration to generate one assignment (starting from root chain at index 1)
-   call recurse_distribute_items_random(coords1, coords2, assign_arrays, 1, best_perm)
+   ! Perform greedy exploration to generate one assignment (starting from root chain at index 1)
+   call recurse_distribute_items_greedy(coords1, coords2, assign_arrays, 1, greedy_perm)
 
-   ! Calculate distance from the random permutation array
-   total_dist = total_sqdist(best_perm, coords1, coords2)
-   write(stderr, '(A)') repeat("=", 60)
-   write(stderr, '(A,I0,A,I0,A)') "Atoms assigned: ", best_perm%count, " out of ", &
-         assign_arrays%num_atoms1, " total atoms"
-   write(stderr, '(A,F10.4)') "Random assignment total squared distance: ", total_dist
-   write(stderr, '(A)') repeat("=", 60)
-   call check_subperm(best_perm)
+   ! Calculate total distance
+   perm_dist = sqdistsum(greedy_perm, coords1, coords2)
+
+!block
+!   write(stderr, '(A)') repeat("=", 60)
+!   write(stderr, '(A,I0,A,I0,A)') "Atoms assigned: ", greedy_perm%current_size, " out of ", &
+!         assign_arrays%num_atoms1, " total atoms"
+!   write(stderr, '(A,F10.4)') "Greedy assignment total squared distance: ", total_dist
+!   write(stderr, '(A)') repeat("=", 60)
+!   call check_subperm(greedy_perm)
+!end block
 end subroutine
 
-subroutine collect_split_parts(assign_arrays, split_parts, num_split_parts)
-   ! Collect all parts that need assignments (have >= 2 items in both molecules)
-   type(array_trees_t), intent(in) :: assign_arrays
-   integer, allocatable, intent(out) :: split_parts(:)
-   integer, intent(out) :: num_split_parts
-   integer :: i, count
-
-   ! First pass: count split parts
-   count = 0
-   do i = 1, assign_arrays%total_chains
-      if (assign_arrays%assigntree(i)%split_part_idx > 0) then
-         if (assign_arrays%partree(assign_arrays%assigntree(i)%split_part_idx)%items1_count >= 2 .and. &
-             assign_arrays%partree(assign_arrays%assigntree(i)%split_part_idx)%items2_count >= 2) then
-            count = count + 1
-         end if
-      end if
-   end do
-
-   num_split_parts = count
-   allocate(split_parts(num_split_parts))
-
-   ! Second pass: collect split part indices
-   count = 0
-   do i = 1, assign_arrays%total_chains
-      if (assign_arrays%assigntree(i)%split_part_idx > 0) then
-         if (assign_arrays%partree(assign_arrays%assigntree(i)%split_part_idx)%items1_count >= 2 .and. &
-             assign_arrays%partree(assign_arrays%assigntree(i)%split_part_idx)%items2_count >= 2) then
-            count = count + 1
-            split_parts(count) = assign_arrays%assigntree(i)%split_part_idx
-         end if
-      end if
-   end do
-end subroutine
-
-recursive subroutine recurse_distribute_items_tree(coords1, coords2, assign_arrays, split_parts, &
+recursive subroutine recurse_distribute_items_global(coords1, coords2, assign_arrays, split_parts, &
                                 num_split_parts, current_split_idx, this_perm, best_perm, min_dist)
    ! Recursively try all assignments for all split parts
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
@@ -419,7 +444,7 @@ recursive subroutine recurse_distribute_items_tree(coords1, coords2, assign_arra
    if (current_split_idx > num_split_parts) then
       combination_count = combination_count + 1
       total_dist = least_total_sqdist(this_perm, coords1, coords2)
-      
+
       ! Update global best if this permutation is better
       if (total_dist < min_dist) then
          min_dist = total_dist
@@ -430,7 +455,7 @@ recursive subroutine recurse_distribute_items_tree(coords1, coords2, assign_arra
 
    ! Get the current split part
    split_part_idx = split_parts(current_split_idx)
-   
+
    ! Find the child branch that uses this split part
    child_branch_idx = 0
    do i = 1, assign_arrays%total_chains
@@ -460,7 +485,7 @@ recursive subroutine recurse_distribute_items_tree(coords1, coords2, assign_arra
          this_perm)
 
       ! Recursively try assignments for remaining split parts
-      call recurse_distribute_items_tree(coords1, coords2, assign_arrays, split_parts, num_split_parts, &
+      call recurse_distribute_items_global(coords1, coords2, assign_arrays, split_parts, num_split_parts, &
          current_split_idx + 1, this_perm, best_perm, min_dist)
 
       ! Restore permutation state
@@ -474,7 +499,7 @@ recursive subroutine recurse_distribute_items_tree(coords1, coords2, assign_arra
    end do
 end subroutine
 
-subroutine distribute_items_tree(coords1, coords2, assign_arrays, best_perm)
+subroutine distribute_items_global(coords1, coords2, assign_arrays, best_perm)
    ! DFS exploration of all permutations
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_arrays
@@ -505,7 +530,7 @@ subroutine distribute_items_tree(coords1, coords2, assign_arrays, best_perm)
    call collect_split_parts(assign_arrays, split_parts, num_split_parts)
 
    ! Try all assignments for all split parts
-   call recurse_distribute_items_tree(coords1, coords2, assign_arrays, split_parts, num_split_parts, 1, &
+   call recurse_distribute_items_global(coords1, coords2, assign_arrays, split_parts, num_split_parts, 1, &
       this_perm, best_perm, min_dist)
 
    ! Clean up
@@ -515,19 +540,21 @@ subroutine distribute_items_tree(coords1, coords2, assign_arrays, best_perm)
 !   write(stderr, '(A)') repeat("=", 60)
 !   write(stderr, '(A,I0)') "Split parts found: ", num_split_parts
 !   write(stderr, '(A,I0)') "Total permutations explored: ", combination_count
-!   write(stderr, '(A,I0,A,I0,A)') "Atoms assigned: ", best_perm%count, " out of ", num_atoms, " total atoms"
+!   write(stderr, '(A,I0,A,I0,A)') "Atoms assigned: ", best_perm%current_size, " out of ", num_atoms, " total atoms"
 !   write(stderr, '(A,F10.4)') "Minimum total squared distance: ", min_dist
 !   write(stderr, '(A)') repeat("=", 60)
 !   call check_subperm(best_perm)
 end subroutine
 
-recursive subroutine recurse_distribute_items_branch(coords1, coords2, assign_arrays, branch_idx, best_perm)
+recursive subroutine recurse_distribute_items_local(coords1, coords2, assign_arrays, &
+                                                    branch_idx, best_perm, accumulated_dist)
    ! DFS exploration of all assignment possibilities - finds permutation that minimizes total distance
-   ! OPTIMIZED: Reduces allocations by reusing arrays within branch scope, but maintains isolation between branches
-   real(rk), intent(in) :: coords1(:,:), coords2(:,:)  ! coordinates needed for distance calculation
+   ! OPTIMIZED: Incremental distance calculation to avoid redundant O(n) sqdistsum calls
+   real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_arrays
    integer, intent(in) :: branch_idx
    type(subperm_t), intent(inout) :: best_perm
+   real(rk), intent(inout) :: accumulated_dist  ! NEW: incrementally track distance
 
    integer :: child_branch_idx, first_link_idx, split_part_idx, i, items2_count, j
    integer :: link_idx, branch_link_offset, branch_num_links
@@ -552,27 +579,29 @@ recursive subroutine recurse_distribute_items_branch(coords1, coords2, assign_ar
       branch_num_links = assign_arrays%assigntree(child_branch_idx)%num_links
 
       items2_count = assign_arrays%partree(split_part_idx)%items2_count
-      min_branch_dist = huge(1.0_rk)  ! Best distance for this specific branch
+      min_branch_dist = huge(1.0_rk)
 
       call subperm_init(best_branch_perm, num_atoms)
       call subperm_init(branch_perm, num_atoms)
 
       ! Try pairing first item1 with each item2 to find best assignment for this branch
       do j = 1, items2_count
-         ! Reset branch assignment for this iteration
-         branch_perm%count = 0
+         ! Reset branch assignment and distance for this iteration
+         branch_perm%current_size = 0
+         branch_dist = 0.0_rk
 
-         ! Make assignment and recompute MNAs in one combined operation (using first item1, index=1)
-         call distribute_part_items(assign_arrays, split_part_idx, child_branch_idx, first_link_idx, 1, j, &
-            branch_perm)
+         ! Make assignment and recompute MNAs (using first item1, index=1)
+         call distribute_part_items(assign_arrays, split_part_idx, child_branch_idx, &
+                                   first_link_idx, 1, j, branch_perm)
 
-         ! Recursively explore subtree and collect child permutation
-         call recurse_distribute_items_branch(coords1, coords2, assign_arrays, child_branch_idx, branch_perm)
+         ! Add new assigned pairs distance to branch distance
+         branch_dist = branch_dist + sqdistsum(branch_perm, coords1, coords2)
 
-         ! Calculate partial distance for this branch
-         branch_dist = total_sqdist(branch_perm, coords1, coords2)
+         ! Recursively explore subtree - distance is accumulated in branch_dist
+         call recurse_distribute_items_local(coords1, coords2, assign_arrays, &
+                                            child_branch_idx, branch_perm, branch_dist)
 
-         ! Update best distance for this branch if this assignment is better
+         ! branch_dist now contains total accumulated distance - no recalculation needed!
          if (branch_dist < min_branch_dist) then
             min_branch_dist = branch_dist
             best_branch_perm = branch_perm
@@ -585,18 +614,22 @@ recursive subroutine recurse_distribute_items_branch(coords1, coords2, assign_ar
          end do
       end do
 
-      ! Update the optimal assignment with the best assigment from this branch
+      ! Update the optimal assignment with the best assignment from this branch
       call subperm_merge(best_perm, best_branch_perm)
+
+      ! Accumulate the best distance from this branch
+      accumulated_dist = accumulated_dist + min_branch_dist
    end do
 end subroutine
 
-subroutine distribute_items_branch(coords1, coords2, assign_arrays, best_perm)
+subroutine distribute_items_local(coords1, coords2, assign_arrays, best_perm)
    ! DFS exploration wrapper - finds optimal assignment among all possibilities
+   ! OPTIMIZED: Uses incremental distance calculation
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_arrays
    type(subperm_t), intent(out) :: best_perm
-   ! Local variables
    integer :: num_atoms
+   real(rk) :: total_dist
 
    num_atoms = assign_arrays%num_atoms1
 
@@ -609,20 +642,189 @@ subroutine distribute_items_branch(coords1, coords2, assign_arrays, best_perm)
    ! Initialize DFS exploration variables
    combination_count = 0
 
+   ! Initialize distance accumulator with preassigned pairs
+   total_dist = sqdistsum(best_perm, coords1, coords2)
+
    ! Perform DFS exploration to find optimal assignment (starting from root chain at index 1)
-   call recurse_distribute_items_branch(coords1, coords2, assign_arrays, 1, best_perm)
+   call recurse_distribute_items_local(coords1, coords2, assign_arrays, 1, best_perm, total_dist)
 
 !block
 !   integer :: assigned_count
-!   real(rk) :: total_dist
-!   assigned_count = best_perm%count
-!   total_dist = total_sqdist(best_perm, coords1, coords2)
+!   assigned_count = best_perm%current_size
 !   write(stderr, '(A)') repeat("=", 60)
 !   write(stderr, '(A,I0)') "Assignment combinations probed: ", combination_count
 !   write(stderr, '(A,I0,A,I0,A)') "Atoms assigned: ", assigned_count, " out of ", num_atoms, " total atoms"
 !   write(stderr, '(A,F10.4)') "Minimum total squared distance: ", total_dist
 !   write(stderr, '(A)') repeat("=", 60)
 !   call check_subperm(best_perm)
+!end block
+end subroutine
+
+recursive subroutine recurse_distribute_items_local_pruned(coords1, coords2, assign_arrays, &
+         branch_idx, total_budget, best_perm, accumulated_dist, success)
+   ! DFS exploration with pruning - finds permutation that minimizes total distance
+   ! OPTIMIZED: Incremental distance calculation to avoid redundant sqdistsum calls
+   real(rk), intent(in) :: coords1(:,:), coords2(:,:)
+   type(array_trees_t), intent(inout) :: assign_arrays
+   integer, intent(in) :: branch_idx
+   real(rk), intent(in) :: total_budget
+   type(subperm_t), intent(inout) :: best_perm
+   real(rk), intent(inout) :: accumulated_dist  ! NEW: incrementally track distance
+   logical, intent(inout) :: success
+
+   integer :: child_branch_idx, first_link_idx, split_part_idx, i, items2_count, j
+   integer :: link_idx, branch_link_offset, branch_num_links
+   type(subperm_t) :: best_branch_perm, branch_perm
+   real(rk) :: branch_dist, min_branch_dist
+   logical :: branch_success, child_success
+   real(rk) :: remaining_budget
+   integer :: num_atoms
+
+   num_atoms = assign_arrays%num_atoms1
+
+   ! Check if this is a leaf level (no more child branches)
+   if (assign_arrays%assigntree(branch_idx)%num_children == 0) then
+      combination_count = combination_count + 1
+      success = .true.
+      return
+   end if
+
+   ! Calculate remaining budget at this level
+   remaining_budget = total_budget - accumulated_dist
+
+   ! Process each child branch independently
+   do i = 1, assign_arrays%assigntree(branch_idx)%num_children
+      ! Early exit: if no threshold budget remains, remaining branches cannot succeed
+      if (remaining_budget <= 0.0_rk) then
+         success = .false.
+         return
+      end if
+
+      child_branch_idx = assign_arrays%assigntree(branch_idx)%child_indices(i)
+      first_link_idx = assign_arrays%assigntree(child_branch_idx)%link_offset + 1
+      split_part_idx = assign_arrays%assigntree(child_branch_idx)%split_part_idx
+      branch_link_offset = assign_arrays%assigntree(child_branch_idx)%link_offset
+      branch_num_links = assign_arrays%assigntree(child_branch_idx)%num_links
+
+      items2_count = assign_arrays%partree(split_part_idx)%items2_count
+      min_branch_dist = huge(1.0_rk)  ! Best distance for this specific branch
+      branch_success = .false.
+
+      call subperm_init(best_branch_perm, num_atoms)
+      call subperm_init(branch_perm, num_atoms)
+
+      ! Try pairing first item1 with each item2 to find best assignment for this branch
+      do j = 1, items2_count
+         ! Reset branch assignment for this iteration
+         branch_perm%current_size = 0
+         branch_dist = 0.0_rk
+
+         ! Make assignment and recompute MNAs in one combined operation (using first item1, index=1)
+         call distribute_part_items(assign_arrays, split_part_idx, child_branch_idx, first_link_idx, 1, j, &
+            branch_perm)
+
+         ! Add new assigned pairs distance to branch distance
+         branch_dist = branch_dist + sqdistsum(branch_perm, coords1, coords2)
+
+         ! PRUNING: Early check - only continue if current partial distance is within remaining threshold
+         if (branch_dist <= remaining_budget) then
+            child_success = .false.
+
+            ! Recursively explore subtree - distance accumulates in branch_dist
+            call recurse_distribute_items_local_pruned(coords1, coords2, assign_arrays, child_branch_idx, &
+               total_budget, branch_perm, branch_dist, child_success)
+
+            ! Only consider this branch if the recursive call succeeded
+            if (child_success) then
+               ! branch_dist now contains total accumulated distance - no recalculation needed!
+               if (branch_dist < min_branch_dist) then
+                  min_branch_dist = branch_dist
+                  best_branch_perm = branch_perm
+                  branch_success = .true.
+               end if
+            end if
+         end if
+
+         ! Reset state for next iteration - only reset links used by this branch
+         do link_idx = branch_link_offset + 1, branch_link_offset + branch_num_links
+            assign_arrays%itemdir1_entries(link_idx, :) = 0
+            assign_arrays%itemdir2_entries(link_idx, :) = 0
+         end do
+      end do
+
+      ! If this branch failed to find a solution, the entire recursion fails
+      if (.not. branch_success) then
+         success = .false.
+         return
+      end if
+
+      ! Update the optimal assignment with the best assignment from this branch
+      call subperm_merge(best_perm, best_branch_perm)
+
+      ! Accumulate the best distance from this branch
+      accumulated_dist = accumulated_dist + min_branch_dist
+
+      ! Update remaining budget (subtract this branch's contribution)
+      remaining_budget = remaining_budget - min_branch_dist
+   end do
+
+   ! If we get here, all branches succeeded
+   success = .true.
+end subroutine
+
+subroutine distribute_items_local_pruned(coords1, coords2, assign_arrays, total_budget, best_perm)
+   ! DFS exploration with pruning threshold - finds assignment within threshold
+   ! OPTIMIZED: Uses incremental distance calculation
+   real(rk), intent(in) :: coords1(:,:), coords2(:,:)
+   type(array_trees_t), intent(inout) :: assign_arrays
+   real(rk), intent(in) :: total_budget
+   type(subperm_t), intent(out) :: best_perm
+   ! Local variables
+   integer :: num_atoms
+   logical :: success
+   real(rk) :: accumulated_dist
+
+   num_atoms = assign_arrays%num_atoms1
+
+   ! Initialize optimal assignment
+   call subperm_init(best_perm, num_atoms)
+
+   ! Initialize assignment with preassigned pairs
+   call collect_leaf_assignments(assign_arrays, 1, best_perm)
+
+   ! Initialize accumulated distance with preassigned pairs
+   accumulated_dist = sqdistsum(best_perm, coords1, coords2)
+
+   ! Initialize DFS exploration variables
+   success = .false.
+   combination_count = 0
+
+   ! Perform pruned DFS exploration (starting from root chain at index 1)
+   call recurse_distribute_items_local_pruned(coords1, coords2, assign_arrays, 1, &
+      total_budget, best_perm, accumulated_dist, success)
+
+   if (.not. success) then
+      error stop 'No solution found within threshold'
+   end if
+
+!block
+!   integer :: assigned_count
+!
+!   assigned_count = best_perm%current_size
+!   write(stderr, '(A)') repeat("=", 60)
+!   write(stderr, '(A,F10.4)') "Pruning threshold: ", total_budget
+!   write(stderr, '(A,I0)') "Assignment combinations probed (pruned): ", combination_count
+!   write(stderr, '(A,I0,A,I0,A)') "Atoms assigned: ", assigned_count, " out of ", num_atoms, " total atoms"
+!
+!   if (success) then
+!      write(stderr, '(A,F10.4)') "Final total squared distance: ", accumulated_dist
+!      write(stderr, '(A)') "SUCCESS: Found solution within threshold"
+!      call check_subperm(best_perm)
+!   else
+!      write(stderr, '(A)') "FAILURE: No solution found within threshold"
+!      write(stderr, '(A)') "         best_perm should be ignored"
+!   end if
+!   write(stderr, '(A)') repeat("=", 60)
 !end block
 end subroutine
 

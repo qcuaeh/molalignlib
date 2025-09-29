@@ -51,7 +51,7 @@ type(partition_t) :: atomtypes
 type(assigntree_node_t), pointer :: mnachain
 type(array_trees_t) :: assign_arrays
 type(registry_t) :: registry
-real(rk) :: rmsd
+real(rk) :: rmsd, prune_thres
 real(rk) :: center1(3), center2(3), rotquat(4)
 real(rk), dimension(:), allocatable :: weights1, weights2
 real(rk), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, coords2r
@@ -76,6 +76,7 @@ count_flag = .true.
 rebond_flag = .false.
 mapping_flag = .false.
 label_flag = .false.
+iterate_flag = .true.
 
 max_records = 1
 count_thres = 10
@@ -248,13 +249,13 @@ if (align_flag) then
 !            rotquat = registry%records(i)%rotquat
             rotquat = least_rotquat( atomperm, coords1w, coords2w)
             coords2r = rotated_coords( coords2, rotquat, center1)
-            rmsd = sqrt( mean_sqdist( atomperm, weights1, coords1, coords2r))
+            rmsd = sqrt( sqdistmean( atomperm, weights1, coords1, coords2r))
 
             write (stdout,'(A)') str( rmsd)
 
             if (mapping_flag) then
-               do j = 1, atomperm%count
-                  write (stdout,'(I0," -> ",I0)') atomperm%subset(j), atomperm%permut(j)
+               do j = 1, atomperm%current_size
+                  write (stdout,'(I0," -> ",I0)') atomperm%subset1(j), atomperm%subset2(j)
                end do
             end if
 
@@ -269,16 +270,16 @@ if (align_flag) then
 
       else
 
-         call distribute_items_tree( coords1w, coords2w, assign_arrays, atomperm)
+         call distribute_items_global( coords1w, coords2w, assign_arrays, atomperm)
          rotquat = least_rotquat( atomperm, coords1w, coords2w)
          coords2r = rotated_coords( coords2, rotquat, center1)
-         rmsd = sqrt( mean_sqdist( atomperm, weights1, coords1, coords2r))
+         rmsd = sqrt( sqdistmean( atomperm, weights1, coords1, coords2r))
 
          write (stdout,'(A)') str( rmsd)
 
          if (mapping_flag) then
-            do j = 1, atomperm%count
-               write (stdout,'(I0," -> ",I0)') atomperm%subset(j), atomperm%permut(j)
+            do j = 1, atomperm%current_size
+               write (stdout,'(I0," -> ",I0)') atomperm%subset1(j), atomperm%subset2(j)
             end do
          end if
 
@@ -296,7 +297,7 @@ if (align_flag) then
       atomperm = default_atomperm( atoms1, atoms2)
       rotquat = least_rotquat( atomperm, coords1w, coords2w)
       coords2r = rotated_coords( coords2, rotquat, center1)
-      rmsd = sqrt( mean_sqdist( atomperm, weights1, coords1, coords2r))
+      rmsd = sqrt( sqdistmean( atomperm, weights1, coords1, coords2r))
 
       write (stdout,'(A)') str( rmsd)
 
@@ -321,11 +322,13 @@ else
       if (tree_flag) then
          call print_chain_tree_array( assign_arrays)
       end if
-      call distribute_items_branch( coords1w, coords2w, assign_arrays, atomperm)
-      rmsd = sqrt( mean_sqdist( atomperm, weights1, coords1, coords2))
+!      call distribute_items_local( coords1w, coords2w, assign_arrays, atomperm)
+      call distribute_items_greedy( coords1, coords2r, assign_arrays, atomperm, prune_thres)
+      call distribute_items_local_pruned( coords1w, coords2w, assign_arrays, prune_thres, atomperm)
+      rmsd = sqrt( sqdistmean( atomperm, weights1, coords1, coords2))
    else
       atomperm = default_atomperm( atoms1, atoms2)
-      rmsd = sqrt( mean_sqdist( atomperm, weights1, coords1, coords2))
+      rmsd = sqrt( sqdistmean( atomperm, weights1, coords1, coords2))
    end if
 
    write (stdout,'(A)') str( rmsd)

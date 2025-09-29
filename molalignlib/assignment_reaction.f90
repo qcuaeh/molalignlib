@@ -53,14 +53,11 @@ subroutine find_reactive_bonds( atoms1, atoms2, atomtypes, atomperm)
    type(real_matrix), dimension(:), allocatable :: minbiases
    type(registry_t), target :: registry
    integer :: adjd
-   integer, dimension(:), allocatable :: auxperm
    integer, dimension(:), allocatable :: elnums1, elnums2
    logical, dimension(:,:), allocatable :: adjmat1, adjmat2
    real(rk), dimension(:), allocatable :: weights1, weights2
    real(rk), dimension(:,:), allocatable :: wcoords1, wcoords2
    real(rk) :: center1(3), center2(3)
-
-   allocate (auxperm, mold=atomperm)
 
    elnums1 = atoms1%elnum
    elnums2 = atoms2%elnum
@@ -208,9 +205,9 @@ subroutine optimize_atomperm_isomer( atoms1, atoms2, registry)
    ! Local variables
    type(partition_t) :: atomtypes
    logical, dimension(:,:), allocatable :: adjmat1, adjmat2
-   integer, dimension(:), allocatable :: atomperm, auxperm
    integer, dimension(:), allocatable :: elnums1, elnums2
    real(rk), dimension(:,:), allocatable :: wcoords1, wcoords2
+   integer, dimension(:), allocatable :: atomperm
 
    ! Abort if molecules have different number of atoms
    if (size(atoms1) /= size(atoms2)) then
@@ -234,7 +231,6 @@ subroutine optimize_atomperm_isomer( atoms1, atoms2, registry)
    end if
 
    allocate (atomperm(size(atoms1)))
-   allocate (auxperm(size(atoms1)))
 
    elnums1 = atoms1%elnum
    elnums2 = atoms2%elnum

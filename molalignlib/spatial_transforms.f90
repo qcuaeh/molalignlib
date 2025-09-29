@@ -26,15 +26,15 @@ public angle
 public quatmul
 public quatrotmat
 public randrotquat
-public mean_sqdist
-public total_sqdist
+public sqdistmean
+public sqdistsum
 public rotate_coords
 public rotated_coords
 public translate_coords
 public least_rotquat
 public least_total_sqdist
 
-interface total_sqdist
+interface sqdistsum
    module procedure total_sqdist_base
    module procedure total_sqdist_perm
    module procedure total_sqdist_subperm
@@ -228,32 +228,32 @@ function rotated_coords_center(coords, rotquat, center) result(rotated_coords)
    end do
 end function
 
-real(rk) function total_sqdist_base(coords1, coords2) result(total_sqdist)
+real(rk) function total_sqdist_base(coords1, coords2) result(sqdistsum)
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
 
-   total_sqdist = sum(sum((coords1 - coords2)**2, dim=1))
+   sqdistsum = sum(sum((coords1 - coords2)**2, dim=1))
 end function
 
-real(rk) function total_sqdist_perm(atomperm, coords1, coords2) result(total_sqdist)
+real(rk) function total_sqdist_perm(atomperm, coords1, coords2) result(sqdistsum)
    integer, dimension(:), intent(in) :: atomperm
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
 
-   total_sqdist = sum(sum((coords1 - coords2(:, atomperm))**2, dim=1))
+   sqdistsum = sum(sum((coords1 - coords2(:, atomperm))**2, dim=1))
 end function
 
-real(rk) function total_sqdist_subperm(atomperm, coords1, coords2) result(total_sqdist)
+real(rk) function total_sqdist_subperm(atomperm, coords1, coords2) result(sqdistsum)
    type(subperm_t), target, intent(in) :: atomperm
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    ! Local variables
-   integer, dimension(:), pointer :: subs, perm
+   integer, dimension(:), pointer :: sub1, sub2
    integer :: i
 
-   subs => atomperm%subset
-   perm => atomperm%permut
+   sub1 => atomperm%subset1
+   sub2 => atomperm%subset2
 
-   total_sqdist = 0
-   do i = 1, atomperm%count
-      total_sqdist = total_sqdist + sum((coords1(:, subs(i)) - coords2(:, perm(i)))**2, dim=1)
+   sqdistsum = 0
+   do i = 1, atomperm%current_size
+      sqdistsum = sqdistsum + sum((coords1(:, sub1(i)) - coords2(:, sub2(i)))**2, dim=1)
    end do
 end function
 
@@ -264,17 +264,17 @@ function least_total_sqdist_subperm(atomperm, coords1, coords2) result(leastotsq
    real(rk) :: leastotsqdist
    real(rk) :: residuals(4, 4)
    real(rk), dimension(:,:), allocatable :: coordsp, coordsm
-   integer, dimension(:), pointer :: subs, perm
+   integer, dimension(:), pointer :: sub1, sub2
    integer :: i
 
-   subs => atomperm%subset
-   perm => atomperm%permut
-   allocate (coordsp(3, atomperm%count))
-   allocate (coordsm(3, atomperm%count))
+   sub1 => atomperm%subset1
+   sub2 => atomperm%subset2
+   allocate (coordsp(3, atomperm%current_size))
+   allocate (coordsm(3, atomperm%current_size))
 
-   do i = 1, atomperm%count
-      coordsp(:, i) = coords1(:, subs(i)) + coords2(:, perm(i))
-      coordsm(:, i) = coords1(:, subs(i)) - coords2(:, perm(i))
+   do i = 1, atomperm%current_size
+      coordsp(:, i) = coords1(:, sub1(i)) + coords2(:, sub2(i))
+      coordsm(:, i) = coords1(:, sub1(i)) - coords2(:, sub2(i))
    end do
 
    ! Compute residuals matrix using the common procedure
@@ -283,25 +283,25 @@ function least_total_sqdist_subperm(atomperm, coords1, coords2) result(leastotsq
    leastotsqdist = max(leasteigval(residuals), 0._rk)
 end function
 
-real(rk) function mean_sqdist(atomperm, weights, coords1, coords2)
+real(rk) function sqdistmean(atomperm, weights, coords1, coords2)
    type(subperm_t), target, intent(in) :: atomperm
    real(rk), dimension(:), intent(in) :: weights
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    ! Local variables
-   real(rk) :: total_weight, total_sqdist
-   integer, dimension(:), pointer :: subs, perm
+   real(rk) :: total_weight, sqdistsum
+   integer, dimension(:), pointer :: sub1, sub2
    integer :: i
 
-   subs => atomperm%subset
-   perm => atomperm%permut
+   sub1 => atomperm%subset1
+   sub2 => atomperm%subset2
 
    total_weight = 0
-   total_sqdist = 0
-   do i = 1, atomperm%count
-      total_weight = total_weight + weights(subs(i))
-      total_sqdist = total_sqdist + weights(subs(i))*sum((coords1(:, subs(i)) - coords2(:, perm(i)))**2, dim=1)
+   sqdistsum = 0
+   do i = 1, atomperm%current_size
+      total_weight = total_weight + weights(sub1(i))
+      sqdistsum = sqdistsum + weights(sub1(i))*sum((coords1(:, sub1(i)) - coords2(:, sub2(i)))**2, dim=1)
    end do
-   mean_sqdist = total_sqdist / total_weight
+   sqdistmean = sqdistsum / total_weight
 end function
 
 subroutine compute_residuals_matrix(coordsp, coordsm, residuals)
@@ -402,22 +402,22 @@ function least_rotquat_subperm(atomperm, coords1, coords2) result(rotquat)
    real(rk), dimension(4) :: rotquat
    real(rk), dimension(:,:), allocatable :: coordsp, coordsm
    real(rk) :: residuals(4, 4)
-   integer, dimension(:), pointer :: subs, perm
+   integer, dimension(:), pointer :: sub1, sub2
    integer :: i
 
-   subs => atomperm%subset
-   perm => atomperm%permut
-   allocate (coordsp(3, atomperm%count))
-   allocate (coordsm(3, atomperm%count))
+   sub1 => atomperm%subset1
+   sub2 => atomperm%subset2
+   allocate (coordsp(3, atomperm%current_size))
+   allocate (coordsm(3, atomperm%current_size))
 
-   do i = 1, atomperm%count
-      coordsp(:, i) = coords1(:, subs(i)) + coords2(:, perm(i))
-      coordsm(:, i) = coords1(:, subs(i)) - coords2(:, perm(i))
+   do i = 1, atomperm%current_size
+      coordsp(:, i) = coords1(:, sub1(i)) + coords2(:, sub2(i))
+      coordsm(:, i) = coords1(:, sub1(i)) - coords2(:, sub2(i))
    end do
 
    ! Compute residuals matrix using the common procedure
    call compute_residuals_matrix(coordsp, coordsm, residuals)
-!   total_sqdist = max(leasteigval(residuals), 0._rk)
+!   sqdistsum = max(leasteigval(residuals), 0._rk)
    rotquat = leasteigvec(residuals)
 end function
 

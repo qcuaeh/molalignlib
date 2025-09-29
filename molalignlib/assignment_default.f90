@@ -28,13 +28,13 @@ function default_atomperm(atoms1, atoms2) result(subperm)
    integer :: i
 
    call subperm_init( subperm, size(atoms1))
-   n => subperm%count
+   n => subperm%current_size
    do i = 1, size(atoms1)
       if (atoms1(i)%mask) then
          if (atoms2(i)%mask) then
             n = n + 1
-            subperm%subset(n) = i
-            subperm%permut(n) = i
+            subperm%subset1(n) = i
+            subperm%subset2(n) = i
          else
             write (stderr, '(A)') "Error: Aligning atoms don't match"
             stop 1

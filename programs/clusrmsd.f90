@@ -67,6 +67,7 @@ write_flag = .false.
 pipe_flag = .false.
 mass_flag = .false.
 label_flag = .false.
+iterate_flag = .true.
 
 max_records = 1
 count_thres = 10
@@ -218,7 +219,7 @@ if (align_flag) then
 !         rotquat = registry%records(i)%rotquat
          rotquat = least_rotquat( atomperm, coords1w, coords2w)
          coords2r = rotated_coords( coords2w, rotquat)
-         rmsd = sqrt( mean_sqdist( atomperm, weights1, coords1w, coords2r))
+         rmsd = sqrt( sqdistmean( atomperm, weights1, coords1w, coords2r))
 
          write (stdout,'(A)') str( rmsd)
 
@@ -235,7 +236,7 @@ if (align_flag) then
       atomperm = default_atomperm( atoms1, atoms2)
       rotquat = least_rotquat( coords1w, coords2w)
       coords2r = rotated_coords( coords2w, rotquat)
-      rmsd = sqrt( mean_sqdist( atomperm, weights1, coords1w, coords2r))
+      rmsd = sqrt( sqdistmean( atomperm, weights1, coords1w, coords2r))
 
       write (stdout,'(A)') str( rmsd)
 
@@ -257,10 +258,10 @@ else
    if (remap_flag) then
       call prune_procedure( atomtypes, atoms1, atoms2, prunes)
       call assign_atoms_pruned( atomtypes, coords1w, coords2w, prunes, atomperm)
-      rmsd = sqrt( mean_sqdist( atomperm, weights1, coords1w, coords2w))
+      rmsd = sqrt( sqdistmean( atomperm, weights1, coords1w, coords2w))
    else
       atomperm = default_atomperm( atoms1, atoms2)
-      rmsd = sqrt( mean_sqdist( atomperm, weights1, coords1w, coords2w))
+      rmsd = sqrt( sqdistmean( atomperm, weights1, coords1w, coords2w))
    end if
 
    write (stdout,'(A)') str( rmsd)

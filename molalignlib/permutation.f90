@@ -20,11 +20,10 @@ implicit none
 
 ! Derived type to store permutation subsets
 type :: subperm_t
-   integer :: perm_size  ! total permutation size
-   integer :: count  ! partial permutation count
-   integer, allocatable :: subset(:)  ! indices of assigned entries in permutation
-   integer, allocatable :: permut(:)  ! permut(i) = j means atom i -> atom j
-   integer, allocatable :: backward(:)  ! backward(j) = i means atom i -> atom j
+   integer :: total_size  ! full permutation size
+   integer :: current_size  ! total permutation size
+   integer, allocatable :: subset1(:)  ! indices of assigned atoms in mol1
+   integer, allocatable :: subset2(:)  ! indices of assigned atoms in mol2
 end type
 
 interface operator(==)
@@ -90,20 +89,20 @@ elemental function subperm_equality(left, right) result(equality)
    logical :: equality
    integer :: i
 
-   if (left%count /= right%count) then
+   if (left%current_size /= right%current_size) then
       equality = .false.
       return
    end if
 
-!   do i = 1, left%count
-!      if (left%subset(i) /= right%subset(i)) then
+!   do i = 1, left%current_size
+!      if (left%subset1(i) /= right%subset1(i)) then
 !         equality = .false.
 !         return
 !      end if
 !   end do
 
-   do i = 1, left%count
-      if (left%permut(i) /= right%permut(i)) then
+   do i = 1, left%current_size
+      if (left%subset2(i) /= right%subset2(i)) then
          equality = .false.
          return
       end if
@@ -116,10 +115,10 @@ subroutine subperm_init(subperm, perm_size)
    type(subperm_t), intent(out) :: subperm
    integer, intent(in) :: perm_size
 
-   allocate(subperm%subset(perm_size))
-   allocate(subperm%permut(perm_size))
-   subperm%perm_size = perm_size
-   subperm%count = 0
+   allocate(subperm%subset1(perm_size))
+   allocate(subperm%subset2(perm_size))
+   subperm%total_size = perm_size
+   subperm%current_size = 0
 end subroutine
 
 subroutine subperm_add(subperm, i1, i2)
@@ -133,18 +132,18 @@ subroutine subperm_add(subperm, i1, i2)
    block
       ! Check for conflicts
       integer :: i
-      do i = 1, subperm%count
-         if (subperm%subset(i) == i1 .or. subperm%permut(i) == i2) then
+      do i = 1, subperm%current_size
+         if (subperm%subset1(i) == i1 .or. subperm%subset2(i) == i2) then
             error stop "subperm index conflict"
          end if
       end do
    end block
    end if
 
-   n = subperm%count + 1
-   subperm%subset(n) = i1
-   subperm%permut(n) = i2
-   subperm%count = n
+   n = subperm%current_size + 1
+   subperm%subset1(n) = i1
+   subperm%subset2(n) = i2
+   subperm%current_size = n
 end subroutine
 
 subroutine subperm_merge(subperm, other_subperm)
@@ -153,9 +152,9 @@ subroutine subperm_merge(subperm, other_subperm)
    type(subperm_t), intent(in) :: other_subperm
    integer :: i, i1, i2
 
-   do i = 1, other_subperm%count
-      i1 = other_subperm%subset(i)
-      i2 = other_subperm%permut(i)
+   do i = 1, other_subperm%current_size
+      i1 = other_subperm%subset1(i)
+      i2 = other_subperm%subset2(i)
       call subperm_add( subperm, i1, i2)
    end do
 end subroutine
@@ -167,12 +166,12 @@ subroutine subperm_to_perm(subperm, perm, invperm)
    ! Local variables
    integer :: i, i1, i2, j1, j2
 
-   perm = identity_permutation(subperm%perm_size)
-   invperm = identity_permutation(subperm%perm_size)
+   perm = identity_permutation(subperm%total_size)
+   invperm = identity_permutation(subperm%total_size)
 
-   do i = 1, subperm%count
-      i1 = subperm%subset(i)
-      i2 = subperm%permut(i)
+   do i = 1, subperm%current_size
+      i1 = subperm%subset1(i)
+      i2 = subperm%subset2(i)
       j1 = invperm(i2)
       j2 = perm(i1)
       perm(i1) = i2
@@ -185,8 +184,8 @@ end subroutine
 subroutine check_subperm(subperm)
    implicit none
    type(subperm_t), intent(in) :: subperm
-   logical :: subset_seen(subperm%perm_size)
-   logical :: permut_seen(subperm%perm_size)
+   logical :: subset_seen(subperm%total_size)
+   logical :: permut_seen(subperm%total_size)
    logical :: has_errors
    integer :: i, src_idx, tgt_idx
 
@@ -195,21 +194,21 @@ subroutine check_subperm(subperm)
    permut_seen = .false.
 
    ! Check if count is within valid bounds
-   if (subperm%count < 0 .or. subperm%count > subperm%perm_size) then
-      write(stderr, '(A,I0,A,I0,A)') 'Count ', subperm%count, &
-         ' is out of range [0,', subperm%perm_size, ']'
+   if (subperm%current_size < 0 .or. subperm%current_size > subperm%total_size) then
+      write(stderr, '(A,I0,A,I0,A)') 'Count ', subperm%current_size, &
+         ' is out of range [0,', subperm%total_size, ']'
       has_errors = .true.
    end if
 
    ! Check each pair in the partial permutation
-   do i = 1, subperm%count
-      src_idx = subperm%subset(i)
-      tgt_idx = subperm%permut(i)
+   do i = 1, subperm%current_size
+      src_idx = subperm%subset1(i)
+      tgt_idx = subperm%subset2(i)
 
       ! Check if source index is out of bounds
-      if (src_idx < 1 .or. src_idx > subperm%perm_size) then
+      if (src_idx < 1 .or. src_idx > subperm%total_size) then
          write(stderr, '(A,I0,A,I0,A,I0,A)') 'Source index ', src_idx, &
-            ' at position ', i, ' is out of range [1,', subperm%perm_size, ']'
+            ' at position ', i, ' is out of range [1,', subperm%total_size, ']'
          has_errors = .true.
       else
          ! Only check for repetition if within bounds
@@ -223,9 +222,9 @@ subroutine check_subperm(subperm)
       end if
 
       ! Check if target index is out of bounds
-      if (tgt_idx < 1 .or. tgt_idx > subperm%perm_size) then
+      if (tgt_idx < 1 .or. tgt_idx > subperm%total_size) then
          write(stderr, '(A,I0,A,I0,A,I0,A)') 'Target index ', tgt_idx, &
-            ' at position ', i, ' is out of range [1,', subperm%perm_size, ']'
+            ' at position ', i, ' is out of range [1,', subperm%total_size, ']'
          has_errors = .true.
       else
          ! Only check for repetition if within bounds
@@ -243,7 +242,7 @@ subroutine check_subperm(subperm)
       error stop 'Sub-permutation is not valid'
    else
       write(stderr, '(A,I0,A,I0,A)') 'Sub-permutation is valid (', &
-         subperm%count, '/', subperm%perm_size, ' assignments)'
+         subperm%current_size, '/', subperm%total_size, ' assignments)'
    end if
 end subroutine
 

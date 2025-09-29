@@ -28,9 +28,7 @@ use atom_mnas
 use atom_types
 use pruning
 use registration
-
 implicit none
-logical, parameter :: iter_flag = .true.
 
 contains
 
@@ -42,9 +40,9 @@ subroutine optimize_atomperm_cluster(coords1, coords2, atomtypes, prunes, regist
 
    ! Local variables
    integer :: num_steps
-   type(subperm_t) :: atomperm, auxperm
+   type(subperm_t) :: atomperm, new_atomperm
    real(rk), dimension(:,:), allocatable :: coords2r
-   real(rk) :: rmsd, rotation_step(4), rotation(4)
+   real(rk) :: permdist, rotation_step(4), rotation(4)
 
    ! Initialize random number generator
    call random_initialize()
@@ -66,19 +64,21 @@ subroutine optimize_atomperm_cluster(coords1, coords2, atomtypes, prunes, regist
       rotation = quatmul( rotation, rotation_step)
       num_steps = 1
 
-      do while (iter_flag)
-         call assign_atoms_pruned( atomtypes, coords1, coords2r, prunes, auxperm)
-         if (auxperm == atomperm) exit
-         atomperm = auxperm
-         rotation_step = least_rotquat( atomperm, coords1, coords2r)
-         call rotate_coords( coords2r, rotation_step)
-         rotation = quatmul( rotation, rotation_step)
-         num_steps = num_steps + 1
-      end do
+      if (iterate_flag) then
+         do
+            call assign_atoms_pruned( atomtypes, coords1, coords2r, prunes, new_atomperm)
+            if (new_atomperm == atomperm) exit
+            atomperm = new_atomperm
+            rotation_step = least_rotquat( atomperm, coords1, coords2r)
+            call rotate_coords( coords2r, rotation_step)
+            rotation = quatmul( rotation, rotation_step)
+            num_steps = num_steps + 1
+         end do
+      end if
 
       ! Push local minimum to registry
-      rmsd = sqrt( total_sqdist( atomperm, coords1, coords2r))
-      call push_record( registry, atomperm, num_steps, rmsd=rmsd, rotation=rotation)
+      permdist = sqrt( sqdistsum( atomperm, coords1, coords2r))
+      call push_record( registry, atomperm, num_steps, permdist=permdist, rotation=rotation)
 
    end do
 

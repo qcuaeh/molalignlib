@@ -41,11 +41,11 @@ subroutine assign_atoms_nearest( atomtypes, coords1, coords2, atomperm)
    integer, dimension(:), intent(out) :: atomperm
    ! Local variables
    integer :: h, num_items1
-   integer, dimension(:), allocatable :: auxperm
+   integer, dimension(:), allocatable :: perm
    integer, dimension(:), pointer :: items1, items2
    real(rk) :: dist
 
-   allocate (auxperm(maxval(atomtypes%parts%num_items1)))
+   allocate (perm(maxval(atomtypes%parts%num_items1)))
 
    ! Fill distance matrix for each block
 
@@ -53,8 +53,8 @@ subroutine assign_atoms_nearest( atomtypes, coords1, coords2, atomperm)
       num_items1 = atomtypes%parts(h)%num_items1
       items1 => atomtypes%parts(h)%items1
       items2 => atomtypes%parts(h)%items2
-      call solve_lap_nearest(num_items1, items1, items2, coords1, coords2, auxperm, dist)
-      atomperm(items1) = items2(auxperm(:num_items1))
+      call solve_lap_nearest(num_items1, items1, items2, coords1, coords2, perm, dist)
+      atomperm(items1) = items2(perm(:num_items1))
    end do
 end subroutine
 
@@ -67,14 +67,14 @@ subroutine assign_atoms_pruned( atomtypes, coords1, coords2, prunes, atomperm)
    type(subperm_t), intent(out) :: atomperm
    ! Local variables
    integer :: h, num_items1
-   integer, dimension(:), allocatable :: auxperm
+   integer, dimension(:), allocatable :: perm
    integer, dimension(:), pointer :: items1, items2
    real(rk) :: dist
    integer :: i, j
 
    call subperm_init(atomperm, size(coords1, dim=2))
-   atomperm%count = size(coords1, dim=2)
-   allocate (auxperm(maxval(atomtypes%parts%num_items1)))
+   atomperm%current_size = size(coords1, dim=2)
+   allocate (perm(maxval(atomtypes%parts%num_items1)))
 
    ! Optimize atomperm for each block
    i = 0
@@ -82,12 +82,12 @@ subroutine assign_atoms_pruned( atomtypes, coords1, coords2, prunes, atomperm)
       num_items1 = atomtypes%parts(h)%num_items1
       items1 => atomtypes%parts(h)%items1
       items2 => atomtypes%parts(h)%items2
-      call solve_lap_pruned(num_items1, items1, items2, coords1, coords2, prunes(h)%ee, auxperm, dist)
-!      atomperm(items1) = items2(auxperm(:num_items1))
+      call solve_lap_pruned(num_items1, items1, items2, coords1, coords2, prunes(h)%ee, perm, dist)
+!      atomperm(items1) = items2(perm(:num_items1))
       do j = 1, num_items1
          i = i + 1
-         atomperm%subset(i) = items1(j)
-         atomperm%permut(items1(j)) = items2(auxperm(j))
+         atomperm%subset1(i) = items1(j)
+         atomperm%subset2(items1(j)) = items2(perm(j))
       end do
    end do
 end subroutine
@@ -101,14 +101,14 @@ subroutine assign_atoms( atomtypes, coords1, coords2, atomperm, dist)
    real(rk), intent(out) :: dist
    ! Local variables
    integer :: h
-   integer, dimension(:), allocatable :: auxperm
+   integer, dimension(:), allocatable :: perm
 
-   allocate (auxperm(maxval(atomtypes%parts%num_items1)))
+   allocate (perm(maxval(atomtypes%parts%num_items1)))
 
    ! Optimize atomperm for each block
    do h = 1, atomtypes%num_parts
-      call solve_lap(atomtypes%parts(h), coords1, coords2, auxperm, dist)
-      atomperm(atomtypes%parts(h)%items1) = atomtypes%parts(h)%items2(auxperm(:atomtypes%parts(h)%num_items1))
+      call solve_lap(atomtypes%parts(h), coords1, coords2, perm, dist)
+      atomperm(atomtypes%parts(h)%items1) = atomtypes%parts(h)%items2(perm(:atomtypes%parts(h)%num_items1))
    end do
 end subroutine
 
@@ -121,15 +121,15 @@ subroutine assign_atoms_biased( atomtypes, coords1, coords2, biases, atomperm)
    integer, dimension(:), intent(out) :: atomperm
    ! Local variables
    integer :: h
-   integer, dimension(:), allocatable :: auxperm
+   integer, dimension(:), allocatable :: perm
    real(rk) :: dist
 
-   allocate (auxperm(maxval(atomtypes%parts%num_items1)))
+   allocate (perm(maxval(atomtypes%parts%num_items1)))
 
    ! Optimize atomperm for each block
    do h = 1, atomtypes%num_parts
-      call solve_lap_biased(atomtypes%parts(h), coords1, coords2, biases(h)%ee, auxperm, dist)
-      atomperm(atomtypes%parts(h)%items1) = atomtypes%parts(h)%items2(auxperm(:atomtypes%parts(h)%num_items1))
+      call solve_lap_biased(atomtypes%parts(h), coords1, coords2, biases(h)%ee, perm, dist)
+      atomperm(atomtypes%parts(h)%items1) = atomtypes%parts(h)%items2(perm(:atomtypes%parts(h)%num_items1))
    end do
 end subroutine
 

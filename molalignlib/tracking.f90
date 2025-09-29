@@ -157,7 +157,7 @@ subroutine minadjdiff( atomtypes, mnatypes, molfrags, atoms1, atoms2, coords1, &
    tracked(:) = .false.
    invperm = inverse_permutation( atomperm)
    moldiff = adjacencydiff( atomperm, adjmat1, adjmat2)
-   moldist = total_sqdist( atomperm, coords1, coords2)
+   moldist = sqdistsum( atomperm, coords1, coords2)
 
    if ( print_info ) then
       print '(a,1x,i0)', "moldiff:", moldiff
@@ -173,7 +173,7 @@ subroutine minadjdiff( atomtypes, mnatypes, molfrags, atoms1, atoms2, coords1, &
    if ( print_info ) then
       print '(a,1x,i0)', "Fragments:", size(molfrags)
       print '(a,1x,i0,1x,i0)', "moldiff:", adjacencydiff( atomperm, adjmat1, adjmat2), moldiff
-      print '(a,1x,f0.4,1x,f0.4)', "moldist:", total_sqdist( atomperm, coords1, coords2), moldist
+      print '(a,1x,f0.4,1x,f0.4)', "moldist:", sqdistsum( atomperm, coords1, coords2), moldist
    end if
 
 !    if (adjacencydiff( atomperm, adjmat1, adjmat2) /= moldiff) then

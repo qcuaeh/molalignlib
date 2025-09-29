@@ -34,9 +34,7 @@ use assigntree_build
 use assigntree_distribute_linked
 use assigntree_distribute
 use registration
-
 implicit none
-logical, parameter :: iter_flag = .true.
 
 contains
 
@@ -46,9 +44,9 @@ subroutine optimize_atomperm_conform( coords1, coords2, assign_arrays, registry)
    type(registry_t), target, intent(out) :: registry
 
    ! Local variables
-   type(subperm_t) :: atomperm, auxperm
+   type(subperm_t) :: atomperm, new_atomperm
    real(rk), dimension(:,:), allocatable :: coords2r
-   real(rk) :: rmsd, rotation_step(4), rotation(4)
+   real(rk) :: permdist, prune_thres, rotation_step(4), rotation(4)
    integer, pointer :: num_trials, lead_count
    integer :: num_steps
 
@@ -68,26 +66,31 @@ subroutine optimize_atomperm_conform( coords1, coords2, assign_arrays, registry)
       coords2r = rotated_coords( coords2, rotation)
 
       ! Assign atoms with current orientation
-      call distribute_items_branch( coords1, coords2r, assign_arrays, atomperm)
+!      call distribute_items_local( coords1, coords2r, assign_arrays, atomperm)
+      call distribute_items_greedy( coords1, coords2r, assign_arrays, atomperm, prune_thres)
+      call distribute_items_local_pruned( coords1, coords2r, assign_arrays, prune_thres, atomperm)
       rotation_step = least_rotquat( atomperm, coords1, coords2r)
       call rotate_coords( coords2r, rotation_step)
       rotation = quatmul( rotation, rotation_step)
       num_steps = 1
 
-      do while (iter_flag)
-         call distribute_items_branch( coords1, coords2r, assign_arrays, auxperm)
-!         write (stderr,'(F8.4)') sqrt( total_sqdist( auxperm, coords1, coords2r))
-         if (auxperm == atomperm) exit
-         atomperm = auxperm
-         rotation_step = least_rotquat( atomperm, coords1, coords2r)
-         call rotate_coords( coords2r, rotation_step)
-         rotation = quatmul( rotation, rotation_step)
-         num_steps = num_steps + 1
-      end do
+      if (iterate_flag) then
+         do
+!            call distribute_items_local( coords1, coords2r, assign_arrays, new_atomperm)
+            prune_thres = sqdistsum( atomperm, coords1, coords2r)
+            call distribute_items_local_pruned( coords1, coords2r, assign_arrays, prune_thres, new_atomperm)
+            if (new_atomperm == atomperm) exit
+            atomperm = new_atomperm
+            rotation_step = least_rotquat( atomperm, coords1, coords2r)
+            call rotate_coords( coords2r, rotation_step)
+            rotation = quatmul( rotation, rotation_step)
+            num_steps = num_steps + 1
+         end do
+      end if
 
       ! Update results
-      rmsd = sqrt( total_sqdist( atomperm, coords1, coords2r))
-      call push_record( registry, atomperm, num_steps, rmsd=rmsd, rotation=rotation)
+      permdist = sqdistsum( atomperm, coords1, coords2r)
+      call push_record( registry, atomperm, num_steps, permdist=permdist, rotation=rotation)
 
    end do
 end subroutine
