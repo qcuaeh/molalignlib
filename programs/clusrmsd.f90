@@ -58,7 +58,6 @@ integer :: i
 
 ! Set default options
 
-test_flag = .false.
 stats_flag = .false.
 mirror_flag = .false.
 align_flag = .false.
@@ -67,6 +66,7 @@ write_flag = .false.
 pipe_flag = .false.
 mass_flag = .false.
 label_flag = .false.
+random_flag = .false.
 iterate_flag = .true.
 
 max_records = 1
@@ -115,8 +115,8 @@ do while (get_arg(arg))
       call read_optarg( arg, extpipe)
    case ('-stats')
       stats_flag = .true.
-   case ('-test')
-      test_flag = .true.
+   case ('-random')
+      random_flag = .true.
    case default
       call read_posarg( arg, posargs)
    end select

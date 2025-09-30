@@ -25,10 +25,10 @@ contains
 
 subroutine random_initialize()
 
-   if (test_flag) then
-      call default_set_seeds()
-   else
+   if (random_flag) then
       call time_set_seeds()
+   else
+      call default_set_seeds()
    end if
 
 end subroutine

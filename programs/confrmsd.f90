@@ -61,7 +61,6 @@ integer :: i, j
 
 ! Set default options
 
-test_flag = .false.
 stats_flag = .false.
 heavy_flag = .false.
 mirror_flag = .false.
@@ -76,6 +75,7 @@ count_flag = .true.
 rebond_flag = .false.
 mapping_flag = .false.
 label_flag = .false.
+random_flag = .false.
 iterate_flag = .true.
 
 max_records = 1
@@ -124,8 +124,8 @@ do while (get_arg(arg))
       tree_flag = .true.
    case ('-stats')
       stats_flag = .true.
-   case ('-test')
-      test_flag = .true.
+   case ('-random')
+      random_flag = .true.
    case ('-rebond')
       rebond_flag = .true.
    case default
