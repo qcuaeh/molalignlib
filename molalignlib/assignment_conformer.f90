@@ -772,7 +772,7 @@ recursive subroutine recurse_assign_atoms_local_pruned(coords1, coords2, assign_
    success = .true.
 end subroutine
 
-subroutine assign_atoms_local_pruned(coords1, coords2, assign_arrays, total_budget, best_perm)
+logical function assign_atoms_local_pruned(coords1, coords2, assign_arrays, total_budget, best_perm) result(success)
    ! DFS exploration with pruning threshold - finds assignment within threshold
    ! OPTIMIZED: Uses incremental distance calculation
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
@@ -781,7 +781,6 @@ subroutine assign_atoms_local_pruned(coords1, coords2, assign_arrays, total_budg
    type(subperm_t), intent(out) :: best_perm
    ! Local variables
    integer :: num_atoms
-   logical :: success
    real(rk) :: accumulated_dist
 
    num_atoms = assign_arrays%num_atoms1
@@ -803,10 +802,6 @@ subroutine assign_atoms_local_pruned(coords1, coords2, assign_arrays, total_budg
    call recurse_assign_atoms_local_pruned(coords1, coords2, assign_arrays, 1, &
       total_budget, best_perm, accumulated_dist, success)
 
-   if (.not. success) then
-      error stop 'No solution found within threshold'
-   end if
-
 !block
 !   integer :: assigned_count
 !
@@ -826,6 +821,6 @@ subroutine assign_atoms_local_pruned(coords1, coords2, assign_arrays, total_budg
 !   end if
 !   write(stderr, '(A)') repeat("=", 60)
 !end block
-end subroutine
+end function
 
 end module

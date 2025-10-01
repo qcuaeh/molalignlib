@@ -114,7 +114,7 @@ subroutine find_reactive_bonds( atoms1, atoms2, atomtypes, atomperm)
       call minadjdiff( atomtypes, scnatypes, molfrags1, atoms1, atoms2, wcoords1, wcoords2, atomperm)
       ! Update results
       adjd = adjacencydiff( atomperm, adjmat1, adjmat2)
-      call push_record( registry, atomperm, 1, adjd=adjd)
+      call insert_record( registry, atomperm, 1, adjd=adjd)
 
    end do
 

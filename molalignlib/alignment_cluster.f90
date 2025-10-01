@@ -43,6 +43,7 @@ subroutine optimize_atomperm_cluster(coords1, coords2, atomtypes, prunes, regist
    type(subperm_t) :: atomperm, new_atomperm
    real(rk), dimension(:,:), allocatable :: coords2r
    real(rk) :: permdist, rotation_step(4), rotation(4)
+   integer :: insert_pos
 
    ! Initialize random number generator
    call random_initialize()
@@ -78,7 +79,7 @@ subroutine optimize_atomperm_cluster(coords1, coords2, atomtypes, prunes, regist
 
       ! Push local minimum to registry
       permdist = sqrt( sqdistsum( atomperm, coords1, coords2r))
-      call push_record( registry, atomperm, num_steps, permdist=permdist, rotation=rotation)
+      insert_pos = insert_record( registry, atomperm, num_steps, permdist=permdist, rotation=rotation)
 
    end do
 

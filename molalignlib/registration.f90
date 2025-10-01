@@ -24,7 +24,7 @@ private
 
 public record_t
 public registry_t
-public push_record
+public insert_record
 public print_records
 public init_rmsd_registry
 public init_adjd_registry
@@ -51,70 +51,70 @@ end type
 
 contains
 
-subroutine init_rmsd_registry(self, max_records)
-   class(registry_t), intent(inout) :: self
+subroutine init_rmsd_registry(registry, max_records)
+   class(registry_t), intent(inout) :: registry
    integer, intent(in) :: max_records
 
    if (max_records < 1) then
       error stop 'max_records < 1'
    end if
 
-   self%use_position = .true.
-   self%use_adjacency = .false.
-   self%num_records = 0
-   self%num_trials = 0
-   self%total_steps = 0
-   self%overflow = .false.
+   registry%use_position = .true.
+   registry%use_adjacency = .false.
+   registry%num_records = 0
+   registry%num_trials = 0
+   registry%total_steps = 0
+   registry%overflow = .false.
 
-   allocate (self%records(max_records))
+   allocate (registry%records(max_records))
 
-   self%records%count = 0
-   self%records%permdist = huge(self%records(1)%permdist)
+   registry%records%count = 0
+   registry%records%permdist = huge(registry%records(1)%permdist)
 end subroutine
 
-subroutine init_dual_registry(self, max_records)
-   class(registry_t), intent(inout) :: self
+subroutine init_dual_registry(registry, max_records)
+   class(registry_t), intent(inout) :: registry
    integer, intent(in) :: max_records
 
    if (max_records < 1) then
       error stop 'max_records < 1'
    end if
 
-   self%use_position = .true.
-   self%use_adjacency = .true.
-   self%num_records = 0
-   self%num_trials = 0
-   self%total_steps = 0
-   self%overflow = .false.
+   registry%use_position = .true.
+   registry%use_adjacency = .true.
+   registry%num_records = 0
+   registry%num_trials = 0
+   registry%total_steps = 0
+   registry%overflow = .false.
 
-   allocate (self%records(max_records))
+   allocate (registry%records(max_records))
 
-   self%records%count = 0
-   self%records%adjd = huge(self%records(1)%adjd)
+   registry%records%count = 0
+   registry%records%adjd = huge(registry%records(1)%adjd)
 end subroutine
 
-subroutine init_adjd_registry(self, max_records)
-   class(registry_t), intent(inout) :: self
+subroutine init_adjd_registry(registry, max_records)
+   class(registry_t), intent(inout) :: registry
    integer, intent(in) :: max_records
 
    if (max_records < 1) then
       error stop 'max_records < 1'
    end if
 
-   self%use_position = .false.
-   self%use_adjacency = .true.
-   self%num_records = 0
-   self%num_trials = 0
-   self%overflow = .false.
+   registry%use_position = .false.
+   registry%use_adjacency = .true.
+   registry%num_records = 0
+   registry%num_trials = 0
+   registry%overflow = .false.
 
-   allocate (self%records(max_records))
+   allocate (registry%records(max_records))
 
-   self%records%count = 0
-   self%records%adjd = huge(self%records(1)%adjd)
+   registry%records%count = 0
+   registry%records%adjd = huge(registry%records(1)%adjd)
 end subroutine
 
-subroutine push_record(self, atomperm, num_steps, adjd, permdist, rotation)
-   class(registry_t), target, intent(inout) :: self
+integer function insert_record(registry, atomperm, num_steps, adjd, permdist, rotation)
+   class(registry_t), target, intent(inout) :: registry
    type(subperm_t), intent(in) :: atomperm
    integer, intent(in) :: num_steps
    integer, intent(in), optional :: adjd
@@ -126,27 +126,27 @@ subroutine push_record(self, atomperm, num_steps, adjd, permdist, rotation)
    integer :: i, j
 
    ! Validate required parameters based on flags
-   if (.not. self%use_position .and. .not. self%use_adjacency) then
+   if (.not. registry%use_position .and. .not. registry%use_adjacency) then
       error stop 'Registry not properly initialized - no processing mode enabled'
    end if
 
    ! Handle position-based processing
-   if (self%use_position) then
+   if (registry%use_position) then
       if (.not. present(permdist)) error stop 'permdist required when use_position=TRUE'
       if (.not. present(rotation)) error stop 'rotation required when use_position=TRUE'
    end if
 
    ! Handle adjacency-based processing
-   if (self%use_adjacency) then
+   if (registry%use_adjacency) then
       if (.not. present(adjd)) error stop 'adjd required when use_adjacency=TRUE'
    end if
 
-   self%num_trials = self%num_trials + 1
-   self%total_steps = self%total_steps + num_steps
+   registry%num_trials = registry%num_trials + 1
+   registry%total_steps = registry%total_steps + num_steps
 
    ! Check for existing records to update
-   do i = 1, self%num_records
-      record => self%records(i)
+   do i = 1, registry%num_records
+      record => registry%records(i)
       if (atomperm == record%atomperm) then
          record%count = record%count + 1
          record%aver_steps = record%aver_steps + (num_steps - record%aver_steps) / record%count
@@ -155,22 +155,25 @@ subroutine push_record(self, atomperm, num_steps, adjd, permdist, rotation)
    end do
 
    ! Find insertion point and insert new record
-   do i = 1, size(self%records)
-      record => self%records(i)
+   insert_record = 0
+   do i = 1, size(registry%records)
+      record => registry%records(i)
 
       ! Determine insertion criteria based on mode
-      if (self%use_adjacency .and. self%use_position) then
+      if (registry%use_adjacency .and. registry%use_position) then
          should_insert = (adjd < record%adjd .or. (adjd == record%adjd .and. permdist < record%permdist))
-      else if (self%use_position) then
+      else if (registry%use_position) then
          should_insert = (permdist < record%permdist)
       else
          should_insert = (adjd < record%adjd)
       end if
 
       if (should_insert) then
+         insert_record = i
+
          ! Shift records to make room
-         do j = size(self%records), i + 1, -1
-            self%records(j) = self%records(j - 1)
+         do j = size(registry%records), i + 1, -1
+            registry%records(j) = registry%records(j - 1)
          end do
 
          ! Initialize new record
@@ -178,13 +181,13 @@ subroutine push_record(self, atomperm, num_steps, adjd, permdist, rotation)
          record%count = 1
 
          ! Set fields based on enabled processing modes
-         if (self%use_position) then
+         if (registry%use_position) then
             record%permdist = permdist
             record%rotation = rotation
             record%aver_steps = num_steps
          end if
 
-         if (self%use_adjacency) then
+         if (registry%use_adjacency) then
             record%adjd = adjd
          end if
 
@@ -193,14 +196,14 @@ subroutine push_record(self, atomperm, num_steps, adjd, permdist, rotation)
    end do
 
    ! Update record count and overflow status
-   if (.not. self%overflow) then
-      if (self%num_records < size(self%records)) then
-         self%num_records = self%num_records + 1
+   if (.not. registry%overflow) then
+      if (registry%num_records < size(registry%records)) then
+         registry%num_records = registry%num_records + 1
       else
-         self%overflow = .true.
+         registry%overflow = .true.
       end if
    end if
-end subroutine
+end function
 
 subroutine print_records(registry)
    type(registry_t), intent(in) :: registry

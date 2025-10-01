@@ -343,7 +343,7 @@ function least_rotquat_base(coords1, coords2) result(rotquat)
 ! Find the optimal rotation in quaternion representation by least squares minimization
 ! Reference: Acta Cryst. (1989). A45, 208-210
    real(rk), dimension(:,:), intent(in) :: coords1
-   real(rk), dimension(:,:), intent(inout) :: coords2
+   real(rk), dimension(:,:), intent(in) :: coords2
    ! Local variables
    real(rk), dimension(4) :: rotquat
    real(rk), dimension(:,:), allocatable :: coordsp, coordsm
@@ -370,7 +370,7 @@ function least_rotquat_perm(atomperm, coords1, coords2) result(rotquat)
 ! Reference: Acta Cryst. (1989). A45, 208-210
    integer, dimension(:), intent(in) :: atomperm
    real(rk), dimension(:,:), intent(in) :: coords1
-   real(rk), dimension(:,:), intent(inout) :: coords2
+   real(rk), dimension(:,:), intent(in) :: coords2
    ! Local variables
    real(rk), dimension(4) :: rotquat
    real(rk), dimension(:,:), allocatable :: coordsp, coordsm
@@ -397,7 +397,7 @@ function least_rotquat_subperm(atomperm, coords1, coords2) result(rotquat)
 ! Reference: Acta Cryst. (1989). A45, 208-210
    type(subperm_t), target, intent(in) :: atomperm
    real(rk), dimension(:,:), intent(in) :: coords1
-   real(rk), dimension(:,:), intent(inout) :: coords2
+   real(rk), dimension(:,:), intent(in) :: coords2
    ! Local variables
    real(rk), dimension(4) :: rotquat
    real(rk), dimension(:,:), allocatable :: coordsp, coordsm

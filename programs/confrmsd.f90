@@ -50,7 +50,7 @@ type(partition_t) :: atomtypes
 type(assigntree_node_t), pointer :: hnachain
 type(array_trees_t) :: assign_arrays
 type(registry_t) :: registry
-real(rk) :: rmsd, prune_thres
+real(rk) :: rmsd, prunedist
 real(rk) :: center1(3), center2(3), rotquat(4)
 real(rk), dimension(:), allocatable :: weights1, weights2
 real(rk), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, coords2r
@@ -322,8 +322,9 @@ else
          call print_chain_tree_array( assign_arrays)
       end if
 !      call assign_atoms_local( coords1w, coords2w, assign_arrays, atomperm)
-      call assign_atoms_greedy( coords1, coords2r, assign_arrays, atomperm, prune_thres)
-      call assign_atoms_local_pruned( coords1w, coords2w, assign_arrays, prune_thres, atomperm)
+      call assign_atoms_greedy( coords1, coords2r, assign_arrays, atomperm, prunedist)
+      if (.not. assign_atoms_local_pruned( coords1w, coords2w, assign_arrays, prunedist, atomperm)) &
+            error stop 'assignment failed'
       rmsd = sqrt( sqdistmean( atomperm, weights1, coords1, coords2))
    else
       atomperm = identity_subperm( atoms1, atoms2)
