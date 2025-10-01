@@ -1,6 +1,6 @@
-module lcrs_tree_arrays
+module lcrs_arrays
 use parameters
-use lcrs_tree
+use lcrs_trees
 use molecule
 implicit none
 private
@@ -61,20 +61,20 @@ end type
 ! Array-based assignment tree with 2D itemdir arrays
 type, public :: array_trees_t
    ! Pure arrays for item values (no linked lists!)
-   integer, allocatable :: vertidcs1(:)
-   integer, allocatable :: vertidcs2(:)
+   integer, allocatable :: atomidcs1(:)
+   integer, allocatable :: atomidcs2(:)
    type(chain_item_t), allocatable :: chain(:)
    type(partree_item_t), allocatable :: partree(:)
    type(assigntree_item_t), allocatable :: assigntree(:)
    ! Flattened variable-length data - all pure integer arrays!
-   integer, allocatable :: itemdir1_entries(:,:)  ! [link_idx, atom_idx] - vertices1 itemdir 2D array
-   integer, allocatable :: itemdir2_entries(:,:)  ! [link_idx, atom_idx] - vertices2 itemdir 2D array
+   integer, allocatable :: itemdir1_entries(:,:)  ! [link_idx, atom_idx] - adjcs1 itemdir 2D array
+   integer, allocatable :: itemdir2_entries(:,:)  ! [link_idx, atom_idx] - adjcs2 itemdir 2D array
    integer, allocatable :: partref_entries(:)     ! Part indices for partrefs
    ! Adjacency information stored directly for fastest access
-   integer, allocatable :: adj_lists1(:,:)     ! Direct 2D adjacency lists for vertices1 [atom_idx, neighbor_idx]
-   integer, allocatable :: adj_lists2(:,:)     ! Direct 2D adjacency lists for vertices2 [atom_idx, neighbor_idx]
-   integer, allocatable :: adj_counts1(:)      ! Count for each vertices1 atom's adjacency list
-   integer, allocatable :: adj_counts2(:)      ! Count for each vertices2 atom's adjacency list
+   integer, allocatable :: adj_lists1(:,:)     ! Direct 2D adjacency lists for adjcs1 [atom_idx, neighbor_idx]
+   integer, allocatable :: adj_lists2(:,:)     ! Direct 2D adjacency lists for adjcs2 [atom_idx, neighbor_idx]
+   integer, allocatable :: adj_counts1(:)      ! Count for each adjcs1 atom's adjacency list
+   integer, allocatable :: adj_counts2(:)      ! Count for each adjcs2 atom's adjacency list
    ! Metadata
    integer :: num_atoms1, num_atoms2  ! number of atoms in each molecule
    integer :: total_items1, total_items2, total_parts
@@ -87,8 +87,8 @@ end type
 
 contains
 
-subroutine convert_trees_to_arrays(vertices1, vertices2, part_tree, assign_tree, assign_arrays)
-   type(vertex_t), dimension(:), intent(in) :: vertices1, vertices2
+subroutine convert_trees_to_arrays(adjcs1, adjcs2, part_tree, assign_tree, assign_arrays)
+   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(partree_node_t), pointer, intent(in) :: part_tree
    type(assigntree_node_t), pointer, intent(in) :: assign_tree
    type(array_trees_t), intent(out) :: assign_arrays
@@ -104,12 +104,12 @@ subroutine convert_trees_to_arrays(vertices1, vertices2, part_tree, assign_tree,
    assign_arrays%total_partref_entries = assign_tree%total_partrefs
 
    ! Store molecule sizes
-   assign_arrays%num_atoms1 = size(vertices1)
-   assign_arrays%num_atoms2 = size(vertices2)
+   assign_arrays%num_atoms1 = size(adjcs1)
+   assign_arrays%num_atoms2 = size(adjcs2)
 
    ! Allocate all arrays with exact sizes (existing allocation code)
-   allocate(assign_arrays%vertidcs1(assign_arrays%total_items1))
-   allocate(assign_arrays%vertidcs2(assign_arrays%total_items2))
+   allocate(assign_arrays%atomidcs1(assign_arrays%total_items1))
+   allocate(assign_arrays%atomidcs2(assign_arrays%total_items2))
    allocate(assign_arrays%partree(assign_arrays%total_parts))
    allocate(assign_arrays%chain(assign_arrays%total_links))
    allocate(assign_arrays%assigntree(assign_arrays%total_chains))
@@ -127,8 +127,8 @@ subroutine convert_trees_to_arrays(vertices1, vertices2, part_tree, assign_tree,
 
    ! OPTIMIZATION: Use intrinsic array operations instead of explicit loops
    assign_arrays%partref_entries = 0
-   assign_arrays%vertidcs1 = 0
-   assign_arrays%vertidcs2 = 0
+   assign_arrays%atomidcs1 = 0
+   assign_arrays%atomidcs2 = 0
 
    ! NEW: Initialize 2D itemdir arrays
    assign_arrays%itemdir1_entries = 0
@@ -141,7 +141,7 @@ subroutine convert_trees_to_arrays(vertices1, vertices2, part_tree, assign_tree,
    assign_arrays%adj_counts2 = 0
 
    ! Populate adjacency information
-   call populate_adjacency_arrays(vertices1, vertices2, assign_arrays)
+   call populate_adjacency_arrays(adjcs1, adjcs2, assign_arrays)
 
    ! Convert part tree starting from root with global item tracking
    item1_idx = 0
@@ -155,38 +155,38 @@ subroutine convert_trees_to_arrays(vertices1, vertices2, part_tree, assign_tree,
                                assign_arrays%local_combinations, assign_arrays%global_combinations)
 end subroutine
 
-subroutine populate_adjacency_arrays(vertices1, vertices2, assign_arrays)
+subroutine populate_adjacency_arrays(adjcs1, adjcs2, assign_arrays)
    ! Populate the 2D adjacency arrays directly - each atom gets its own row
-   type(vertex_t), dimension(:), intent(in) :: vertices1, vertices2
+   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(array_trees_t), intent(inout) :: assign_arrays
    integer :: i, j
 
-   ! Populate vertices1 adjacency information - direct 2D storage
+   ! Populate adjcs1 adjacency information - direct 2D storage
    do i = 1, assign_arrays%num_atoms1
-      assign_arrays%adj_counts1(i) = size(vertices1(i)%adjlist)
+      assign_arrays%adj_counts1(i) = size(adjcs1(i)%adjlist)
 
       ! Copy adjacency list directly to 2D array
-      do j = 1, size(vertices1(i)%adjlist)
-         assign_arrays%adj_lists1(i, j) = vertices1(i)%adjlist(j)
+      do j = 1, size(adjcs1(i)%adjlist)
+         assign_arrays%adj_lists1(i, j) = adjcs1(i)%adjlist(j)
       end do
 
       ! Zero out unused entries (though not strictly necessary)
-      do j = size(vertices1(i)%adjlist) + 1, MAX_COORD
+      do j = size(adjcs1(i)%adjlist) + 1, MAX_COORD
          assign_arrays%adj_lists1(i, j) = 0
       end do
    end do
 
-   ! Populate vertices2 adjacency information - direct 2D storage
+   ! Populate adjcs2 adjacency information - direct 2D storage
    do i = 1, assign_arrays%num_atoms2
-      assign_arrays%adj_counts2(i) = size(vertices2(i)%adjlist)
+      assign_arrays%adj_counts2(i) = size(adjcs2(i)%adjlist)
 
       ! Copy adjacency list directly to 2D array
-      do j = 1, size(vertices2(i)%adjlist)
-         assign_arrays%adj_lists2(i, j) = vertices2(i)%adjlist(j)
+      do j = 1, size(adjcs2(i)%adjlist)
+         assign_arrays%adj_lists2(i, j) = adjcs2(i)%adjlist(j)
       end do
 
       ! Zero out unused entries (though not strictly necessary)
-      do j = size(vertices2(i)%adjlist) + 1, MAX_COORD
+      do j = size(adjcs2(i)%adjlist) + 1, MAX_COORD
          assign_arrays%adj_lists2(i, j) = 0
       end do
    end do
@@ -205,7 +205,7 @@ subroutine convert_signature(part, assign_arrays, part_idx)
    do i = 1, size(part%signature)
       if (associated(part%signature(i)%ptr)) then
          temp_count = temp_count + 1
-         temp_values(temp_count) = part%signature(i)%ptr%global_index
+         temp_values(temp_count) = part%signature(i)%ptr%globidx
       end if
    end do
 
@@ -253,32 +253,32 @@ recursive subroutine convert_parts_recurse(part, assign_arrays, item1_idx, item2
    if (.not. associated(part)) return
 
    ! Convert this part (global indices always start at 1)
-   part_idx = part%global_index
+   part_idx = part%globidx
 
    assign_arrays%partree(part_idx)%depth = part%depth
    assign_arrays%partree(part_idx)%num_children = part%num_children
 
    ! Relationships using global indices
    if (associated(part%parent_part)) then
-      assign_arrays%partree(part_idx)%parent_part_idx = part%parent_part%global_index
+      assign_arrays%partree(part_idx)%parent_part_idx = part%parent_part%globidx
    else
       assign_arrays%partree(part_idx)%parent_part_idx = 0
    end if
 
    if (associated(part%first_child_part)) then
-      assign_arrays%partree(part_idx)%first_child_idx = part%first_child_part%global_index
+      assign_arrays%partree(part_idx)%first_child_idx = part%first_child_part%globidx
    else
       assign_arrays%partree(part_idx)%first_child_idx = 0
    end if
 
    if (associated(part%last_child_part)) then
-      assign_arrays%partree(part_idx)%last_child_idx = part%last_child_part%global_index
+      assign_arrays%partree(part_idx)%last_child_idx = part%last_child_part%globidx
    else
       assign_arrays%partree(part_idx)%last_child_idx = 0
    end if
 
    if (associated(part%next_sibling_part)) then
-      assign_arrays%partree(part_idx)%next_sibling_idx = part%next_sibling_part%global_index
+      assign_arrays%partree(part_idx)%next_sibling_idx = part%next_sibling_part%globidx
    else
       assign_arrays%partree(part_idx)%next_sibling_idx = 0
    end if
@@ -299,7 +299,7 @@ recursive subroutine convert_parts_recurse(part, assign_arrays, item1_idx, item2
    do while (associated(item))
       i = i + 1
       item1_idx = item1_idx + 1
-      assign_arrays%vertidcs1(item1_idx) = item%vertidx
+      assign_arrays%atomidcs1(item1_idx) = item%idx
       item => item%next_item
    end do
 
@@ -309,7 +309,7 @@ recursive subroutine convert_parts_recurse(part, assign_arrays, item1_idx, item2
    do while (associated(item))
       i = i + 1
       item2_idx = item2_idx + 1
-      assign_arrays%vertidcs2(item2_idx) = item%vertidx
+      assign_arrays%atomidcs2(item2_idx) = item%idx
       item => item%next_item
    end do
 
@@ -320,7 +320,7 @@ recursive subroutine convert_parts_recurse(part, assign_arrays, item1_idx, item2
       child_count = 0
       do while (associated(child_part))
          child_count = child_count + 1
-         assign_arrays%partree(part_idx)%child_indices(child_count) = child_part%global_index
+         assign_arrays%partree(part_idx)%child_indices(child_count) = child_part%globidx
          child_part => child_part%next_sibling_part
       end do
    end if
@@ -359,7 +359,7 @@ recursive subroutine convert_chains_recurse(chain, assign_arrays, partref_idx, l
    end if
 
    ! Convert this chain (existing conversion logic)
-   chain_idx = chain%global_index
+   chain_idx = chain%globidx
 
    assign_arrays%assigntree(chain_idx)%tot_items1 = chain%tot_items1
    assign_arrays%assigntree(chain_idx)%tot_items2 = chain%tot_items2
@@ -368,32 +368,32 @@ recursive subroutine convert_chains_recurse(chain, assign_arrays, partref_idx, l
 
    ! Cross-tree reference
    if (associated(chain%split_part)) then
-      assign_arrays%assigntree(chain_idx)%split_part_idx = chain%split_part%global_index
+      assign_arrays%assigntree(chain_idx)%split_part_idx = chain%split_part%globidx
    else
       assign_arrays%assigntree(chain_idx)%split_part_idx = 0
    end if
 
    ! Chain relationships
    if (associated(chain%parent_chain)) then
-      assign_arrays%assigntree(chain_idx)%parent_chain_idx = chain%parent_chain%global_index
+      assign_arrays%assigntree(chain_idx)%parent_chain_idx = chain%parent_chain%globidx
    else
       assign_arrays%assigntree(chain_idx)%parent_chain_idx = 0
    end if
 
    if (associated(chain%first_child_chain)) then
-      assign_arrays%assigntree(chain_idx)%first_child_idx = chain%first_child_chain%global_index
+      assign_arrays%assigntree(chain_idx)%first_child_idx = chain%first_child_chain%globidx
    else
       assign_arrays%assigntree(chain_idx)%first_child_idx = 0
    end if
 
    if (associated(chain%last_child_chain)) then
-      assign_arrays%assigntree(chain_idx)%last_child_idx = chain%last_child_chain%global_index
+      assign_arrays%assigntree(chain_idx)%last_child_idx = chain%last_child_chain%globidx
    else
       assign_arrays%assigntree(chain_idx)%last_child_idx = 0
    end if
 
    if (associated(chain%next_sibling_chain)) then
-      assign_arrays%assigntree(chain_idx)%next_sibling_idx = chain%next_sibling_chain%global_index
+      assign_arrays%assigntree(chain_idx)%next_sibling_idx = chain%next_sibling_chain%globidx
    else
       assign_arrays%assigntree(chain_idx)%next_sibling_idx = 0
    end if
@@ -405,7 +405,7 @@ recursive subroutine convert_chains_recurse(chain, assign_arrays, partref_idx, l
       child_count = 0
       do while (associated(child_chain))
          child_count = child_count + 1
-         assign_arrays%assigntree(chain_idx)%child_indices(child_count) = child_chain%global_index
+         assign_arrays%assigntree(chain_idx)%child_indices(child_count) = child_chain%globidx
          child_chain => child_chain%next_sibling_chain
       end do
    end if
@@ -420,7 +420,7 @@ recursive subroutine convert_chains_recurse(chain, assign_arrays, partref_idx, l
       current_link_idx = link_idx
 
       assign_arrays%chain(current_link_idx)%num_parts = link%num_parts
-      assign_arrays%chain(current_link_idx)%parent_chain_idx = chain%global_index
+      assign_arrays%chain(current_link_idx)%parent_chain_idx = chain%globidx
 
       ! Set partref offset (offset = start_idx - 1)
       assign_arrays%chain(current_link_idx)%partref_offset = partref_idx
@@ -429,7 +429,7 @@ recursive subroutine convert_chains_recurse(chain, assign_arrays, partref_idx, l
       partref => link%first_partref
       do while (associated(partref))
          partref_idx = partref_idx + 1
-         assign_arrays%partref_entries(partref_idx) = partref%part%global_index
+         assign_arrays%partref_entries(partref_idx) = partref%part%globidx
          partref => partref%nextref
       end do
 
@@ -581,14 +581,14 @@ subroutine print_part_items_array(assign_arrays, part_idx)
 
    ! Print items1 using offset-based access
    do i = 1, assign_arrays%partree(part_idx)%items1_count
-      write(stderr, '(1X,I0)', advance='no') assign_arrays%vertidcs1(assign_arrays%partree(part_idx)%items1_offset + i)
+      write(stderr, '(1X,I0)', advance='no') assign_arrays%atomidcs1(assign_arrays%partree(part_idx)%items1_offset + i)
    end do
 
    write(stderr, '(A)', advance='no') ' /'
 
    ! Print items2 using offset-based access
    do i = 1, assign_arrays%partree(part_idx)%items2_count
-      write(stderr, '(1X,I0)', advance='no') assign_arrays%vertidcs2(assign_arrays%partree(part_idx)%items2_offset + i)
+      write(stderr, '(1X,I0)', advance='no') assign_arrays%atomidcs2(assign_arrays%partree(part_idx)%items2_offset + i)
    end do
 
    write(stderr, *)

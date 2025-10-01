@@ -1,11 +1,11 @@
-module atom_mnas
+module partitioning_ll
 use parameters
 use derived_types
 use molecule
-use lcrs_tree
+use lcrs_trees
 implicit none
 private
-public collect_atomtypes_linked
+public collect_atomtypes_ll
 
 type :: atomtype_item_t
    integer :: elnum
@@ -48,7 +48,7 @@ function find_atomtype(atomtypetable, atom) result(part)
    part => null()
 end function
 
-function collect_atomtypes_linked(atoms1, atoms2) result(chain_root)
+function collect_atomtypes_ll(atoms1, atoms2) result(chain_root)
 ! Partition atoms by atomic number and label
    type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
    ! Local variables

@@ -22,20 +22,20 @@ use sorting
 use utils
 use permutation
 use molecule
-use lcrs_tree
-use atom_types
-use atom_mnas
-use spatial_transforms
+use lcrs_trees
+use partitioning
+use hna
+use euclidean
 implicit none
 contains
 
-subroutine compute_mna_biases(vertices1, vertices2, atomtypes, biases)
-! Iteratively compute MNA types
-   type(vertex_t), dimension(:), intent(in) :: vertices1, vertices2
+subroutine compute_hna_biases(adjcs1, adjcs2, atomtypes, biases)
+! Iteratively compute HNA types
+   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(partition_t), intent(in) :: atomtypes
    type(int_matrix), dimension(:), allocatable, intent(out) :: biases
    ! Local variables
-   type(assigntree_node_t), pointer :: mnachain
+   type(assigntree_node_t), pointer :: hnachain
    integer :: h, i, j, iatom, jatom
    integer :: num_splits
 !   integer :: link_idx
@@ -47,8 +47,8 @@ subroutine compute_mna_biases(vertices1, vertices2, atomtypes, biases)
       biases(h)%ee = 0
    end do
 
-   ! Initialize MNA chain with element types
-   mnachain => chain_from_partition(atomtypes)
+   ! Initialize HNA chain with element types
+   hnachain => chain_from_partition(atomtypes)
 
 !   link_idx = 0
    do
@@ -56,21 +56,21 @@ subroutine compute_mna_biases(vertices1, vertices2, atomtypes, biases)
 !      write(stderr, *)
 !      write(stderr, '(a)') repeat('-- link_idx '//str(link_idx)//' --', 6)
 
-      ! Call compute_mna_partition and get the number of splits
-      call compute_mna_partition(vertices1, vertices2, mnachain, num_splits)
+      ! Call refine_hna_partition and get the number of splits
+      call refine_hna_partition(adjcs1, adjcs2, hnachain, num_splits)
 
       ! Exit loop if no splits occurred in the last iteration
       if (num_splits == 0) exit
 
-      ! Update biases with MNAs at current level
+      ! Update biases with HNAs at current level
       do h = 1, atomtypes%num_parts
          do j = 1, atomtypes%parts(h)%num_items2
             jatom = atomtypes%parts(h)%items2(j)
             do i = 1, atomtypes%parts(h)%num_items1
                iatom = atomtypes%parts(h)%items1(i)
                if (associated( &
-                  mnachain%last_link%itemdir1(iatom)%ptr, &
-                  mnachain%last_link%itemdir2(jatom)%ptr) &
+                  hnachain%last_link%itemdir1(iatom)%ptr, &
+                  hnachain%last_link%itemdir2(jatom)%ptr) &
                ) then
                   biases(h)%ee(i, j) = biases(h)%ee(i, j) + 1
                end if
@@ -88,7 +88,7 @@ subroutine compute_mna_biases(vertices1, vertices2, atomtypes, biases)
 !      end do
 !   end do
 
-   call delete_chain(mnachain)  ! Cleanup
+   call delete_chain(hnachain)  ! Cleanup
 end subroutine
 
 end module

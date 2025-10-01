@@ -21,7 +21,7 @@ program confrmsd
 use parameters
 use options
 use molecule
-use spatial_transforms
+use euclidean
 use utils
 use chemistry
 use permutation
@@ -32,9 +32,8 @@ use argparse
 use biasing
 use pruning
 use registration
-use assigntree_distribute
 use assignment_conformer
-use assignment_default
+use alignment_conformer
 
 implicit none
 
@@ -46,9 +45,9 @@ logical :: heavy_flag, mass_flag, align_flag, remap_flag, stoch_flag, count_flag
 type(strlist_type) :: posargs(2)
 type(atom_t), dimension(:), allocatable :: atoms1, atoms2
 type(bond_t), dimension(:), allocatable :: bonds1, bonds2
-type(vertex_t), dimension(:), allocatable :: vertices1, vertices2
+type(adjc_t), dimension(:), allocatable :: adjcs1, adjcs2
 type(partition_t) :: atomtypes
-type(assigntree_node_t), pointer :: mnachain
+type(assigntree_node_t), pointer :: hnachain
 type(array_trees_t) :: assign_arrays
 type(registry_t) :: registry
 real(rk) :: rmsd, prune_thres
@@ -196,11 +195,11 @@ else
 end if
 
 if (rebond_flag) then
-   call get_graph_from_distances( atoms1, vertices1)
-   call get_graph_from_distances( atoms2, vertices2)
+   call adjacency_from_distance( atoms1, adjcs1)
+   call adjacency_from_distance( atoms2, adjcs2)
 else
-   call get_graph_from_bonds( atoms1, bonds1, vertices1)
-   call get_graph_from_bonds( atoms2, bonds2, vertices2)
+   call adjacency_from_bonds( atoms1, bonds1, adjcs1)
+   call adjacency_from_bonds( atoms2, bonds2, adjcs2)
 end if
 
 ! Get mol1 coordinates
@@ -226,8 +225,8 @@ if (align_flag) then
    if (remap_flag) then
 
       ! Pre-compute assignment tree
-      call compute_scna_partition( vertices1, vertices2, atomtypes, mnachain)
-      call build_assignment_tree( vertices1, vertices2, mnachain%last_link, assign_arrays)
+      call compute_hna_partition( adjcs1, adjcs2, atomtypes, hnachain)
+      call build_assignment_tree( adjcs1, adjcs2, hnachain%last_link, assign_arrays)
 
       if (tree_flag) then
          call print_chain_tree_array( assign_arrays)
@@ -270,7 +269,7 @@ if (align_flag) then
 
       else
 
-         call distribute_items_global( coords1w, coords2w, assign_arrays, atomperm)
+         call assign_atoms_global( coords1w, coords2w, assign_arrays, atomperm)
          rotquat = least_rotquat( atomperm, coords1w, coords2w)
          coords2r = rotated_coords( coords2, rotquat, center1)
          rmsd = sqrt( sqdistmean( atomperm, weights1, coords1, coords2r))
@@ -294,7 +293,7 @@ if (align_flag) then
 
    else
 
-      atomperm = default_atomperm( atoms1, atoms2)
+      atomperm = identity_subperm( atoms1, atoms2)
       rotquat = least_rotquat( atomperm, coords1w, coords2w)
       coords2r = rotated_coords( coords2, rotquat, center1)
       rmsd = sqrt( sqdistmean( atomperm, weights1, coords1, coords2r))
@@ -317,17 +316,17 @@ else
    coords2w = get_weighted_coords( atoms2, weights2)
 
    if (remap_flag) then
-      call compute_scna_partition( vertices1, vertices2, atomtypes, mnachain)
-      call build_assignment_tree( vertices1, vertices2, mnachain%last_link, assign_arrays)
+      call compute_hna_partition( adjcs1, adjcs2, atomtypes, hnachain)
+      call build_assignment_tree( adjcs1, adjcs2, hnachain%last_link, assign_arrays)
       if (tree_flag) then
          call print_chain_tree_array( assign_arrays)
       end if
-!      call distribute_items_local( coords1w, coords2w, assign_arrays, atomperm)
-      call distribute_items_greedy( coords1, coords2r, assign_arrays, atomperm, prune_thres)
-      call distribute_items_local_pruned( coords1w, coords2w, assign_arrays, prune_thres, atomperm)
+!      call assign_atoms_local( coords1w, coords2w, assign_arrays, atomperm)
+      call assign_atoms_greedy( coords1, coords2r, assign_arrays, atomperm, prune_thres)
+      call assign_atoms_local_pruned( coords1w, coords2w, assign_arrays, prune_thres, atomperm)
       rmsd = sqrt( sqdistmean( atomperm, weights1, coords1, coords2))
    else
-      atomperm = default_atomperm( atoms1, atoms2)
+      atomperm = identity_subperm( atoms1, atoms2)
       rmsd = sqrt( sqdistmean( atomperm, weights1, coords1, coords2))
    end if
 

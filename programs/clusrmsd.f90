@@ -21,7 +21,7 @@ program clusrmsd
 use parameters
 use options
 use molecule
-use spatial_transforms
+use euclidean
 use utils
 use chemistry
 use adjacency
@@ -33,8 +33,7 @@ use argparse
 use biasing
 use pruning
 use registration
-use assignment_cluster
-use assignment_default
+use alignment_cluster
 
 implicit none
 
@@ -233,7 +232,7 @@ if (align_flag) then
 
    else
 
-      atomperm = default_atomperm( atoms1, atoms2)
+      atomperm = identity_subperm( atoms1, atoms2)
       rotquat = least_rotquat( coords1w, coords2w)
       coords2r = rotated_coords( coords2w, rotquat)
       rmsd = sqrt( sqdistmean( atomperm, weights1, coords1w, coords2r))
@@ -260,7 +259,7 @@ else
       call assign_atoms_pruned( atomtypes, coords1w, coords2w, prunes, atomperm)
       rmsd = sqrt( sqdistmean( atomperm, weights1, coords1w, coords2w))
    else
-      atomperm = default_atomperm( atoms1, atoms2)
+      atomperm = identity_subperm( atoms1, atoms2)
       rmsd = sqrt( sqdistmean( atomperm, weights1, coords1w, coords2w))
    end if
 

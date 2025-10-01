@@ -16,6 +16,7 @@
 
 module permutation
 use parameters
+use molecule
 implicit none
 
 ! Derived type to store permutation subsets
@@ -245,6 +246,28 @@ subroutine check_subperm(subperm)
          subperm%current_size, '/', subperm%total_size, ' assignments)'
    end if
 end subroutine
+
+function identity_subperm(atoms1, atoms2) result(subperm)
+   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
+   type(subperm_t), target :: subperm
+   integer, pointer :: n
+   integer :: i
+
+   call subperm_init( subperm, size(atoms1))
+   n => subperm%current_size
+   do i = 1, size(atoms1)
+      if (atoms1(i)%mask) then
+         if (atoms2(i)%mask) then
+            n = n + 1
+            subperm%subset1(n) = i
+            subperm%subset2(n) = i
+         else
+            write (stderr, '(A)') "Error: Aligning atoms don't match"
+            stop 1
+         end if
+      end if
+   end do
+end function
 
 subroutine perm1_next3 ( n, p, more, rank )
 !This subroutine was obtained from:

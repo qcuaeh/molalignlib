@@ -6,8 +6,8 @@ use random
 use sorting
 use permutation
 use adjacency
-use spatial_transforms
-use lcrs_tree
+use euclidean
+use lcrs_trees
 use molecule
 use derived_types
 implicit none
@@ -89,14 +89,14 @@ recursive subroutine recrun( atoms, tracked, iatom, nfrag, fragszs, fragidcs)
 
 end subroutine
 
-subroutine minadjdiff( atomtypes, mnatypes, molfrags, atoms1, atoms2, coords1, &
+subroutine minadjdiff( atomtypes, scnatypes, molfrags, atoms1, atoms2, coords1, &
                        coords2, atomperm)
 !
 ! Find best correspondence between points of graphs
 !
 
    ! Arguments
-   type(partition_t), intent(in) :: atomtypes, mnatypes
+   type(partition_t), intent(in) :: atomtypes, scnatypes
    type(int_list), dimension(:), intent(in) :: molfrags
    type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
@@ -148,8 +148,8 @@ subroutine minadjdiff( atomtypes, mnatypes, molfrags, atoms1, atoms2, coords1, &
 
    ! set atoms equivalence indices
 
-   eqvidx1 = mnatypes%itemdir1
-   eqvidx2 = mnatypes%itemdir2
+   eqvidx1 = scnatypes%itemdir1
+   eqvidx2 = scnatypes%itemdir2
 
    !  initialization
 

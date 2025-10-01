@@ -1,10 +1,10 @@
-module atom_types
+module partitioning
 use options
 use parameters
 use derived_types
 use chemistry
 use molecule
-use lcrs_tree
+use lcrs_trees
 implicit none
 private
 public collect_atomtypes

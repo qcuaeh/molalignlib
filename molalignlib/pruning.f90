@@ -20,7 +20,7 @@ use derived_types
 use molecule
 use options
 use sorting
-use lcrs_tree
+use lcrs_trees
 
 implicit none
 
@@ -32,7 +32,7 @@ abstract interface
       use parameters
       use derived_types
       use molecule
-      use lcrs_tree
+      use lcrs_trees
       type(partition_t), intent(in) :: atomtypes
       type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
       type(bool_matrix), dimension(:), allocatable, intent(out) :: prunes

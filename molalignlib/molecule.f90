@@ -5,8 +5,8 @@ implicit none
 private
 public set_coords
 public include_heavy_atoms
-public get_graph_from_bonds
-public get_graph_from_distances
+public adjacency_from_bonds
+public adjacency_from_distance
 public get_coords
 public get_mirrored_coords
 public get_weighted_coords
@@ -32,7 +32,7 @@ type, public :: bond_t
    integer :: atomidx2
 end type
 
-type, public :: vertex_t
+type, public :: adjc_t
    integer, allocatable :: adjlist(:)
 end type
 
@@ -68,16 +68,16 @@ subroutine set_coords(atoms, coords)
    end do
 end subroutine
 
-subroutine get_graph_from_bonds(atoms, bonds, graph)
+subroutine adjacency_from_bonds(atoms, bonds, adjcs)
    type(atom_t), dimension(:), intent(in) :: atoms
    type(bond_t), dimension(:), intent(in) :: bonds
-   type(vertex_t), dimension(:), allocatable, intent(out) :: graph
+   type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs
    ! Local variables
    integer, allocatable ::  nadjs(:)
    integer, allocatable :: adjlist(:,:)
    integer :: i, idx1, idx2
 
-   allocate (graph(size(atoms)))
+   allocate (adjcs(size(atoms)))
    allocate (nadjs(size(atoms)))
    allocate (adjlist(MAX_COORD, size(atoms)))
 
@@ -93,14 +93,14 @@ subroutine get_graph_from_bonds(atoms, bonds, graph)
       end if
    end do
 
-   do i = 1, size(graph)
-      graph(i)%adjlist = adjlist(1:nadjs(i), i)
+   do i = 1, size(adjcs)
+      adjcs(i)%adjlist = adjlist(1:nadjs(i), i)
    end do
 end subroutine
 
-subroutine get_graph_from_distances(atoms, graph)
+subroutine adjacency_from_distance(atoms, adjcs)
    type(atom_t), dimension(:), intent(in) :: atoms
-   type(vertex_t), dimension(:), allocatable, intent(out) :: graph
+   type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs
    ! Local variables
    integer, allocatable :: nadjs(:)
    integer, allocatable :: adjlist(:,:)
@@ -108,7 +108,7 @@ subroutine get_graph_from_distances(atoms, graph)
    real(rk), allocatable :: atom_radii(:)
    real(rk) :: atom_dist
 
-   allocate (graph(size(atoms)))
+   allocate (adjcs(size(atoms)))
    allocate (nadjs(size(atoms)))
    allocate (adjlist(MAX_COORD, size(atoms)))
 
@@ -138,8 +138,8 @@ subroutine get_graph_from_distances(atoms, graph)
       end if
    end do
 
-   do i = 1, size(graph)
-      graph(i)%adjlist = adjlist(1:nadjs(i), i)
+   do i = 1, size(adjcs)
+      adjcs(i)%adjlist = adjlist(1:nadjs(i), i)
    end do
 end subroutine
 

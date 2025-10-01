@@ -18,7 +18,7 @@ module registration
 use parameters
 use permutation
 use adjacency
-use spatial_transforms
+use euclidean
 implicit none
 private
 

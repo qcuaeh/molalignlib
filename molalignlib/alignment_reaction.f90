@@ -14,7 +14,7 @@
 ! You should have received a copy of the GNU General Public License
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-module assignment_reaction
+module alignment_reaction
 use parameters
 use options
 use random
@@ -22,19 +22,18 @@ use molecule
 use utils
 use chemistry
 use permutation
-use spatial_transforms
-use assignment_atoms
+use euclidean
+use assignment_cluster
 use adjacency
 use biasing
 use pruning
-use lcrs_tree
-use lcrs_tree_arrays
-use atom_mnas
-use assigntree_build
-use assigntree_distribute_linked
-use assigntree_distribute
-use registration
+use lcrs_trees
+use lcrs_arrays
+use hna
+use assignment_tree
 use assignment_conformer
+use registration
+use alignment_conformer
 
 implicit none
 
@@ -46,8 +45,8 @@ subroutine find_reactive_bonds( atoms1, atoms2, atomtypes, atomperm)
    integer, dimension(:), intent(out) :: atomperm
 
    ! Local variables
-   type(partition_t) :: mnatypes
-   type(assigntree_node_t), pointer :: mnachain
+   type(partition_t) :: scnatypes
+   type(assigntree_node_t), pointer :: hnachain
    type(int_list), dimension(:), allocatable :: molfrags1, molfrags2
    type(int_matrix), dimension(:), allocatable :: biases
    type(real_matrix), dimension(:), allocatable :: minbiases
@@ -85,16 +84,16 @@ subroutine find_reactive_bonds( atoms1, atoms2, atomtypes, atomperm)
    call translate_coords( wcoords2, -center2)
    call translate_coords( wcoords2, center1)
 
-   ! Compute MNA types
-   call compute_scna_partition( atoms1, atoms2, atomtypes, mnachain)
-   call link_to_partition( mnachain%last_link, mnatypes)
+   ! Compute HNA types
+   call compute_hna_partition( atoms1, atoms2, atomtypes, hnachain)
+   call link_to_partition( hnachain%last_link, scnatypes)
 
    ! Find molecular fragments
    call find_molfrags( atoms1, first_partition(atomtypes), molfrags1)
    call find_molfrags( atoms2, second_partition(atomtypes), molfrags2)
 
    ! Find unfeasible assignments
-   call compute_mna_biases( atoms1, atoms2, atomtypes, biases)
+   call compute_hna_biases( atoms1, atoms2, atomtypes, biases)
 
    call build_minbiases(atomtypes, atoms1, atoms2, biases, minbiases)
 !CZGC: calcular min_rmsd_matrix usando 'minimum_rmsd' con vecinos en spatial.f90
@@ -112,7 +111,7 @@ subroutine find_reactive_bonds( atoms1, atoms2, atomtypes, atomperm)
       ! Assign atoms with current orientation
       call assign_atoms_biased( atomtypes, wcoords1, wcoords2, biases, atomperm)
       ! Reassign mismatches
-      call minadjdiff( atomtypes, mnatypes, molfrags1, atoms1, atoms2, wcoords1, wcoords2, atomperm)
+      call minadjdiff( atomtypes, scnatypes, molfrags1, atoms1, atoms2, wcoords1, wcoords2, atomperm)
       ! Update results
       adjd = adjacencydiff( atomperm, adjmat1, adjmat2)
       call push_record( registry, atomperm, 1, adjd=adjd)
@@ -145,7 +144,7 @@ subroutine remove_reactive_bonds( atoms1, atoms2, atomtypes, atomperm)
          if (.not. adjmat2(atomperm(iatom), atomperm(jatom))) then
 !            write (stderr, *) 'remove atoms1 bond:', iatom, jatom
             call remove_bond(atoms1, iatom, jatom)
-!            items1 = mnatypes%parts(mnatypes%itemdir1(jatom))%items1
+!            items1 = scnatypes%parts(scnatypes%itemdir1(jatom))%items1
 !            do k = 1, size(items1)
 !               katom = items1(k)
 !               call remove_bond(atoms1, iatom, katom)
@@ -161,7 +160,7 @@ subroutine remove_reactive_bonds( atoms1, atoms2, atomtypes, atomperm)
          if (.not. adjmat1(invperm(iatom), invperm(jatom))) then
 !            write (stderr, *) 'remove atoms2 bond:', iatom, jatom
             call remove_bond(atoms2, iatom, jatom)
-!            items2 = mnatypes%parts(mnatypes%itemdir2(jatom))%items2
+!            items2 = scnatypes%parts(scnatypes%itemdir2(jatom))%items2
 !            do k = 1, size(items2)
 !               katom = items2(k)
 !               call remove_bond(atoms1, invperm(iatom), invperm(katom))
