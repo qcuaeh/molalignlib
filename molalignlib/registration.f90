@@ -36,7 +36,7 @@ type :: record_t
    real(rk) :: permdist                                 ! Used when use_position=TRUE
    real(rk) :: rotation(4)
    real(rk) :: aver_steps                               ! Used when use_position=TRUE
-   type(subperm_t) :: atomperm
+   integer, dimension(:), allocatable :: atomperm
 end type
 
 type :: registry_t
@@ -45,77 +45,72 @@ type :: registry_t
    logical :: overflow
    integer :: total_steps                               ! Used when use_position=TRUE
    integer :: num_trials
-   integer :: num_records
+   integer :: occ_records
    type(record_t), dimension(:), allocatable :: records
 end type
 
 contains
 
-subroutine init_rmsd_registry(registry, max_records)
-   class(registry_t), intent(inout) :: registry
-   integer, intent(in) :: max_records
+subroutine init_rmsd_registry(registry, num_records)
+   type(registry_t), intent(inout) :: registry
+   integer, intent(in) :: num_records
 
-   if (max_records < 1) then
-      error stop 'max_records < 1'
+   if (num_records < 1) then
+      error stop 'num_records < 1'
    end if
 
+   allocate (registry%records(num_records))
    registry%use_position = .true.
    registry%use_adjacency = .false.
-   registry%num_records = 0
+   registry%occ_records = 0
    registry%num_trials = 0
    registry%total_steps = 0
    registry%overflow = .false.
-
-   allocate (registry%records(max_records))
-
    registry%records%count = 0
-   registry%records%permdist = huge(registry%records(1)%permdist)
+   registry%records%permdist = huge(rk)
 end subroutine
 
-subroutine init_dual_registry(registry, max_records)
-   class(registry_t), intent(inout) :: registry
-   integer, intent(in) :: max_records
+subroutine init_adjd_registry(registry, num_records)
+   type(registry_t), intent(inout) :: registry
+   integer, intent(in) :: num_records
 
-   if (max_records < 1) then
-      error stop 'max_records < 1'
+   if (num_records < 1) then
+      error stop 'num_records < 1'
    end if
 
-   registry%use_position = .true.
-   registry%use_adjacency = .true.
-   registry%num_records = 0
-   registry%num_trials = 0
-   registry%total_steps = 0
-   registry%overflow = .false.
-
-   allocate (registry%records(max_records))
-
-   registry%records%count = 0
-   registry%records%adjd = huge(registry%records(1)%adjd)
-end subroutine
-
-subroutine init_adjd_registry(registry, max_records)
-   class(registry_t), intent(inout) :: registry
-   integer, intent(in) :: max_records
-
-   if (max_records < 1) then
-      error stop 'max_records < 1'
-   end if
-
+   allocate (registry%records(num_records))
    registry%use_position = .false.
    registry%use_adjacency = .true.
-   registry%num_records = 0
+   registry%occ_records = 0
    registry%num_trials = 0
    registry%overflow = .false.
-
-   allocate (registry%records(max_records))
-
    registry%records%count = 0
-   registry%records%adjd = huge(registry%records(1)%adjd)
+   registry%records%adjd = huge(ik)
 end subroutine
 
-integer function insert_record(registry, atomperm, num_steps, adjd, permdist, rotation)
-   class(registry_t), target, intent(inout) :: registry
-   type(subperm_t), intent(in) :: atomperm
+subroutine init_dual_registry(registry, num_records)
+   type(registry_t), intent(inout) :: registry
+   integer, intent(in) :: num_records
+
+   if (num_records < 1) then
+      error stop 'num_records < 1'
+   end if
+
+   allocate (registry%records(num_records))
+   registry%use_position = .true.
+   registry%use_adjacency = .true.
+   registry%occ_records = 0
+   registry%num_trials = 0
+   registry%total_steps = 0
+   registry%overflow = .false.
+   registry%records%count = 0
+   registry%records%adjd = huge(ik)
+   registry%records%permdist = huge(rk)
+end subroutine
+
+subroutine insert_record(registry, atomperm, num_steps, adjd, permdist, rotation)
+   type(registry_t), target, intent(inout) :: registry
+   integer, dimension(:), intent(in) :: atomperm
    integer, intent(in) :: num_steps
    integer, intent(in), optional :: adjd
    real(rk), intent(in), optional :: permdist
@@ -145,9 +140,9 @@ integer function insert_record(registry, atomperm, num_steps, adjd, permdist, ro
    registry%total_steps = registry%total_steps + num_steps
 
    ! Check for existing records to update
-   do i = 1, registry%num_records
+   do i = 1, registry%occ_records
       record => registry%records(i)
-      if (atomperm == record%atomperm) then
+      if (all(atomperm == record%atomperm)) then
          record%count = record%count + 1
          record%aver_steps = record%aver_steps + (num_steps - record%aver_steps) / record%count
          return
@@ -155,7 +150,6 @@ integer function insert_record(registry, atomperm, num_steps, adjd, permdist, ro
    end do
 
    ! Find insertion point and insert new record
-   insert_record = 0
    do i = 1, size(registry%records)
       record => registry%records(i)
 
@@ -169,8 +163,6 @@ integer function insert_record(registry, atomperm, num_steps, adjd, permdist, ro
       end if
 
       if (should_insert) then
-         insert_record = i
-
          ! Shift records to make room
          do j = size(registry%records), i + 1, -1
             registry%records(j) = registry%records(j - 1)
@@ -197,13 +189,13 @@ integer function insert_record(registry, atomperm, num_steps, adjd, permdist, ro
 
    ! Update record count and overflow status
    if (.not. registry%overflow) then
-      if (registry%num_records < size(registry%records)) then
-         registry%num_records = registry%num_records + 1
+      if (registry%occ_records < size(registry%records)) then
+         registry%occ_records = registry%occ_records + 1
       else
          registry%overflow = .true.
       end if
    end if
-end function
+end subroutine
 
 subroutine print_records(registry)
    type(registry_t), intent(in) :: registry
@@ -223,7 +215,7 @@ subroutine print_records(registry)
       line = repeat('-', 42)
       write (stderr, '(2x,a,4x,a,5x,a,5x,a,7x,a)') '#', 'Count', 'Steps', 'Rotθ', 'Δxyz'
       write (stderr, '(a)') line(1:42)
-      do i = 1, registry%num_records
+      do i = 1, registry%occ_records
          record = registry%records(i)
          write (stderr, '(i3,4x,i4,4x,f5.1,5x,f5.1,4x,f8.4)') &
             i, record%count, record%aver_steps, angle(record%rotation), record%permdist
@@ -234,7 +226,7 @@ subroutine print_records(registry)
       line = repeat('-', 49)
       write (stderr, '(2x,a,4x,a,5x,a,4x,a,5x,a,6x,a)') '#', 'Count', 'Steps', 'Rotθ', 'Δadj', 'Δxyz'
       write (stderr, '(a)') line
-      do i = 1, registry%num_records
+      do i = 1, registry%occ_records
          record = registry%records(i)
          write (stderr, '(i3,4x,i4,4x,f5.1,5x,f5.1,3x,i4,4x,f8.4)') &
             i, record%count, record%aver_steps, angle(record%rotation), record%adjd, record%permdist
@@ -245,7 +237,7 @@ subroutine print_records(registry)
       line = repeat('-', 25)
       write (stderr, '(2x,a,4x,a,4x,a)') '#', 'Count', 'Δadj'
       write (stderr, '(a)') line(1:25)
-      do i = 1, registry%num_records
+      do i = 1, registry%occ_records
          record = registry%records(i)
          write (stderr, '(i3,4x,i4,4x,i4)') i, record%count, record%adjd
       end do
@@ -258,9 +250,9 @@ subroutine print_records(registry)
       write (stderr, '(a,1x,i0)') 'Minimization steps =', registry%total_steps
    end if
    if (registry%overflow) then
-      write (stderr, '(a,1x,i0)') 'Visited local minima >', registry%num_records
+      write (stderr, '(a,1x,i0)') 'Visited local minima >', registry%occ_records
    else
-      write (stderr, '(a,1x,i0)') 'Visited local minima =', registry%num_records
+      write (stderr, '(a,1x,i0)') 'Visited local minima =', registry%occ_records
    end if
 
    flush(stderr)

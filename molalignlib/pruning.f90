@@ -118,7 +118,7 @@ subroutine prune_rd( atomtypes, atoms1, atoms2, prunes)
          do j = 1, num_items2
             jatom = atomtypes%parts(h)%items2(j)
             do k = 1, atomtypes%num_parts
-               if (any(abs(dists2(jatom)%e(k)%e - dists1(iatom)%e(k)%e) > prune_tol)) then
+               if (any(abs(dists2(jatom)%e(k)%e - dists1(iatom)%e(k)%e) > 3.4641*prune_tol)) then
                   prunes(h)%ee(j, i) = .true.
                   exit
                end if

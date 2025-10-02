@@ -103,7 +103,7 @@ subroutine find_reactive_bonds( atoms1, atoms2, atomtypes, atomperm)
    call random_initialize()
 
    ! Initialize local minima registry
-   call init_adjd_registry( registry, max_records)
+   call init_adjd_registry( registry, num_records)
 
    ! Optimize atom permutation
    do while (registry%records(1)%count < count_thres .and. registry%num_trials < max_trials)

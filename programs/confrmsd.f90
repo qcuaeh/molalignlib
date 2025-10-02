@@ -38,10 +38,8 @@ use alignment_conformer
 implicit none
 
 character(:), allocatable :: title1, title2
-character(:), allocatable :: arg, pathout, dummy
-character(:), allocatable :: extin1, extin2, extout, extpipe
-logical :: heavy_flag, mass_flag, align_flag, remap_flag, stoch_flag, count_flag, &
-   write_flag, pipe_flag, stats_flag, tree_flag, rebond_flag, mapping_flag
+character(:), allocatable :: arg, fileout_path, dummy
+character(:), allocatable :: extin1, extin2, extout, extin
 type(strlist_type) :: posargs(2)
 type(atom_t), dimension(:), allocatable :: atoms1, atoms2
 type(bond_t), dimension(:), allocatable :: bonds1, bonds2
@@ -50,12 +48,14 @@ type(partition_t) :: atomtypes
 type(assigntree_node_t), pointer :: hnachain
 type(array_trees_t) :: assign_arrays
 type(registry_t) :: registry
-real(rk) :: rmsd, prunedist
+real(rk) :: rmsd, permdist
 real(rk) :: center1(3), center2(3), rotquat(4)
 real(rk), dimension(:), allocatable :: weights1, weights2
 real(rk), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, coords2r
+integer, dimension(:), pointer :: atomset1, atomset2
+integer, dimension(:), allocatable :: atomset1_alloc, atomset2_alloc
+integer, dimension(:), allocatable :: atomperm
 integer :: unitin1, unitin2, unitout
-type(subperm_t) :: atomperm
 integer :: i, j
 
 ! Set default options
@@ -65,8 +65,8 @@ heavy_flag = .false.
 mirror_flag = .false.
 align_flag = .false.
 remap_flag = .false.
-write_flag = .false.
-pipe_flag = .false.
+coords_flag = .false.
+stdin_flag = .false.
 tree_flag = .false.
 mass_flag = .false.
 stoch_flag = .true.
@@ -77,9 +77,11 @@ label_flag = .false.
 random_flag = .false.
 iterate_flag = .true.
 
-max_records = 1
+extin = 'xyz'
+num_records = 1
 count_thres = 10
-max_trials = huge( max_trials)
+unitout = stdout
+max_trials = huge( ik)
 
 ! Read command options
 
@@ -111,14 +113,16 @@ do while (get_arg(arg))
    case ('-trials')
       call read_optarg( arg, max_trials)
    case ('-n')
-      call read_optarg( arg, max_records)
-   case ('-aligned')
-      write_flag = .true.
-      call read_optarg( arg, pathout)
-   case ('-pipe')
-      pipe_flag = .true.
-      write_flag = .true.
-      call read_optarg( arg, extpipe)
+      call read_optarg( arg, num_records)
+   case ('-coords')
+      coords_flag = .true.
+   case ('-out')
+      fileout_flag = .true.
+      call read_optarg( arg, fileout_path)
+   case ('-stdin')
+      stdin_flag = .true.
+   case ('-extin')
+      call read_optarg( arg, extin)
    case ('-tree')
       tree_flag = .true.
    case ('-stats')
@@ -132,13 +136,12 @@ do while (get_arg(arg))
    end select
 end do
 
-if (pipe_flag) then
-   extin1 = extpipe
-   extin2 = extpipe
-   extout = extpipe
+if (stdin_flag) then
+   extin1 = extin
+   extin2 = extin
+   extout = extin
    unitin1 = stdin
    unitin2 = stdin
-   unitout = stdout
 else
    select case (ipos)
    case (0)
@@ -156,10 +159,11 @@ else
       write (stderr, '(A)') 'Error: Too many file paths'
       stop 1
    end select
-   if (write_flag) then
-      call split_path( pathout, dummy, dummy, extout)
-      call open2write( pathout, unitout)
-   end if
+end if
+
+if (fileout_flag) then
+   call split_path( fileout_path, dummy, dummy, extout)
+   call open2write( fileout_path, unitout)
 end if
 
 ! Read coordinates
@@ -167,17 +171,17 @@ call readfile( unitin1, extin1, title1, atoms1, bonds1)
 call readfile( unitin2, extin2, title2, atoms2, bonds2)
 
 if (heavy_flag) then
-   ! Include heavy atoms only
-   call include_heavy_atoms( atoms1)
-   call include_heavy_atoms( atoms2)
+   ! Include only heavy atoms
+   call include_heavy_atoms( atoms1, atomset1, atomset1_alloc)
+   call include_heavy_atoms( atoms2, atomset2, atomset2_alloc)
 else
    ! Include all atoms
-   atoms1%mask = .true.
-   atoms2%mask = .true.
+   call include_all_atoms( atoms1, atomset1, atomset1_alloc)
+   call include_all_atoms( atoms2, atomset2, atomset2_alloc)
 end if
 
 ! Collect atom types in a partition
-call collect_atomtypes( atoms1, atoms2, atomtypes)
+call collect_atomtypes( atomset1, atomset2, atoms1, atoms2, atomtypes)
 
 ! Abort if there are conflicting atomic types
 if (any(atomtypes%parts%num_items1 /= atomtypes%parts%num_items2)) then
@@ -195,11 +199,11 @@ else
 end if
 
 if (rebond_flag) then
-   call adjacency_from_distance( atoms1, adjcs1)
-   call adjacency_from_distance( atoms2, adjcs2)
+   call adjacency_from_distance( atomset1, atoms1, adjcs1)
+   call adjacency_from_distance( atomset2, atoms2, adjcs2)
 else
-   call adjacency_from_bonds( atoms1, bonds1, adjcs1)
-   call adjacency_from_bonds( atoms2, bonds2, adjcs2)
+   call adjacency_from_bonds( atomset1, atoms1, bonds1, adjcs1)
+   call adjacency_from_bonds( atomset2, atoms2, bonds2, adjcs2)
 end if
 
 ! Get mol1 coordinates
@@ -214,8 +218,8 @@ end if
 
 if (align_flag) then
 
-   center1 = get_centroid( atoms1, weights1)
-   center2 = get_centroid( atoms2, weights2)
+   center1 = get_centroid( atomset1, atoms1, weights1)
+   center2 = get_centroid( atomset2, atoms2, weights2)
    call translate_coords( coords2, center1 - center2)
 
    ! Get weighted-centered coordinates
@@ -236,29 +240,29 @@ if (align_flag) then
             assign_arrays%global_combinations > count_thres*assign_arrays%local_combinations)) then
 
          ! Remap atoms to minimize the MSD
-         call optimize_atomperm_conform( coords1w, coords2w, assign_arrays, registry)
+         call optimize_atomperm_conform( atomset1, atomset2, assign_arrays, coords1w, coords2w, registry)
 
          ! Print optimization stats
          if (stats_flag) then
             call print_records( registry)
          end if
 
-         do i = 1, registry%num_records
+         do i = 1, registry%occ_records
             atomperm = registry%records(i)%atomperm
 !            rotquat = registry%records(i)%rotquat
-            rotquat = least_rotquat( atomperm, coords1w, coords2w)
+            rotquat = least_rotquat( atomset1, atomperm, coords1w, coords2w)
             coords2r = rotated_coords( coords2, rotquat, center1)
-            rmsd = sqrt( sqdistmean( atomperm, weights1, coords1, coords2r))
+            rmsd = sqrt( sqdistmean( atomset1, atomperm, weights1, coords1, coords2r))
 
             write (stdout,'(A)') str( rmsd)
 
             if (mapping_flag) then
-               do j = 1, atomperm%current_size
-                  write (stdout,'(I0," -> ",I0)') atomperm%subset1(j), atomperm%subset2(j)
+               do j = 1, size(atomperm)
+                  write (stdout,'(I0," -> ",I0)') j, atomperm(j)
                end do
             end if
 
-            if (write_flag) then
+            if (coords_flag) then
                title2 = 'RMSD=' // str( rmsd)
                coords2r = rotated_coords( coords2, rotquat, center1)
                call set_coords( atoms2, coords2r)
@@ -270,19 +274,19 @@ if (align_flag) then
       else
 
          call assign_atoms_global( coords1w, coords2w, assign_arrays, atomperm)
-         rotquat = least_rotquat( atomperm, coords1w, coords2w)
+         rotquat = least_rotquat( atomset1, atomperm, coords1w, coords2w)
          coords2r = rotated_coords( coords2, rotquat, center1)
-         rmsd = sqrt( sqdistmean( atomperm, weights1, coords1, coords2r))
+         rmsd = sqrt( sqdistmean( atomset1, atomperm, weights1, coords1, coords2r))
 
          write (stdout,'(A)') str( rmsd)
 
          if (mapping_flag) then
-            do j = 1, atomperm%current_size
-               write (stdout,'(I0," -> ",I0)') atomperm%subset1(j), atomperm%subset2(j)
+            do j = 1, size(atomperm)
+               write (stdout,'(I0," -> ",I0)') j, atomperm(j)
             end do
          end if
 
-         if (write_flag) then
+         if (coords_flag) then
             title2 = 'RMSD=' // str( rmsd)
             coords2r = rotated_coords( coords2, rotquat, center1)
             call set_coords( atoms2, coords2r)
@@ -293,14 +297,14 @@ if (align_flag) then
 
    else
 
-      atomperm = identity_subperm( atoms1, atoms2)
-      rotquat = least_rotquat( atomperm, coords1w, coords2w)
+      atomperm = identity_permutation( size(atoms1))
+      rotquat = least_rotquat( atomset1, atomperm, coords1w, coords2w)
       coords2r = rotated_coords( coords2, rotquat, center1)
-      rmsd = sqrt( sqdistmean( atomperm, weights1, coords1, coords2r))
+      rmsd = sqrt( sqdistmean( atomset1, atomperm, weights1, coords1, coords2r))
 
       write (stdout,'(A)') str( rmsd)
 
-      if (write_flag) then
+      if (coords_flag) then
          title2 = 'RMSD=' // str( rmsd)
          coords2r = rotated_coords( coords2, rotquat, center1)
          call set_coords( atoms2, coords2r)
@@ -321,19 +325,18 @@ else
       if (tree_flag) then
          call print_chain_tree_array( assign_arrays)
       end if
-!      call assign_atoms_local( coords1w, coords2w, assign_arrays, atomperm)
-      call assign_atoms_greedy( coords1, coords2r, assign_arrays, atomperm, prunedist)
-      if (.not. assign_atoms_local_pruned( coords1w, coords2w, assign_arrays, prunedist, atomperm)) &
-            error stop 'assignment failed'
-      rmsd = sqrt( sqdistmean( atomperm, weights1, coords1, coords2))
+!      call assign_atoms_local( coords1w, coords2w, assign_arrays, atomperm, permdist)
+      call assign_atoms_greedy( coords1w, coords2w, assign_arrays, atomperm, permdist)
+      call assign_atoms_local_pruned( coords1w, coords2w, assign_arrays, atomperm, permdist)
+      rmsd = sqrt( sqdistmean( atomset1, atomperm, weights1, coords1, coords2))
    else
-      atomperm = identity_subperm( atoms1, atoms2)
-      rmsd = sqrt( sqdistmean( atomperm, weights1, coords1, coords2))
+      atomperm = identity_permutation( size(atoms1))
+      rmsd = sqrt( sqdistmean( atomset1, atomperm, weights1, coords1, coords2))
    end if
 
    write (stdout,'(A)') str( rmsd)
 
-   if (write_flag) then
+   if (coords_flag) then
       title2 = 'RMSD=' // str( rmsd)
       coords2r = rotated_coords( coords2, rotquat, center1)
       call set_coords( atoms2, coords2r)

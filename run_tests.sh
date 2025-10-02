@@ -10,10 +10,10 @@ run_tests() {
       name=$(basename "$file" .xyz)_$suffix
       echo -n "Running test $subdir/$name... "
       if $write_test; then
-         "$executable" "$@" < "$file" > "$testdir/$subdir/$name.out" 2>/dev/null
+         "$executable" "$@" < "$file" > "$testdir/$subdir/$name.out" 2>&1
          echo done
       else
-         if diff -bB "$testdir/$subdir/$name.out" <("$executable" "$@" < "$file" 2>/dev/null); then
+         if diff -bB "$testdir/$subdir/$name.out" <("$executable" "$@" < "$file" 2>&1); then
             echo ok
          else
             echo failed
@@ -38,4 +38,4 @@ while getopts ":w" opt; do
   esac
 done
 
-run_tests prune17 jcim.2c01187/0.05 -pipe xyz -test -stats -N 5 -align -remap -prune rd -tol 0.17
+run_tests prune17 jcim.2c01187/0.05 -stdin -coords -stats -N 5 -align -remap -prune 0.05

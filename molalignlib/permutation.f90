@@ -16,15 +16,15 @@
 
 module permutation
 use parameters
-use molecule
 implicit none
 
 ! Derived type to store permutation subsets
 type :: subperm_t
-   integer :: total_size  ! full permutation size
-   integer :: current_size  ! total permutation size
-   integer, allocatable :: subset1(:)  ! indices of assigned atoms in mol1
-   integer, allocatable :: subset2(:)  ! indices of assigned atoms in mol2
+   integer :: atomset_size   ! number of assigned pairs
+   integer :: atomperm_size     ! atom permutation array size
+   integer, pointer :: atomset(:)             ! pointer to active slice of subset_alloc
+   integer, allocatable :: subset_alloc(:)   ! allocated storage for atomset
+   integer, allocatable :: atomperm(:)       ! atom permutation array
 end type
 
 interface operator(==)
@@ -88,22 +88,17 @@ end function
 elemental function subperm_equality(left, right) result(equality)
    type(subperm_t), intent(in) :: left, right
    logical :: equality
-   integer :: i
+   integer :: i, idx
 
-   if (left%current_size /= right%current_size) then
+   if (left%atomset_size /= right%atomset_size) then
       equality = .false.
       return
    end if
 
-!   do i = 1, left%current_size
-!      if (left%subset1(i) /= right%subset1(i)) then
-!         equality = .false.
-!         return
-!      end if
-!   end do
-
-   do i = 1, left%current_size
-      if (left%subset2(i) /= right%subset2(i)) then
+   ! Check if all assigned pairs match
+   do i = 1, left%atomset_size
+      idx = left%atomset(i)
+      if (left%atomperm(idx) /= right%atomperm(idx)) then
          equality = .false.
          return
       end if
@@ -113,165 +108,103 @@ elemental function subperm_equality(left, right) result(equality)
 end function
 
 subroutine subperm_init(subperm, perm_size)
-   type(subperm_t), intent(out) :: subperm
+   type(subperm_t), target, intent(out) :: subperm
    integer, intent(in) :: perm_size
+   integer :: i
 
-   allocate(subperm%subset1(perm_size))
-   allocate(subperm%subset2(perm_size))
-   subperm%total_size = perm_size
-   subperm%current_size = 0
+   allocate(subperm%subset_alloc(perm_size))
+   allocate(subperm%atomperm(perm_size))
+   subperm%atomperm_size = perm_size
+   subperm%atomset_size = 0
+
+   ! Initialize atomset pointer to empty slice
+   subperm%atomset => subperm%subset_alloc(1:0)
+
+   ! Initialize atomperm as identity permutation
+   do i = 1, perm_size
+      subperm%atomperm(i) = i
+   end do
 end subroutine
 
 subroutine subperm_add(subperm, i1, i2)
-   ! Merge source assignment into target assignment
-   type(subperm_t), intent(inout) :: subperm
+   type(subperm_t), target, intent(inout) :: subperm
    integer, intent(in) :: i1, i2
-   ! Local variables
    integer :: n
 
    if (DEBUGGING) then
    block
-      ! Check for conflicts
       integer :: i
-      do i = 1, subperm%current_size
-         if (subperm%subset1(i) == i1 .or. subperm%subset2(i) == i2) then
-            error stop "subperm index conflict"
+      ! Check if i1 is already in atomset
+      do i = 1, subperm%atomset_size
+         if (subperm%atomset(i) == i1) then
+            error stop "subperm index conflict: i1 already in atomset"
+         end if
+      end do
+      ! Check if i2 is already assigned to something in atomset
+      do i = 1, subperm%atomset_size
+         if (subperm%atomperm(subperm%atomset(i)) == i2) then
+            error stop "subperm index conflict: i2 already assigned"
          end if
       end do
    end block
    end if
 
-   n = subperm%current_size + 1
-   subperm%subset1(n) = i1
-   subperm%subset2(n) = i2
-   subperm%current_size = n
+   n = subperm%atomset_size + 1
+   subperm%subset_alloc(n) = i1
+   subperm%atomperm(i1) = i2
+   subperm%atomset_size = n
+
+   ! Update atomset pointer to include the new element
+   subperm%atomset => subperm%subset_alloc(1:n)
 end subroutine
 
 subroutine subperm_merge(subperm, other_subperm)
-   ! Merge source assignment into target assignment
    type(subperm_t), intent(inout) :: subperm
    type(subperm_t), intent(in) :: other_subperm
    integer :: i, i1, i2
 
-   do i = 1, other_subperm%current_size
-      i1 = other_subperm%subset1(i)
-      i2 = other_subperm%subset2(i)
-      call subperm_add( subperm, i1, i2)
+   do i = 1, other_subperm%atomset_size
+      i1 = other_subperm%atomset(i)
+      i2 = other_subperm%atomperm(i1)
+      call subperm_add(subperm, i1, i2)
    end do
 end subroutine
 
 subroutine subperm_to_perm(subperm, perm, invperm)
-   ! Merge source assignment into target assignment
    type(subperm_t), intent(in) :: subperm
    integer, dimension(:), allocatable, intent(out) :: perm, invperm
-   ! Local variables
-   integer :: i, i1, i2, j1, j2
+   integer :: i, i1, i2
 
-   perm = identity_permutation(subperm%total_size)
-   invperm = identity_permutation(subperm%total_size)
+   perm = identity_permutation(subperm%atomperm_size)
+   invperm = identity_permutation(subperm%atomperm_size)
 
-   do i = 1, subperm%current_size
-      i1 = subperm%subset1(i)
-      i2 = subperm%subset2(i)
-      j1 = invperm(i2)
-      j2 = perm(i1)
+   ! Apply all assignments from subperm
+   do i = 1, subperm%atomset_size
+      i1 = subperm%atomset(i)
+      i2 = subperm%atomperm(i1)
       perm(i1) = i2
       invperm(i2) = i1
-      perm(j1) = j2
-      invperm(j2) = j1
+   end do
+
+   ! Handle unassigned elements to maintain valid permutation
+   ! (swap unassigned elements to match the identity where possible)
+   do i = 1, subperm%atomperm_size
+      if (invperm(i) == i) cycle  ! Already correctly placed
+      ! Find element that should be here
+      if (perm(invperm(i)) /= i) then
+         ! Swap
+         i1 = invperm(i)
+         i2 = perm(i1)
+         perm(i1) = i
+         invperm(i) = i1
+         perm(invperm(i2)) = i2
+         invperm(i2) = invperm(i2)
+      end if
    end do
 end subroutine
 
-subroutine check_subperm(subperm)
-   implicit none
-   type(subperm_t), intent(in) :: subperm
-   logical :: subset_seen(subperm%total_size)
-   logical :: permut_seen(subperm%total_size)
-   logical :: has_errors
-   integer :: i, src_idx, tgt_idx
-
-   has_errors = .false.
-   subset_seen = .false.
-   permut_seen = .false.
-
-   ! Check if count is within valid bounds
-   if (subperm%current_size < 0 .or. subperm%current_size > subperm%total_size) then
-      write(stderr, '(A,I0,A,I0,A)') 'Count ', subperm%current_size, &
-         ' is out of range [0,', subperm%total_size, ']'
-      has_errors = .true.
-   end if
-
-   ! Check each pair in the partial permutation
-   do i = 1, subperm%current_size
-      src_idx = subperm%subset1(i)
-      tgt_idx = subperm%subset2(i)
-
-      ! Check if source index is out of bounds
-      if (src_idx < 1 .or. src_idx > subperm%total_size) then
-         write(stderr, '(A,I0,A,I0,A,I0,A)') 'Source index ', src_idx, &
-            ' at position ', i, ' is out of range [1,', subperm%total_size, ']'
-         has_errors = .true.
-      else
-         ! Only check for repetition if within bounds
-         if (subset_seen(src_idx)) then
-            write(stderr, '(A,I0,A)') 'Source index ', src_idx, &
-               ' appears multiple times in subset'
-            has_errors = .true.
-         else
-            subset_seen(src_idx) = .true.
-         end if
-      end if
-
-      ! Check if target index is out of bounds
-      if (tgt_idx < 1 .or. tgt_idx > subperm%total_size) then
-         write(stderr, '(A,I0,A,I0,A,I0,A)') 'Target index ', tgt_idx, &
-            ' at position ', i, ' is out of range [1,', subperm%total_size, ']'
-         has_errors = .true.
-      else
-         ! Only check for repetition if within bounds
-         if (permut_seen(tgt_idx)) then
-            write(stderr, '(A,I0,A)') 'Target index ', tgt_idx, &
-               ' appears multiple times in permutation'
-            has_errors = .true.
-         else
-            permut_seen(tgt_idx) = .true.
-         end if
-      end if
-   end do
-
-   if (has_errors) then
-      error stop 'Sub-permutation is not valid'
-   else
-      write(stderr, '(A,I0,A,I0,A)') 'Sub-permutation is valid (', &
-         subperm%current_size, '/', subperm%total_size, ' assignments)'
-   end if
-end subroutine
-
-function identity_subperm(atoms1, atoms2) result(subperm)
-   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
-   type(subperm_t), target :: subperm
-   integer, pointer :: n
-   integer :: i
-
-   call subperm_init( subperm, size(atoms1))
-   n => subperm%current_size
-   do i = 1, size(atoms1)
-      if (atoms1(i)%mask) then
-         if (atoms2(i)%mask) then
-            n = n + 1
-            subperm%subset1(n) = i
-            subperm%subset2(n) = i
-         else
-            write (stderr, '(A)') "Error: Aligning atoms don't match"
-            stop 1
-         end if
-      end if
-   end do
-end function
-
+! Original at https://people.sc.fsu.edu/~jburkardt/f_src/atomset/atomset.f90
 subroutine perm1_next3 ( n, p, more, rank )
-!This subroutine was obtained from:
-!https://people.sc.fsu.edu/~jburkardt/f_src/subset/subset.f90
 
 !*****************************************************************************80
 !
@@ -325,49 +258,39 @@ subroutine perm1_next3 ( n, p, more, rank )
 !
 !    Input/output, integer RANK, the rank of the current permutation.
 !
-  integer :: n
-  integer :: p(n)
-  logical :: more
-  integer :: rank
 
-  integer :: i
-  integer :: m2
-  integer :: n2
-  integer :: q
-  integer :: s
-  integer :: t
+  integer n
+  integer i
+  integer m2
+  logical more
+  integer n2
+  integer p(n)
+  integer q
+  integer rank
+  integer s
+  integer t
 
   if ( .not. more ) then
-
     do i = 1, n
       p(i) = i
     end do
-
     more = .true.
     rank = 1
-
   else
-
     n2 = n
     m2 = rank
     s = n
-
     do
-
       q = mod ( m2, n2 )
       t = mod ( m2, 2 * n2 )
-
       if ( q /= 0 ) then
         exit
       end if
-
       if ( t == 0 ) then
         s = s - 1
       end if
-
       m2 = m2 / n2
       n2 = n2 - 1
-
       if ( n2 == 0 ) then
         do i = 1, n
           p(i) = i
@@ -376,11 +299,8 @@ subroutine perm1_next3 ( n, p, more, rank )
         rank = 1
         exit
       end if
-
     end do
-
     if ( n2 /= 0 ) then
-
       if ( q == t ) then
         s = s - q
       else
@@ -392,11 +312,8 @@ subroutine perm1_next3 ( n, p, more, rank )
       t      = p(s)
       p(s)   = p(s+1)
       p(s+1) = t
-
       rank = rank + 1
-
     end if
-
   end if
 
   return

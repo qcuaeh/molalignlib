@@ -42,7 +42,7 @@ subroutine writefile(unit, extout, title, atoms, bonds, atomperm)
    character(*), intent(in) :: title
    type(atom_t), dimension(:), intent(in) :: atoms
    type(bond_t), dimension(:), intent(in) :: bonds
-   type(subperm_t), intent(in) :: atomperm
+   integer, dimension(:), intent(in) :: atomperm
 
    select case (extout)
    case ('xyz')
@@ -64,20 +64,18 @@ subroutine writefile_xyz(unit, title, atoms, bonds, atomperm)
    character(*), intent(in) :: title
    type(atom_t), dimension(:), intent(in) :: atoms
    type(bond_t), dimension(:), intent(in) :: bonds
-   type(subperm_t), intent(in) :: atomperm
+   integer, dimension(:), intent(in) :: atomperm
    ! Local varibles
-   integer, dimension(:), allocatable :: perm, invperm
    type(atom_t) :: iatom
    integer :: num_atoms, i
 
-   call subperm_to_perm(atomperm, perm, invperm)
    num_atoms = size(atoms)
 
    write (unit, '(I0)') num_atoms
    write (unit, '(A)') title
 
    do i = 1, num_atoms
-      iatom = atoms(perm(i))
+      iatom = atoms(atomperm(i))
       write (unit, '(A,3(2X,F12.6))') element_symbols(iatom%elnum), iatom%coords
    end do
 end subroutine
@@ -88,14 +86,14 @@ subroutine writefile_mol2(unit, title, atoms, bonds, atomperm)
    character(*), intent(in) :: title
    type(atom_t), dimension(:), intent(in) :: atoms
    type(bond_t), dimension(:), intent(in) :: bonds
-   type(subperm_t), intent(in) :: atomperm
+   integer, dimension(:), intent(in) :: atomperm
    ! Local variables
    type(atom_t) :: iatom
-   integer, dimension(:), allocatable :: perm, invperm
+   integer, dimension(:), allocatable :: invperm
    integer :: num_atoms, num_bonds, atomidx1, atomidx2, i
    character(4) :: atom_type
 
-   call subperm_to_perm(atomperm, perm, invperm)
+   invperm = inverse_permutation(atomperm)
 
    num_atoms = size(atoms)
    num_bonds = size(bonds)
@@ -112,7 +110,7 @@ subroutine writefile_mol2(unit, title, atoms, bonds, atomperm)
 
    write (unit, '(A)') '@<TRIPOS>ATOM'
    do i = 1, num_atoms
-      iatom = atoms(perm(i))
+      iatom = atoms(atomperm(i))
       if (iatom%elnum > 1) then
          atom_type = 'Hev'
       else
@@ -136,13 +134,13 @@ subroutine writefile_sdf(unit, title, atoms, bonds, atomperm)
    character(*), intent(in) :: title
    type(atom_t), dimension(:), intent(in) :: atoms
    type(bond_t), dimension(:), intent(in) :: bonds
-   type(subperm_t), intent(in) :: atomperm
+   integer, dimension(:), intent(in) :: atomperm
    ! Local variables
    type(atom_t) :: iatom
-   integer, dimension(:), allocatable :: perm, invperm
+   integer, dimension(:), allocatable :: invperm
    integer :: num_atoms, num_bonds, atomidx1, atomidx2, i
 
-   call subperm_to_perm(atomperm, perm, invperm)
+   invperm = inverse_permutation(atomperm)
 
    num_atoms = size(atoms)
    num_bonds = size(bonds)
@@ -164,7 +162,7 @@ subroutine writefile_sdf(unit, title, atoms, bonds, atomperm)
    ! Atom block
    ! Format: xxxxx.xxxxyyyyy.yyyyzzzzz.zzzz aaaddcccssshhhbbbvvvHHHrrriiimmmnnneee
    do i = 1, num_atoms
-      iatom = atoms(perm(i))
+      iatom = atoms(atomperm(i))
       write (unit, '(3F10.4,1X,A3,I2,11I3)') &
          iatom%coords, element_symbols(iatom%elnum), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
    end do

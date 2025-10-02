@@ -4,6 +4,7 @@ use chemistry
 implicit none
 private
 public set_coords
+public include_all_atoms
 public include_heavy_atoms
 public adjacency_from_bonds
 public adjacency_from_distance
@@ -18,12 +19,9 @@ public print_bonds
 !public remove_bond
 
 type, public :: atom_t
-   logical :: mask
    integer :: elnum
    integer :: typeid
    real(rk) :: coords(3)
-!   integer, pointer :: adjlist(:)
-!   integer, pointer :: adjlist_allocation(MAX_COORD)
 end type
 
 type, public :: bond_t
@@ -43,18 +41,39 @@ end interface
 
 contains
 
-subroutine include_heavy_atoms(atoms)
+subroutine include_all_atoms(atoms, atomset, subset_alloc)
    type(atom_t), dimension(:), intent(inout) :: atoms
+   integer, dimension(:), pointer, intent(out) :: atomset
+   integer, dimension(:), allocatable, target, intent(out) :: subset_alloc
    ! Local variables
    integer :: i
 
+   allocate (subset_alloc(size(atoms)))
+   atomset => subset_alloc
+
    do i = 1, size(atoms)
-      if (atoms(i)%elnum > 1) then
-         atoms(i)%mask = .true.
-      else
-         atoms(i)%mask = .false.
+      subset_alloc(i) = i
+   end do
+end subroutine
+
+subroutine include_heavy_atoms(atoms, atomset, subset_alloc)
+   type(atom_t), dimension(:), intent(inout) :: atoms
+   integer, dimension(:), pointer, intent(out) :: atomset
+   integer, dimension(:), allocatable, target, intent(out) :: subset_alloc
+   ! Local variables
+   integer :: atomidx, n
+
+   allocate (subset_alloc(size(atoms)))
+
+   n = 0
+   do atomidx = 1, size(atoms)
+      if (atoms(n)%elnum > 1) then
+         n = n + 1
+         subset_alloc(n) = atomidx
       end if
    end do
+
+   atomset => subset_alloc(1:n)
 end subroutine
 
 subroutine set_coords(atoms, coords)
@@ -68,7 +87,8 @@ subroutine set_coords(atoms, coords)
    end do
 end subroutine
 
-subroutine adjacency_from_bonds(atoms, bonds, adjcs)
+subroutine adjacency_from_bonds(atomset, atoms, bonds, adjcs)
+   integer, dimension(:), intent(in) :: atomset
    type(atom_t), dimension(:), intent(in) :: atoms
    type(bond_t), dimension(:), intent(in) :: bonds
    type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs
@@ -85,7 +105,7 @@ subroutine adjacency_from_bonds(atoms, bonds, adjcs)
    do i = 1, size(bonds)
       idx1 = bonds(i)%atomidx1
       idx2 = bonds(i)%atomidx2
-      if (atoms(idx1)%mask .and. atoms(idx2)%mask) then
+      if (any(atomset == idx1) .and. any(atomset == idx2)) then
          nadjs(idx1) = nadjs(idx1) + 1
          nadjs(idx2) = nadjs(idx2) + 1
          adjlist(nadjs(idx1), idx1) = idx2
@@ -98,7 +118,8 @@ subroutine adjacency_from_bonds(atoms, bonds, adjcs)
    end do
 end subroutine
 
-subroutine adjacency_from_distance(atoms, adjcs)
+subroutine adjacency_from_distance(atomset, atoms, adjcs)
+   integer, dimension(:), intent(in) :: atomset
    type(atom_t), dimension(:), intent(in) :: atoms
    type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs
    ! Local variables
@@ -119,9 +140,9 @@ subroutine adjacency_from_distance(atoms, adjcs)
    ! than the sum of their adjacency radius
    nadjs = 0
    do i = 1, size(atoms)
-      if (atoms(i)%mask) then
+      if (any(atomset == i)) then
          do j = i + 1, size(atoms)
-            if (atoms(j)%mask) then
+            if (any(atomset == j)) then
                atom_dist = sqrt(sum((atoms(i)%coords - atoms(j)%coords)**2))
                if (atom_dist < atom_radii(i) + atom_radii(j)) then
                   nadjs(i) = nadjs(i) + 1
@@ -174,11 +195,14 @@ function get_weighted_coords_base(atoms, weights) result(coords)
    real(rk), dimension(:), intent(in) :: weights
    real(rk), dimension(:,:), allocatable :: coords
    ! Local variables
+   real(rk) :: total_weight
    integer :: i
 
    allocate (coords(3, size(atoms)))
+   total_weight = sum(weights)
+
    do i = 1, size(atoms)
-      coords(:, i) = sqrt(weights(i))*atoms(i)%coords
+      coords(:, i) = sqrt(weights(i)/total_weight)*atoms(i)%coords
    end do
 end function
 
@@ -188,16 +212,20 @@ function get_weighted_coords_center(atoms, weights, center) result(coords)
    real(rk), intent(in) :: center(3)
    real(rk), dimension(:,:), allocatable :: coords
    ! Local variables
+   real(rk) :: total_weight
    integer :: i
 
    allocate (coords(3, size(atoms)))
+   total_weight = sum(weights)
+
    do i = 1, size(atoms)
-      coords(:, i) = sqrt(weights(i))*(atoms(i)%coords - center)
+      coords(:, i) = sqrt(weights(i)/total_weight)*(atoms(i)%coords - center)
    end do
 end function
 
-function get_centroid(atoms, weights) result(centroid)
+function get_centroid(atomset, atoms, weights) result(centroid)
 ! Calculate the coordinates of the center of mass
+   integer, dimension(:), intent(in) :: atomset
    type(atom_t), dimension(:), intent(in) :: atoms
    real(rk), dimension(:), intent(in) :: weights
    ! Local variables
@@ -208,7 +236,7 @@ function get_centroid(atoms, weights) result(centroid)
    total_weight = 0
    total_coords = 0
    do i = 1, size(atoms)
-      if (atoms(i)%mask) then
+      if (any(atomset == i)) then
          total_weight = total_weight + weights(i)
          total_coords = total_coords + weights(i)*atoms(i)%coords
       end if

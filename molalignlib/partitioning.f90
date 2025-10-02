@@ -79,8 +79,9 @@ function find_atomtype(atomtypetable, elnum, typeid) result(partidx)
    partidx = 0  ! Not found
 end function
 
-subroutine collect_atomtypes(atoms1, atoms2, atomtypes)
+subroutine collect_atomtypes(atomset1, atomset2, atoms1, atoms2, atomtypes)
 ! Single-pass approach using reverse mapping - no large 2D arrays needed
+   integer, dimension(:), intent(in) :: atomset1, atomset2
    type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
    type(partition_t), intent(out) :: atomtypes
 
@@ -121,7 +122,7 @@ subroutine collect_atomtypes(atoms1, atoms2, atomtypes)
    ! SINGLE PASS: Process all atoms, build assignments AND count sizes
    ! First molecule
    do i = 1, num_atoms1
-      if (atoms1(i)%mask) then
+      if (any(atomset1 == i)) then
          partidx = find_atomtype(atomtypetable, atoms1(i)%elnum, atoms1(i)%typeid)
          if (partidx == 0) then
             current_part = current_part + 1
@@ -135,7 +136,7 @@ subroutine collect_atomtypes(atoms1, atoms2, atomtypes)
 
    ! Second molecule
    do i = 1, num_atoms2
-      if (atoms2(i)%mask) then
+      if (any(atomset2 == i)) then
          partidx = find_atomtype(atomtypetable, atoms2(i)%elnum, atoms2(i)%typeid)
          if (partidx == 0) then
             current_part = current_part + 1
@@ -177,7 +178,7 @@ subroutine collect_atomtypes(atoms1, atoms2, atomtypes)
 
    ! Fill first molecule using reverse mapping
    do i = 1, num_atoms1
-      if (atoms1(i)%mask) then
+      if (any(atomset1 == i)) then
          partidx = itemdir1_temp(i)
          part_fill1(partidx) = part_fill1(partidx) + 1
          atomtypes%parts(partidx)%items1(part_fill1(partidx)) = i
@@ -186,7 +187,7 @@ subroutine collect_atomtypes(atoms1, atoms2, atomtypes)
 
    ! Fill second molecule using reverse mapping
    do i = 1, num_atoms2
-      if (atoms2(i)%mask) then
+      if (any(atomset2 == i)) then
          partidx = itemdir2_temp(i)
          part_fill2(partidx) = part_fill2(partidx) + 1
          atomtypes%parts(partidx)%items2(part_fill2(partidx)) = i

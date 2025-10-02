@@ -360,7 +360,7 @@ recursive subroutine recurse_assign_atoms_greedy(coords1, coords2, assign_arrays
       items2_offset = assign_arrays%partree(split_part_idx)%items2_offset
 
       ! Find the closest pair (greedy choice)
-      min_dist = huge(1.0_rk)
+      min_dist = huge(rk)
       greedy_idx1 = 1
       greedy_idx2 = 1
 
@@ -395,13 +395,14 @@ recursive subroutine recurse_assign_atoms_greedy(coords1, coords2, assign_arrays
    end do
 end subroutine
 
-subroutine assign_atoms_greedy(coords1, coords2, assign_arrays, greedy_perm, perm_dist)
+subroutine assign_atoms_greedy(coords1, coords2, assign_arrays, atomperm, permdist)
    ! Greedy exploration wrapper - generates assignment by always choosing closest pairs
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_arrays
-   type(subperm_t), intent(out) :: greedy_perm
-   real(rk), intent(out) :: perm_dist
+   integer, dimension(:), allocatable, intent(out) :: atomperm
+   real(rk), intent(out) :: permdist
    ! Local variables
+   type(subperm_t) :: greedy_perm
 
    ! Initialize greedy assignment
    call subperm_init(greedy_perm, assign_arrays%num_atoms1)
@@ -412,16 +413,19 @@ subroutine assign_atoms_greedy(coords1, coords2, assign_arrays, greedy_perm, per
    ! Perform greedy exploration to generate one assignment (starting from root chain at index 1)
    call recurse_assign_atoms_greedy(coords1, coords2, assign_arrays, 1, greedy_perm)
 
+   ! Convert subperm type to permutation array
+   allocate (atomperm(greedy_perm%atomperm_size))
+   atomperm = greedy_perm%atomperm
+
    ! Calculate total distance
-   perm_dist = sqdistsum(greedy_perm, coords1, coords2)
+   permdist = sqdistsum(atomperm, coords1, coords2)
 
 !block
 !   write(stderr, '(A)') repeat("=", 60)
-!   write(stderr, '(A,I0,A,I0,A)') "Atoms assigned: ", greedy_perm%current_size, " out of ", &
+!   write(stderr, '(A,I0,A,I0,A)') "Atoms assigned: ", greedy_perm%atomset_size, " out of ", &
 !         assign_arrays%num_atoms1, " total atoms"
-!   write(stderr, '(A,F10.4)') "Greedy assignment total squared distance: ", total_dist
+!   write(stderr, '(A,F10.4)') "Greedy assignment total squared distance: ", permdist
 !   write(stderr, '(A)') repeat("=", 60)
-!   call check_subperm(greedy_perm)
 !end block
 end subroutine
 
@@ -443,7 +447,9 @@ recursive subroutine recurse_assign_atoms_global(coords1, coords2, assign_arrays
    ! Base case: we've made assignments for all split parts - evaluate complete permutation
    if (current_split_idx > num_split_parts) then
       combination_count = combination_count + 1
-      total_dist = least_total_sqdist(this_perm, coords1, coords2)
+
+      ! Calculate least distance of this permutation
+      total_dist = least_sqdistsum(this_perm%atomset, this_perm%atomperm, coords1, coords2)
 
       ! Update global best if this permutation is better
       if (total_dist < min_dist) then
@@ -499,13 +505,13 @@ recursive subroutine recurse_assign_atoms_global(coords1, coords2, assign_arrays
    end do
 end subroutine
 
-subroutine assign_atoms_global(coords1, coords2, assign_arrays, best_perm)
+subroutine assign_atoms_global(coords1, coords2, assign_arrays, atomperm)
    ! DFS exploration of all permutations
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_arrays
-   type(subperm_t), intent(out) :: best_perm
+   integer, dimension(:), allocatable, intent(out) :: atomperm
    ! Local variables
-   type(subperm_t) :: this_perm
+   type(subperm_t) :: this_perm, best_perm
    real(rk) :: min_dist
    integer, allocatable :: split_parts(:)
    integer :: num_split_parts, num_atoms
@@ -521,7 +527,7 @@ subroutine assign_atoms_global(coords1, coords2, assign_arrays, best_perm)
    call collect_leaf_assignments(assign_arrays, 1, best_perm)
 
    ! Initialize global minimum distance
-   min_dist = huge(1.0_rk)
+   min_dist = huge(rk)
 
    ! Initialize DFS exploration variables
    combination_count = 0
@@ -536,14 +542,17 @@ subroutine assign_atoms_global(coords1, coords2, assign_arrays, best_perm)
    ! Clean up
    deallocate(split_parts)
 
+   ! Convert subperm type to permutation array
+   allocate (atomperm(best_perm%atomperm_size))
+   atomperm = best_perm%atomperm
+
    ! Output results
 !   write(stderr, '(A)') repeat("=", 60)
 !   write(stderr, '(A,I0)') "Split parts found: ", num_split_parts
 !   write(stderr, '(A,I0)') "Total permutations explored: ", combination_count
-!   write(stderr, '(A,I0,A,I0,A)') "Atoms assigned: ", best_perm%current_size, " out of ", num_atoms, " total atoms"
+!   write(stderr, '(A,I0,A,I0,A)') "Atoms assigned: ", best_perm%atomset_size, " out of ", num_atoms, " total atoms"
 !   write(stderr, '(A,F10.4)') "Minimum total squared distance: ", min_dist
 !   write(stderr, '(A)') repeat("=", 60)
-!   call check_subperm(best_perm)
 end subroutine
 
 recursive subroutine recurse_assign_atoms_local(coords1, coords2, assign_arrays, &
@@ -579,7 +588,7 @@ recursive subroutine recurse_assign_atoms_local(coords1, coords2, assign_arrays,
       branch_num_links = assign_arrays%assigntree(child_branch_idx)%num_links
 
       items2_count = assign_arrays%partree(split_part_idx)%items2_count
-      min_branch_dist = huge(1.0_rk)
+      min_branch_dist = huge(rk)
 
       call subperm_init(best_branch_perm, num_atoms)
       call subperm_init(branch_perm, num_atoms)
@@ -587,15 +596,15 @@ recursive subroutine recurse_assign_atoms_local(coords1, coords2, assign_arrays,
       ! Try pairing first item1 with each item2 to find best assignment for this branch
       do j = 1, items2_count
          ! Reset branch assignment and distance for this iteration
-         branch_perm%current_size = 0
-         branch_dist = 0.0_rk
+         branch_perm%atomset_size = 0
+         branch_dist = 0
 
          ! Make assignment and recompute HNAs (using first item1, index=1)
          call assign_branch_atoms(assign_arrays, split_part_idx, child_branch_idx, &
                                    first_link_idx, 1, j, branch_perm)
 
          ! Add new assigned pairs distance to branch distance
-         branch_dist = branch_dist + sqdistsum(branch_perm, coords1, coords2)
+         branch_dist = branch_dist + sqdistsum(branch_perm%atomset, branch_perm%atomperm, coords1, coords2)
 
          ! Recursively explore subtree - distance is accumulated in branch_dist
          call recurse_assign_atoms_local(coords1, coords2, assign_arrays, &
@@ -622,14 +631,16 @@ recursive subroutine recurse_assign_atoms_local(coords1, coords2, assign_arrays,
    end do
 end subroutine
 
-subroutine assign_atoms_local(coords1, coords2, assign_arrays, best_perm)
+subroutine assign_atoms_local(coords1, coords2, assign_arrays, atomperm, total_dist)
    ! DFS exploration wrapper - finds optimal assignment among all possibilities
    ! OPTIMIZED: Uses incremental distance calculation
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_arrays
-   type(subperm_t), intent(out) :: best_perm
+   integer, dimension(:), allocatable, intent(out) :: atomperm
+   real(rk), intent(out) :: total_dist
+   ! Local variables
+   type(subperm_t) :: best_perm
    integer :: num_atoms
-   real(rk) :: total_dist
 
    num_atoms = assign_arrays%num_atoms1
 
@@ -643,20 +654,23 @@ subroutine assign_atoms_local(coords1, coords2, assign_arrays, best_perm)
    combination_count = 0
 
    ! Initialize distance accumulator with preassigned pairs
-   total_dist = sqdistsum(best_perm, coords1, coords2)
+   total_dist = sqdistsum(best_perm%atomset, best_perm%atomperm, coords1, coords2)
 
    ! Perform DFS exploration to find optimal assignment (starting from root chain at index 1)
    call recurse_assign_atoms_local(coords1, coords2, assign_arrays, 1, best_perm, total_dist)
 
+   ! Convert subperm type to permutation array
+   allocate (atomperm(best_perm%atomperm_size))
+   atomperm = best_perm%atomperm
+
 !block
 !   integer :: assigned_count
-!   assigned_count = best_perm%current_size
+!   assigned_count = best_perm%atomset_size
 !   write(stderr, '(A)') repeat("=", 60)
 !   write(stderr, '(A,I0)') "Assignment combinations probed: ", combination_count
 !   write(stderr, '(A,I0,A,I0,A)') "Atoms assigned: ", assigned_count, " out of ", num_atoms, " total atoms"
 !   write(stderr, '(A,F10.4)') "Minimum total squared distance: ", total_dist
 !   write(stderr, '(A)') repeat("=", 60)
-!   call check_subperm(best_perm)
 !end block
 end subroutine
 
@@ -695,7 +709,7 @@ recursive subroutine recurse_assign_atoms_local_pruned(coords1, coords2, assign_
    ! Process each child branch independently
    do i = 1, assign_arrays%assigntree(branch_idx)%num_children
       ! Early exit: if no threshold budget remains, remaining branches cannot succeed
-      if (remaining_budget <= 0.0_rk) then
+      if (remaining_budget < 0) then
          success = .false.
          return
       end if
@@ -707,7 +721,7 @@ recursive subroutine recurse_assign_atoms_local_pruned(coords1, coords2, assign_
       branch_num_links = assign_arrays%assigntree(child_branch_idx)%num_links
 
       items2_count = assign_arrays%partree(split_part_idx)%items2_count
-      min_branch_dist = huge(1.0_rk)  ! Best distance for this specific branch
+      min_branch_dist = huge(rk)  ! Best distance for this specific branch
       branch_success = .false.
 
       call subperm_init(best_branch_perm, num_atoms)
@@ -716,18 +730,18 @@ recursive subroutine recurse_assign_atoms_local_pruned(coords1, coords2, assign_
       ! Try pairing first item1 with each item2 to find best assignment for this branch
       do j = 1, items2_count
          ! Reset branch assignment for this iteration
-         branch_perm%current_size = 0
-         branch_dist = 0.0_rk
+         branch_perm%atomset_size = 0
+         branch_dist = 0
 
          ! Make assignment and recompute HNAs operation (using first item1, index=1)
          call assign_branch_atoms(assign_arrays, split_part_idx, child_branch_idx, first_link_idx, 1, j, &
             branch_perm)
 
          ! Add new assigned pairs distance to branch distance
-         branch_dist = branch_dist + sqdistsum(branch_perm, coords1, coords2)
+         branch_dist = branch_dist + sqdistsum(branch_perm%atomset, branch_perm%atomperm, coords1, coords2)
 
          ! PRUNING: Early check - only continue if current partial distance is within remaining threshold
-         if (branch_dist <= remaining_budget) then
+         if (branch_dist < remaining_budget) then
             child_success = .false.
 
             ! Recursively explore subtree - distance accumulates in branch_dist
@@ -768,21 +782,24 @@ recursive subroutine recurse_assign_atoms_local_pruned(coords1, coords2, assign_
       remaining_budget = remaining_budget - min_branch_dist
    end do
 
-   ! If we get here, all branches succeeded
-   success = .true.
+   ! If we get here, check if we're within budget
+   success = (remaining_budget >= 0)
 end subroutine
 
-logical function assign_atoms_local_pruned(coords1, coords2, assign_arrays, total_budget, best_perm) result(success)
+subroutine assign_atoms_local_pruned(coords1, coords2, assign_arrays, atomperm, permdist)
    ! DFS exploration with pruning threshold - finds assignment within threshold
    ! OPTIMIZED: Uses incremental distance calculation
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_arrays
-   real(rk), intent(in) :: total_budget
-   type(subperm_t), intent(out) :: best_perm
+   integer, dimension(:), allocatable, intent(out) :: atomperm
+   real(rk), intent(inout) :: permdist
    ! Local variables
+   real(rk) :: total_budget
+   type(subperm_t) :: best_perm
+   logical :: success
    integer :: num_atoms
-   real(rk) :: accumulated_dist
 
+   total_budget = permdist + MSD_TOL
    num_atoms = assign_arrays%num_atoms1
 
    ! Initialize optimal assignment
@@ -792,7 +809,7 @@ logical function assign_atoms_local_pruned(coords1, coords2, assign_arrays, tota
    call collect_leaf_assignments(assign_arrays, 1, best_perm)
 
    ! Initialize accumulated distance with preassigned pairs
-   accumulated_dist = sqdistsum(best_perm, coords1, coords2)
+   permdist = sqdistsum(best_perm%atomset, best_perm%atomperm, coords1, coords2)
 
    ! Initialize DFS exploration variables
    success = .false.
@@ -800,27 +817,32 @@ logical function assign_atoms_local_pruned(coords1, coords2, assign_arrays, tota
 
    ! Perform pruned DFS exploration (starting from root chain at index 1)
    call recurse_assign_atoms_local_pruned(coords1, coords2, assign_arrays, 1, &
-      total_budget, best_perm, accumulated_dist, success)
+      total_budget, best_perm, permdist, success)
+
+   if (.not. success) error stop 'Assignment failed'
+
+   ! Convert subperm type to permutation array
+   allocate (atomperm(best_perm%atomperm_size))
+   atomperm = best_perm%atomperm
 
 !block
 !   integer :: assigned_count
 !
-!   assigned_count = best_perm%current_size
+!   assigned_count = best_perm%atomset_size
 !   write(stderr, '(A)') repeat("=", 60)
 !   write(stderr, '(A,F10.4)') "Pruning threshold: ", total_budget
 !   write(stderr, '(A,I0)') "Assignment combinations probed (pruned): ", combination_count
 !   write(stderr, '(A,I0,A,I0,A)') "Atoms assigned: ", assigned_count, " out of ", num_atoms, " total atoms"
 !
 !   if (success) then
-!      write(stderr, '(A,F10.4)') "Final total squared distance: ", accumulated_dist
+!      write(stderr, '(A,F10.4)') "Final total squared distance: ", permdist
 !      write(stderr, '(A)') "SUCCESS: Found solution within threshold"
-!      call check_subperm(best_perm)
 !   else
 !      write(stderr, '(A)') "FAILURE: No solution found within threshold"
 !      write(stderr, '(A)') "         best_perm should be ignored"
 !   end if
 !   write(stderr, '(A)') repeat("=", 60)
 !end block
-end function
+end subroutine
 
 end module

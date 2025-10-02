@@ -44,9 +44,9 @@ end function
 function str_real(x) result(str)
    real(rk), intent(in) :: x
    character(:), allocatable :: str
-   integer, parameter :: WIDTH=PRINTED_DECIMALS+10
+   integer, parameter :: WIDTH=DECIMAL_PLACES+10
    character(WIDTH) :: temp
-   write(temp, '(F'//str_int(WIDTH)//'.'//str_int(PRINTED_DECIMALS)//')') x
+   write(temp, '(F'//str_int(WIDTH)//'.'//str_int(DECIMAL_PLACES)//')') x
    str = trim(adjustl(temp))
 end function
 

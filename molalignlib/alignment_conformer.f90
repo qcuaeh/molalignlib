@@ -37,15 +37,17 @@ implicit none
 
 contains
 
-subroutine optimize_atomperm_conform( coords1, coords2, assign_arrays, registry)
-   real(rk), dimension(:,:), intent(in) :: coords1, coords2
+subroutine optimize_atomperm_conform( atomset1, atomset2, assign_arrays, coords1, coords2, registry)
+   integer, dimension(:), intent(in) :: atomset1, atomset2
    type(array_trees_t), intent(inout) :: assign_arrays
+   real(rk), dimension(:,:), intent(in) :: coords1, coords2
    type(registry_t), target, intent(out) :: registry
 
    ! Local variables
-   type(subperm_t) :: atomperm, new_atomperm
+   integer, dimension(:), allocatable :: atomperm, new_atomperm
    real(rk), dimension(:,:), allocatable :: coords2r
-   real(rk) :: permdist, prunedist, rotation_step(4), rotation(4)
+   real(rk) :: permdist, new_permdist
+   real(rk), dimension(4) :: rotation, total_rotation
    integer, pointer :: num_trials, lead_count
    integer :: num_steps
 
@@ -53,52 +55,45 @@ subroutine optimize_atomperm_conform( coords1, coords2, assign_arrays, registry)
    call random_initialize()
 
    ! Initialize local minima registry
-   call init_rmsd_registry( registry, max_records)
+   call init_rmsd_registry( registry, num_records)
    num_trials => registry%num_trials
    lead_count => registry%records(1)%count
-   prunedist = huge(prunedist)
 
    ! Optimize atom permutation
    do while (lead_count < count_thres .and. num_trials < max_trials)
 
       ! Get randomly rotated coords2
-      rotation = randrotquat()
-      coords2r = rotated_coords( coords2, rotation)
+      total_rotation = randrotquat()
+      coords2r = rotated_coords( coords2, total_rotation)
 
       ! Assign atoms with current orientation
-!      call assign_atoms_local( coords1, coords2r, assign_arrays, atomperm)
-!      call assign_atoms_greedy( coords1, coords2r, assign_arrays, atomperm, prunedist)
+!      call assign_atoms_local( coords1, coords2r, assign_arrays, atomperm, permdist)
+      call assign_atoms_greedy( coords1, coords2r, assign_arrays, atomperm, permdist)
+      call assign_atoms_local_pruned( coords1, coords2r, assign_arrays, atomperm, permdist)
+      rotation = least_rotquat( atomset1, atomperm, coords1, coords2r)
+      total_rotation = quatmul( total_rotation, rotation)
+      call rotate_coords( atomset2, coords2r, rotation)
+      permdist = sqdistsum( atomset1, atomperm, coords1, coords2r)
+      num_steps = 1
 
-      if (assign_atoms_local_pruned( coords1, coords2r, assign_arrays, prunedist, atomperm)) then
-
-         rotation_step = least_rotquat( atomperm, coords1, coords2r)
-         call rotate_coords( coords2r, rotation_step)
-         rotation = quatmul( rotation, rotation_step)
-         num_steps = 1
-   
-         if (iterate_flag) then
-            do
-   !            call assign_atoms_local( coords1, coords2r, assign_arrays, new_atomperm)
-               permdist = sqdistsum( atomperm, coords1, coords2r)
-               if (.not. assign_atoms_local_pruned( coords1, coords2r, assign_arrays, permdist, new_atomperm)) &
-                     error stop 'assignment failed'
-               if (new_atomperm == atomperm) exit
-               atomperm = new_atomperm
-               rotation_step = least_rotquat( atomperm, coords1, coords2r)
-               call rotate_coords( coords2r, rotation_step)
-               rotation = quatmul( rotation, rotation_step)
-               num_steps = num_steps + 1
-            end do
-         end if
-   
-         ! Update results
-         permdist = sqdistsum( atomperm, coords1, coords2r)
-         if (insert_record( registry, atomperm, num_steps, permdist=permdist, rotation=rotation) == 1) then
-            prunedist = permdist + 0.0457*sum(coords1(:,atomperm%subset1)*coords2r(:,atomperm%subset2))
-!            write (stdout,*) lead_count, permdist, 0.0457*sum(coords1(:,atomperm%subset1)*coords2r(:,atomperm%subset2))
-         end if
-
+      if (iterate_flag) then
+         do
+!            call assign_atoms_local( coords1, coords2r, assign_arrays, new_atomperm, new_permdist)
+            new_permdist = permdist
+            call assign_atoms_local_pruned( coords1, coords2r, assign_arrays, new_atomperm, new_permdist)
+!            write (stdout,*) permdist, new_permdist
+            if (all(atomperm == new_atomperm)) exit
+            atomperm = new_atomperm
+            rotation = least_rotquat( atomset1, atomperm, coords1, coords2r)
+            total_rotation = quatmul( total_rotation, rotation)
+            call rotate_coords( atomset2, coords2r, rotation)
+            permdist = sqdistsum( atomset1, atomperm, coords1, coords2r)
+            num_steps = num_steps + 1
+         end do
       end if
+
+      ! Update results
+      call insert_record( registry, atomperm, num_steps, permdist=permdist, rotation=total_rotation)
 
    end do
 end subroutine

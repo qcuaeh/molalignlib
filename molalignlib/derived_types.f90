@@ -1,6 +1,5 @@
 module derived_types
 use parameters
-
 implicit none
 
 type, public :: int_list

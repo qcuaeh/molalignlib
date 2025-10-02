@@ -22,14 +22,14 @@ use permutation
 use lap_jv_sparse
 use lap_hungarian
 use random
-
 implicit none
-
 private
 public assign_atoms
 public assign_atoms_biased
 public assign_atoms_pruned
 public assign_atoms_nearest
+
+real(rk), parameter :: SCALE = 1E-3
 
 contains
 
@@ -64,31 +64,23 @@ subroutine assign_atoms_pruned( atomtypes, coords1, coords2, prunes, atomperm)
    type(partition_t), target, intent(in) :: atomtypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    type(bool_matrix), dimension(:), intent(in) :: prunes
-   type(subperm_t), intent(out) :: atomperm
+   integer, dimension(:), allocatable, intent(out) :: atomperm
    ! Local variables
    integer :: h, num_items1
    integer, dimension(:), allocatable :: perm
    integer, dimension(:), pointer :: items1, items2
    real(rk) :: dist
-   integer :: i, j
 
-   call subperm_init(atomperm, size(coords1, dim=2))
-   atomperm%current_size = size(coords1, dim=2)
    allocate (perm(maxval(atomtypes%parts%num_items1)))
+   allocate (atomperm(sum(atomtypes%parts%num_items1)))
 
    ! Optimize atomperm for each block
-   i = 0
    do h = 1, atomtypes%num_parts
       num_items1 = atomtypes%parts(h)%num_items1
       items1 => atomtypes%parts(h)%items1
       items2 => atomtypes%parts(h)%items2
       call solve_lap_pruned(num_items1, items1, items2, coords1, coords2, prunes(h)%ee, perm, dist)
-!      atomperm(items1) = items2(perm(:num_items1))
-      do j = 1, num_items1
-         i = i + 1
-         atomperm%subset1(i) = items1(j)
-         atomperm%subset2(items1(j)) = items2(perm(j))
-      end do
+      atomperm(items1) = items2(perm(:num_items1))
    end do
 end subroutine
 
@@ -168,7 +160,7 @@ subroutine solve_lap_biased(part, p, q, biases, perm, dist)
 
    do j = 1, part%num_items2
       do i = 1, part%num_items1
-!         costs(i, j) = maxbias - biases(i, j) + BIAS_SF*sum((p(:, part%items1(i)) - q(:, part%items2(j)))**2)
+!         costs(i, j) = maxbias - biases(i, j) + SCALE*sum((p(:, part%items1(i)) - q(:, part%items2(j)))**2)
          costs(i, j) = maxbias - biases(i, j) + random_standard_real()
       end do
    end do
@@ -438,7 +430,7 @@ subroutine solve_lap_nearest(n, s1, s2, p, q, perm, dist)
 !  NOTE that there is no symmetry with respect to exchange of I and J!
 !  This runs slower than the above heap algorithm.
 !
-!      cc(1:m*n) = huge(1_int64)
+!      cc(1:m*n) = huge(int64)
 !      do i = 1, n
 !         k = first(i) - 1
 !         do j = 1, n
