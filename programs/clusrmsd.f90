@@ -70,6 +70,7 @@ random_flag = .false.
 iterate_flag = .true.
 
 extin = 'xyz'
+extout = 'xyz'
 num_records = 1
 count_thres = 10
 unitout = stdout
@@ -126,7 +127,6 @@ end do
 if (stdin_flag) then
    extin1 = extin
    extin2 = extin
-   extout = extin
    unitin1 = stdin
    unitin2 = stdin
 else
@@ -222,13 +222,13 @@ if (align_flag) then
          coords2r = rotated_coords( coords2, rotquat, center1)
          rmsd = sqrt( sqdistmean( atomset1, atomperm, weights1, coords1, coords2r))
 
-         write (stdout,'(A)') str( rmsd)
-
          if (coords_flag) then
             title2 = 'RMSD=' // str( rmsd)
             coords2r = rotated_coords( coords2, rotquat, center1)
             call set_coords( atoms2, coords2r)
             call writefile( unitout, extout, title2, atoms2, bonds2, atomperm)
+         else
+            write (unitout,'(A)') str( rmsd)
          end if
       end do
 
@@ -239,13 +239,13 @@ if (align_flag) then
       coords2r = rotated_coords( coords2, rotquat, center1)
       rmsd = sqrt( sqdistmean( atomset1, atomperm, weights1, coords1, coords2r))
 
-      write (stdout,'(A)') str( rmsd)
-
       if (coords_flag) then
          title2 = 'RMSD=' // str( rmsd)
          coords2r = rotated_coords( coords2, rotquat, center1)
          call set_coords( atoms2, coords2r)
          call writefile( unitout, extout, title2, atoms2, bonds2, atomperm)
+      else
+         write (unitout,'(A)') str( rmsd)
       end if
 
    end if
@@ -265,13 +265,13 @@ else
       rmsd = sqrt( sqdistmean( atomset1, atomperm, weights1, coords1, coords2))
    end if
 
-   write (stdout,'(A)') str( rmsd)
-
    if (coords_flag) then
       title2 = 'RMSD=' // str( rmsd)
       coords2r = rotated_coords( coords2, rotquat, center1)
       call set_coords( atoms2, coords2r)
       call writefile( unitout, extout, title2, atoms2, bonds2, atomperm)
+   else
+      write (unitout,'(A)') str( rmsd)
    end if
 
 end if

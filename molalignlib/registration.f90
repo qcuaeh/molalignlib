@@ -209,7 +209,6 @@ subroutine print_records(registry)
       error stop 'Registry not properly initialized - no processing mode enabled'
    end if
 
-   write (stderr, *)
    if (registry%use_position .and. .not. registry%use_adjacency) then
       ! Position only
       line = repeat('-', 42)
@@ -254,6 +253,7 @@ subroutine print_records(registry)
    else
       write (stderr, '(a,1x,i0)') 'Visited local minima =', registry%occ_records
    end if
+   write (stderr, *)
 
    flush(stderr)
 end subroutine
