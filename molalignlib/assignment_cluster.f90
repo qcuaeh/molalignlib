@@ -21,6 +21,7 @@ use derived_types
 use permutation
 use lap_jv_sparse
 use lap_hungarian
+use euclidean
 use random
 implicit none
 private
@@ -29,146 +30,117 @@ public assign_atoms_biased
 public assign_atoms_pruned
 public assign_atoms_nearest
 
-real(rk), parameter :: SCALE = 1E-3
-
 contains
 
-subroutine assign_atoms_nearest( atomtypes, coords1, coords2, atomperm)
-! Find best correspondence between points sets with fixed orientation
+subroutine assign_atoms( atomtypes, coords1, coords2, atomperm, dist)
+! ----------------------------------------------------------------
+! Finds the optimal mapping between points with fixed orientation
+! ----------------------------------------------------------------
+   type(partition_t), target, intent(in) :: atomtypes
+   real(rk), dimension(:,:), intent(in) :: coords1, coords2
+   integer, dimension(:), intent(out) :: atomperm
+   real(rk), intent(out) :: dist
+   ! Local variables
+   type(partition_part_t), pointer :: part
+   integer, dimension(:), allocatable :: perm
+   real(rk), dimension(:,:), allocatable :: costs
+   integer :: max_num_items1, max_num_items2
+   integer :: h, i, j
 
+   max_num_items1 =  maxval(atomtypes%parts%num_items1)
+   max_num_items2 =  maxval(atomtypes%parts%num_items2)
+   allocate (perm(max_num_items1))
+   allocate (costs(max_num_items1, max_num_items2))
+
+   ! Optimize atomperm for each block
+   do h = 1, atomtypes%num_parts
+      part => atomtypes%parts(h)
+      costs = distance_matrix(part, coords1, coords2)
+      call assndx(1, costs, part%num_items1, part%num_items2, perm, dist)
+      atomperm(part%items1) = part%items2(perm(1:part%num_items1))
+   end do
+end subroutine
+
+subroutine assign_atoms_biased( atomtypes, biases, coords1, coords2, atomperm)
+! ----------------------------------------------------------------
+! Finds the optimal mapping between points with fixed orientation
+! ----------------------------------------------------------------
+   type(partition_t), target, intent(in) :: atomtypes
+   type(int_matrix), dimension(:), intent(in) :: biases
+   real(rk), dimension(:,:), intent(in) :: coords1, coords2
+   integer, dimension(:), intent(out) :: atomperm
+   ! Local variables
+   type(partition_part_t), pointer :: part
+   integer, dimension(:), allocatable :: perm
+   real(rk), dimension(:,:), allocatable :: costs
+   real(rk) :: dist
+   integer :: maxnum_items1, maxnum_items2
+   integer :: h, i, j
+
+   maxnum_items1 =  maxval(atomtypes%parts%num_items1)
+   maxnum_items2 =  maxval(atomtypes%parts%num_items2)
+   allocate (perm(maxnum_items1))
+   allocate (costs(maxnum_items1, maxnum_items2))
+
+   ! Optimize atomperm for each block
+   do h = 1, atomtypes%num_parts
+      part => atomtypes%parts(h)
+      costs = distance_matrix(part, coords1, coords2) + biases(h)%ee
+      call assndx(1, costs, part%num_items1, part%num_items2, perm, dist)
+      atomperm(part%items1) = part%items2(perm(1:part%num_items1))
+   end do
+end subroutine
+
+subroutine assign_atoms_nearest( atomtypes, coords1, coords2, atomperm)
+! ----------------------------------------------------------------
+! Finds the optimal mapping between points with fixed orientation
+! ----------------------------------------------------------------
    type(partition_t), target, intent(in) :: atomtypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    integer, dimension(:), intent(out) :: atomperm
    ! Local variables
-   integer :: h, num_items1
+   type(partition_part_t), pointer :: part
    integer, dimension(:), allocatable :: perm
-   integer, dimension(:), pointer :: items1, items2
    real(rk) :: dist
+   integer :: h
 
    allocate (perm(maxval(atomtypes%parts%num_items1)))
 
    ! Fill distance matrix for each block
 
    do h = 1, atomtypes%num_parts
-      num_items1 = atomtypes%parts(h)%num_items1
-      items1 => atomtypes%parts(h)%items1
-      items2 => atomtypes%parts(h)%items2
-      call solve_lap_nearest(num_items1, items1, items2, coords1, coords2, perm, dist)
-      atomperm(items1) = items2(perm(:num_items1))
+      part => atomtypes%parts(h)
+      call solve_lap_nearest(part%num_items1, part%items1, part%items2, coords1, coords2, perm, dist)
+      atomperm(part%items1) = part%items2(perm(1:part%num_items1))
    end do
 end subroutine
 
 subroutine assign_atoms_pruned( atomtypes, coords1, coords2, prunes, atomperm)
-! Find best correspondence between points sets with fixed orientation
-
+! ----------------------------------------------------------------
+! Finds the optimal mapping between points with fixed orientation
+! ----------------------------------------------------------------
    type(partition_t), target, intent(in) :: atomtypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    type(bool_matrix), dimension(:), intent(in) :: prunes
    integer, dimension(:), allocatable, intent(out) :: atomperm
    ! Local variables
-   integer :: h, num_items1
+   type(partition_part_t), pointer :: part
    integer, dimension(:), allocatable :: perm
-   integer, dimension(:), pointer :: items1, items2
    real(rk) :: dist
+   integer :: h
 
    allocate (perm(maxval(atomtypes%parts%num_items1)))
    allocate (atomperm(sum(atomtypes%parts%num_items1)))
 
    ! Optimize atomperm for each block
    do h = 1, atomtypes%num_parts
-      num_items1 = atomtypes%parts(h)%num_items1
-      items1 => atomtypes%parts(h)%items1
-      items2 => atomtypes%parts(h)%items2
-      call solve_lap_pruned(num_items1, items1, items2, coords1, coords2, prunes(h)%ee, perm, dist)
-      atomperm(items1) = items2(perm(:num_items1))
+      part => atomtypes%parts(h)
+      call solve_lap_pruned(part%num_items1, part%items1, part%items2, coords1, coords2, prunes(h)%ee, perm, dist)
+      atomperm(part%items1) = part%items2(perm(1:part%num_items1))
    end do
 end subroutine
 
-subroutine assign_atoms( atomtypes, coords1, coords2, atomperm, dist)
-! Find best correspondence between points sets with fixed orientation
-
-   type(partition_t), intent(in) :: atomtypes
-   real(rk), dimension(:,:), intent(in) :: coords1, coords2
-   integer, dimension(:), intent(out) :: atomperm
-   real(rk), intent(out) :: dist
-   ! Local variables
-   integer :: h
-   integer, dimension(:), allocatable :: perm
-
-   allocate (perm(maxval(atomtypes%parts%num_items1)))
-
-   ! Optimize atomperm for each block
-   do h = 1, atomtypes%num_parts
-      call solve_lap(atomtypes%parts(h), coords1, coords2, perm, dist)
-      atomperm(atomtypes%parts(h)%items1) = atomtypes%parts(h)%items2(perm(:atomtypes%parts(h)%num_items1))
-   end do
-end subroutine
-
-subroutine assign_atoms_biased( atomtypes, coords1, coords2, biases, atomperm)
-! Find best correspondence between points sets with fixed orientation
-
-   type(partition_t), intent(in) :: atomtypes
-   real(rk), dimension(:,:), intent(in) :: coords1, coords2
-   type(int_matrix), dimension(:), intent(in) :: biases
-   integer, dimension(:), intent(out) :: atomperm
-   ! Local variables
-   integer :: h
-   integer, dimension(:), allocatable :: perm
-   real(rk) :: dist
-
-   allocate (perm(maxval(atomtypes%parts%num_items1)))
-
-   ! Optimize atomperm for each block
-   do h = 1, atomtypes%num_parts
-      call solve_lap_biased(atomtypes%parts(h), coords1, coords2, biases(h)%ee, perm, dist)
-      atomperm(atomtypes%parts(h)%items1) = atomtypes%parts(h)%items2(perm(:atomtypes%parts(h)%num_items1))
-   end do
-end subroutine
-
-subroutine solve_lap(part, p, q, perm, dist)
-   type(partition_part_t), intent(in) :: part
-   real(rk), dimension(:,:), intent(in) :: p, q
-   integer, dimension(:), intent(out) :: perm
-   real(rk), intent(out) :: dist
-   ! Local variables
-   integer :: i, j
-   real(rk), dimension(:,:), allocatable :: costs
-
-   allocate (costs(part%num_items1, part%num_items2))
-
-   do j = 1, part%num_items2
-      do i = 1, part%num_items1
-         costs(i, j) = sum((p(:, part%items1(i)) - q(:, part%items2(j)))**2)
-      end do
-   end do
-
-   call assndx(1, costs, part%num_items1, part%num_items2, perm, dist)
-end subroutine
-
-subroutine solve_lap_biased(part, p, q, biases, perm, dist)
-   type(partition_part_t), intent(in) :: part
-   real(rk), dimension(:,:), intent(in) :: p, q
-   integer, dimension(:,:), intent(in) :: biases
-   integer, dimension(:), intent(out) :: perm
-   real(rk), intent(out) :: dist
-   ! Local variables
-   real(rk), dimension(:,:), allocatable :: costs
-   integer :: i, j, maxbias
-
-   allocate (costs(part%num_items1, part%num_items2))
-   maxbias = maxval(biases)
-
-   do j = 1, part%num_items2
-      do i = 1, part%num_items1
-!         costs(i, j) = maxbias - biases(i, j) + SCALE*sum((p(:, part%items1(i)) - q(:, part%items2(j)))**2)
-         costs(i, j) = maxbias - biases(i, j) + random_standard_real()
-      end do
-   end do
-
-   call assndx(1, costs, part%num_items1, part%num_items2, perm, dist)
-end subroutine
-
-subroutine solve_lap_pruned(n, s1, s2, p, q, prun, perm, dist)
+subroutine solve_lap_pruned(n, s1, s2, x1, x2, prun, perm, dist)
 ! Adapted from GMIN: A program for finding global minima
 ! Copyright (C) 1999-2006 David J. Wales
 
@@ -182,25 +154,25 @@ subroutine solve_lap_pruned(n, s1, s2, p, q, prun, perm, dist)
 !
 
 !   This is the main routine for minimum distance calculation.
-!   Given two coordinate vectors p,q of particles each, return
+!   Given two coordinate vectors x1,x2 of particles each, return
 !   the minimum distance in dist, and the permutation in perm.
 !   perm is an integer vector such that
-!     p(i) <--> q(perm(i))
+!     x1(i) <--> x2(perm(i))
 !   i.e.
-!     sum(i=1,n) permdist(p(i), q(perm(i))) == dist
+!     sum(i=1,n) permdist(x1(i), x2(perm(i))) == dist
 
 !   Input
 !     n  : System size
-!     p,q: Coordinate vectors (n particles)
+!     x1,x2: Coordinate vectors (n particles)
 
    integer, intent(in) :: n
    integer, intent(in) :: s1(n), s2(n)
-   real(rk), intent(in) :: p(3, *), q(3, *)
+   real(rk), intent(in) :: x1(3, *), x2(3, *)
    logical, intent(in) :: prun(n, n)
    real(rk), parameter :: scale = 1.0e6_rk ! Precision
 
 !   Output
-!     perm: Permutation so that p(i) <--> q(perm(i))
+!     perm: Permutation so that x1(i) <--> x2(perm(i))
 !     dist: Minimum attainable distance
 !   We have
    integer, intent(out) :: perm(n)
@@ -238,7 +210,7 @@ subroutine solve_lap_pruned(n, s1, s2, p, q, prun, perm, dist)
       k = first(i)
       do j = 1, n
          if (.not. prun(j, i)) then
-            cc(k) = scale * sum((p(:, s1(i)) - q(:, s2(j)))**2)
+            cc(k) = scale * sum((x1(:, s1(i)) - x2(:, s2(j)))**2)
             kk(k) = j
             k = k + 1
          end if
@@ -273,7 +245,7 @@ subroutine solve_lap_pruned(n, s1, s2, p, q, prun, perm, dist)
    dist = real(h, rk) / scale
 end subroutine
 
-subroutine solve_lap_nearest(n, s1, s2, p, q, perm, dist)
+subroutine solve_lap_nearest(n, s1, s2, x1, x2, perm, dist)
 ! Adapted from GMIN: A program for finding global minima
 ! Copyright (C) 1999-2006 David J. Wales
 
@@ -287,25 +259,25 @@ subroutine solve_lap_nearest(n, s1, s2, p, q, perm, dist)
 !
 
 !   This is the main routine for minimum distance calculation.
-!   Given two coordinate vectors p,q of particles each, return
+!   Given two coordinate vectors x1,x2 of particles each, return
 !   the minimum distance in dist, and the permutation in perm.
 !   perm is an integer vector such that
-!     p(i) <--> q(perm(i))
+!     x1(i) <--> x2(perm(i))
 !   i.e.
-!     sum(i=1,n) permdist(p(i), q(perm(i))) == dist
+!     sum(i=1,n) permdist(x1(i), x2(perm(i))) == dist
 
 !   Input
 !     n  : System size
-!     p,q: Coordinate vectors (n particles)
+!     x1,x2: Coordinate vectors (n particles)
 
    integer, intent(in) :: n
    integer, intent(in) :: s1(n), s2(n)
-   real(rk), intent(in) :: p(3, *), q(3, *)
+   real(rk), intent(in) :: x1(3, *), x2(3, *)
    real(rk), parameter :: scale = 1.0e6_rk ! Precision
    integer, parameter :: maxnei = 20 ! Maximum number of closest neighbours
 
 !   Output
-!     perm: Permutation so that p(i) <--> q(perm(i))
+!     perm: Permutation so that x1(i) <--> x2(perm(i))
 !     dist: Minimum attainable distance
 !   We have
    integer, intent(out) :: perm(n)
@@ -352,7 +324,7 @@ subroutine solve_lap_nearest(n, s1, s2, p, q, perm, dist)
       do i = 1, n
          k = first(i)
          do j = 1, n
-            cc(k) = scale * sum((p(:, s1(i)) - q(:, s2(j)))**2)
+            cc(k) = scale * sum((x1(:, s1(i)) - x2(:, s2(j)))**2)
             kk(k) = j
             k = k + 1
          end do
@@ -369,7 +341,7 @@ subroutine solve_lap_nearest(n, s1, s2, p, q, perm, dist)
       do i = 1, n
          k = first(i) - 1
          do j = 1, m
-            d = scale * sum((p(:, s1(i)) - q(:, s2(j)))**2)
+            d = scale * sum((x1(:, s1(i)) - x2(:, s2(j)))**2)
             cc(k+j) = d
             kk(k+j) = j
             l = j
@@ -387,7 +359,7 @@ subroutine solve_lap_nearest(n, s1, s2, p, q, perm, dist)
             end if
 11       end do
          do j = m+1, n
-            d = scale * sum((p(:, s1(i)) - q(:, s2(j)))**2)
+            d = scale * sum((x1(:, s1(i)) - x2(:, s2(j)))**2)
             if (d < cc(k+1)) then
                cc(k+1) = d
                kk(k+1) = j
@@ -434,7 +406,7 @@ subroutine solve_lap_nearest(n, s1, s2, p, q, perm, dist)
 !      do i = 1, n
 !         k = first(i) - 1
 !         do j = 1, n
-!            d = scale * sum((p(:, s1(i)) - q(:, s2(j)))**2)
+!            d = scale * sum((x1(:, s1(i)) - x2(:, s2(j)))**2)
 !            if (d > cc(k+m)) cycle
 !            do l = m, 2, -1
 !               if (d > cc(k+l-1)) exit

@@ -68,7 +68,7 @@ subroutine compute_hna_biases(adjcs1, adjcs2, atomtypes, biases)
             jatom = atomtypes%parts(h)%items2(j)
             do i = 1, atomtypes%parts(h)%num_items1
                iatom = atomtypes%parts(h)%items1(i)
-               if (associated( &
+               if (.not. associated( &
                   hnachain%last_link%itemdir1(iatom)%ptr, &
                   hnachain%last_link%itemdir2(jatom)%ptr) &
                ) then
