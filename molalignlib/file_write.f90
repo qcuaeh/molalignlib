@@ -16,10 +16,10 @@
 
 module file_write
 use parameters
-use options
+use permutation
 use chemistry
 use molecule
-use permutation
+use options
 implicit none
 
 contains

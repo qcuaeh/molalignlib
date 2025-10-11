@@ -1,10 +1,10 @@
 module partitioning
-use options
 use parameters
 use derived_types
 use chemistry
 use molecule
 use lcrs_trees
+use options
 implicit none
 private
 public collect_atomtypes

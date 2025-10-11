@@ -7,7 +7,7 @@ use iso_fortran_env, only: int32, int64, real32, real64
 implicit none
 
 ! Enable/disable debug tests
-logical, parameter :: DEBUGGING = .true.
+logical, parameter :: DEBUGGING = .false.
 
 ! Numerical kinds
 integer, parameter :: ik = int32 ! 32-bit integer kind

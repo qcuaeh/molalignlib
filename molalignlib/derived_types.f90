@@ -3,35 +3,35 @@ use parameters
 implicit none
 
 type, public :: int_list
-   integer, dimension(:), allocatable :: e
+   integer, dimension(:), allocatable :: u
 end type
 
 type, public :: real_list
-   real(rk), dimension(:), allocatable :: e
+   real(rk), dimension(:), allocatable :: u
 end type
 
 type :: int_matrix
-   integer, dimension(:,:), allocatable :: ee
+   integer, dimension(:,:), allocatable :: a
 end type
 
 type :: bool_matrix
-   logical, dimension(:,:), allocatable :: ee
+   logical, dimension(:,:), allocatable :: a
 end type
 
 type :: real_matrix
-   real(rk), dimension(:,:), allocatable :: ee
+   real(rk), dimension(:,:), allocatable :: a
 end type
 
 type, public :: int_listlist
-   type(int_list), dimension(:), allocatable :: e
+   type(int_list), dimension(:), allocatable :: u
 end type
 
 type, public :: real_listlist
-   type(real_list), dimension(:), allocatable :: e
+   type(real_list), dimension(:), allocatable :: u
 end type
 
 type, public :: int_listmatrix
-   type(int_list), dimension(:,:), allocatable :: ee
+   type(int_list), dimension(:,:), allocatable :: a
 end type
 
 ! Semipart array

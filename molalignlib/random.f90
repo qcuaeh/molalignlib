@@ -16,9 +16,8 @@
 
 module random
 use parameters
-use options
 use randlib
-
+use options
 implicit none
 
 contains

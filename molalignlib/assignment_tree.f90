@@ -96,8 +96,8 @@ subroutine assign_branch_atoms(adjcs1, adjcs2, branch)
 
    rand_idx1 = random_uniform_integer(1, branch%split_part%num_items1)
    rand_idx2 = random_uniform_integer(1, branch%split_part%num_items2)
-   call resplit_part_indexed(branch%split_part, branch%first_link, rand_idx1, rand_idx2)
-!   call resplit_part_indexed(branch%split_part, branch%first_link, 1, 1)
+   call split_part_indexed(branch%split_part, branch%first_link, rand_idx1, rand_idx2)
+!   call split_part_indexed(branch%split_part, branch%first_link, 1, 1)
 
    link_idx = 1
    link => branch%first_link
@@ -111,7 +111,7 @@ subroutine assign_branch_atoms(adjcs1, adjcs2, branch)
    end do
 end subroutine
 
-subroutine resplit_part_indexed(part, link, index1, index2)
+subroutine split_part_indexed(part, link, index1, index2)
    type(partree_node_t), pointer, intent(inout) :: part
    type(chain_node_t), pointer, intent(inout) :: link
    integer, intent(in) :: index1, index2
@@ -267,7 +267,7 @@ function would_part_split(adjcs1, adjcs2, itemdir1, itemdir2, part) result(would
    end do
 end function
 
-subroutine recompute_hna_partition(adjcs1, adjcs2, hnachain, branch, branch_parts, num_splits)
+subroutine recompute_consistent_hna_partition(adjcs1, adjcs2, hnachain, branch, branch_parts, num_splits)
 ! Compute next level HNA types - only keeps children if real split occurred
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(assigntree_node_t), pointer, intent(inout) :: hnachain
@@ -409,8 +409,8 @@ recursive subroutine split_dependent_parts(adjcs1, adjcs2, hnachain, branch, bra
 
    ! Compute self-consistent HNAs
    do
-      ! Call recompute_hna_partition and get the number of splits
-      call recompute_hna_partition(adjcs1, adjcs2, hnachain, branch, branch_parts, num_splits)
+      ! Call recompute_consistent_hna_partition and get the number of splits
+      call recompute_consistent_hna_partition(adjcs1, adjcs2, hnachain, branch, branch_parts, num_splits)
 
       ! Exit loop if no splits occurred
       if (num_splits == 0) exit

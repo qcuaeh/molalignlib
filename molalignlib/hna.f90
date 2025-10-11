@@ -7,7 +7,7 @@ implicit none
 private
 public refine_hna_part
 public refine_hna_partition
-public compute_hna_partition
+public compute_consistent_hna_partition
 
 contains
 
@@ -85,7 +85,7 @@ subroutine refine_hna_partition(atoms1, atoms2, hnachain, num_splits)
    end do
 end subroutine
 
-subroutine compute_hna_partition(atoms1, atoms2, atomtypes, hnachain)
+subroutine compute_consistent_hna_partition(atoms1, atoms2, atomtypes, hnachain)
 ! Iteratively compute HNA types until convergence
    type(adjc_t), dimension(:), intent(in) :: atoms1, atoms2
    type(partition_t), intent(in) :: atomtypes

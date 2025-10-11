@@ -16,7 +16,6 @@
 
 module alignment_cluster
 use parameters
-use options
 use random
 use molecule
 use chemistry
@@ -28,6 +27,7 @@ use hna
 use partitioning
 use pruning
 use registration
+use options
 implicit none
 
 contains

@@ -205,7 +205,7 @@ subroutine convert_signature(part, assign_arrays, part_idx)
    do i = 1, size(part%signature)
       if (associated(part%signature(i)%ptr)) then
          temp_count = temp_count + 1
-         temp_values(temp_count) = part%signature(i)%ptr%globidx
+         temp_values(temp_count) = part%signature(i)%ptr%global_idx
       end if
    end do
 
@@ -253,32 +253,32 @@ recursive subroutine convert_parts_recurse(part, assign_arrays, item1_idx, item2
    if (.not. associated(part)) return
 
    ! Convert this part (global indices always start at 1)
-   part_idx = part%globidx
+   part_idx = part%global_idx
 
    assign_arrays%partree(part_idx)%depth = part%depth
    assign_arrays%partree(part_idx)%num_children = part%num_children
 
    ! Relationships using global indices
    if (associated(part%parent_part)) then
-      assign_arrays%partree(part_idx)%parent_part_idx = part%parent_part%globidx
+      assign_arrays%partree(part_idx)%parent_part_idx = part%parent_part%global_idx
    else
       assign_arrays%partree(part_idx)%parent_part_idx = 0
    end if
 
    if (associated(part%first_child_part)) then
-      assign_arrays%partree(part_idx)%first_child_idx = part%first_child_part%globidx
+      assign_arrays%partree(part_idx)%first_child_idx = part%first_child_part%global_idx
    else
       assign_arrays%partree(part_idx)%first_child_idx = 0
    end if
 
    if (associated(part%last_child_part)) then
-      assign_arrays%partree(part_idx)%last_child_idx = part%last_child_part%globidx
+      assign_arrays%partree(part_idx)%last_child_idx = part%last_child_part%global_idx
    else
       assign_arrays%partree(part_idx)%last_child_idx = 0
    end if
 
    if (associated(part%next_sibling_part)) then
-      assign_arrays%partree(part_idx)%next_sibling_idx = part%next_sibling_part%globidx
+      assign_arrays%partree(part_idx)%next_sibling_idx = part%next_sibling_part%global_idx
    else
       assign_arrays%partree(part_idx)%next_sibling_idx = 0
    end if
@@ -320,7 +320,7 @@ recursive subroutine convert_parts_recurse(part, assign_arrays, item1_idx, item2
       child_count = 0
       do while (associated(child_part))
          child_count = child_count + 1
-         assign_arrays%partree(part_idx)%child_indices(child_count) = child_part%globidx
+         assign_arrays%partree(part_idx)%child_indices(child_count) = child_part%global_idx
          child_part => child_part%next_sibling_part
       end do
    end if
@@ -359,7 +359,7 @@ recursive subroutine convert_chains_recurse(chain, assign_arrays, partref_idx, l
    end if
 
    ! Convert this chain (existing conversion logic)
-   chain_idx = chain%globidx
+   chain_idx = chain%global_idx
 
    assign_arrays%assigntree(chain_idx)%tot_items1 = chain%tot_items1
    assign_arrays%assigntree(chain_idx)%tot_items2 = chain%tot_items2
@@ -368,32 +368,32 @@ recursive subroutine convert_chains_recurse(chain, assign_arrays, partref_idx, l
 
    ! Cross-tree reference
    if (associated(chain%split_part)) then
-      assign_arrays%assigntree(chain_idx)%split_part_idx = chain%split_part%globidx
+      assign_arrays%assigntree(chain_idx)%split_part_idx = chain%split_part%global_idx
    else
       assign_arrays%assigntree(chain_idx)%split_part_idx = 0
    end if
 
    ! Chain relationships
    if (associated(chain%parent_chain)) then
-      assign_arrays%assigntree(chain_idx)%parent_chain_idx = chain%parent_chain%globidx
+      assign_arrays%assigntree(chain_idx)%parent_chain_idx = chain%parent_chain%global_idx
    else
       assign_arrays%assigntree(chain_idx)%parent_chain_idx = 0
    end if
 
    if (associated(chain%first_child_chain)) then
-      assign_arrays%assigntree(chain_idx)%first_child_idx = chain%first_child_chain%globidx
+      assign_arrays%assigntree(chain_idx)%first_child_idx = chain%first_child_chain%global_idx
    else
       assign_arrays%assigntree(chain_idx)%first_child_idx = 0
    end if
 
    if (associated(chain%last_child_chain)) then
-      assign_arrays%assigntree(chain_idx)%last_child_idx = chain%last_child_chain%globidx
+      assign_arrays%assigntree(chain_idx)%last_child_idx = chain%last_child_chain%global_idx
    else
       assign_arrays%assigntree(chain_idx)%last_child_idx = 0
    end if
 
    if (associated(chain%next_sibling_chain)) then
-      assign_arrays%assigntree(chain_idx)%next_sibling_idx = chain%next_sibling_chain%globidx
+      assign_arrays%assigntree(chain_idx)%next_sibling_idx = chain%next_sibling_chain%global_idx
    else
       assign_arrays%assigntree(chain_idx)%next_sibling_idx = 0
    end if
@@ -405,7 +405,7 @@ recursive subroutine convert_chains_recurse(chain, assign_arrays, partref_idx, l
       child_count = 0
       do while (associated(child_chain))
          child_count = child_count + 1
-         assign_arrays%assigntree(chain_idx)%child_indices(child_count) = child_chain%globidx
+         assign_arrays%assigntree(chain_idx)%child_indices(child_count) = child_chain%global_idx
          child_chain => child_chain%next_sibling_chain
       end do
    end if
@@ -420,7 +420,7 @@ recursive subroutine convert_chains_recurse(chain, assign_arrays, partref_idx, l
       current_link_idx = link_idx
 
       assign_arrays%chain(current_link_idx)%num_parts = link%num_parts
-      assign_arrays%chain(current_link_idx)%parent_chain_idx = chain%globidx
+      assign_arrays%chain(current_link_idx)%parent_chain_idx = chain%global_idx
 
       ! Set partref offset (offset = start_idx - 1)
       assign_arrays%chain(current_link_idx)%partref_offset = partref_idx
@@ -429,7 +429,7 @@ recursive subroutine convert_chains_recurse(chain, assign_arrays, partref_idx, l
       partref => link%first_partref
       do while (associated(partref))
          partref_idx = partref_idx + 1
-         assign_arrays%partref_entries(partref_idx) = partref%part%globidx
+         assign_arrays%partref_entries(partref_idx) = partref%part%global_idx
          partref => partref%nextref
       end do
 

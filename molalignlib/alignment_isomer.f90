@@ -17,7 +17,6 @@
 module alignment_isomer
 use parameters
 use derived_types
-use options
 use random
 use molecule
 use euclidean
@@ -26,6 +25,7 @@ use biasing
 use partitioning
 use registration
 use assignment_atoms
+use options
 implicit none
 
 contains

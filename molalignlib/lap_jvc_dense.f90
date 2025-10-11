@@ -3,22 +3,22 @@ use parameters
 implicit none
 contains
 
-subroutine jvc_dense(cost, n, rowsol, lapcost)
+subroutine jvc_dense(costs, n, rowsol, lapcost)
 !---------------------------------------------------------------------------------------
 ! Solves the Linear Assignment Problem using the JVC algorithm for dense square matrices
-! Finds the assignment that minimizes the total cost
+! Finds the assignment that minimizes the total costs
 !
 ! Input:
-!   cost(n,n)  - Cost matrix (will be modified during computation)
+!   costs(n,n)  - Cost matrix (will be modified during computation)
 !   n          - Problem dimension
 !
 ! Output:
 !   rowsol(n)  - Solution vector where rowsol(i) = j means row i is assigned to column j
-!   lapcost    - Total cost of the optimal assignment
+!   lapcost    - Total costs of the optimal assignment
 !---------------------------------------------------------------------------------------
 
    integer, intent(in) :: n
-   real(rk), intent(inout) :: cost(:,:)
+   real(rk), intent(in) :: costs(:,:)
    integer, intent(out) :: rowsol(:)
    real(rk), intent(out) :: lapcost
    
@@ -50,12 +50,12 @@ subroutine jvc_dense(cost, n, rowsol, lapcost)
    ! COLUMN REDUCTION
    !---------------------------------------------------
    do j = n, 1, -1  ! Reverse order gives better results
-      ! Find minimum cost over rows
-      dmin = cost(1, j)
+      ! Find minimum costs over rows
+      dmin = costs(1, j)
       imin = 1
       do i = 2, n
-         if (cost(i, j) < dmin) then
-            dmin = cost(i, j)
+         if (costs(i, j) < dmin) then
+            dmin = costs(i, j)
             imin = i
          end if
       end do
@@ -92,7 +92,7 @@ subroutine jvc_dense(cost, n, rowsol, lapcost)
          dmin = huge(1.0_rk)
          do j = 1, n
             if (j /= j1) then
-               h = cost(i, j) - v(j)
+               h = costs(i, j) - v(j)
                if (h < dmin) dmin = h
             end if
          end do
@@ -112,13 +112,13 @@ subroutine jvc_dense(cost, n, rowsol, lapcost)
          i = free(k)
          k = k + 1
          
-         ! Find minimum and second minimum reduced cost over columns
-         umin = cost(i, 1) - v(1)
+         ! Find minimum and second minimum reduced costs over columns
+         umin = costs(i, 1) - v(1)
          j1 = 1
          usubmin = huge(1.0_rk)
          
          do j = 2, n
-            h = cost(i, j) - v(j)
+            h = costs(i, j) - v(j)
             if (h < usubmin) then
                if (h < umin) then
                   usubmin = umin
@@ -135,7 +135,7 @@ subroutine jvc_dense(cost, n, rowsol, lapcost)
          i0 = colsol(j1)
          
          if ((usubmin - umin) > resolution) then
-            ! Increase minimum reduced cost to subminimum
+            ! Increase minimum reduced costs to subminimum
             v(j1) = v(j1) - (usubmin - umin)
          else if (i0 > 0) then
             ! Minimum and subminimum equal, swap columns if j1 is assigned
@@ -181,7 +181,7 @@ subroutine jvc_dense(cost, n, rowsol, lapcost)
       
       ! Dijkstra shortest path algorithm
       do j = 1, n
-         d(j) = cost(freerow, j) - v(j)
+         d(j) = costs(freerow, j) - v(j)
          pred(j) = freerow
          collist(j) = j
       end do
@@ -227,11 +227,11 @@ subroutine jvc_dense(cost, n, rowsol, lapcost)
             j1 = collist(low)
             low = low + 1
             i = colsol(j1)
-            h = cost(i, j1) - v(j1) - dmin
+            h = costs(i, j1) - v(j1) - dmin
             
             do k = up, n
                j = collist(k)
-               v2 = cost(i, j) - v(j) - h
+               v2 = costs(i, j) - v(j) - h
                if (v2 < d(j)) then
                   pred(j) = i
                   if (abs(v2 - dmin) < resolution) then
@@ -270,13 +270,13 @@ subroutine jvc_dense(cost, n, rowsol, lapcost)
    end do
    
    !---------------------------------------------------
-   ! Calculate total cost
+   ! Calculate total costs
    !---------------------------------------------------
    lapcost = 0.0_rk
    do i = 1, n
       j = rowsol(i)
-      u(i) = cost(i, j) - v(j)
-      lapcost = lapcost + cost(i, j)
+      u(i) = costs(i, j) - v(j)
+      lapcost = lapcost + costs(i, j)
    end do
    
    ! Cleanup

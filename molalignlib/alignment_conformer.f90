@@ -17,10 +17,9 @@
 module alignment_conformer
 use parameters
 use derived_types
-use options
+use utils
 use random
 use molecule
-use utils
 use chemistry
 use permutation
 use euclidean
@@ -33,6 +32,7 @@ use lcrs_arrays
 use assignment_tree
 use assignment_conformer
 use registration
+use options
 implicit none
 
 contains

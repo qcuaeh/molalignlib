@@ -16,14 +16,14 @@
 
 module assignment_atoms
 use parameters
-use options
 use derived_types
 use random
 use euclidean
 use permutation
+!use lap_hungarian
 use lap_jvc_dense
 use lap_jvc_sparse
-!use lap_hungarian
+use options
 implicit none
 private
 public assign_atoms_biased
@@ -62,7 +62,7 @@ subroutine assign_atoms_biased( atomtypes, biases, coords1, coords2, atomperm)
 
       ! Build cost matrix: distances + biases
       costs(1:part%num_items1, 1:part%num_items1) = &
-         distance_matrix(part, coords1, coords2) + biases(h)%ee
+         distance_matrix(part, coords1, coords2) + biases(h)%a
 
       ! Solve assignment problem using JVC algorithm
       call jvc_dense(costs, part%num_items1, perm, lapcost)
@@ -92,7 +92,7 @@ subroutine assign_atoms_pruned( atomtypes, coords1, coords2, prunes, atomperm)
    ! Optimize atomperm for each block
    do h = 1, atomtypes%num_parts
       part => atomtypes%parts(h)
-      call solve_lap_pruned(part%num_items1, part%items1, part%items2, coords1, coords2, prunes(h)%ee, perm, dist)
+      call solve_lap_pruned(part%num_items1, part%items1, part%items2, coords1, coords2, prunes(h)%a, perm, dist)
       atomperm(part%items1) = part%items2(perm(1:part%num_items1))
    end do
 end subroutine

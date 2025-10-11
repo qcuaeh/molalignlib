@@ -17,11 +17,10 @@
 module pruning
 use parameters
 use derived_types
-use molecule
-use options
 use sorting
+use molecule
 use lcrs_trees
-
+use options
 implicit none
 
 real(rk) :: prune_tol
@@ -53,10 +52,10 @@ subroutine prune_none( atomtypes, atoms1, atoms2, prunes)
    do h = 1, atomtypes%num_parts
       num_items1 = atomtypes%parts(h)%num_items1
       num_items2 = atomtypes%parts(h)%num_items2
-      allocate (prunes(h)%ee(num_items1, num_items2))
+      allocate (prunes(h)%a(num_items1, num_items2))
       do i = 1, num_items1
          do j = 1, num_items2
-            prunes(h)%ee(j, i) = .false.
+            prunes(h)%a(j, i) = .false.
          end do
       end do
    end do
@@ -80,11 +79,11 @@ subroutine prune_rd( atomtypes, atoms1, atoms2, prunes)
    allocate (prunes(atomtypes%num_parts))
 
    do i = 1, size(coords1, dim=2)
-      allocate (dists1(i)%e(atomtypes%num_parts))
-      allocate (dists2(i)%e(atomtypes%num_parts))
+      allocate (dists1(i)%u(atomtypes%num_parts))
+      allocate (dists2(i)%u(atomtypes%num_parts))
       do h = 1, atomtypes%num_parts
-         allocate (dists1(i)%e(h)%e(atomtypes%parts(h)%num_items1))
-         allocate (dists2(i)%e(h)%e(atomtypes%parts(h)%num_items2))
+         allocate (dists1(i)%u(h)%u(atomtypes%parts(h)%num_items1))
+         allocate (dists2(i)%u(h)%u(atomtypes%parts(h)%num_items2))
       end do
    end do
 
@@ -92,9 +91,9 @@ subroutine prune_rd( atomtypes, atoms1, atoms2, prunes)
       do h = 1, atomtypes%num_parts
          do j = 1, atomtypes%parts(h)%num_items1
             jatom = atomtypes%parts(h)%items1(j)
-            dists1(i)%e(h)%e(j) = sqrt(sum((coords1(:, jatom) - coords1(:, i))**2))
+            dists1(i)%u(h)%u(j) = sqrt(sum((coords1(:, jatom) - coords1(:, i))**2))
          end do
-         call sort(dists1(i)%e(h)%e)
+         call sort(dists1(i)%u(h)%u)
       end do
    end do
 
@@ -102,24 +101,24 @@ subroutine prune_rd( atomtypes, atoms1, atoms2, prunes)
       do h = 1, atomtypes%num_parts
          do j = 1, atomtypes%parts(h)%num_items2
             jatom = atomtypes%parts(h)%items2(j)
-            dists2(i)%e(h)%e(j) = sqrt(sum((coords2(:, jatom) - coords2(:, i))**2))
+            dists2(i)%u(h)%u(j) = sqrt(sum((coords2(:, jatom) - coords2(:, i))**2))
          end do
-         call sort(dists2(i)%e(h)%e)
+         call sort(dists2(i)%u(h)%u)
       end do
    end do
 
    do h = 1, atomtypes%num_parts
       num_items1 = atomtypes%parts(h)%num_items1
       num_items2 = atomtypes%parts(h)%num_items2
-      allocate (prunes(h)%ee(num_items1, num_items2))
-      prunes(h)%ee = .false.
+      allocate (prunes(h)%a(num_items1, num_items2))
+      prunes(h)%a = .false.
       do i = 1, num_items1
          iatom = atomtypes%parts(h)%items1(i)
          do j = 1, num_items2
             jatom = atomtypes%parts(h)%items2(j)
             do k = 1, atomtypes%num_parts
-               if (any(abs(dists2(jatom)%e(k)%e - dists1(iatom)%e(k)%e) > 3.4641*prune_tol)) then
-                  prunes(h)%ee(j, i) = .true.
+               if (any(abs(dists2(jatom)%u(k)%u - dists1(iatom)%u(k)%u) > 3.4641*prune_tol)) then
+                  prunes(h)%a(j, i) = .true.
                   exit
                end if
             end do

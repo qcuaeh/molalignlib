@@ -19,7 +19,6 @@
 !> @{
 program confrmsd
 use parameters
-use options
 use molecule
 use euclidean
 use utils
@@ -34,7 +33,7 @@ use pruning
 use registration
 use assignment_conformer
 use alignment_conformer
-
+use options
 implicit none
 
 character(:), allocatable :: title1, title2
@@ -183,7 +182,7 @@ end if
 ! Collect atom types in a partition
 call collect_atomtypes( atomset1, atomset2, atoms1, atoms2, atomtypes)
 
-! Abort if there are conflicting atomic types
+! Abort if atom types do not match
 if (any(atomtypes%parts%num_items1 /= atomtypes%parts%num_items2)) then
    write (stderr, '(A)') 'Error: These molecules are not isomers'
    stop 1
@@ -229,7 +228,7 @@ if (align_flag) then
    if (remap_flag) then
 
       ! Pre-compute assignment tree
-      call compute_hna_partition( adjcs1, adjcs2, atomtypes, hnachain)
+      call compute_consistent_hna_partition( adjcs1, adjcs2, atomtypes, hnachain)
       call build_assignment_tree( adjcs1, adjcs2, hnachain%last_link, assign_arrays)
 
       if (tree_flag) then
@@ -319,7 +318,7 @@ else
    coords2w = get_weighted_coords( atoms2, weights2)
 
    if (remap_flag) then
-      call compute_hna_partition( adjcs1, adjcs2, atomtypes, hnachain)
+      call compute_consistent_hna_partition( adjcs1, adjcs2, atomtypes, hnachain)
       call build_assignment_tree( adjcs1, adjcs2, hnachain%last_link, assign_arrays)
       if (tree_flag) then
          call print_chain_tree_array( assign_arrays)

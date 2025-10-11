@@ -16,7 +16,6 @@
 
 module biasing
 use parameters
-use options
 use derived_types
 use sorting
 use utils
@@ -26,7 +25,9 @@ use lcrs_trees
 use partitioning
 use hna
 use euclidean
+use options
 implicit none
+
 contains
 
 subroutine compute_hna_biases(adjcs1, adjcs2, atomtypes, biases)
@@ -43,8 +44,8 @@ subroutine compute_hna_biases(adjcs1, adjcs2, atomtypes, biases)
    allocate(biases(atomtypes%num_parts))
 
    do h = 1, atomtypes%num_parts
-      allocate(biases(h)%ee(atomtypes%parts(h)%num_items1, atomtypes%parts(h)%num_items2))
-      biases(h)%ee = 0
+      allocate(biases(h)%a(atomtypes%parts(h)%num_items1, atomtypes%parts(h)%num_items2))
+      biases(h)%a = 0
    end do
 
    ! Initialize HNA chain with element types
@@ -72,7 +73,7 @@ subroutine compute_hna_biases(adjcs1, adjcs2, atomtypes, biases)
                   hnachain%last_link%itemdir1(iatom)%ptr, &
                   hnachain%last_link%itemdir2(jatom)%ptr) &
                ) then
-                  biases(h)%ee(i, j) = biases(h)%ee(i, j) + 1
+                  biases(h)%a(i, j) = biases(h)%a(i, j) + 1
                end if
             end do
          end do
@@ -84,7 +85,7 @@ subroutine compute_hna_biases(adjcs1, adjcs2, atomtypes, biases)
 !   do h = 1, atomtypes%num_parts
 !      write(stderr, *)
 !      do j = 1, atomtypes%parts(h)%num_items2
-!         write(stderr, '(*(i2))') biases(h)%ee(:atomtypes%parts(h)%num_items1, j)
+!         write(stderr, '(*(i2))') biases(h)%a(:atomtypes%parts(h)%num_items1, j)
 !      end do
 !   end do
 
