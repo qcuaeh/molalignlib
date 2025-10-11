@@ -22,7 +22,7 @@ use molecule
 use chemistry
 use permutation
 use euclidean
-use assignment_cluster
+use assignment_atoms
 use lcrs_trees
 use hna
 use partitioning

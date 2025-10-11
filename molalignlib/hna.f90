@@ -6,6 +6,7 @@ use lcrs_trees
 implicit none
 private
 public refine_hna_part
+public refine_hna_partition
 public compute_hna_partition
 
 contains

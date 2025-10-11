@@ -267,7 +267,7 @@ function would_part_split(adjcs1, adjcs2, itemdir1, itemdir2, part) result(would
    end do
 end function
 
-subroutine refine_hna_partition(adjcs1, adjcs2, hnachain, branch, branch_parts, num_splits)
+subroutine recompute_hna_partition(adjcs1, adjcs2, hnachain, branch, branch_parts, num_splits)
 ! Compute next level HNA types - only keeps children if real split occurred
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(assigntree_node_t), pointer, intent(inout) :: hnachain
@@ -409,8 +409,8 @@ recursive subroutine split_dependent_parts(adjcs1, adjcs2, hnachain, branch, bra
 
    ! Compute self-consistent HNAs
    do
-      ! Call refine_hna_partition and get the number of splits
-      call refine_hna_partition(adjcs1, adjcs2, hnachain, branch, branch_parts, num_splits)
+      ! Call recompute_hna_partition and get the number of splits
+      call recompute_hna_partition(adjcs1, adjcs2, hnachain, branch, branch_parts, num_splits)
 
       ! Exit loop if no splits occurred
       if (num_splits == 0) exit

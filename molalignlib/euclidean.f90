@@ -421,6 +421,8 @@ function distance_matrix( part, coords1, coords2)
    ! Local variables
    integer :: i, j
 
+   allocate (distance_matrix(part%num_items1, part%num_items2))
+
    do j = 1, part%num_items2
       do i = 1, part%num_items1
          distance_matrix(i, j) = sum((coords1(:, part%items1(i)) - coords2(:, part%items2(j)))**2)

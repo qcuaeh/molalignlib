@@ -1,3 +1,3 @@
-clusrmsd.f90 ClusRMSD
+clustrmsd.f90 ClustRMSD
 confrmsd.f90 ConfRMSD
-#rmsd_reaction.f90 ReacRMSD
+isormsd.f90 IsoRMSD

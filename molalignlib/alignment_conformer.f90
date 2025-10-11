@@ -24,7 +24,7 @@ use utils
 use chemistry
 use permutation
 use euclidean
-use assignment_cluster
+use assignment_atoms
 use adjacency
 use biasing
 use pruning

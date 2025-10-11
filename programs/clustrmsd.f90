@@ -14,10 +14,10 @@
 ! You should have received a copy of the GNU General Public License
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-!> @defgroup clusrmsd ClusRMSD
+!> @defgroup clustrmsd ClustRMSD
 !> @brief Program to calculate RMSDs between atom clusters
 !> @{
-program clusrmsd
+program clustrmsd
 use parameters
 use options
 use molecule
@@ -100,8 +100,8 @@ do while (get_arg(arg))
       mass_flag = .true.
    case ('-mirror')
       mirror_flag = .true.
-   case ('-count')
-      call read_optarg( arg, count_thres)
+   case ('-thres')
+      call read_optarg(arg, count_thres)
    case ('-trials')
       call read_optarg( arg, max_trials)
    case ('-n')
