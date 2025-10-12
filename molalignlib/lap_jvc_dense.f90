@@ -9,7 +9,7 @@ subroutine jvc_dense(costs, n, rowsol, lapcost)
 ! Finds the assignment that minimizes the total costs
 !
 ! Input:
-!   costs(n,n)  - Cost matrix (will be modified during computation)
+!   costs(n,n) - Cost matrix
 !   n          - Problem dimension
 !
 ! Output:
@@ -25,7 +25,7 @@ subroutine jvc_dense(costs, n, rowsol, lapcost)
    ! Local variables
    integer :: i, j, j1, j2, k, f
    integer :: imin, numfree, prvnumfree, i0, freerow
-   integer :: last, low, up, endofpath
+   integer :: last, low, up, endofpath, loopcnt
    real(rk) :: dmin, h, umin, usubmin, v2
    real(rk), parameter :: resolution = 1.0e-10_rk
    logical :: unassignedfound
@@ -101,9 +101,11 @@ subroutine jvc_dense(costs, n, rowsol, lapcost)
    end do
    
    !---------------------------------------------------
-   ! AUGMENTING ROW REDUCTION (done twice)
+   ! AUGMENTING ROW REDUCTION (done exactly twice)
    !---------------------------------------------------
-   do while (numfree > 0)  ! Loop until no free rows remain
+   loopcnt = 0
+   do while (loopcnt < 2)
+      loopcnt = loopcnt + 1
       k = 1
       prvnumfree = numfree
       numfree = 0
@@ -159,18 +161,6 @@ subroutine jvc_dense(costs, n, rowsol, lapcost)
             end if
          end if
       end do
-      
-      ! Exit after at most 2 iterations
-      if (prvnumfree == 0) exit
-   end do
-   
-   ! Rebuild free list for augmentation phase
-   numfree = 0
-   do i = 1, n
-      if (colsol(rowsol(i)) /= i) then
-         numfree = numfree + 1
-         free(numfree) = i
-      end if
    end do
    
    !---------------------------------------------------

@@ -44,9 +44,9 @@ subroutine assign_atoms_biased( atomtypes, biases, coords1, coords2, atomperm)
    ! Local variables
    type(partition_part_t), pointer :: part
    integer, dimension(:), allocatable :: perm
-   real(rk), dimension(:,:), allocatable :: costs
+   real(rk), dimension(:,:), allocatable :: dists, costs
    integer :: maxnum_items
-   real(rk) :: lapcost
+   real(rk) :: normfac, lapcost
    integer :: h
 
    ! Since num_items1 == num_items2, we only need one size
@@ -54,17 +54,22 @@ subroutine assign_atoms_biased( atomtypes, biases, coords1, coords2, atomperm)
 
    allocate (perm(maxnum_items))
    allocate (atomperm(sum(atomtypes%parts%num_items1)))
+   allocate (dists(maxnum_items, maxnum_items))
    allocate (costs(maxnum_items, maxnum_items))
 
    ! Optimize atomperm for each block
    do h = 1, atomtypes%num_parts
       part => atomtypes%parts(h)
 
+      call compute_distance_matrix(part, coords1, coords2, dists)
+      normfac = 1./maxval(dists)
+
       ! Build cost matrix: distances + biases
-      costs(1:part%num_items1, 1:part%num_items1) = &
-         distance_matrix(part, coords1, coords2) + biases(h)%a
+      costs(1:part%num_items1, 1:part%num_items1) = biases(h)%a &
+            + normfac*dists(1:part%num_items1, 1:part%num_items1)
 
       ! Solve assignment problem using JVC algorithm
+!      call assndx(1, costs, part%num_items1, part%num_items1, perm, lapcost)
       call jvc_dense(costs, part%num_items1, perm, lapcost)
 
       ! Map the solution back to original atom indices
