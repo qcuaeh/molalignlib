@@ -14,10 +14,10 @@
 ! You should have received a copy of the GNU General Public License
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-!> @defgroup clustrmsd ClustRMSD
+!> @defgroup atormsd AtoRMSD
 !> @brief Program to calculate RMSDs between atom clusters
 !> @{
-program clustrmsd
+program atormsd
 use parameters
 use molecule
 use euclidean
@@ -32,7 +32,7 @@ use argparse
 use biasing
 use pruning
 use registration
-use alignment_cluster
+use alignment_atoms
 use options
 implicit none
 

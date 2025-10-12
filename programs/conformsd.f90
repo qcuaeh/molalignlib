@@ -14,10 +14,10 @@
 ! You should have received a copy of the GNU General Public License
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-!> @defgroup confrmsd ConfRMSD
+!> @defgroup conformsd ConfoRMSD
 !> @brief Program to calculate RMSDs between conformers
 !> @{
-program confrmsd
+program conformsd
 use parameters
 use molecule
 use euclidean
