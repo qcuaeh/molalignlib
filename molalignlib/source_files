@@ -21,6 +21,7 @@ file_write.f90
 argparse.f90
 lcrs_trees.f90
 lcrs_arrays.f90
+#tracking.f90
 partitioning.f90
 partitioning_ll.f90
 hna.f90
@@ -29,7 +30,7 @@ pruning.f90
 assignment_tree.f90
 assignment_atoms.f90
 assignment_conformer.f90
-registration.f90
+recording.f90
 alignment_atoms.f90
 alignment_conformer.f90
 alignment_isomer.f90

@@ -31,7 +31,7 @@ use lcrs_trees
 use lcrs_arrays
 use assignment_tree
 use assignment_conformer
-use registration
+use recording
 use options
 implicit none
 
@@ -49,13 +49,13 @@ subroutine optimize_atomperm_conform( atomset1, atomset2, assign_arrays, coords1
    real(rk) :: permdist, new_permdist
    real(rk), dimension(4) :: rotation, total_rotation
    integer, pointer :: num_trials, lead_count
-   integer :: num_steps
+   integer :: steps
 
    ! Initialize random number generator
    call random_initialize()
 
    ! Initialize local minima registry
-   call init_rmsd_registry( registry, num_records)
+   call init_permutation_grouped_registry( registry, num_records)
    num_trials => registry%num_trials
    lead_count => registry%records(1)%count
 
@@ -74,7 +74,7 @@ subroutine optimize_atomperm_conform( atomset1, atomset2, assign_arrays, coords1
       total_rotation = quatmul( total_rotation, rotation)
       call rotate_coords( atomset2, coords2r, rotation)
       permdist = sqdistsum( atomset1, atomperm, coords1, coords2r)
-      num_steps = 1
+      steps = 1
 
       if (iterate_flag) then
          do
@@ -88,12 +88,12 @@ subroutine optimize_atomperm_conform( atomset1, atomset2, assign_arrays, coords1
             total_rotation = quatmul( total_rotation, rotation)
             call rotate_coords( atomset2, coords2r, rotation)
             permdist = sqdistsum( atomset1, atomperm, coords1, coords2r)
-            num_steps = num_steps + 1
+            steps = steps + 1
          end do
       end if
 
       ! Update results
-      call insert_record( registry, atomperm, num_steps, permdist=permdist, rotation=total_rotation)
+      call insert_record( registry, atomperm, 0, permdist, steps, total_rotation)
 
    end do
 end subroutine

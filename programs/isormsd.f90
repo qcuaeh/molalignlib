@@ -30,7 +30,7 @@ use file_read
 use file_write
 use argparse
 use biasing
-use registration
+use recording
 use alignment_isomer
 use options
 implicit none

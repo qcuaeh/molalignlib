@@ -30,11 +30,12 @@ implicit none
 
 contains
 
-subroutine compute_hna_biases(adjcs1, adjcs2, atomtypes, biases)
+subroutine compute_hna_biases(adjcs1, adjcs2, atomtypes, biases, scnatypes)
 ! Iteratively compute HNA types
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(partition_t), intent(in) :: atomtypes
    type(int_matrix), dimension(:), allocatable, intent(out) :: biases
+   type(partition_t), intent(out) :: scnatypes
    ! Local variables
    type(assigntree_node_t), pointer :: hnachain
    integer :: h, i, j, iatom, jatom
@@ -88,6 +89,9 @@ subroutine compute_hna_biases(adjcs1, adjcs2, atomtypes, biases)
 !         write(stderr, '(*(i2))') biases(h)%a(:atomtypes%parts(h)%num_items1, j)
 !      end do
 !   end do
+
+   ! Extract scnatypes from the final HNA partition
+   call link_to_partition(hnachain%last_link, scnatypes)
 
    call delete_chain(hnachain)  ! Cleanup
 end subroutine

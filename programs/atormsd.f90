@@ -31,7 +31,7 @@ use file_write
 use argparse
 use biasing
 use pruning
-use registration
+use recording
 use alignment_atoms
 use options
 implicit none

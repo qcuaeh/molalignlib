@@ -26,7 +26,7 @@ use lcrs_trees
 use hna
 use partitioning
 use pruning
-use registration
+use recording
 use options
 implicit none
 
@@ -40,7 +40,7 @@ subroutine optimize_atomperm_cluster(atomset1, atomset2, atomtypes, prunes, coor
    type(registry_t), intent(out) :: registry
 
    ! Local variables
-   integer :: num_steps
+   integer :: steps
    integer, dimension(:), allocatable :: atomperm, new_atomperm
    real(rk), dimension(:,:), allocatable :: coords2r
    real(rk) :: permdist, rotation(4), total_rotation(4)
@@ -49,7 +49,7 @@ subroutine optimize_atomperm_cluster(atomset1, atomset2, atomtypes, prunes, coor
    call random_initialize()
 
    ! Initialize local minima registry
-   call init_rmsd_registry( registry, num_records)
+   call init_permutation_grouped_registry( registry, num_records)
 
    ! Optimize atom permutation
    do while (registry%records(1)%count < count_thres .and. registry%num_trials < max_trials)
@@ -63,7 +63,7 @@ subroutine optimize_atomperm_cluster(atomset1, atomset2, atomtypes, prunes, coor
       rotation = least_rotquat( atomset1, atomperm, coords1, coords2r)
       call rotate_coords( atomset1, coords2r, rotation)
       total_rotation = quatmul( total_rotation, rotation)
-      num_steps = 1
+      steps = 1
 
       if (iterate_flag) then
          do
@@ -73,13 +73,13 @@ subroutine optimize_atomperm_cluster(atomset1, atomset2, atomtypes, prunes, coor
             rotation = least_rotquat( atomset1, atomperm, coords1, coords2r)
             call rotate_coords( atomset1, coords2r, rotation)
             total_rotation = quatmul( total_rotation, rotation)
-            num_steps = num_steps + 1
+            steps = steps + 1
          end do
       end if
 
       ! Push local minimum to registry
       permdist = sqrt( sqdistsum( atomset1, atomperm, coords1, coords2r))
-      call insert_record( registry, atomperm, num_steps, permdist=permdist, rotation=total_rotation)
+      call insert_record( registry, atomperm, 0, permdist, steps, total_rotation)
 
    end do
 
