@@ -23,7 +23,7 @@ run_tests() {
 }
 
 testdir=$PWD/tests
-executable=./build/ClustRMSD
+executable=./build/atormsd
 write_test=false
 
 while getopts ":w" opt; do

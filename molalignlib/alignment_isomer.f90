@@ -21,7 +21,6 @@ use random
 use molecule
 use euclidean
 use adjacency
-!use tracking
 use biasing
 use partitioning
 use recording
@@ -47,26 +46,22 @@ subroutine optimize_atomperm_isomer(atomset1, atomset2, atomtypes, adjcs1, adjcs
    integer, pointer :: num_trials, lead_count
    integer :: steps
    integer :: permdiff
-!   type(int_list), dimension(:), allocatable :: molfrags1
-   logical, dimension(:,:), allocatable :: adjmat1, adjmat2
+   logical, dimension(:,:), allocatable :: adjmat2
    type(int_matrix), dimension(:), allocatable :: biases
    type(partition_t) :: scnatypes
 
-   ! Initialize random number generator
-   call random_initialize()
-
-   ! Compute adjacency matrices from adjacency lists
-   adjmat1 = adjcs_to_adjmat(adjcs1)
+   ! Convert adjacency lists to adjacency matrix
    adjmat2 = adjcs_to_adjmat(adjcs2)
-
-   ! Find molecular fragments
-!   call find_molfrags(adjcs1, first_partition(atomtypes), molfrags1)
 
    ! Compute HNA types and biases
    call compute_hna_biases(adjcs1, adjcs2, atomtypes, biases, scnatypes)
 
+   ! Initialize random number generator
+   call random_initialize()
+
    ! Initialize local minima registry (dual mode: adjacency + position)
-   call init_permutation_grouped_registry(registry, num_records)
+!   call init_permutation_grouped_registry(registry, num_records)
+   call init_adjacency_grouped_registry(registry, num_records)
    num_trials => registry%num_trials
    lead_count => registry%records(1)%count
 
@@ -79,36 +74,34 @@ subroutine optimize_atomperm_isomer(atomset1, atomset2, atomtypes, adjcs1, adjcs
 
       ! Assign atoms with current orientation using biases
       call assign_atoms_biased(atomtypes, biases, coords1, coords2r, atomperm)
-!      call minimize_adjdiff(atomtypes, scnatypes, molfrags1, adjcs1, adjcs2, &
-!            coords1, coords2, atomperm)
+      call minimize_adjdiff(atomset1, atomtypes, scnatypes, adjcs1, adjcs2, adjmat2, &
+            coords1, coords2, atomperm)
 
       ! Optimize rotation
       rotation = least_rotquat(atomset1, atomperm, coords1, coords2r)
       total_rotation = quatmul(total_rotation, rotation)
       call rotate_coords(atomset2, coords2r, rotation)
 
-      permdiff = adjacencydiff(atomperm, adjmat1, adjmat2)
+      permdiff = adjacencydiff(atomset1, atomperm, adjcs1, adjcs2)
       permdist = sqdistsum(atomset1, atomperm, coords1, coords2r)
       steps = 1
 
       if (iterate_flag) then
-         do
-            ! Try to improve assignment
-            call assign_atoms_biased(atomtypes, biases, coords1, coords2r, new_atomperm)
-!            call minimize_adjdiff(atomtypes, scnatypes, molfrags1, adjcs1, adjcs2, &
-!                  coords1, coords2, atomperm)
-
-            if (all(atomperm == new_atomperm)) exit
-            atomperm = new_atomperm
-
-            rotation = least_rotquat(atomset1, atomperm, coords1, coords2r)
-            total_rotation = quatmul(total_rotation, rotation)
-            call rotate_coords(atomset2, coords2r, rotation)
-
-            permdiff = adjacencydiff(atomperm, adjmat1, adjmat2)
-            permdist = sqdistsum(atomset1, atomperm, coords1, coords2r)
-            steps = steps + 1
-         end do
+!         do
+!            ! Try to improve assignment
+!            call assign_atoms_biased(atomtypes, biases, coords1, coords2r, new_atomperm)
+!
+!            if (all(atomperm == new_atomperm)) exit
+!            atomperm = new_atomperm
+!
+!            rotation = least_rotquat(atomset1, atomperm, coords1, coords2r)
+!            total_rotation = quatmul(total_rotation, rotation)
+!            call rotate_coords(atomset2, coords2r, rotation)
+!
+!            permdiff = adjacencydiff(atomset1, atomperm, adjcs1, adjcs2)
+!            permdist = sqdistsum(atomset1, atomperm, coords1, coords2r)
+!            steps = steps + 1
+!         end do
       end if
 
       ! Update results
@@ -116,21 +109,5 @@ subroutine optimize_atomperm_isomer(atomset1, atomset2, atomtypes, adjcs1, adjcs
 
    end do
 end subroutine
-
-function adjcs_to_adjmat(adjcs) result(adjmat)
-   type(adjc_t), dimension(:), intent(in) :: adjcs
-   logical, dimension(:,:), allocatable :: adjmat
-   integer :: i, j, k
-
-   allocate(adjmat(size(adjcs), size(adjcs)))
-   adjmat = .false.
-
-   do i = 1, size(adjcs)
-      do j = 1, size(adjcs(i)%adjlist)
-         k = adjcs(i)%adjlist(j)
-         adjmat(i, k) = .true.
-      end do
-   end do
-end function
 
 end module

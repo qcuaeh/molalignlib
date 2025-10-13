@@ -53,16 +53,19 @@ subroutine assign_atoms_biased( atomtypes, biases, coords1, coords2, atomperm)
    maxnum_items = maxval(atomtypes%parts%num_items1)
 
    allocate (perm(maxnum_items))
-   allocate (atomperm(sum(atomtypes%parts%num_items1)))
+   allocate (atomperm(size(coords1, 2)))
    allocate (dists(maxnum_items, maxnum_items))
    allocate (costs(maxnum_items, maxnum_items))
+
+   ! Initialize atomperm as identity permutation
+   atomperm = identity_permutation(size(coords1, 2))
 
    ! Optimize atomperm for each block
    do h = 1, atomtypes%num_parts
       part => atomtypes%parts(h)
 
       call compute_distance_matrix(part, coords1, coords2, dists)
-      normfac = 1./maxval(dists(1:part%num_items1,1:part%num_items1))
+      normfac = 1./maxval(dists)
 
       ! Build cost matrix: distances + biases
       costs(1:part%num_items1, 1:part%num_items1) = biases(h)%a &
@@ -92,12 +95,42 @@ subroutine assign_atoms_pruned( atomtypes, coords1, coords2, prunes, atomperm)
    integer :: h
 
    allocate (perm(maxval(atomtypes%parts%num_items1)))
-   allocate (atomperm(sum(atomtypes%parts%num_items1)))
+   allocate (atomperm(size(coords1, 2)))
+
+   ! Initialize atomperm as identity permutation
+   atomperm = identity_permutation(size(coords1, 2))
 
    ! Optimize atomperm for each block
    do h = 1, atomtypes%num_parts
       part => atomtypes%parts(h)
       call solve_lap_pruned(part%num_items1, part%items1, part%items2, coords1, coords2, prunes(h)%a, perm, dist)
+      atomperm(part%items1) = part%items2(perm(1:part%num_items1))
+   end do
+end subroutine
+
+subroutine assign_atoms_nearest( atomtypes, coords1, coords2, atomperm)
+!------------------------------------------------------------------------
+! Finds the optimal mapping between points with fixed orientation
+!------------------------------------------------------------------------
+   type(partition_t), target, intent(in) :: atomtypes
+   real(rk), dimension(:,:), intent(in) :: coords1, coords2
+   integer, dimension(:), allocatable, intent(out) :: atomperm
+   ! Local variables
+   type(partition_part_t), pointer :: part
+   integer, dimension(:), allocatable :: perm
+   real(rk) :: dist
+   integer :: h
+
+   allocate (perm(maxval(atomtypes%parts%num_items1)))
+   allocate (atomperm(size(coords1, 2)))
+
+   ! Initialize atomperm as identity permutation
+   atomperm = identity_permutation(size(coords1, 2))
+
+   ! Fill distance matrix for each block
+   do h = 1, atomtypes%num_parts
+      part => atomtypes%parts(h)
+      call solve_lap_nearest(part%num_items1, part%items1, part%items2, coords1, coords2, perm, dist)
       atomperm(part%items1) = part%items2(perm(1:part%num_items1))
    end do
 end subroutine
@@ -186,31 +219,6 @@ subroutine solve_lap_pruned(n, s1, s2, x1, x2, prun, perm, dist)
          error stop 'Assignment is not a permutation'
       end if
    end if
-end subroutine
-
-subroutine assign_atoms_nearest( atomtypes, coords1, coords2, atomperm)
-!------------------------------------------------------------------------
-! Finds the optimal mapping between points with fixed orientation
-!------------------------------------------------------------------------
-   type(partition_t), target, intent(in) :: atomtypes
-   real(rk), dimension(:,:), intent(in) :: coords1, coords2
-   integer, dimension(:), allocatable, intent(out) :: atomperm
-   ! Local variables
-   type(partition_part_t), pointer :: part
-   integer, dimension(:), allocatable :: perm
-   real(rk) :: dist
-   integer :: h
-
-   allocate (perm(maxval(atomtypes%parts%num_items1)))
-   allocate (atomperm(sum(atomtypes%parts%num_items1)))
-
-   ! Fill distance matrix for each block
-
-   do h = 1, atomtypes%num_parts
-      part => atomtypes%parts(h)
-      call solve_lap_nearest(part%num_items1, part%items1, part%items2, coords1, coords2, perm, dist)
-      atomperm(part%items1) = part%items2(perm(1:part%num_items1))
-   end do
 end subroutine
 
 subroutine solve_lap_nearest(n, s1, s2, x1, x2, perm, dist)

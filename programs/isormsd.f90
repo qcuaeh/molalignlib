@@ -51,7 +51,6 @@ real(rk), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, c
 integer, dimension(:), pointer :: atomset1, atomset2
 integer, dimension(:), allocatable :: atomset1_alloc, atomset2_alloc
 integer, dimension(:), allocatable :: atomperm
-logical, dimension(:,:), allocatable :: adjmat1, adjmat2
 integer :: adjd
 integer :: unitin1, unitin2, unitout
 integer :: i, j
@@ -231,11 +230,7 @@ if (align_flag) then
          rotquat = least_rotquat(atomset1, atomperm, coords1w, coords2w)
          coords2r = rotated_coords(coords2, rotquat, center1)
          rmsd = sqrt(sqdistmean(atomset1, atomperm, weights1, coords1, coords2r))
-         
-         ! Calculate adjacency difference for reporting
-         adjmat1 = adjcs_to_adjmat(adjcs1)
-         adjmat2 = adjcs_to_adjmat(adjcs2)
-         adjd = adjacencydiff(atomperm, adjmat1, adjmat2)
+         adjd = adjacencydiff(atomset1, atomperm, adjcs1, adjcs2)
 
          if (mapping_flag) then
             do j = 1, size(atomperm)
@@ -259,11 +254,7 @@ if (align_flag) then
       rotquat = least_rotquat(atomset1, atomperm, coords1w, coords2w)
       coords2r = rotated_coords(coords2, rotquat, center1)
       rmsd = sqrt(sqdistmean(atomset1, atomperm, weights1, coords1, coords2r))
-
-      ! Calculate adjacency difference
-      adjmat1 = adjcs_to_adjmat(adjcs1)
-      adjmat2 = adjcs_to_adjmat(adjcs2)
-      adjd = adjacencydiff(atomperm, adjmat1, adjmat2)
+      adjd = adjacencydiff(atomset1, atomperm, adjcs1, adjcs2)
 
       if (coords_flag) then
          title2 = 'RMSD=' // str(rmsd) // ' Δadj=' // str(adjd)
@@ -284,24 +275,18 @@ else
    if (remap_flag) then
       call optimize_atomperm_isomer(atomset1, atomset2, atomtypes, adjcs1, adjcs2, &
                                      coords1w, coords2w, registry)
-      
+
       if (stats_flag) then
          call print_records(registry)
       end if
-      
+
       atomperm = registry%records(1)%atomperm
       rmsd = sqrt(sqdistmean(atomset1, atomperm, weights1, coords1, coords2))
-      
-      adjmat1 = adjcs_to_adjmat(adjcs1)
-      adjmat2 = adjcs_to_adjmat(adjcs2)
-      adjd = adjacencydiff(atomperm, adjmat1, adjmat2)
+      adjd = adjacencydiff(atomset1, atomperm, adjcs1, adjcs2)
    else
       atomperm = identity_permutation(size(atoms1))
       rmsd = sqrt(sqdistmean(atomset1, atomperm, weights1, coords1, coords2))
-      
-      adjmat1 = adjcs_to_adjmat(adjcs1)
-      adjmat2 = adjcs_to_adjmat(adjcs2)
-      adjd = adjacencydiff(atomperm, adjmat1, adjmat2)
+      adjd = adjacencydiff(atomset1, atomperm, adjcs1, adjcs2)
    end if
 
    if (coords_flag) then

@@ -67,7 +67,7 @@ subroutine include_heavy_atoms(atoms, atomset, subset_alloc)
 
    n = 0
    do atomidx = 1, size(atoms)
-      if (atoms(n)%elnum > 1) then
+      if (atoms(atomidx)%elnum > 1) then
          n = n + 1
          subset_alloc(n) = atomidx
       end if
