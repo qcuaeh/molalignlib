@@ -62,7 +62,7 @@ subroutine assign_atoms_biased( atomtypes, biases, coords1, coords2, atomperm)
       part => atomtypes%parts(h)
 
       call compute_distance_matrix(part, coords1, coords2, dists)
-      normfac = 1./maxval(dists)
+      normfac = 1./maxval(dists(1:part%num_items1,1:part%num_items1))
 
       ! Build cost matrix: distances + biases
       costs(1:part%num_items1, 1:part%num_items1) = biases(h)%a &

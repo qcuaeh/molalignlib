@@ -55,8 +55,6 @@ subroutine writefile(unit, extout, title, atoms, bonds, atomperm)
       write (stderr, '(A,A,A)') 'Error: File format "', extout, '" is not supported'
       stop 1
    end select
-
-   flush(stderr)
 end subroutine
 
 subroutine writefile_xyz(unit, title, atoms, bonds, atomperm)
