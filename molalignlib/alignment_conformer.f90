@@ -67,9 +67,12 @@ subroutine optimize_atomperm_conform( atomset1, atomset2, assign_arrays, coords1
       coords2r = rotated_coords( coords2, total_rotation)
 
       ! Assign atoms with current orientation
-!      call assign_atoms_local( coords1, coords2r, assign_arrays, atomperm, permdist)
-      call assign_atoms_greedy( coords1, coords2r, assign_arrays, atomperm, permdist)
-      call assign_atoms_local_pruned( coords1, coords2r, assign_arrays, atomperm, permdist)
+      if (PRUNE_ASSIGNMENT_TREE) then
+         call assign_atoms_greedy( coords1, coords2r, assign_arrays, atomperm, permdist)
+         call assign_atoms_local_pruned( coords1, coords2r, assign_arrays, atomperm, permdist)
+      else
+         call assign_atoms_local( coords1, coords2r, assign_arrays, atomperm, permdist)
+      end if
       rotation = least_rotquat( atomset1, atomperm, coords1, coords2r)
       total_rotation = quatmul( total_rotation, rotation)
       call rotate_coords( atomset2, coords2r, rotation)
@@ -78,9 +81,12 @@ subroutine optimize_atomperm_conform( atomset1, atomset2, assign_arrays, coords1
 
       if (iterate_flag) then
          do
-!            call assign_atoms_local( coords1, coords2r, assign_arrays, new_atomperm, new_permdist)
-            new_permdist = permdist
-            call assign_atoms_local_pruned( coords1, coords2r, assign_arrays, new_atomperm, new_permdist)
+            if (PRUNE_ASSIGNMENT_TREE) then
+               new_permdist = permdist
+               call assign_atoms_local_pruned( coords1, coords2r, assign_arrays, new_atomperm, new_permdist)
+            else
+               call assign_atoms_local( coords1, coords2r, assign_arrays, new_atomperm, new_permdist)
+            end if
 !            write (stdout,*) permdist, new_permdist
             if (all(atomperm == new_atomperm)) exit
             atomperm = new_atomperm

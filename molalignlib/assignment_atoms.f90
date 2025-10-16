@@ -65,7 +65,7 @@ subroutine assign_atoms_biased( atomtypes, biases, coords1, coords2, atomperm)
       part => atomtypes%parts(h)
 
       call compute_distance_matrix(part, coords1, coords2, dists)
-      normfac = 1./maxval(dists)
+      normfac = 1./maxval(dists(1:part%num_items1, 1:part%num_items1))
 
       ! Build cost matrix: distances + biases
       costs(1:part%num_items1, 1:part%num_items1) = biases(h)%a &
@@ -214,7 +214,7 @@ subroutine solve_lap_pruned(n, s1, s2, x1, x2, prun, perm, dist)
       stop
    end if
 
-   if (DEBUGGING) then
+   if (DO_DEBUG_TESTS) then
       if (.not. is_permutation(perm)) then
          error stop 'Assignment is not a permutation'
       end if
@@ -379,7 +379,7 @@ subroutine solve_lap_nearest(n, s1, s2, x1, x2, perm, dist)
       stop
    end if
 
-   if (DEBUGGING) then
+   if (DO_DEBUG_TESTS) then
       if (.not. is_permutation(perm)) then
          error stop 'Assignment is not a permutation'
       end if

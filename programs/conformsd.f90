@@ -323,9 +323,12 @@ else
       if (tree_flag) then
          call print_chain_tree_array( assign_arrays)
       end if
-!      call assign_atoms_local( coords1w, coords2w, assign_arrays, atomperm, permdist)
-      call assign_atoms_greedy( coords1w, coords2w, assign_arrays, atomperm, permdist)
-      call assign_atoms_local_pruned( coords1w, coords2w, assign_arrays, atomperm, permdist)
+      if (PRUNE_ASSIGNMENT_TREE) then
+         call assign_atoms_greedy( coords1w, coords2w, assign_arrays, atomperm, permdist)
+         call assign_atoms_local_pruned( coords1w, coords2w, assign_arrays, atomperm, permdist)
+      else
+         call assign_atoms_local( coords1w, coords2w, assign_arrays, atomperm, permdist)
+      end if
       rmsd = sqrt( sqdistmean( atomset1, atomperm, weights1, coords1, coords2))
    else
       atomperm = identity_permutation( size(atoms1))

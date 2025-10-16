@@ -6,8 +6,11 @@ use iso_fortran_env, only: int32, int64, real32, real64
 !use iso_c_binding, only: c_int, c_long, c_float, c_double
 implicit none
 
-! Enable/disable debug tests
-logical, parameter :: DEBUGGING = .false.
+! Debug flags
+logical, parameter :: DO_DEBUG_TESTS = .false.
+
+! Optimization flags
+logical, parameter :: PRUNE_ASSIGNMENT_TREE = .true.
 
 ! Numerical kinds
 integer, parameter :: ik = int32 ! 32-bit integer kind

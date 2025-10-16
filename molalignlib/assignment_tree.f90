@@ -340,6 +340,25 @@ subroutine split_part_first(part, link)
    type(partree_node_t), pointer :: child_part
    type(item_node_t), pointer :: item1, item2
 
+   ! Verify that both molecules are conformers
+   if (part%num_items1 /= part%num_items2) then
+      write(stderr, '(A)') "ERROR: Molecules are not conformers!"
+      stop
+   end if
+
+   if (DO_DEBUG_TESTS) then
+      ! Verify that the item chains are properly linked
+      item1 => part%first_item1%next_item
+      item2 => part%first_item2%next_item
+      do while (associated(item1) .and. associated(item2))
+         item1 => item1%next_item
+         item2 => item2%next_item
+      end do
+      if (associated(item1) .neqv. associated(item2)) then
+         error stop "FATAL: Item chains have different lengths."
+      end if
+   end if
+
    ! Create first child and add first item from each molecule
    child_part => new_child_part(part)
    call link_part(link, child_part)

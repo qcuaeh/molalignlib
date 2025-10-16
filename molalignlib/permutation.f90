@@ -131,7 +131,7 @@ subroutine subperm_add(subperm, i1, i2)
    integer, intent(in) :: i1, i2
    integer :: n
 
-   if (DEBUGGING) then
+   if (DO_DEBUG_TESTS) then
    block
       integer :: i
       ! Check if i1 is already in atomset

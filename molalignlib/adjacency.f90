@@ -213,7 +213,7 @@ subroutine minimize_adjdiff(atomset1, atomtypes, scnatypes, adjcs1, adjcs2, adjm
               invperm, tracked, moldiff, moldist, ntrack, track, coords1, coords2)
    end do
 
-   if (DEBUGGING) then
+   if (DO_DEBUG_TESTS) then
       if (adjacencydiff(atomset1, atomperm, adjcs1, adjcs2) /= moldiff) then
          error stop 'incorrect edge difference'
       end if
