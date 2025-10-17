@@ -93,7 +93,7 @@ subroutine prune_rd( atomtypes, atoms1, atoms2, prunes)
             jatom = atomtypes%parts(h)%items1(j)
             dists1(i)%u(h)%u(j) = sqrt(sum((coords1(:, jatom) - coords1(:, i))**2))
          end do
-         call sort(dists1(i)%u(h)%u)
+         call quicksort(dists1(i)%u(h)%u)
       end do
    end do
 
@@ -103,7 +103,7 @@ subroutine prune_rd( atomtypes, atoms1, atoms2, prunes)
             jatom = atomtypes%parts(h)%items2(j)
             dists2(i)%u(h)%u(j) = sqrt(sum((coords2(:, jatom) - coords2(:, i))**2))
          end do
-         call sort(dists2(i)%u(h)%u)
+         call quicksort(dists2(i)%u(h)%u)
       end do
    end do
 

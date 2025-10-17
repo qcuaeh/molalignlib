@@ -247,7 +247,7 @@ if (align_flag) then
          end if
 
          do i = 1, registry%occ_records
-            atomperm1 = registry%records(i)%atomperm
+            atomperm1 = registry%records(i)%atomperm1
 !            rotquat = registry%records(i)%rotquat
             rotquat = least_rotquat( atomset1, atomperm1, coords1w, coords2w)
             coords2r = rotated_coords( coords2, rotquat, center1)

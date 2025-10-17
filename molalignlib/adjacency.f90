@@ -1,28 +1,24 @@
 module adjacency
 use parameters
 use derived_types
-use random
 use permutation
 use euclidean
 use chemistry
 use molecule
+use sorting
 implicit none
 private
 
 public adjcs_to_adjmat
+public adjmat_to_adjcs
 public adjacencydiff
 public adjacencydelta
 public compute_differing_bonds
-public minimize_adjdiff
+public match_bonds_to_mol1
 
 interface adjacencydiff
    module procedure adjacencydiff_perm
 end interface
-
-! Module-level variables used by minimize_adjdiff and its helper procedures
-! These are read-only after initialization and shared across recursive calls
-integer, dimension(:), allocatable :: blkidx1, blkidx2
-integer, dimension(:), allocatable :: eqvidx1, eqvidx2
 
 contains
 
@@ -42,6 +38,31 @@ function adjcs_to_adjmat(adjcs) result(adjmat)
       end do
    end do
 end function
+
+subroutine adjmat_to_adjcs(adjmat, adjcs)
+   logical, dimension(:,:), intent(in) :: adjmat
+   type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs
+   integer :: i, j, n, count
+   integer, dimension(:), allocatable :: temp_list
+   
+   n = size(adjmat, 1)
+   allocate(adjcs(n))
+   allocate(temp_list(n))
+   
+   do i = 1, n
+      count = 0
+      do j = 1, n
+         if (adjmat(i, j)) then
+            count = count + 1
+            temp_list(count) = j
+         end if
+      end do
+      allocate(adjcs(i)%adjlist(count))
+      adjcs(i)%adjlist = temp_list(1:count)
+   end do
+   
+   deallocate(temp_list)
+end subroutine
 
 function adjacencydiff_perm(atomset1, atomperm1, adjcs1, adjcs2) result(diff)
 !------------------------------------------------------------------------------
@@ -144,367 +165,80 @@ function adjacencydelta(adjcs1, adjmat2, atomperm1, k, l) result(delta)
    delta = 2*(nkk + nll - nkl - nlk)
 end function
 
-subroutine compute_differing_bonds(atomset1, atomperm1, adjcs1, adjcs2, moldiff)
-!------------------------------------------------------------------------------
-! Compute the sorted list of differing bond hashes between two molecular structures
-! given an atom permutation mapping.
-!
-! A bond hash is computed as: min(atom1, atom2) * MAX_ATOMS + max(atom1, atom2)
-! This ensures each bond has a unique integer representation regardless of order.
-!
-! The returned array is sorted for efficient comparison.
-!------------------------------------------------------------------------------
-   use parameters
-   use molecule, only: adjc_t
-   use permutation, only: inverse_permutation
-   use sorting, only: sort
+subroutine compute_differing_bonds(atomset1, atomperm1, adjmat1, adjmat2, moldiffs)
 
    integer, dimension(:), intent(in) :: atomset1
    integer, dimension(:), intent(in) :: atomperm1
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
-   integer, dimension(:), allocatable, intent(out) :: moldiff
+   logical, dimension(:,:), intent(in) :: adjmat1, adjmat2
+   integer, dimension(:,:), allocatable, intent(out) :: moldiffs
 
    ! Local variables
-   integer :: i, j, idx1, idx2, mapped_idx1, neighbor_idx1, mapped_neighbor_idx1
+   integer :: i, j, idx1, idx2, mapped_idx1, mapped_idx2
    integer :: num_atoms, max_edges, bond_count
-   integer, dimension(:), allocatable :: temp_bonds, atomperm2
-   integer :: bond_hash, min_atom, max_atom
-   integer :: atom1_in_struct1, atom2_in_struct1
-   logical :: bond_in_struct2
-
-   ! Maximum number of atoms (used for hash function)
-   integer, parameter :: MAX_ATOMS = 10000
+   integer, dimension(:,:), allocatable :: temp_bonds
+   integer :: atom1, atom2
+   logical :: bond_in_mol1, bond_in_mol2
 
    num_atoms = size(atomset1)
-   ! Maximum possible edges: each atom can have up to MAX_COORD neighbors
-   max_edges = num_atoms * MAX_COORD
+   ! Maximum possible differing edges
+   max_edges = num_atoms * (num_atoms - 1) / 2
 
-   allocate(temp_bonds(max_edges))
+   allocate(temp_bonds(2, max_edges))
    bond_count = 0
 
-   ! Compute inverse permutation once
-   atomperm2 = inverse_permutation(atomperm1)
-
-   ! Find bonds that are in structure 1 but not in structure 2
+   ! Compare all pairs of atoms in atomset1
    do i = 1, size(atomset1)
       idx1 = atomset1(i)
       mapped_idx1 = atomperm1(idx1)
 
-      do j = 1, size(adjcs1(idx1)%adjlist)
-         neighbor_idx1 = adjcs1(idx1)%adjlist(j)
+      do j = i + 1, size(atomset1)
+         idx2 = atomset1(j)
+         mapped_idx2 = atomperm1(idx2)
 
-         ! Only process each edge once (consider edges where idx1 < neighbor)
-         if (idx1 < neighbor_idx1) then
-            mapped_neighbor_idx1 = atomperm1(neighbor_idx1)
+         ! Check bond status in both structures
+         bond_in_mol1 = adjmat1(idx1, idx2)
+         bond_in_mol2 = adjmat2(mapped_idx1, mapped_idx2)
 
-            ! Check if edge (mapped_idx1, mapped_neighbor_idx1) exists in structure 2
-            bond_in_struct2 = any(adjcs2(mapped_idx1)%adjlist(:) == mapped_neighbor_idx1)
+         ! If bond status differs, it's a differing bond
+         if (bond_in_mol1 .neqv. bond_in_mol2) then
+            ! Store atom pair with lower index first
+            atom1 = min(mapped_idx1, mapped_idx2)
+            atom2 = max(mapped_idx1, mapped_idx2)
 
-            if (.not. bond_in_struct2) then
-               ! Bond exists in struct1 but not in struct2 - compute hash
-               min_atom = min(mapped_idx1, mapped_neighbor_idx1)
-               max_atom = max(mapped_idx1, mapped_neighbor_idx1)
-               bond_hash = min_atom * MAX_ATOMS + max_atom
-
-               bond_count = bond_count + 1
-               temp_bonds(bond_count) = bond_hash
-            end if
-         end if
-      end do
-   end do
-
-   ! Find bonds that are in structure 2 but not in structure 1
-   do i = 1, size(atomset1)
-      idx2 = atomperm1(atomset1(i))
-
-      do j = 1, size(adjcs2(idx2)%adjlist)
-         neighbor_idx1 = adjcs2(idx2)%adjlist(j)
-
-         ! Only process each edge once (consider edges where idx2 < neighbor)
-         if (idx2 < neighbor_idx1) then
-            ! Use inverse permutation to find atoms in structure 1
-            atom1_in_struct1 = atomperm2(idx2)
-            atom2_in_struct1 = atomperm2(neighbor_idx1)
-
-            ! Check if this bond exists in structure 1
-            bond_in_struct2 = any(adjcs1(atom1_in_struct1)%adjlist(:) == atom2_in_struct1)
-
-            if (.not. bond_in_struct2) then
-               ! Bond exists in struct2 but not in struct1 - compute hash
-               min_atom = min(idx2, neighbor_idx1)
-               max_atom = max(idx2, neighbor_idx1)
-               bond_hash = min_atom * MAX_ATOMS + max_atom
-
-               bond_count = bond_count + 1
-               temp_bonds(bond_count) = bond_hash
-            end if
+            bond_count = bond_count + 1
+            temp_bonds(1, bond_count) = atom1
+            temp_bonds(2, bond_count) = atom2
          end if
       end do
    end do
 
    ! Allocate final array with exact size
-   allocate(moldiff(bond_count))
-   moldiff = temp_bonds(1:bond_count)
+   allocate(moldiffs(2, bond_count))
+   moldiffs = temp_bonds(:, 1:bond_count)
 
    ! Sort the bonds for efficient comparison
    if (bond_count > 0) then
-      call sort(moldiff)
+      call sort_pairs(moldiffs)
    end if
 
    deallocate(temp_bonds)
 end subroutine
 
-subroutine minimize_adjdiff(atomset1, atomtypes, scnatypes, adjcs1, adjcs2, adjmat2, &
-                  coords1, coords2, atomperm1)
-!------------------------------------------------------------------------------
-! Find best correspondence between points of graphs
-! Randomly selects starting atoms - fragment identification is implicit
-!------------------------------------------------------------------------------
-
-   integer, dimension(:), intent(in) :: atomset1
-   type(partition_t), intent(in) :: atomtypes, scnatypes
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
-   logical, dimension(:,:), intent(in) :: adjmat2
-   real(rk), dimension(:,:), intent(in) :: coords1, coords2
-   integer, dimension(:), intent(inout) :: atomperm1
-
-   ! Local variables
-   integer :: ntrack, permdiff
-   integer, dimension(:), allocatable :: track
-   logical, dimension(:), allocatable :: tracked
-   integer, dimension(:), allocatable :: atomperm2
-   real(rk) :: permdist
-   integer :: num_atoms, i
-
-   ! Variables for random selection
-   integer, dimension(:), allocatable :: untracked_atoms
-   integer :: num_untracked, random_idx, start_atom
-
-   num_atoms = size(adjcs1)
-
-   allocate(track(num_atoms))
-   allocate(tracked(num_atoms))
-   allocate(atomperm2(num_atoms))
-   allocate(untracked_atoms(num_atoms))
-
-   ! Set atoms block indices
-   blkidx1 = atomtypes%itemdir1
-   blkidx2 = atomtypes%itemdir2
-
-   ! Set atoms equivalence indices
-   eqvidx1 = scnatypes%itemdir1
-   eqvidx2 = scnatypes%itemdir2
-
-   ! Initialization
-   ntrack = 0
-   tracked(:) = .false.
-   atomperm2 = inverse_permutation(atomperm1)
-   permdiff = adjacencydiff(atomset1, atomperm1, adjcs1, adjcs2)
-!   permdist = sqdistsum(atomset1, atomperm1, coords1, coords2)
-
-   ! Process all atoms by randomly selecting untracked ones
-   ! Each random selection implicitly starts a new fragment
-   do while (ntrack < num_atoms)
-      ! Build list of untracked atoms
-      num_untracked = 0
-      do i = 1, num_atoms
-         if (.not. tracked(i)) then
-            num_untracked = num_untracked + 1
-            untracked_atoms(num_untracked) = i
-         end if
-      end do
-
-      ! Pick a random untracked atom
-      random_idx = random_uniform_integer(1, num_untracked)
-      start_atom = untracked_atoms(random_idx)
-
-      ! Process fragment starting from this random atom
-      ! Recursion naturally explores the entire connected component
-      call recurse_minimize_adjdiff(start_atom, adjcs1, adjcs2, adjmat2, atomperm1, &
-              atomperm2, tracked, permdiff, permdist, ntrack, track, coords1, coords2)
-   end do
-
-   if (DO_DEBUG_TESTS) then
-      if (adjacencydiff(atomset1, atomperm1, adjcs1, adjcs2) /= permdiff) then
-         error stop 'incorrect edge difference'
-      end if
-   end if
-
-   ! Deallocate arrays
-   deallocate(untracked_atoms)
-   deallocate(blkidx1, blkidx2, eqvidx1, eqvidx2)
-end subroutine
-
-subroutine match_neighbors(node, adjcs1, adjcs2, atomperm1, tracked, nmatch, matches, &
-                nmismatch1, mismatches1, nmismatch2, mismatches2)
-! Classify the atoms connected to node as matches or unmatched
-   integer, intent(in) :: node
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
-   integer, dimension(:), intent(in) :: atomperm1
-   logical, dimension(:), intent(in) :: tracked
-   integer, intent(out) :: nmatch, nmismatch1, nmismatch2
-   integer, dimension(:), intent(out) :: matches, mismatches1, mismatches2
-   ! Local variables
-   integer :: i, mapped_node
-
-   mapped_node = atomperm1(node)
-   nmatch = 0
-   nmismatch1 = 0
-   nmismatch2 = 0
-
-   ! Classify neighbors of node in structure 1
-   do i = 1, size(adjcs1(node)%adjlist)
-      if (any(adjcs2(mapped_node)%adjlist(:) == atomperm1(adjcs1(node)%adjlist(i)))) then
-         nmatch = nmatch + 1
-         matches(nmatch) = adjcs1(node)%adjlist(i)
-      else
-         nmismatch1 = nmismatch1 + 1
-         mismatches1(nmismatch1) = adjcs1(node)%adjlist(i)
-      end if
-   end do
-
-   ! Find neighbors in structure 2 that don't match
-   do i = 1, size(adjcs2(mapped_node)%adjlist)
-      if (.not. any(atomperm1(matches(:nmatch)) == adjcs2(mapped_node)%adjlist(i))) then
-         nmismatch2 = nmismatch2 + 1
-         mismatches2(nmismatch2) = adjcs2(mapped_node)%adjlist(i)
-      end if
-   end do
-end subroutine
-
-recursive subroutine recurse_minimize_adjdiff(node, adjcs1, adjcs2, adjmat2, atomperm1, &
-                atomperm2, tracked, permdiff, permdist, ntrack, track, coords1, coords2)
-! Backtracks structure to find assignments that minimize permdiff
-   integer, intent(in) :: node
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
-   logical, dimension(:,:), intent(in) :: adjmat2
-   integer, dimension(:), intent(inout) :: atomperm1, atomperm2
-   logical, dimension(:), intent(inout) :: tracked
-   integer, intent(inout) :: permdiff, ntrack
-   integer, dimension(:), intent(inout) :: track
-   real(rk), intent(inout) :: permdist
-   real(rk), dimension(:,:), intent(in) :: coords1, coords2
-
-   ! Local variables
-   integer :: nmatch, nmismatch1, nmismatch2
-   integer, dimension(:), allocatable :: matches, mismatches1, mismatches2
-   integer, dimension(:), allocatable :: mapping_branch, unmapping_branch, track_branch
-   integer :: moldiff_branch, ntrack_branch
-   logical, dimension(:), allocatable :: tracked_branch, matched1, matched2
-   real(rk) :: moldist_branch
-   integer :: i, j, num_atoms
-
-   num_atoms = size(adjcs1)
-
-   allocate(matches(num_atoms))
-   allocate(mismatches1(num_atoms))
-   allocate(mismatches2(num_atoms))
-   allocate(mapping_branch(num_atoms))
-   allocate(unmapping_branch(num_atoms))
-   allocate(track_branch(num_atoms))
-   allocate(tracked_branch(num_atoms))
-   allocate(matched1(num_atoms))
-   allocate(matched2(num_atoms))
-
-   ! Reserve node as tracked
-   ntrack = ntrack + 1
-   track(ntrack) = node
-   tracked(node) = .true.
-
-   ! Classify neighbor atoms as matches or mismatched for coords1/coords2
-   call match_neighbors(node, adjcs1, adjcs2, atomperm1, tracked, nmatch, matches, &
-               nmismatch1, mismatches1, nmismatch2, mismatches2)
-
-!   print *, "node:", node
-!   print *, "matches:", matches(:nmatch)
-!   print *, "mismatches1:", mismatches1(:nmismatch1)
-!   print *, "mismatches2:", mismatches2(:nmismatch2)
-
-   ! Shuffle indices
-   call shuffle(matches(:nmatch))
-   call shuffle(mismatches1(:nmismatch1))
-   call shuffle(mismatches2(:nmismatch2))
-
-   ! Run over matched neighbors
-   do i = 1, nmatch
-      if (.not. tracked(matches(i))) then
-         call recurse_minimize_adjdiff(matches(i), adjcs1, adjcs2, adjmat2, atomperm1, &
-                 atomperm2, tracked, permdiff, permdist, ntrack, track, coords1, coords2)
-      end if
-   end do
-
-   matched1(:nmismatch1) = .false.
-   matched2(:nmismatch2) = .false.
-
-   ! Run over mismatched neighbors
-   do i = 1, nmismatch1
-      if (.not. tracked(mismatches1(i))) then
-         do j = 1, nmismatch2
-            if (.not. matched2(j)) then
-               if (blkidx1(mismatches1(i)) == blkidx2(mismatches2(j))) then
-
-                  ntrack_branch = ntrack
-                  track_branch(:) = track(:)
-                  tracked_branch(:) = tracked(:)
-                  mapping_branch(:) = atomperm1(:)
-                  unmapping_branch(:) = atomperm2(:)
-
-                  ! Apply swap to atomperm1 branch
-                  mapping_branch(mismatches1(i)) = mismatches2(j)
-                  mapping_branch(atomperm2(mismatches2(j))) = atomperm1(mismatches1(i))
-
-                  ! Apply swap to atomperm2 branch
-                  unmapping_branch(mismatches2(j)) = mismatches1(i)
-                  unmapping_branch(atomperm1(mismatches1(i))) = atomperm2(mismatches2(j))
-
-                  ! Update adjd with swap
-                  moldiff_branch = permdiff + adjacencydelta(adjcs1, adjmat2, &
-                                atomperm1, mismatches1(i), atomperm2(mismatches2(j)))
-
-                  ! Update ssd with swap
-!                  moldist_branch = permdist + ( &
-!                     - sum((coords2(:, atomperm1(mismatches1(i))) - coords1(:, mismatches1(i)))**2) &
-!                     - sum((coords2(:, mismatches2(j)) - coords1(:, atomperm2(mismatches2(j))))**2) &
-!                     + sum((coords2(:, mismatches2(j)) - coords1(:, mismatches1(i)))**2) &
-!                     + sum((coords2(:, atomperm1(mismatches1(i))) - coords1(:, atomperm2(mismatches2(j))))**2))
-
-                  ! Backtrack swapped index
-                  call recurse_minimize_adjdiff(mismatches1(i), adjcs1, adjcs2, adjmat2, mapping_branch, &
-                     unmapping_branch, tracked_branch, moldiff_branch, moldist_branch, ntrack_branch, &
-                     track_branch, coords1, coords2)
-
-                  if ( &
-                     moldiff_branch < permdiff &
-                     .and. ( &
-                        eqvidx1(mismatches1(i)) == eqvidx1(atomperm2(mismatches2(j))) &
-                        .and. eqvidx2(atomperm1(mismatches1(i))) == eqvidx2(mismatches2(j)) &
-                     ) &
-                  ) then
-                     ntrack = ntrack_branch
-                     track(:) = track_branch(:)
-                     tracked(:) = tracked_branch(:)
-                     atomperm1(:) = mapping_branch(:)
-                     atomperm2(:) = unmapping_branch(:)
-                     permdiff = moldiff_branch
-!                     permdist = moldist_branch
-                     matched1(i) = .true.
-                     matched2(j) = .true.
-                     exit   ! exits inner do loop
-                  end if
-               end if
-            end if
-         end do
-      end if
-   end do
-
-   ! Run over non-matched neighbors
-   do i = 1, nmismatch1
-      if (.not. matched1(i)) then
-         if (.not. tracked(mismatches1(i))) then
-            call recurse_minimize_adjdiff(mismatches1(i), adjcs1, adjcs2, adjmat2, atomperm1, &
-                    atomperm2, tracked, permdiff, permdist, ntrack, track, coords1, coords2)
-         end if
-      end if
+subroutine match_bonds_to_mol1(adjmat2, moldiffs)
+   ! Modify mol2's bonds to match mol1's connectivity
+   ! If bond exists in mol2: remove it (exists in mol2 but not mol1)
+   ! If bond doesn't exist in mol2: add it (exists in mol1 but not mol2)
+   logical, dimension(:,:), intent(inout) :: adjmat2
+   integer, dimension(:,:), intent(in) :: moldiffs
+   integer :: i, atom1, atom2
+   
+   do i = 1, size(moldiffs, 2)
+      atom1 = moldiffs(1, i)
+      atom2 = moldiffs(2, i)
+      
+      ! Toggle the bond: if it exists, remove it; if it doesn't exist, add it
+      adjmat2(atom1, atom2) = .not. adjmat2(atom1, atom2)
+      adjmat2(atom2, atom1) = .not. adjmat2(atom2, atom1)
    end do
 end subroutine
 

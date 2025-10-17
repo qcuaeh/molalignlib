@@ -12,8 +12,8 @@ public assign_atoms_global
 public assign_atoms_local
 public assign_atoms_local_pruned
 
-! Maximum possible number of children for a part
-integer, parameter :: MAX_CHILDREN = 8
+! Maximum number of children for a part
+integer, parameter :: MAX_CHILDREN = 10
 
 ! Module-level signature workspace to eliminate allocations
 integer :: signature_array(MAX_COORD)

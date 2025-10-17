@@ -25,6 +25,7 @@ use biasing
 use partitioning
 use recording
 use assignment_atoms
+use assignment_bonds
 use options
 implicit none
 
@@ -46,12 +47,13 @@ subroutine optimize_atomperm_isomer(atomset1, atomset2, atomtypes, adjcs1, adjcs
    integer, pointer :: num_trials, lead_count
    integer :: steps
    integer :: permdiff
-   integer, dimension(:), allocatable :: moldiff
-   logical, dimension(:,:), allocatable :: adjmat2
    type(int_matrix), dimension(:), allocatable :: biases
+   logical, dimension(:,:), allocatable :: adjmat1, adjmat2
+   integer, dimension(:,:), allocatable :: moldiffs
    type(partition_t) :: scnatypes
 
    ! Convert adjacency lists to adjacency matrix
+   adjmat1 = adjcs_to_adjmat(adjcs1)
    adjmat2 = adjcs_to_adjmat(adjcs2)
 
    ! Compute HNA types and biases
@@ -77,7 +79,7 @@ subroutine optimize_atomperm_isomer(atomset1, atomset2, atomtypes, adjcs1, adjcs
       call assign_atoms_biased(atomtypes, biases, coords1, coords2r, atomperm1)
       call minimize_adjdiff(atomset1, atomtypes, scnatypes, adjcs1, adjcs2, adjmat2, &
             coords1, coords2, atomperm1)
-      call compute_differing_bonds(atomset1, atomperm1, adjcs1, adjcs2, moldiff)
+      call compute_differing_bonds(atomset1, atomperm1, adjmat1, adjmat2, moldiffs)
 
       ! Optimize rotation
       rotation = least_rotquat(atomset1, atomperm1, coords1, coords2r)
@@ -89,7 +91,7 @@ subroutine optimize_atomperm_isomer(atomset1, atomset2, atomtypes, adjcs1, adjcs
       steps = 1
 
       ! Update results
-      call insert_record_hetero(registry, atomperm1, moldiff, permdist, steps, total_rotation)
+      call insert_record_hetero(registry, atomperm1, moldiffs, permdist, steps, total_rotation)
 
    end do
 end subroutine

@@ -28,6 +28,9 @@ real(rk), parameter :: MSD_TOL = 1E-6
 integer, parameter :: wl = 32 ! Word length
 integer, parameter :: ll = 256 ! Line length
 
+! Maximum number of atoms (currently not used)
+integer, parameter :: MAX_ATOMS = 1000000
+
 ! Maximum coordination number
 integer, parameter :: MAX_COORD = 10
 

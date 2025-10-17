@@ -32,6 +32,9 @@ use argparse
 use biasing
 use recording
 use alignment_isomer
+use assignment_conformer
+use alignment_conformer
+use pruning
 use options
 implicit none
 
@@ -42,8 +45,12 @@ type(strlist_type) :: posargs(2)
 type(atom_t), dimension(:), allocatable :: atoms1, atoms2
 type(bond_t), dimension(:), allocatable :: bonds1, bonds2
 type(adjc_t), dimension(:), allocatable :: adjcs1, adjcs2
+type(adjc_t), dimension(:), allocatable :: adjcs2_mod
+logical, dimension(:,:), allocatable :: adjmat2
 type(partition_t) :: atomtypes
-type(registry_t) :: registry
+type(assigntree_node_t), pointer :: hnachain
+type(array_trees_t) :: assign_arrays
+type(registry_t) :: registry, conform_registry
 real(rk) :: rmsd
 real(rk) :: center1(3), center2(3), rotquat(4)
 real(rk), dimension(:), allocatable :: weights1, weights2
@@ -53,7 +60,7 @@ integer, dimension(:), allocatable :: atomset1_alloc, atomset2_alloc
 integer, dimension(:), allocatable :: atomperm1
 integer :: adjd
 integer :: unitin1, unitin2, unitout
-integer :: i, j
+integer :: i, j, k
 
 ! Set default options
 
@@ -226,26 +233,54 @@ if (align_flag) then
       end if
 
       do i = 1, registry%occ_records
-         atomperm1 = registry%records(i)%atomperm
-         rotquat = least_rotquat(atomset1, atomperm1, coords1w, coords2w)
-         coords2r = rotated_coords(coords2, rotquat, center1)
-         rmsd = sqrt(sqdistmean(atomset1, atomperm1, weights1, coords1, coords2r))
-         adjd = adjacencydiff(atomset1, atomperm1, adjcs1, adjcs2)
 
-         if (mapping_flag) then
-            do j = 1, size(atomperm1)
-               write (stdout,'(I0," -> ",I0)') j, atomperm1(j)
-            end do
-         end if
+         atomperm1 = registry%records(i)%atomperm1
 
-         if (coords_flag) then
-            title2 = 'RMSD=' // str(rmsd) // ' Δadj=' // str(adjd)
-            call set_coords(atoms2, coords2r)
-            call writefile(unitout, extout, title2, atoms2, bonds2, atomperm1)
+         ! Modify molecule 2's bonds to match molecule 1 (making them conformers)
+         if (allocated(registry%records(i)%moldiffs)) then
+            ! Convert to matrix for bond modification
+            adjmat2 = adjcs_to_adjmat(adjcs2)
+
+            call match_bonds_to_mol1(adjmat2, registry%records(i)%moldiffs)
+
+            ! Convert modified adjacency matrix back to adjacency list
+            call adjmat_to_adjcs(adjmat2, adjcs2_mod)
+
+            ! Build assignment tree for conformers with modified adjacency
+            call compute_consistent_hna_partition(adjcs1, adjcs2_mod, atomtypes, hnachain)
+            call build_assignment_tree(adjcs1, adjcs2_mod, hnachain%last_link, assign_arrays)
          else
-            write (stdout,'(A,A,I0,A)') str(rmsd), '(', adjd, ')'
+            ! Already conformers, use original adjacencies
+            call compute_consistent_hna_partition(adjcs1, adjcs2, atomtypes, hnachain)
+            call build_assignment_tree(adjcs1, adjcs2, hnachain%last_link, assign_arrays)
          end if
 
+         ! Optimize atom permutation as conformers
+         call optimize_atomperm_conform(atomset1, atomset2, assign_arrays, &
+                                        coords1w, coords2w, conform_registry)
+
+         ! Process conformer optimization results
+         do k = 1, conform_registry%occ_records
+            atomperm1 = conform_registry%records(k)%atomperm1
+            rotquat = least_rotquat(atomset1, atomperm1, coords1w, coords2w)
+            coords2r = rotated_coords(coords2, rotquat, center1)
+            rmsd = sqrt(sqdistmean(atomset1, atomperm1, weights1, coords1, coords2r))
+            adjd = adjacencydiff(atomset1, atomperm1, adjcs1, adjcs2)
+
+            if (mapping_flag) then
+               do j = 1, size(atomperm1)
+                  write (stdout,'(I0," -> ",I0)') j, atomperm1(j)
+               end do
+            end if
+
+            if (coords_flag) then
+               title2 = 'RMSD=' // str(rmsd) // ' Δadj=' // str(adjd)
+               call set_coords(atoms2, coords2r)
+               call writefile(unitout, extout, title2, atoms2, bonds2, atomperm1)
+            else
+               write (stdout,'(A,A,I0,A)') str(rmsd), '(', adjd, ')'
+            end if
+         end do
       end do
 
    else
@@ -281,7 +316,7 @@ else
          call print_records(registry)
       end if
 
-      atomperm1 = registry%records(1)%atomperm
+      atomperm1 = registry%records(1)%atomperm1
       rmsd = sqrt(sqdistmean(atomset1, atomperm1, weights1, coords1, coords2))
       adjd = adjacencydiff(atomset1, atomperm1, adjcs1, adjcs2)
    else
@@ -305,24 +340,6 @@ else
    end if
 
 end if
-
-contains
-
-!function adjcs_to_adjmat(adjcs) result(adjmat)
-!   type(adjc_t), dimension(:), intent(in) :: adjcs
-!   logical, dimension(:,:), allocatable :: adjmat
-!   integer :: i, j, k
-!
-!   allocate(adjmat(size(adjcs), size(adjcs)))
-!   adjmat = .false.
-!
-!   do i = 1, size(adjcs)
-!      do j = 1, size(adjcs(i)%adjlist)
-!         k = adjcs(i)%adjlist(j)
-!         adjmat(i, k) = .true.
-!      end do
-!   end do
-!end function
 
 end program
 !> @}
