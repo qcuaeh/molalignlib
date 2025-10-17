@@ -39,13 +39,14 @@ subroutine optimize_atomperm_isomer(atomset1, atomset2, atomtypes, adjcs1, adjcs
    type(registry_t), target, intent(out) :: registry
 
    ! Local variables
-   integer, dimension(:), allocatable :: atomperm, new_atomperm
+   integer, dimension(:), allocatable :: atomperm
    real(rk), dimension(:,:), allocatable :: coords2r
    real(rk) :: permdist
    real(rk), dimension(4) :: rotation, total_rotation
    integer, pointer :: num_trials, lead_count
    integer :: steps
    integer :: permdiff
+   integer, dimension(:), allocatable :: moldiff
    logical, dimension(:,:), allocatable :: adjmat2
    type(int_matrix), dimension(:), allocatable :: biases
    type(partition_t) :: scnatypes
@@ -60,8 +61,8 @@ subroutine optimize_atomperm_isomer(atomset1, atomset2, atomtypes, adjcs1, adjcs
    call random_initialize()
 
    ! Initialize local minima registry (dual mode: adjacency + position)
-!   call init_permutation_grouped_registry(registry, num_records)
-   call init_adjacency_grouped_registry(registry, num_records)
+!   call init_registry(registry, num_records)
+   call init_registry(registry, num_records)
    num_trials => registry%num_trials
    lead_count => registry%records(1)%count
 
@@ -76,6 +77,7 @@ subroutine optimize_atomperm_isomer(atomset1, atomset2, atomtypes, adjcs1, adjcs
       call assign_atoms_biased(atomtypes, biases, coords1, coords2r, atomperm)
       call minimize_adjdiff(atomset1, atomtypes, scnatypes, adjcs1, adjcs2, adjmat2, &
             coords1, coords2, atomperm)
+      call compute_differing_bonds(atomset1, atomperm, adjcs1, adjcs2, moldiff)
 
       ! Optimize rotation
       rotation = least_rotquat(atomset1, atomperm, coords1, coords2r)
@@ -86,26 +88,8 @@ subroutine optimize_atomperm_isomer(atomset1, atomset2, atomtypes, adjcs1, adjcs
       permdist = sqdistsum(atomset1, atomperm, coords1, coords2r)
       steps = 1
 
-      if (iterate_flag) then
-!         do
-!            ! Try to improve assignment
-!            call assign_atoms_biased(atomtypes, biases, coords1, coords2r, new_atomperm)
-!
-!            if (all(atomperm == new_atomperm)) exit
-!            atomperm = new_atomperm
-!
-!            rotation = least_rotquat(atomset1, atomperm, coords1, coords2r)
-!            total_rotation = quatmul(total_rotation, rotation)
-!            call rotate_coords(atomset2, coords2r, rotation)
-!
-!            permdiff = adjacencydiff(atomset1, atomperm, adjcs1, adjcs2)
-!            permdist = sqdistsum(atomset1, atomperm, coords1, coords2r)
-!            steps = steps + 1
-!         end do
-      end if
-
       ! Update results
-      call insert_record(registry, atomperm, permdiff, permdist, steps, total_rotation)
+      call insert_record_hetero(registry, atomperm, moldiff, permdist, steps, total_rotation)
 
    end do
 end subroutine

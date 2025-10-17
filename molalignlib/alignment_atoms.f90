@@ -49,7 +49,7 @@ subroutine optimize_atomperm_cluster(atomset1, atomset2, atomtypes, prunes, coor
    call random_initialize()
 
    ! Initialize local minima registry
-   call init_permutation_grouped_registry( registry, num_records)
+   call init_registry( registry, num_records)
 
    ! Optimize atom permutation
    do while (registry%records(1)%count < count_thres .and. registry%num_trials < max_trials)
@@ -79,7 +79,7 @@ subroutine optimize_atomperm_cluster(atomset1, atomset2, atomtypes, prunes, coor
 
       ! Push local minimum to registry
       permdist = sqrt( sqdistsum( atomset1, atomperm, coords1, coords2r))
-      call insert_record( registry, atomperm, 0, permdist, steps, total_rotation)
+      call insert_record_homo( registry, atomperm, permdist, steps, total_rotation)
 
    end do
 

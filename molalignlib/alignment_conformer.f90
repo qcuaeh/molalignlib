@@ -55,7 +55,7 @@ subroutine optimize_atomperm_conform( atomset1, atomset2, assign_arrays, coords1
    call random_initialize()
 
    ! Initialize local minima registry
-   call init_permutation_grouped_registry( registry, num_records)
+   call init_registry( registry, num_records)
    num_trials => registry%num_trials
    lead_count => registry%records(1)%count
 
@@ -99,7 +99,7 @@ subroutine optimize_atomperm_conform( atomset1, atomset2, assign_arrays, coords1
       end if
 
       ! Update results
-      call insert_record( registry, atomperm, 0, permdist, steps, total_rotation)
+      call insert_record_homo( registry, atomperm, permdist, steps, total_rotation)
 
    end do
 end subroutine
