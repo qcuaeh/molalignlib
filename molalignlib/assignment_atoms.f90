@@ -32,7 +32,7 @@ public assign_atoms_nearest
 
 contains
 
-subroutine assign_atoms_biased( atomtypes, biases, coords1, coords2, atomperm)
+subroutine assign_atoms_biased( atomtypes, biases, coords1, coords2, atomperm1)
 !------------------------------------------------------------------------
 ! Finds the optimal mapping between points with fixed orientation
 ! Uses JVC algorithm (assumes num_items1 == num_items2 for all parts)
@@ -40,10 +40,10 @@ subroutine assign_atoms_biased( atomtypes, biases, coords1, coords2, atomperm)
    type(partition_t), target, intent(in) :: atomtypes
    type(int_matrix), dimension(:), intent(in) :: biases
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
-   integer, dimension(:), allocatable, intent(out) :: atomperm
+   integer, dimension(:), allocatable, intent(out) :: atomperm1
    ! Local variables
    type(partition_part_t), pointer :: part
-   integer, dimension(:), allocatable :: perm
+   integer, dimension(:), allocatable :: partperm
    real(rk), dimension(:,:), allocatable :: dists, costs
    integer :: maxnum_items
    real(rk) :: normfac, lapcost
@@ -52,15 +52,15 @@ subroutine assign_atoms_biased( atomtypes, biases, coords1, coords2, atomperm)
    ! Since num_items1 == num_items2, we only need one size
    maxnum_items = maxval(atomtypes%parts%num_items1)
 
-   allocate (perm(maxnum_items))
-   allocate (atomperm(size(coords1, 2)))
+   allocate (atomperm1(size(coords1, 2)))
+   allocate (partperm(maxnum_items))
    allocate (dists(maxnum_items, maxnum_items))
    allocate (costs(maxnum_items, maxnum_items))
 
-   ! Initialize atomperm as identity permutation
-   atomperm = identity_permutation(size(coords1, 2))
+   ! Initialize atomperm1 as identity permutation
+   call init_identity_permutation(atomperm1)
 
-   ! Optimize atomperm for each block
+   ! Optimize atomperm1 for each block
    do h = 1, atomtypes%num_parts
       part => atomtypes%parts(h)
 
@@ -72,70 +72,70 @@ subroutine assign_atoms_biased( atomtypes, biases, coords1, coords2, atomperm)
             + normfac*dists(1:part%num_items1, 1:part%num_items1)
 
       ! Solve assignment problem using JVC algorithm
-!      call assndx(1, costs, part%num_items1, part%num_items1, perm, lapcost)
-      call jvc_dense(costs, part%num_items1, perm, lapcost)
+!      call assndx(1, costs, part%num_items1, part%num_items1, partperm, lapcost)
+      call jvc_dense(costs, part%num_items1, partperm, lapcost)
 
       ! Map the solution back to original atom indices
-      atomperm(part%items1) = part%items2(perm(1:part%num_items1))
+      atomperm1(part%items1) = part%items2(partperm(1:part%num_items1))
    end do
 end subroutine
 
-subroutine assign_atoms_pruned( atomtypes, coords1, coords2, prunes, atomperm)
+subroutine assign_atoms_pruned( atomtypes, coords1, coords2, prunes, atomperm1)
 !------------------------------------------------------------------------
 ! Finds the optimal mapping between points with fixed orientation
 !------------------------------------------------------------------------
    type(partition_t), target, intent(in) :: atomtypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    type(bool_matrix), dimension(:), intent(in) :: prunes
-   integer, dimension(:), allocatable, intent(out) :: atomperm
+   integer, dimension(:), allocatable, intent(out) :: atomperm1
    ! Local variables
    type(partition_part_t), pointer :: part
-   integer, dimension(:), allocatable :: perm
+   integer, dimension(:), allocatable :: partperm
    real(rk) :: dist
    integer :: h
 
-   allocate (perm(maxval(atomtypes%parts%num_items1)))
-   allocate (atomperm(size(coords1, 2)))
+   allocate (atomperm1(size(coords1, 2)))
+   allocate (partperm(maxval(atomtypes%parts%num_items1)))
 
-   ! Initialize atomperm as identity permutation
-   atomperm = identity_permutation(size(coords1, 2))
+   ! Initialize atomperm1 as identity permutation
+   call init_identity_permutation(atomperm1)
 
-   ! Optimize atomperm for each block
+   ! Optimize atomperm1 for each block
    do h = 1, atomtypes%num_parts
       part => atomtypes%parts(h)
-      call solve_lap_pruned(part%num_items1, part%items1, part%items2, coords1, coords2, prunes(h)%a, perm, dist)
-      atomperm(part%items1) = part%items2(perm(1:part%num_items1))
+      call solve_lap_pruned(part%num_items1, part%items1, part%items2, coords1, coords2, prunes(h)%a, partperm, dist)
+      atomperm1(part%items1) = part%items2(partperm(1:part%num_items1))
    end do
 end subroutine
 
-subroutine assign_atoms_nearest( atomtypes, coords1, coords2, atomperm)
+subroutine assign_atoms_nearest( atomtypes, coords1, coords2, atomperm1)
 !------------------------------------------------------------------------
 ! Finds the optimal mapping between points with fixed orientation
 !------------------------------------------------------------------------
    type(partition_t), target, intent(in) :: atomtypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
-   integer, dimension(:), allocatable, intent(out) :: atomperm
+   integer, dimension(:), allocatable, intent(out) :: atomperm1
    ! Local variables
    type(partition_part_t), pointer :: part
-   integer, dimension(:), allocatable :: perm
+   integer, dimension(:), allocatable :: partperm
    real(rk) :: dist
    integer :: h
 
-   allocate (perm(maxval(atomtypes%parts%num_items1)))
-   allocate (atomperm(size(coords1, 2)))
+   allocate (atomperm1(size(coords1, 2)))
+   allocate (partperm(maxval(atomtypes%parts%num_items1)))
 
-   ! Initialize atomperm as identity permutation
-   atomperm = identity_permutation(size(coords1, 2))
+   ! Initialize atomperm1 as identity permutation
+   call init_identity_permutation(atomperm1)
 
    ! Fill distance matrix for each block
    do h = 1, atomtypes%num_parts
       part => atomtypes%parts(h)
-      call solve_lap_nearest(part%num_items1, part%items1, part%items2, coords1, coords2, perm, dist)
-      atomperm(part%items1) = part%items2(perm(1:part%num_items1))
+      call solve_lap_nearest(part%num_items1, part%items1, part%items2, coords1, coords2, partperm, dist)
+      atomperm1(part%items1) = part%items2(partperm(1:part%num_items1))
    end do
 end subroutine
 
-subroutine solve_lap_pruned(n, s1, s2, x1, x2, prun, perm, dist)
+subroutine solve_lap_pruned(n, s1, s2, x1, x2, prun, partperm, dist)
 !--------------------------------------------------------------------
 ! Interface to JVC sparse algorithm for calculating minimum distance
 ! of two atomic configurations with respect to
@@ -143,11 +143,11 @@ subroutine solve_lap_pruned(n, s1, s2, x1, x2, prun, perm, dist)
 !
 ! This is the main routine for minimum distance calculation.
 ! Given two coordinate vectors x1,x2 of particles each, return
-! the minimum distance in dist, and the permutation in perm.
-! perm is an integer vector such that
-!   x1(i) <--> x2(perm(i))
+! the minimum distance in dist, and the permutation in partperm.
+! partperm is an integer vector such that
+!   x1(i) <--> x2(partperm(i))
 ! i.e.
-!   sum(i=1,n) distance(x1(i), x2(perm(i))) == dist
+!   sum(i=1,n) distance(x1(i), x2(partperm(i))) == dist
 !
 ! Input
 !   n  : System size
@@ -163,9 +163,9 @@ subroutine solve_lap_pruned(n, s1, s2, x1, x2, prun, perm, dist)
    logical, intent(in) :: prun(n, n)
 
 !  Output
-!   perm: Permutation so that x1(i) <--> x2(perm(i))
+!   partperm: Permutation so that x1(i) <--> x2(partperm(i))
 !   dist: Minimum attainable distance
-   integer, intent(out) :: perm(n)
+   integer, intent(out) :: partperm(n)
    real(rk), intent(out) :: dist
 
 !  Local variables
@@ -207,7 +207,7 @@ subroutine solve_lap_pruned(n, s1, s2, x1, x2, prun, perm, dist)
    end do
 
    ! Call JVC sparse bipartite matching routine
-   call jvc_sparse(n, sz, cc, kk, first, perm, dist, ierr)
+   call jvc_sparse(n, sz, cc, kk, first, partperm, dist, ierr)
 
    if (ierr /= 0) then
       write (stderr, '(a)') 'Error: Assignment failed'
@@ -215,13 +215,13 @@ subroutine solve_lap_pruned(n, s1, s2, x1, x2, prun, perm, dist)
    end if
 
    if (DO_DEBUG_TESTS) then
-      if (.not. is_permutation(perm)) then
+      if (.not. is_permutation(partperm)) then
          error stop 'Assignment is not a permutation'
       end if
    end if
 end subroutine
 
-subroutine solve_lap_nearest(n, s1, s2, x1, x2, perm, dist)
+subroutine solve_lap_nearest(n, s1, s2, x1, x2, partperm, dist)
 !--------------------------------------------------------------------
 ! Adapted from GMIN: A program for finding global minima
 ! Copyright (C) 1999-2006 David J. Wales
@@ -236,11 +236,11 @@ subroutine solve_lap_nearest(n, s1, s2, x1, x2, perm, dist)
 !
 ! This is the main routine for minimum distance calculation.
 ! Given two coordinate vectors x1,x2 of particles each, return
-! the minimum distance in dist, and the permutation in perm.
-! perm is an integer vector such that
-!   x1(i) <--> x2(perm(i))
+! the minimum distance in dist, and the permutation in partperm.
+! partperm is an integer vector such that
+!   x1(i) <--> x2(partperm(i))
 ! i.e.
-!   sum(i=1,n) distance(x1(i), x2(perm(i))) == dist
+!   sum(i=1,n) distance(x1(i), x2(partperm(i))) == dist
 !--------------------------------------------------------------------
 
 !  Input
@@ -252,9 +252,9 @@ subroutine solve_lap_nearest(n, s1, s2, x1, x2, perm, dist)
    integer, parameter :: maxnei = 20 ! Maximum number of closest neighbours
 
 !  Output
-!   perm: Permutation so that x1(i) <--> x2(perm(i))
+!   partperm: Permutation so that x1(i) <--> x2(partperm(i))
 !   dist: Minimum attainable distance
-   integer, intent(out) :: perm(n)
+   integer, intent(out) :: partperm(n)
    real(rk), intent(out) :: dist
 
 !  Local variables
@@ -372,7 +372,7 @@ subroutine solve_lap_nearest(n, s1, s2, x1, x2, perm, dist)
    end if
 
 !   Call JVC sparse bipartite matching routine
-   call jvc_sparse(n, sz, cc, kk, first, perm, dist, ierr)
+   call jvc_sparse(n, sz, cc, kk, first, partperm, dist, ierr)
 
    if (ierr /= 0) then
       write (stderr, '(a)') 'Error: Assignment failed'
@@ -380,7 +380,7 @@ subroutine solve_lap_nearest(n, s1, s2, x1, x2, perm, dist)
    end if
 
    if (DO_DEBUG_TESTS) then
-      if (.not. is_permutation(perm)) then
+      if (.not. is_permutation(partperm)) then
          error stop 'Assignment is not a permutation'
       end if
    end if

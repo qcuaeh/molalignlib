@@ -395,11 +395,11 @@ recursive subroutine recurse_assign_atoms_greedy(coords1, coords2, assign_arrays
    end do
 end subroutine
 
-subroutine assign_atoms_greedy(coords1, coords2, assign_arrays, atomperm, permdist)
+subroutine assign_atoms_greedy(coords1, coords2, assign_arrays, atomperm1, permdist)
    ! Greedy exploration wrapper - generates assignment by always choosing closest pairs
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_arrays
-   integer, dimension(:), allocatable, intent(out) :: atomperm
+   integer, dimension(:), allocatable, intent(out) :: atomperm1
    real(rk), intent(out) :: permdist
    ! Local variables
    type(subperm_t) :: greedy_perm
@@ -414,11 +414,11 @@ subroutine assign_atoms_greedy(coords1, coords2, assign_arrays, atomperm, permdi
    call recurse_assign_atoms_greedy(coords1, coords2, assign_arrays, 1, greedy_perm)
 
    ! Convert subperm type to permutation array
-   allocate (atomperm(greedy_perm%atomperm_size))
-   atomperm = greedy_perm%atomperm
+   allocate (atomperm1(greedy_perm%atomperm_size))
+   atomperm1 = greedy_perm%atomperm
 
    ! Calculate total distance
-   permdist = sqdistsum(atomperm, coords1, coords2)
+   permdist = sqdistsum(atomperm1, coords1, coords2)
 
 !block
 !   write(stderr, '(A)') repeat("=", 60)
@@ -505,11 +505,11 @@ recursive subroutine recurse_assign_atoms_global(coords1, coords2, assign_arrays
    end do
 end subroutine
 
-subroutine assign_atoms_global(coords1, coords2, assign_arrays, atomperm)
+subroutine assign_atoms_global(coords1, coords2, assign_arrays, atomperm1)
    ! DFS exploration of all permutations
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_arrays
-   integer, dimension(:), allocatable, intent(out) :: atomperm
+   integer, dimension(:), allocatable, intent(out) :: atomperm1
    ! Local variables
    type(subperm_t) :: this_perm, best_perm
    real(rk) :: min_dist
@@ -543,8 +543,8 @@ subroutine assign_atoms_global(coords1, coords2, assign_arrays, atomperm)
    deallocate(split_parts)
 
    ! Convert subperm type to permutation array
-   allocate (atomperm(best_perm%atomperm_size))
-   atomperm = best_perm%atomperm
+   allocate (atomperm1(best_perm%atomperm_size))
+   atomperm1 = best_perm%atomperm
 
    ! Output results
 !   write(stderr, '(A)') repeat("=", 60)
@@ -631,12 +631,12 @@ recursive subroutine recurse_assign_atoms_local(coords1, coords2, assign_arrays,
    end do
 end subroutine
 
-subroutine assign_atoms_local(coords1, coords2, assign_arrays, atomperm, total_dist)
+subroutine assign_atoms_local(coords1, coords2, assign_arrays, atomperm1, total_dist)
    ! DFS exploration wrapper - finds optimal assignment among all possibilities
    ! OPTIMIZED: Uses incremental distance calculation
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_arrays
-   integer, dimension(:), allocatable, intent(out) :: atomperm
+   integer, dimension(:), allocatable, intent(out) :: atomperm1
    real(rk), intent(out) :: total_dist
    ! Local variables
    type(subperm_t) :: best_perm
@@ -660,8 +660,8 @@ subroutine assign_atoms_local(coords1, coords2, assign_arrays, atomperm, total_d
    call recurse_assign_atoms_local(coords1, coords2, assign_arrays, 1, best_perm, total_dist)
 
    ! Convert subperm type to permutation array
-   allocate (atomperm(best_perm%atomperm_size))
-   atomperm = best_perm%atomperm
+   allocate (atomperm1(best_perm%atomperm_size))
+   atomperm1 = best_perm%atomperm
 
 !block
 !   integer :: assigned_count
@@ -786,12 +786,12 @@ recursive subroutine recurse_assign_atoms_local_pruned(coords1, coords2, assign_
    success = (remaining_budget >= 0)
 end subroutine
 
-subroutine assign_atoms_local_pruned(coords1, coords2, assign_arrays, atomperm, permdist)
+subroutine assign_atoms_local_pruned(coords1, coords2, assign_arrays, atomperm1, permdist)
    ! DFS exploration with pruning threshold - finds assignment within threshold
    ! OPTIMIZED: Uses incremental distance calculation
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_arrays
-   integer, dimension(:), allocatable, intent(out) :: atomperm
+   integer, dimension(:), allocatable, intent(out) :: atomperm1
    real(rk), intent(inout) :: permdist
    ! Local variables
    real(rk) :: total_budget
@@ -822,8 +822,8 @@ subroutine assign_atoms_local_pruned(coords1, coords2, assign_arrays, atomperm, 
    if (.not. success) error stop 'Assignment failed'
 
    ! Convert subperm type to permutation array
-   allocate (atomperm(best_perm%atomperm_size))
-   atomperm = best_perm%atomperm
+   allocate (atomperm1(best_perm%atomperm_size))
+   atomperm1 = best_perm%atomperm
 
 !block
 !   integer :: assigned_count

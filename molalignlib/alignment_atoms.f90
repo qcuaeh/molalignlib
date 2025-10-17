@@ -41,7 +41,7 @@ subroutine optimize_atomperm_cluster(atomset1, atomset2, atomtypes, prunes, coor
 
    ! Local variables
    integer :: steps
-   integer, dimension(:), allocatable :: atomperm, new_atomperm
+   integer, dimension(:), allocatable :: atomperm1, new_atomperm
    real(rk), dimension(:,:), allocatable :: coords2r
    real(rk) :: permdist, rotation(4), total_rotation(4)
 
@@ -59,8 +59,8 @@ subroutine optimize_atomperm_cluster(atomset1, atomset2, atomtypes, prunes, coor
       coords2r = rotated_coords( coords2, total_rotation)
 
       ! Assign atoms with current orientation
-      call assign_atoms_pruned( atomtypes, coords1, coords2r, prunes, atomperm)
-      rotation = least_rotquat( atomset1, atomperm, coords1, coords2r)
+      call assign_atoms_pruned( atomtypes, coords1, coords2r, prunes, atomperm1)
+      rotation = least_rotquat( atomset1, atomperm1, coords1, coords2r)
       call rotate_coords( atomset1, coords2r, rotation)
       total_rotation = quatmul( total_rotation, rotation)
       steps = 1
@@ -68,9 +68,9 @@ subroutine optimize_atomperm_cluster(atomset1, atomset2, atomtypes, prunes, coor
       if (iterate_flag) then
          do
             call assign_atoms_pruned( atomtypes, coords1, coords2r, prunes, new_atomperm)
-            if (all(new_atomperm == atomperm)) exit
-            atomperm = new_atomperm
-            rotation = least_rotquat( atomset1, atomperm, coords1, coords2r)
+            if (all(new_atomperm == atomperm1)) exit
+            atomperm1 = new_atomperm
+            rotation = least_rotquat( atomset1, atomperm1, coords1, coords2r)
             call rotate_coords( atomset1, coords2r, rotation)
             total_rotation = quatmul( total_rotation, rotation)
             steps = steps + 1
@@ -78,8 +78,8 @@ subroutine optimize_atomperm_cluster(atomset1, atomset2, atomtypes, prunes, coor
       end if
 
       ! Push local minimum to registry
-      permdist = sqrt( sqdistsum( atomset1, atomperm, coords1, coords2r))
-      call insert_record_homo( registry, atomperm, permdist, steps, total_rotation)
+      permdist = sqrt( sqdistsum( atomset1, atomperm1, coords1, coords2r))
+      call insert_record_homo( registry, atomperm1, permdist, steps, total_rotation)
 
    end do
 

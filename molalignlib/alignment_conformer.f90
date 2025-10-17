@@ -44,7 +44,7 @@ subroutine optimize_atomperm_conform( atomset1, atomset2, assign_arrays, coords1
    type(registry_t), target, intent(out) :: registry
 
    ! Local variables
-   integer, dimension(:), allocatable :: atomperm, new_atomperm
+   integer, dimension(:), allocatable :: atomperm1, new_atomperm
    real(rk), dimension(:,:), allocatable :: coords2r
    real(rk) :: permdist, new_permdist
    real(rk), dimension(4) :: rotation, total_rotation
@@ -68,15 +68,15 @@ subroutine optimize_atomperm_conform( atomset1, atomset2, assign_arrays, coords1
 
       ! Assign atoms with current orientation
       if (PRUNE_ASSIGNMENT_TREE) then
-         call assign_atoms_greedy( coords1, coords2r, assign_arrays, atomperm, permdist)
-         call assign_atoms_local_pruned( coords1, coords2r, assign_arrays, atomperm, permdist)
+         call assign_atoms_greedy( coords1, coords2r, assign_arrays, atomperm1, permdist)
+         call assign_atoms_local_pruned( coords1, coords2r, assign_arrays, atomperm1, permdist)
       else
-         call assign_atoms_local( coords1, coords2r, assign_arrays, atomperm, permdist)
+         call assign_atoms_local( coords1, coords2r, assign_arrays, atomperm1, permdist)
       end if
-      rotation = least_rotquat( atomset1, atomperm, coords1, coords2r)
+      rotation = least_rotquat( atomset1, atomperm1, coords1, coords2r)
       total_rotation = quatmul( total_rotation, rotation)
       call rotate_coords( atomset2, coords2r, rotation)
-      permdist = sqdistsum( atomset1, atomperm, coords1, coords2r)
+      permdist = sqdistsum( atomset1, atomperm1, coords1, coords2r)
       steps = 1
 
       if (iterate_flag) then
@@ -88,18 +88,18 @@ subroutine optimize_atomperm_conform( atomset1, atomset2, assign_arrays, coords1
                call assign_atoms_local( coords1, coords2r, assign_arrays, new_atomperm, new_permdist)
             end if
 !            write (stdout,*) permdist, new_permdist
-            if (all(atomperm == new_atomperm)) exit
-            atomperm = new_atomperm
-            rotation = least_rotquat( atomset1, atomperm, coords1, coords2r)
+            if (all(atomperm1 == new_atomperm)) exit
+            atomperm1 = new_atomperm
+            rotation = least_rotquat( atomset1, atomperm1, coords1, coords2r)
             total_rotation = quatmul( total_rotation, rotation)
             call rotate_coords( atomset2, coords2r, rotation)
-            permdist = sqdistsum( atomset1, atomperm, coords1, coords2r)
+            permdist = sqdistsum( atomset1, atomperm1, coords1, coords2r)
             steps = steps + 1
          end do
       end if
 
       ! Update results
-      call insert_record_homo( registry, atomperm, permdist, steps, total_rotation)
+      call insert_record_homo( registry, atomperm1, permdist, steps, total_rotation)
 
    end do
 end subroutine

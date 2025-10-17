@@ -33,9 +33,9 @@ public init_registry
 type :: record_t
    integer :: count
    integer, dimension(:), allocatable :: moldiff    ! List of differing bond hashes
+   real(rk) :: steps
    real(rk) :: permdist
    real(rk) :: rotation(4)
-   real(rk) :: steps
    integer, dimension(:), allocatable :: atomperm
 end type
 
@@ -222,7 +222,7 @@ subroutine print_records(registry)
    integer :: i, num_diff
 
    line = repeat('-', 49)
-   write (stderr, '(2x,a,4x,a,5x,a,4x,a,5x,a,6x,a)') '#', 'Count', 'Steps', 'RotΘ', 'Δadj', 'Δxyz'
+   write (stderr, '(2x,a,4x,a,5x,a,4x,a,5x,a,6x,a)') '#', 'Count', 'Steps', 'Rotθ', 'Δadj', 'Δxyz'
    write (stderr, '(a)') line
    do i = 1, registry%occ_records
       record = registry%records(i)

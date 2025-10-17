@@ -43,13 +43,13 @@ function adjcs_to_adjmat(adjcs) result(adjmat)
    end do
 end function
 
-function adjacencydiff_perm(atomset1, atomperm, adjcs1, adjcs2) result(diff)
+function adjacencydiff_perm(atomset1, atomperm1, adjcs1, adjcs2) result(diff)
 !------------------------------------------------------------------------------
 ! Calculate connectivity difference from adjacency lists.
 ! Returns the number of differing edges.
 !------------------------------------------------------------------------------
    integer, dimension(:), intent(in) :: atomset1
-   integer, dimension(:), intent(in) :: atomperm
+   integer, dimension(:), intent(in) :: atomperm1
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    integer :: diff
    integer :: i, j, idx1, idx2, mapped_idx1, neighbor_idx1, mapped_neighbor_idx1
@@ -62,7 +62,7 @@ function adjacencydiff_perm(atomset1, atomperm, adjcs1, adjcs2) result(diff)
 
    do i = 1, size(atomset1)
       idx1 = atomset1(i)
-      mapped_idx1 = atomperm(idx1)
+      mapped_idx1 = atomperm1(idx1)
       nadjs = size(adjcs1(idx1)%adjlist)
 
       do j = 1, nadjs
@@ -72,7 +72,7 @@ function adjacencydiff_perm(atomset1, atomperm, adjcs1, adjcs2) result(diff)
          if (idx1 < neighbor_idx1) then
             total_edges1 = total_edges1 + 1
 
-            mapped_neighbor_idx1 = atomperm(neighbor_idx1)
+            mapped_neighbor_idx1 = atomperm1(neighbor_idx1)
 
             ! Check if edge (mapped_idx1, mapped_neighbor_idx1) exists in structure 2
             if (any(adjcs2(mapped_idx1)%adjlist(:) == mapped_neighbor_idx1)) then
@@ -83,10 +83,10 @@ function adjacencydiff_perm(atomset1, atomperm, adjcs1, adjcs2) result(diff)
    end do
 
    ! Calculate total edges in structure 2
-   ! Use atomperm(atomset1) to get the corresponding atoms in molecule 2
+   ! Use atomperm1(atomset1) to get the corresponding atoms in molecule 2
    total_edges2 = 0
    do i = 1, size(atomset1)
-      idx2 = atomperm(atomset1(i))
+      idx2 = atomperm1(atomset1(i))
       nadjs = size(adjcs2(idx2)%adjlist)
 
       do j = 1, nadjs
@@ -103,7 +103,7 @@ function adjacencydiff_perm(atomset1, atomperm, adjcs1, adjcs2) result(diff)
    diff = total_edges1 + total_edges2 - 2*common_edges
 end function
 
-function adjacencydelta(adjcs1, adjmat2, atomperm, k, l) result(delta)
+function adjacencydelta(adjcs1, adjmat2, atomperm1, k, l) result(delta)
 !------------------------------------------------------------------------------
 ! Efficiently compute the change in adjacency difference when swapping
 ! atoms k and l in the permutation. Uses adjacency lists for structure 1 and
@@ -111,7 +111,7 @@ function adjacencydelta(adjcs1, adjmat2, atomperm, k, l) result(delta)
 !------------------------------------------------------------------------------
    type(adjc_t), dimension(:), intent(in) :: adjcs1
    logical, dimension(:,:), intent(in) :: adjmat2
-   integer, dimension(:), intent(in) :: atomperm
+   integer, dimension(:), intent(in) :: atomperm1
    integer, intent(in) :: k, l
    integer :: i, nkk, nkl, nll, nlk, delta, nadjs_k, nadjs_l
 
@@ -123,8 +123,8 @@ function adjacencydelta(adjcs1, adjmat2, atomperm, k, l) result(delta)
 
    do i = 1, nadjs_k
       if (adjcs1(k)%adjlist(i) /= l) then
-         if (adjmat2(atomperm(k), atomperm(adjcs1(k)%adjlist(i)))) nkk = nkk + 1
-         if (adjmat2(atomperm(l), atomperm(adjcs1(k)%adjlist(i)))) nkl = nkl + 1
+         if (adjmat2(atomperm1(k), atomperm1(adjcs1(k)%adjlist(i)))) nkk = nkk + 1
+         if (adjmat2(atomperm1(l), atomperm1(adjcs1(k)%adjlist(i)))) nkl = nkl + 1
       end if
    end do
 
@@ -133,8 +133,8 @@ function adjacencydelta(adjcs1, adjmat2, atomperm, k, l) result(delta)
 
    do i = 1, nadjs_l
       if (adjcs1(l)%adjlist(i) /= k) then
-         if (adjmat2(atomperm(l), atomperm(adjcs1(l)%adjlist(i)))) nll = nll + 1
-         if (adjmat2(atomperm(k), atomperm(adjcs1(l)%adjlist(i)))) nlk = nlk + 1
+         if (adjmat2(atomperm1(l), atomperm1(adjcs1(l)%adjlist(i)))) nll = nll + 1
+         if (adjmat2(atomperm1(k), atomperm1(adjcs1(l)%adjlist(i)))) nlk = nlk + 1
       end if
    end do
 
@@ -144,7 +144,7 @@ function adjacencydelta(adjcs1, adjmat2, atomperm, k, l) result(delta)
    delta = 2*(nkk + nll - nkl - nlk)
 end function
 
-subroutine compute_differing_bonds(atomset1, atomperm, adjcs1, adjcs2, moldiff)
+subroutine compute_differing_bonds(atomset1, atomperm1, adjcs1, adjcs2, moldiff)
 !------------------------------------------------------------------------------
 ! Compute the sorted list of differing bond hashes between two molecular structures
 ! given an atom permutation mapping.
@@ -160,14 +160,14 @@ subroutine compute_differing_bonds(atomset1, atomperm, adjcs1, adjcs2, moldiff)
    use sorting, only: sort
 
    integer, dimension(:), intent(in) :: atomset1
-   integer, dimension(:), intent(in) :: atomperm
+   integer, dimension(:), intent(in) :: atomperm1
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    integer, dimension(:), allocatable, intent(out) :: moldiff
 
    ! Local variables
    integer :: i, j, idx1, idx2, mapped_idx1, neighbor_idx1, mapped_neighbor_idx1
    integer :: num_atoms, max_edges, bond_count
-   integer, dimension(:), allocatable :: temp_bonds, invperm
+   integer, dimension(:), allocatable :: temp_bonds, atomperm2
    integer :: bond_hash, min_atom, max_atom
    integer :: atom1_in_struct1, atom2_in_struct1
    logical :: bond_in_struct2
@@ -183,19 +183,19 @@ subroutine compute_differing_bonds(atomset1, atomperm, adjcs1, adjcs2, moldiff)
    bond_count = 0
 
    ! Compute inverse permutation once
-   invperm = inverse_permutation(atomperm)
+   atomperm2 = inverse_permutation(atomperm1)
 
    ! Find bonds that are in structure 1 but not in structure 2
    do i = 1, size(atomset1)
       idx1 = atomset1(i)
-      mapped_idx1 = atomperm(idx1)
+      mapped_idx1 = atomperm1(idx1)
 
       do j = 1, size(adjcs1(idx1)%adjlist)
          neighbor_idx1 = adjcs1(idx1)%adjlist(j)
 
          ! Only process each edge once (consider edges where idx1 < neighbor)
          if (idx1 < neighbor_idx1) then
-            mapped_neighbor_idx1 = atomperm(neighbor_idx1)
+            mapped_neighbor_idx1 = atomperm1(neighbor_idx1)
 
             ! Check if edge (mapped_idx1, mapped_neighbor_idx1) exists in structure 2
             bond_in_struct2 = any(adjcs2(mapped_idx1)%adjlist(:) == mapped_neighbor_idx1)
@@ -215,7 +215,7 @@ subroutine compute_differing_bonds(atomset1, atomperm, adjcs1, adjcs2, moldiff)
 
    ! Find bonds that are in structure 2 but not in structure 1
    do i = 1, size(atomset1)
-      idx2 = atomperm(atomset1(i))
+      idx2 = atomperm1(atomset1(i))
 
       do j = 1, size(adjcs2(idx2)%adjlist)
          neighbor_idx1 = adjcs2(idx2)%adjlist(j)
@@ -223,8 +223,8 @@ subroutine compute_differing_bonds(atomset1, atomperm, adjcs1, adjcs2, moldiff)
          ! Only process each edge once (consider edges where idx2 < neighbor)
          if (idx2 < neighbor_idx1) then
             ! Use inverse permutation to find atoms in structure 1
-            atom1_in_struct1 = invperm(idx2)
-            atom2_in_struct1 = invperm(neighbor_idx1)
+            atom1_in_struct1 = atomperm2(idx2)
+            atom2_in_struct1 = atomperm2(neighbor_idx1)
 
             ! Check if this bond exists in structure 1
             bond_in_struct2 = any(adjcs1(atom1_in_struct1)%adjlist(:) == atom2_in_struct1)
@@ -255,7 +255,7 @@ subroutine compute_differing_bonds(atomset1, atomperm, adjcs1, adjcs2, moldiff)
 end subroutine
 
 subroutine minimize_adjdiff(atomset1, atomtypes, scnatypes, adjcs1, adjcs2, adjmat2, &
-                  coords1, coords2, atomperm)
+                  coords1, coords2, atomperm1)
 !------------------------------------------------------------------------------
 ! Find best correspondence between points of graphs
 ! Randomly selects starting atoms - fragment identification is implicit
@@ -266,13 +266,13 @@ subroutine minimize_adjdiff(atomset1, atomtypes, scnatypes, adjcs1, adjcs2, adjm
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    logical, dimension(:,:), intent(in) :: adjmat2
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
-   integer, dimension(:), intent(inout) :: atomperm
+   integer, dimension(:), intent(inout) :: atomperm1
 
    ! Local variables
    integer :: ntrack, permdiff
    integer, dimension(:), allocatable :: track
    logical, dimension(:), allocatable :: tracked
-   integer, dimension(:), allocatable :: invperm
+   integer, dimension(:), allocatable :: atomperm2
    real(rk) :: permdist
    integer :: num_atoms, i
 
@@ -284,7 +284,7 @@ subroutine minimize_adjdiff(atomset1, atomtypes, scnatypes, adjcs1, adjcs2, adjm
 
    allocate(track(num_atoms))
    allocate(tracked(num_atoms))
-   allocate(invperm(num_atoms))
+   allocate(atomperm2(num_atoms))
    allocate(untracked_atoms(num_atoms))
 
    ! Set atoms block indices
@@ -298,9 +298,9 @@ subroutine minimize_adjdiff(atomset1, atomtypes, scnatypes, adjcs1, adjcs2, adjm
    ! Initialization
    ntrack = 0
    tracked(:) = .false.
-   invperm = inverse_permutation(atomperm)
-   permdiff = adjacencydiff(atomset1, atomperm, adjcs1, adjcs2)
-!   permdist = sqdistsum(atomset1, atomperm, coords1, coords2)
+   atomperm2 = inverse_permutation(atomperm1)
+   permdiff = adjacencydiff(atomset1, atomperm1, adjcs1, adjcs2)
+!   permdist = sqdistsum(atomset1, atomperm1, coords1, coords2)
 
    ! Process all atoms by randomly selecting untracked ones
    ! Each random selection implicitly starts a new fragment
@@ -320,12 +320,12 @@ subroutine minimize_adjdiff(atomset1, atomtypes, scnatypes, adjcs1, adjcs2, adjm
 
       ! Process fragment starting from this random atom
       ! Recursion naturally explores the entire connected component
-      call recurse_minimize_adjdiff(start_atom, adjcs1, adjcs2, adjmat2, atomperm, &
-              invperm, tracked, permdiff, permdist, ntrack, track, coords1, coords2)
+      call recurse_minimize_adjdiff(start_atom, adjcs1, adjcs2, adjmat2, atomperm1, &
+              atomperm2, tracked, permdiff, permdist, ntrack, track, coords1, coords2)
    end do
 
    if (DO_DEBUG_TESTS) then
-      if (adjacencydiff(atomset1, atomperm, adjcs1, adjcs2) /= permdiff) then
+      if (adjacencydiff(atomset1, atomperm1, adjcs1, adjcs2) /= permdiff) then
          error stop 'incorrect edge difference'
       end if
    end if
@@ -335,26 +335,26 @@ subroutine minimize_adjdiff(atomset1, atomtypes, scnatypes, adjcs1, adjcs2, adjm
    deallocate(blkidx1, blkidx2, eqvidx1, eqvidx2)
 end subroutine
 
-subroutine match_neighbors(node, adjcs1, adjcs2, atomperm, tracked, nmatch, matches, &
+subroutine match_neighbors(node, adjcs1, adjcs2, atomperm1, tracked, nmatch, matches, &
                 nmismatch1, mismatches1, nmismatch2, mismatches2)
 ! Classify the atoms connected to node as matches or unmatched
    integer, intent(in) :: node
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
-   integer, dimension(:), intent(in) :: atomperm
+   integer, dimension(:), intent(in) :: atomperm1
    logical, dimension(:), intent(in) :: tracked
    integer, intent(out) :: nmatch, nmismatch1, nmismatch2
    integer, dimension(:), intent(out) :: matches, mismatches1, mismatches2
    ! Local variables
    integer :: i, mapped_node
 
-   mapped_node = atomperm(node)
+   mapped_node = atomperm1(node)
    nmatch = 0
    nmismatch1 = 0
    nmismatch2 = 0
 
    ! Classify neighbors of node in structure 1
    do i = 1, size(adjcs1(node)%adjlist)
-      if (any(adjcs2(mapped_node)%adjlist(:) == atomperm(adjcs1(node)%adjlist(i)))) then
+      if (any(adjcs2(mapped_node)%adjlist(:) == atomperm1(adjcs1(node)%adjlist(i)))) then
          nmatch = nmatch + 1
          matches(nmatch) = adjcs1(node)%adjlist(i)
       else
@@ -365,20 +365,20 @@ subroutine match_neighbors(node, adjcs1, adjcs2, atomperm, tracked, nmatch, matc
 
    ! Find neighbors in structure 2 that don't match
    do i = 1, size(adjcs2(mapped_node)%adjlist)
-      if (.not. any(atomperm(matches(:nmatch)) == adjcs2(mapped_node)%adjlist(i))) then
+      if (.not. any(atomperm1(matches(:nmatch)) == adjcs2(mapped_node)%adjlist(i))) then
          nmismatch2 = nmismatch2 + 1
          mismatches2(nmismatch2) = adjcs2(mapped_node)%adjlist(i)
       end if
    end do
 end subroutine
 
-recursive subroutine recurse_minimize_adjdiff(node, adjcs1, adjcs2, adjmat2, atomperm, &
-                invperm, tracked, permdiff, permdist, ntrack, track, coords1, coords2)
+recursive subroutine recurse_minimize_adjdiff(node, adjcs1, adjcs2, adjmat2, atomperm1, &
+                atomperm2, tracked, permdiff, permdist, ntrack, track, coords1, coords2)
 ! Backtracks structure to find assignments that minimize permdiff
    integer, intent(in) :: node
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    logical, dimension(:,:), intent(in) :: adjmat2
-   integer, dimension(:), intent(inout) :: atomperm, invperm
+   integer, dimension(:), intent(inout) :: atomperm1, atomperm2
    logical, dimension(:), intent(inout) :: tracked
    integer, intent(inout) :: permdiff, ntrack
    integer, dimension(:), intent(inout) :: track
@@ -412,7 +412,7 @@ recursive subroutine recurse_minimize_adjdiff(node, adjcs1, adjcs2, adjmat2, ato
    tracked(node) = .true.
 
    ! Classify neighbor atoms as matches or mismatched for coords1/coords2
-   call match_neighbors(node, adjcs1, adjcs2, atomperm, tracked, nmatch, matches, &
+   call match_neighbors(node, adjcs1, adjcs2, atomperm1, tracked, nmatch, matches, &
                nmismatch1, mismatches1, nmismatch2, mismatches2)
 
 !   print *, "node:", node
@@ -428,8 +428,8 @@ recursive subroutine recurse_minimize_adjdiff(node, adjcs1, adjcs2, adjmat2, ato
    ! Run over matched neighbors
    do i = 1, nmatch
       if (.not. tracked(matches(i))) then
-         call recurse_minimize_adjdiff(matches(i), adjcs1, adjcs2, adjmat2, atomperm, &
-                 invperm, tracked, permdiff, permdist, ntrack, track, coords1, coords2)
+         call recurse_minimize_adjdiff(matches(i), adjcs1, adjcs2, adjmat2, atomperm1, &
+                 atomperm2, tracked, permdiff, permdist, ntrack, track, coords1, coords2)
       end if
    end do
 
@@ -446,27 +446,27 @@ recursive subroutine recurse_minimize_adjdiff(node, adjcs1, adjcs2, adjmat2, ato
                   ntrack_branch = ntrack
                   track_branch(:) = track(:)
                   tracked_branch(:) = tracked(:)
-                  mapping_branch(:) = atomperm(:)
-                  unmapping_branch(:) = invperm(:)
+                  mapping_branch(:) = atomperm1(:)
+                  unmapping_branch(:) = atomperm2(:)
 
-                  ! Apply swap to atomperm branch
+                  ! Apply swap to atomperm1 branch
                   mapping_branch(mismatches1(i)) = mismatches2(j)
-                  mapping_branch(invperm(mismatches2(j))) = atomperm(mismatches1(i))
+                  mapping_branch(atomperm2(mismatches2(j))) = atomperm1(mismatches1(i))
 
-                  ! Apply swap to invperm branch
+                  ! Apply swap to atomperm2 branch
                   unmapping_branch(mismatches2(j)) = mismatches1(i)
-                  unmapping_branch(atomperm(mismatches1(i))) = invperm(mismatches2(j))
+                  unmapping_branch(atomperm1(mismatches1(i))) = atomperm2(mismatches2(j))
 
                   ! Update adjd with swap
                   moldiff_branch = permdiff + adjacencydelta(adjcs1, adjmat2, &
-                                atomperm, mismatches1(i), invperm(mismatches2(j)))
+                                atomperm1, mismatches1(i), atomperm2(mismatches2(j)))
 
                   ! Update ssd with swap
 !                  moldist_branch = permdist + ( &
-!                     - sum((coords2(:, atomperm(mismatches1(i))) - coords1(:, mismatches1(i)))**2) &
-!                     - sum((coords2(:, mismatches2(j)) - coords1(:, invperm(mismatches2(j))))**2) &
+!                     - sum((coords2(:, atomperm1(mismatches1(i))) - coords1(:, mismatches1(i)))**2) &
+!                     - sum((coords2(:, mismatches2(j)) - coords1(:, atomperm2(mismatches2(j))))**2) &
 !                     + sum((coords2(:, mismatches2(j)) - coords1(:, mismatches1(i)))**2) &
-!                     + sum((coords2(:, atomperm(mismatches1(i))) - coords1(:, invperm(mismatches2(j))))**2))
+!                     + sum((coords2(:, atomperm1(mismatches1(i))) - coords1(:, atomperm2(mismatches2(j))))**2))
 
                   ! Backtrack swapped index
                   call recurse_minimize_adjdiff(mismatches1(i), adjcs1, adjcs2, adjmat2, mapping_branch, &
@@ -476,15 +476,15 @@ recursive subroutine recurse_minimize_adjdiff(node, adjcs1, adjcs2, adjmat2, ato
                   if ( &
                      moldiff_branch < permdiff &
                      .and. ( &
-                        eqvidx1(mismatches1(i)) == eqvidx1(invperm(mismatches2(j))) &
-                        .and. eqvidx2(atomperm(mismatches1(i))) == eqvidx2(mismatches2(j)) &
+                        eqvidx1(mismatches1(i)) == eqvidx1(atomperm2(mismatches2(j))) &
+                        .and. eqvidx2(atomperm1(mismatches1(i))) == eqvidx2(mismatches2(j)) &
                      ) &
                   ) then
                      ntrack = ntrack_branch
                      track(:) = track_branch(:)
                      tracked(:) = tracked_branch(:)
-                     atomperm(:) = mapping_branch(:)
-                     invperm(:) = unmapping_branch(:)
+                     atomperm1(:) = mapping_branch(:)
+                     atomperm2(:) = unmapping_branch(:)
                      permdiff = moldiff_branch
 !                     permdist = moldist_branch
                      matched1(i) = .true.
@@ -501,8 +501,8 @@ recursive subroutine recurse_minimize_adjdiff(node, adjcs1, adjcs2, adjmat2, ato
    do i = 1, nmismatch1
       if (.not. matched1(i)) then
          if (.not. tracked(mismatches1(i))) then
-            call recurse_minimize_adjdiff(mismatches1(i), adjcs1, adjcs2, adjmat2, atomperm, &
-                    invperm, tracked, permdiff, permdist, ntrack, track, coords1, coords2)
+            call recurse_minimize_adjdiff(mismatches1(i), adjcs1, adjcs2, adjmat2, atomperm1, &
+                    atomperm2, tracked, permdiff, permdist, ntrack, track, coords1, coords2)
          end if
       end if
    end do

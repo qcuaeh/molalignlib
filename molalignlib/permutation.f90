@@ -33,32 +33,26 @@ end interface
 
 contains
 
-! Get an identity permutation
-function identity_permutation(n) result(perm)
-   integer, intent(in) :: n
-   integer, allocatable :: perm(:)
+subroutine init_identity_permutation(permutation)
+   integer, dimension(:), intent(out) :: permutation
    ! Local variables
    integer :: i
 
-   allocate (perm(n))
-
-   do i = 1, n
-      perm(i) = i
+   do i = 1, size(permutation)
+      permutation(i) = i
    end do
-end function
+end subroutine
 
-! Get the inverse permutation of perm
-function inverse_permutation(perm) result(invperm)
-   integer, dimension(:), intent(in) :: perm
-   integer, dimension(:), allocatable :: invperm
+function inverse_permutation(permutation)
+   integer, dimension(:), intent(in) :: permutation
+   integer, dimension(:), allocatable :: inverse_permutation
    ! Local variables
-   integer :: n, i
+   integer :: i
 
-   n = size(perm)
-   allocate (invperm(n))
+   allocate (inverse_permutation, mold=permutation)
 
-   do i = 1, n
-      invperm(perm(i)) = i
+   do i = 1, size(permutation)
+      inverse_permutation(permutation(i)) = i
    end do
 end function
 
@@ -167,39 +161,6 @@ subroutine subperm_merge(subperm, other_subperm)
       i1 = other_subperm%atomset(i)
       i2 = other_subperm%atomperm(i1)
       call subperm_add(subperm, i1, i2)
-   end do
-end subroutine
-
-subroutine subperm_to_perm(subperm, perm, invperm)
-   type(subperm_t), intent(in) :: subperm
-   integer, dimension(:), allocatable, intent(out) :: perm, invperm
-   integer :: i, i1, i2
-
-   perm = identity_permutation(subperm%atomperm_size)
-   invperm = identity_permutation(subperm%atomperm_size)
-
-   ! Apply all assignments from subperm
-   do i = 1, subperm%atomset_size
-      i1 = subperm%atomset(i)
-      i2 = subperm%atomperm(i1)
-      perm(i1) = i2
-      invperm(i2) = i1
-   end do
-
-   ! Handle unassigned elements to maintain valid permutation
-   ! (swap unassigned elements to match the identity where possible)
-   do i = 1, subperm%atomperm_size
-      if (invperm(i) == i) cycle  ! Already correctly placed
-      ! Find element that should be here
-      if (perm(invperm(i)) /= i) then
-         ! Swap
-         i1 = invperm(i)
-         i2 = perm(i1)
-         perm(i1) = i
-         invperm(i) = i1
-         perm(invperm(i2)) = i2
-         invperm(i2) = invperm(i2)
-      end if
    end do
 end subroutine
 

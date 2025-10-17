@@ -53,7 +53,7 @@ real(rk), dimension(:), allocatable :: weights1, weights2
 real(rk), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, coords2r
 integer, dimension(:), pointer :: atomset1, atomset2
 integer, dimension(:), allocatable :: atomset1_alloc, atomset2_alloc
-integer, dimension(:), allocatable :: atomperm
+integer, dimension(:), allocatable :: atomperm1
 integer :: unitin1, unitin2, unitout
 integer :: i, j
 
@@ -247,15 +247,15 @@ if (align_flag) then
          end if
 
          do i = 1, registry%occ_records
-            atomperm = registry%records(i)%atomperm
+            atomperm1 = registry%records(i)%atomperm
 !            rotquat = registry%records(i)%rotquat
-            rotquat = least_rotquat( atomset1, atomperm, coords1w, coords2w)
+            rotquat = least_rotquat( atomset1, atomperm1, coords1w, coords2w)
             coords2r = rotated_coords( coords2, rotquat, center1)
-            rmsd = sqrt( sqdistmean( atomset1, atomperm, weights1, coords1, coords2r))
+            rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2r))
 
             if (mapping_flag) then
-               do j = 1, size(atomperm)
-                  write (stdout,'(I0," -> ",I0)') j, atomperm(j)
+               do j = 1, size(atomperm1)
+                  write (stdout,'(I0," -> ",I0)') j, atomperm1(j)
                end do
             end if
 
@@ -263,7 +263,7 @@ if (align_flag) then
                title2 = 'RMSD=' // str( rmsd)
                coords2r = rotated_coords( coords2, rotquat, center1)
                call set_coords( atoms2, coords2r)
-               call writefile( unitout, extout, title2, atoms2, bonds2, atomperm)
+               call writefile( unitout, extout, title2, atoms2, bonds2, atomperm1)
             else
                write (stdout,'(A)') str( rmsd)
             end if
@@ -272,21 +272,21 @@ if (align_flag) then
 
       else
 
-         call assign_atoms_global( coords1w, coords2w, assign_arrays, atomperm)
-         rotquat = least_rotquat( atomset1, atomperm, coords1w, coords2w)
+         call assign_atoms_global( coords1w, coords2w, assign_arrays, atomperm1)
+         rotquat = least_rotquat( atomset1, atomperm1, coords1w, coords2w)
          coords2r = rotated_coords( coords2, rotquat, center1)
-         rmsd = sqrt( sqdistmean( atomset1, atomperm, weights1, coords1, coords2r))
+         rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2r))
 
          if (coords_flag) then
             title2 = 'RMSD=' // str( rmsd)
             coords2r = rotated_coords( coords2, rotquat, center1)
             call set_coords( atoms2, coords2r)
-            call writefile( unitout, extout, title2, atoms2, bonds2, atomperm)
+            call writefile( unitout, extout, title2, atoms2, bonds2, atomperm1)
          else
             write (stdout,'(A)') str( rmsd)
             if (mapping_flag) then
-               do j = 1, size(atomperm)
-                  write (stdout,'(I0," -> ",I0)') j, atomperm(j)
+               do j = 1, size(atomperm1)
+                  write (stdout,'(I0," -> ",I0)') j, atomperm1(j)
                end do
             end if
          end if
@@ -295,16 +295,17 @@ if (align_flag) then
 
    else
 
-      atomperm = identity_permutation( size(atoms1))
-      rotquat = least_rotquat( atomset1, atomperm, coords1w, coords2w)
+      allocate (atomperm1(size( coords1w, 2)))
+      call init_identity_permutation( atomperm1)
+      rotquat = least_rotquat( atomset1, atomperm1, coords1w, coords2w)
       coords2r = rotated_coords( coords2, rotquat, center1)
-      rmsd = sqrt( sqdistmean( atomset1, atomperm, weights1, coords1, coords2r))
+      rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2r))
 
       if (coords_flag) then
          title2 = 'RMSD=' // str( rmsd)
          coords2r = rotated_coords( coords2, rotquat, center1)
          call set_coords( atoms2, coords2r)
-         call writefile( unitout, extout, title2, atoms2, bonds2, atomperm)
+         call writefile( unitout, extout, title2, atoms2, bonds2, atomperm1)
       else
          write (stdout,'(A)') str( rmsd)
       end if
@@ -324,22 +325,23 @@ else
          call print_chain_tree_array( assign_arrays)
       end if
       if (PRUNE_ASSIGNMENT_TREE) then
-         call assign_atoms_greedy( coords1w, coords2w, assign_arrays, atomperm, permdist)
-         call assign_atoms_local_pruned( coords1w, coords2w, assign_arrays, atomperm, permdist)
+         call assign_atoms_greedy( coords1w, coords2w, assign_arrays, atomperm1, permdist)
+         call assign_atoms_local_pruned( coords1w, coords2w, assign_arrays, atomperm1, permdist)
       else
-         call assign_atoms_local( coords1w, coords2w, assign_arrays, atomperm, permdist)
+         call assign_atoms_local( coords1w, coords2w, assign_arrays, atomperm1, permdist)
       end if
-      rmsd = sqrt( sqdistmean( atomset1, atomperm, weights1, coords1, coords2))
+      rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2))
    else
-      atomperm = identity_permutation( size(atoms1))
-      rmsd = sqrt( sqdistmean( atomset1, atomperm, weights1, coords1, coords2))
+      allocate (atomperm1(size( coords1w, 2)))
+      call init_identity_permutation( atomperm1)
+      rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2))
    end if
 
    if (coords_flag) then
       title2 = 'RMSD=' // str( rmsd)
       coords2r = rotated_coords( coords2, rotquat, center1)
       call set_coords( atoms2, coords2r)
-      call writefile( unitout, extout, title2, atoms2, bonds2, atomperm)
+      call writefile( unitout, extout, title2, atoms2, bonds2, atomperm1)
    else
       write (stdout,'(A)') str( rmsd)
    end if

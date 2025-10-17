@@ -39,7 +39,7 @@ subroutine optimize_atomperm_isomer(atomset1, atomset2, atomtypes, adjcs1, adjcs
    type(registry_t), target, intent(out) :: registry
 
    ! Local variables
-   integer, dimension(:), allocatable :: atomperm
+   integer, dimension(:), allocatable :: atomperm1
    real(rk), dimension(:,:), allocatable :: coords2r
    real(rk) :: permdist
    real(rk), dimension(4) :: rotation, total_rotation
@@ -74,22 +74,22 @@ subroutine optimize_atomperm_isomer(atomset1, atomset2, atomtypes, adjcs1, adjcs
       coords2r = rotated_coords(coords2, total_rotation)
 
       ! Assign atoms with current orientation using biases
-      call assign_atoms_biased(atomtypes, biases, coords1, coords2r, atomperm)
+      call assign_atoms_biased(atomtypes, biases, coords1, coords2r, atomperm1)
       call minimize_adjdiff(atomset1, atomtypes, scnatypes, adjcs1, adjcs2, adjmat2, &
-            coords1, coords2, atomperm)
-      call compute_differing_bonds(atomset1, atomperm, adjcs1, adjcs2, moldiff)
+            coords1, coords2, atomperm1)
+      call compute_differing_bonds(atomset1, atomperm1, adjcs1, adjcs2, moldiff)
 
       ! Optimize rotation
-      rotation = least_rotquat(atomset1, atomperm, coords1, coords2r)
+      rotation = least_rotquat(atomset1, atomperm1, coords1, coords2r)
       total_rotation = quatmul(total_rotation, rotation)
       call rotate_coords(atomset2, coords2r, rotation)
 
-      permdiff = adjacencydiff(atomset1, atomperm, adjcs1, adjcs2)
-      permdist = sqdistsum(atomset1, atomperm, coords1, coords2r)
+      permdiff = adjacencydiff(atomset1, atomperm1, adjcs1, adjcs2)
+      permdist = sqdistsum(atomset1, atomperm1, coords1, coords2r)
       steps = 1
 
       ! Update results
-      call insert_record_hetero(registry, atomperm, moldiff, permdist, steps, total_rotation)
+      call insert_record_hetero(registry, atomperm1, moldiff, permdist, steps, total_rotation)
 
    end do
 end subroutine
