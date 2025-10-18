@@ -16,7 +16,7 @@ logical :: coords_flag
 logical :: stdin_flag
 logical :: stats_flag
 logical :: tree_flag
-logical :: rebond_flag
+logical :: bond_flag
 logical :: mapping_flag
 logical :: fileout_flag
 

@@ -76,7 +76,7 @@ mapping_flag = .false.
 label_flag = .false.
 random_flag = .false.
 iterate_flag = .true.
-rebond_flag = .false.
+bond_flag = .false.
 
 extin = 'xyz'
 extout = 'xyz'
@@ -124,8 +124,8 @@ do while (get_arg(arg))
       stats_flag = .true.
    case ('-random')
       random_flag = .true.
-   case ('-rebond')
-      rebond_flag = .true.
+   case ('-bond')
+      bond_flag = .true.
    case default
       call read_posarg(arg, posargs)
    end select
@@ -183,6 +183,19 @@ if (any(atomtypes%parts%num_items1 /= atomtypes%parts%num_items2)) then
    stop 1
 end if
 
+! Get adjacency information
+if (bond_flag) then
+   call adjacency_from_distance(atomset1, atoms1, adjcs1)
+   call adjacency_from_distance(atomset2, atoms2, adjcs2)
+else
+   if (size(bonds1) < 1 .and. size(bonds2) < 1) then
+      write (stdout,'(A)') 'ERROR: Molecules have no bonds!'
+      stop
+   end if
+   call adjacency_from_bonds(atomset1, atoms1, bonds1, adjcs1)
+   call adjacency_from_bonds(atomset2, atoms2, bonds2, adjcs2)
+end if
+
 ! Get user defined atom weights
 if (mass_flag) then
    weights1 = atomic_masses(atoms1%elnum)
@@ -190,15 +203,6 @@ if (mass_flag) then
 else
    weights1 = uniform_weights(1._rk, size(atoms1))
    weights2 = uniform_weights(1._rk, size(atoms2))
-end if
-
-! Get adjacency information
-if (rebond_flag) then
-   call adjacency_from_distance(atomset1, atoms1, adjcs1)
-   call adjacency_from_distance(atomset2, atoms2, adjcs2)
-else
-   call adjacency_from_bonds(atomset1, atoms1, bonds1, adjcs1)
-   call adjacency_from_bonds(atomset2, atoms2, bonds2, adjcs2)
 end if
 
 ! Get mol1 coordinates
