@@ -239,7 +239,7 @@ if (align_flag) then
 
    if (remap_flag) then
 
-      ! Pre-compute assignment tree
+      ! Pre-compute assignment tree for decision making
       call compute_consistent_hna_partition( adjcs1, adjcs2, atomtypes, hnachain)
       call build_assignment_tree( adjcs1, adjcs2, hnachain%last_link, assign_arrays)
 
@@ -250,8 +250,8 @@ if (align_flag) then
       if ((stoch_flag .and. .not. count_flag) .or. (stoch_flag .and. count_flag .and. &
             assign_arrays%global_combinations > count_thres*assign_arrays%local_combinations)) then
 
-         ! Remap atoms to minimize the MSD
-         call optimize_atomperm_conform( atomset1, atomset2, assign_arrays, coords1w, coords2w, registry)
+         ! Remap atoms to minimize the MSD (tree will be rebuilt inside)
+         call optimize_atomperm_conform( atomset1, atomset2, adjcs1, adjcs2, atomtypes, coords1w, coords2w, registry)
 
          ! Print optimization stats
          if (stats_flag) then
@@ -331,17 +331,7 @@ else
    coords2w = get_weighted_coords( atoms2, weights2)
 
    if (remap_flag) then
-      call compute_consistent_hna_partition( adjcs1, adjcs2, atomtypes, hnachain)
-      call build_assignment_tree( adjcs1, adjcs2, hnachain%last_link, assign_arrays)
-      if (tree_flag) then
-         call print_chain_tree_array( assign_arrays)
-      end if
-      if (PRUNE_ASSIGNMENT_TREE) then
-         call assign_atoms_greedy( coords1w, coords2w, assign_arrays, atomperm1, permdist)
-         call assign_atoms_local_pruned( coords1w, coords2w, assign_arrays, atomperm1, permdist)
-      else
-         call assign_atoms_local( coords1w, coords2w, assign_arrays, atomperm1, permdist)
-      end if
+      call assign_atomperm_conform( adjcs1, adjcs2, atomtypes, coords1w, coords2w, atomperm1, permdist)
       rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2))
    else
       allocate (atomperm1(size( coords1w, 2)))

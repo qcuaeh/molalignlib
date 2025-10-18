@@ -250,18 +250,14 @@ if (align_flag) then
             ! Convert modified adjacency matrix back to adjacency list
             call adjmat_to_adjcs(adjmat2, adjcs2_mod)
 
-            ! Build assignment tree for conformers with modified adjacency
-            call compute_consistent_hna_partition(adjcs1, adjcs2_mod, atomtypes, hnachain)
-            call build_assignment_tree(adjcs1, adjcs2_mod, hnachain%last_link, assign_arrays)
+            ! Optimize atom permutation as conformers
+            call optimize_atomperm_conform(atomset1, atomset2, adjcs1, adjcs2_mod, atomtypes, &
+                                           coords1w, coords2w, conform_registry)
          else
             ! Already conformers, use original adjacencies
-            call compute_consistent_hna_partition(adjcs1, adjcs2, atomtypes, hnachain)
-            call build_assignment_tree(adjcs1, adjcs2, hnachain%last_link, assign_arrays)
+            call optimize_atomperm_conform(atomset1, atomset2, adjcs1, adjcs2, atomtypes, &
+                                           coords1w, coords2w, conform_registry)
          end if
-
-         ! Optimize atom permutation as conformers
-         call optimize_atomperm_conform(atomset1, atomset2, assign_arrays, &
-                                        coords1w, coords2w, conform_registry)
 
          ! Process conformer optimization results
          do k = 1, conform_registry%occ_records

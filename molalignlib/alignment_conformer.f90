@@ -37,9 +37,10 @@ implicit none
 
 contains
 
-subroutine optimize_atomperm_conform( atomset1, atomset2, assign_arrays, coords1, coords2, registry)
+subroutine optimize_atomperm_conform( atomset1, atomset2, adjcs1, adjcs2, atomtypes, coords1, coords2, registry)
    integer, dimension(:), intent(in) :: atomset1, atomset2
-   type(array_trees_t), intent(inout) :: assign_arrays
+   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   type(partition_t), intent(in) :: atomtypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    type(registry_t), target, intent(out) :: registry
 
@@ -50,6 +51,12 @@ subroutine optimize_atomperm_conform( atomset1, atomset2, assign_arrays, coords1
    real(rk), dimension(4) :: rotation, total_rotation
    integer, pointer :: num_trials, lead_count
    integer :: steps
+   type(assigntree_node_t), pointer :: hnachain
+   type(array_trees_t) :: assign_arrays
+
+   ! Pre-compute assignment tree
+   call compute_consistent_hna_partition( adjcs1, adjcs2, atomtypes, hnachain)
+   call build_assignment_tree( adjcs1, adjcs2, hnachain%last_link, assign_arrays)
 
    ! Initialize random number generator
    call random_initialize()
@@ -102,6 +109,30 @@ subroutine optimize_atomperm_conform( atomset1, atomset2, assign_arrays, coords1
       call insert_record_homo( registry, atomperm1, permdist, steps, total_rotation)
 
    end do
+end subroutine
+
+subroutine assign_atomperm_conform( adjcs1, adjcs2, atomtypes, coords1, coords2, atomperm1, permdist)
+   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   type(partition_t), intent(in) :: atomtypes
+   real(rk), dimension(:,:), intent(in) :: coords1, coords2
+   integer, dimension(:), allocatable, intent(out) :: atomperm1
+   real(rk), intent(out) :: permdist
+
+   ! Local variables
+   type(assigntree_node_t), pointer :: hnachain
+   type(array_trees_t) :: assign_arrays
+
+   ! Pre-compute assignment tree
+   call compute_consistent_hna_partition( adjcs1, adjcs2, atomtypes, hnachain)
+   call build_assignment_tree( adjcs1, adjcs2, hnachain%last_link, assign_arrays)
+
+   ! Assign atoms using greedy and local pruned methods
+   if (PRUNE_ASSIGNMENT_TREE) then
+      call assign_atoms_greedy( coords1, coords2, assign_arrays, atomperm1, permdist)
+      call assign_atoms_local_pruned( coords1, coords2, assign_arrays, atomperm1, permdist)
+   else
+      call assign_atoms_local( coords1, coords2, assign_arrays, atomperm1, permdist)
+   end if
 end subroutine
 
 end module
