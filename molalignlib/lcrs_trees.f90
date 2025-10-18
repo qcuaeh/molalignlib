@@ -604,17 +604,17 @@ subroutine print_link_itemdir(link)
    type(chain_node_t), intent(in) :: link
    integer :: i
 
-   write(stderr, *)
    write(stderr,'(A)') "Item Directory 1:"
    do i = 1, size(link%itemdir1)
       write(stderr,'(2X,I0,1X,A,1X,A)') i, "->", address(link%itemdir1(i)%ptr)
    end do
 
-   write(stderr, *)
    write(stderr,'(A)') "Item Directory 2:"
    do i = 1, size(link%itemdir2)
       write(stderr,'(2X,I0,1X,A,1X,A)') i, "->", address(link%itemdir2(i)%ptr)
    end do
+
+   write(stderr, *)
 end subroutine
 
 function new_bare_chain(tot_items1, tot_items2) result(chain)
@@ -729,7 +729,6 @@ subroutine print_part_tree(part_tree)
       return
    end if
 
-   write(stderr, *)
    write(stderr, '(A)') repeat("=", 25)
    write(stderr, '(A)') "       Part Tree"
    write(stderr, '(A)') repeat("=", 25)
@@ -744,57 +743,9 @@ subroutine print_part_tree(part_tree)
 
    ! Print children recursively
    call print_part_recurse(part_tree, 0, is_last_child)
+   write(stderr, *)
 
    deallocate(is_last_child)
-   write(stderr, *)
-end subroutine
-
-recursive subroutine print_part_recurse(part, depth, is_last_child)
-   type(partree_node_t), pointer, intent(in) :: part
-   integer, intent(in) :: depth
-   logical, dimension(:), intent(inout) :: is_last_child
-   type(partree_node_t), pointer :: child_part, next_child
-   integer :: i, pos
-   character(len=200) :: prefix
-
-   if (.not. associated(part)) return
-
-   ! Process all children
-   child_part => part%first_child_part
-   do while (associated(child_part))
-      ! Check if this is the last child
-      next_child => child_part%next_sibling_part
-      is_last_child(depth + 1) = .not. associated(next_child)
-
-      ! Build prefix for this level
-      prefix = ""
-      pos = 2
-      do i = 1, depth
-         if (is_last_child(i)) then
-            prefix(pos:pos+3) = "    "
-         else
-            prefix(pos:pos+3) = "|   "
-         end if
-         pos = pos + 4
-      end do
-
-      ! Add branch characters (removed trailing space)
-      if (is_last_child(depth + 1)) then
-         prefix(pos:pos+2) = "`--"
-      else
-         prefix(pos:pos+2) = "|--"
-      end if
-      pos = pos + 3
-
-      ! Print part address with item counts
-      write(stderr, '(A,A,1X,A,I0,A,I0,A)') prefix(1:pos-1), address(child_part), &
-         '(', child_part%num_items1, '/', child_part%num_items2, ')'
-
-      ! Recursively print this child's children
-      call print_part_recurse(child_part, depth + 1, is_last_child)
-
-      child_part => next_child
-   end do
 end subroutine
 
 function chain_from_partition(partition) result(chain)
@@ -988,7 +939,6 @@ subroutine print_chain_tree(assign_tree)
 
    if (.not. associated(assign_tree)) error stop
 
-   write(stderr, *)
    write(stderr, '(A)') repeat("=", 25)
    write(stderr, '(A)') "     Assignment Tree"
    write(stderr, '(A)') repeat("=", 25)
@@ -1001,57 +951,9 @@ subroutine print_chain_tree(assign_tree)
    ! Print children recursively
    write(stderr, '(A)') 'ROOT'
    call print_chain_recurse(assign_tree, 0, is_last_child)
+   write(stderr, *)
 
    deallocate(is_last_child)
-   write(stderr, *)
-end subroutine
-
-recursive subroutine print_chain_recurse(chain, depth, is_last_child)
-   type(assigntree_node_t), pointer, intent(in) :: chain
-   integer, intent(in) :: depth
-   logical, dimension(:), intent(inout) :: is_last_child
-   type(assigntree_node_t), pointer :: child_chain, next_child
-   integer :: i, pos
-   character(len=200) :: prefix
-
-   if (.not. associated(chain)) return
-
-   ! Process all children
-   child_chain => chain%first_child_chain
-   do while (associated(child_chain))
-      ! Check if this is the last child
-      next_child => child_chain%next_sibling_chain
-      is_last_child(depth + 1) = .not. associated(next_child)
-
-      ! Build prefix for this level
-      prefix = ""
-      pos = 2
-      do i = 1, depth
-         if (is_last_child(i)) then
-            prefix(pos:pos+3) = "    "
-         else
-            prefix(pos:pos+3) = "|   "
-         end if
-         pos = pos + 4
-      end do
-
-      ! Add branch characters (removed trailing space)
-      if (is_last_child(depth + 1)) then
-         prefix(pos:pos+2) = "`--"
-      else
-         prefix(pos:pos+2) = "|--"
-      end if
-      pos = pos + 3
-
-      ! Print the child address with item counts
-      write(stderr, '(A,A,1X,A,I0,A,I0,A)') prefix(1:pos-1), address(child_chain%split_part), &
-         '(', child_chain%split_part%num_items1, '/', child_chain%split_part%num_items2, ')'
-
-      ! Recursively print this child's children
-      call print_chain_recurse(child_chain, depth + 1, is_last_child)
-
-      child_chain => next_child
-   end do
 end subroutine
 
 subroutine print_part_signature(signature)
@@ -1073,7 +975,6 @@ subroutine print_tree_signatures(part_tree)
       return
    end if
 
-   write(stderr, *)
    write(stderr, '(A)') repeat("=", 25)
    write(stderr, '(A)') "    Part Signatures"
    write(stderr, '(A)') repeat("=", 25)
@@ -1081,7 +982,6 @@ subroutine print_tree_signatures(part_tree)
 
    ! Print children recursively
    call print_signature_recurse(part_tree)
-
    write(stderr, *)
 end subroutine
 
@@ -1114,7 +1014,6 @@ subroutine print_tree_items(part_tree)
       return
    end if
 
-   write(stderr, *)
    write(stderr, '(A)') repeat("=", 25)
    write(stderr, '(A)') "      Part Items"
    write(stderr, '(A)') repeat("=", 25)
@@ -1122,7 +1021,6 @@ subroutine print_tree_items(part_tree)
 
    ! Print children recursively
    call print_items_recurse(part_tree)
-
    write(stderr, *)
 end subroutine
 
@@ -1154,7 +1052,6 @@ subroutine print_leaf_items(part_tree)
       return
    end if
 
-   write(stderr, *)
    write(stderr, '(A)') repeat("=", 25)
    write(stderr, '(A)') "      Leaf Items"
    write(stderr, '(A)') repeat("=", 25)
@@ -1162,7 +1059,6 @@ subroutine print_leaf_items(part_tree)
 
    ! Print children recursively
    call print_leaf_items_recurse(part_tree)
-
    write(stderr, *)
 end subroutine
 
@@ -1197,11 +1093,11 @@ subroutine print_part_indices(part_tree)
       return
    end if
 
-   write(stderr, *)
    write(stderr, '(A)') repeat("=", 35)
    write(stderr, '(A)') "        Part Indices"
    write(stderr, '(A)') repeat("=", 35)
    write(stderr, *)
+
    write(stderr, '(A,I0)') "Total parts created: ", part_tree%total_parts
    write(stderr, '(A,I0)') "Total items1 created: ", part_tree%total_items1
    write(stderr, '(A,I0)') "Total items2 created: ", part_tree%total_items2
@@ -1209,7 +1105,6 @@ subroutine print_part_indices(part_tree)
 
    ! Print children recursively
    call print_part_indices_recurse(part_tree)
-
    write(stderr, *)
 end subroutine
 
@@ -1256,11 +1151,11 @@ subroutine print_chain_indices(assign_tree)
       return
    end if
 
-   write(stderr, *)
    write(stderr, '(A)') repeat("=", 35)
    write(stderr, '(A)') "     Chain Indices"
    write(stderr, '(A)') repeat("=", 35)
    write(stderr, *)
+
    write(stderr, '(A,I0)') "Total chains created: ", assign_tree%total_chains
    write(stderr, '(A,I0)') "Total links created: ", assign_tree%total_links
    write(stderr, '(A,I0)') "Total partrefs created: ", assign_tree%total_partrefs
@@ -1268,7 +1163,6 @@ subroutine print_chain_indices(assign_tree)
 
    ! Print children recursively
    call print_chain_indices_recurse(assign_tree)
-
    write(stderr, *)
 end subroutine
 
@@ -1306,6 +1200,92 @@ recursive subroutine print_chain_indices_recurse(chain)
       call print_chain_indices_recurse(child_chain)
 
       child_chain => child_chain%next_sibling_chain
+   end do
+end subroutine
+
+recursive subroutine print_part_recurse(part, depth, is_last_child)
+   type(partree_node_t), pointer, intent(in) :: part
+   integer, intent(in) :: depth
+   logical, dimension(:), intent(inout) :: is_last_child
+   type(partree_node_t), pointer :: child_part, next_child
+   integer :: i
+
+   if (.not. associated(part)) return
+
+   ! Process all children
+   child_part => part%first_child_part
+   do while (associated(child_part))
+      ! Check if this is the last child
+      next_child => child_part%next_sibling_part
+      is_last_child(depth + 1) = .not. associated(next_child)
+
+      ! Print prefix components directly
+      do i = 1, depth
+         if (is_last_child(i)) then
+            write(stderr, '(A)', advance='no') "    "
+         else
+            write(stderr, '(A)', advance='no') "|   "
+         end if
+      end do
+
+      ! Add branch characters
+      if (is_last_child(depth + 1)) then
+         write(stderr, '(A)', advance='no') "`--"
+      else
+         write(stderr, '(A)', advance='no') "|--"
+      end if
+
+      ! Print part address with item counts
+      write(stderr, '(A,1X,A,I0,A,I0,A)') address(child_part), &
+         '(', child_part%num_items1, '/', child_part%num_items2, ')'
+
+      ! Recursively print this child's children
+      call print_part_recurse(child_part, depth + 1, is_last_child)
+
+      child_part => next_child
+   end do
+end subroutine
+
+recursive subroutine print_chain_recurse(chain, depth, is_last_child)
+   type(assigntree_node_t), pointer, intent(in) :: chain
+   integer, intent(in) :: depth
+   logical, dimension(:), intent(inout) :: is_last_child
+   type(assigntree_node_t), pointer :: child_chain, next_child
+   integer :: i
+
+   if (.not. associated(chain)) return
+
+   ! Process all children
+   child_chain => chain%first_child_chain
+   do while (associated(child_chain))
+      ! Check if this is the last child
+      next_child => child_chain%next_sibling_chain
+      is_last_child(depth + 1) = .not. associated(next_child)
+
+      ! Print prefix components directly
+      do i = 1, depth
+         if (is_last_child(i)) then
+            write(stderr, '(A)', advance='no') "    "
+         else
+            write(stderr, '(A)', advance='no') "|   "
+         end if
+      end do
+
+      ! Add branch characters
+      if (is_last_child(depth + 1)) then
+         write(stderr, '(A)', advance='no') "`--"
+      else
+         write(stderr, '(A)', advance='no') "|--"
+      end if
+
+      ! Print the child address with item counts
+      write(stderr, '(A,1X,A,I0,A,I0,A)') address(child_chain%split_part), &
+         '(', child_chain%split_part%num_items1, '/', child_chain%split_part%num_items2, ')'
+
+      ! Recursively print this child's children
+      call print_chain_recurse(child_chain, depth + 1, is_last_child)
+
+      child_chain => next_child
    end do
 end subroutine
 

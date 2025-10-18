@@ -544,7 +544,6 @@ subroutine print_tree_items_array(assign_arrays)
       return
    end if
 
-   write(stderr, *)
    write(stderr, '(A)') repeat("=", 25)
    write(stderr, '(A)') "      Part Items"
    write(stderr, '(A)') repeat("=", 25)
@@ -552,7 +551,6 @@ subroutine print_tree_items_array(assign_arrays)
 
    ! Root part is always at index 1, print its children recursively
    call print_items_recursive_array(assign_arrays, 1)
-
    write(stderr, *)
 end subroutine
 
@@ -605,7 +603,6 @@ subroutine print_part_tree_array(assign_arrays)
       return
    end if
 
-   write(stderr, *)
    write(stderr, '(A)') repeat("=", 25)
    write(stderr, '(A)') "    Part Tree"
    write(stderr, '(A)') repeat("=", 25)
@@ -620,55 +617,9 @@ subroutine print_part_tree_array(assign_arrays)
 
    ! Print children recursively (root is always at index 1)
    call print_part_recursive_array(assign_arrays, 1, 0, is_last_child)
+   write(stderr, *)
 
    deallocate(is_last_child)
-   write(stderr, *)
-end subroutine
-
-recursive subroutine print_part_recursive_array(assign_arrays, part_idx, depth, is_last_child)
-   type(array_trees_t), intent(in) :: assign_arrays
-   integer, intent(in) :: part_idx, depth
-   logical, dimension(:), intent(inout) :: is_last_child
-   integer :: child_idx, i, j, pos
-   character(len=200) :: prefix
-
-   if (part_idx == 0) return
-
-   ! Process all children using direct array access
-   do i = 1, assign_arrays%partree(part_idx)%num_children
-      child_idx = assign_arrays%partree(part_idx)%child_indices(i)
-
-      ! Check if this is the last child
-      is_last_child(depth + 1) = (i == assign_arrays%partree(part_idx)%num_children)
-
-      ! Build prefix for this level
-      prefix = ""
-      pos = 1
-      do j = 1, depth
-         if (is_last_child(j)) then
-            prefix(pos:pos+3) = "   "
-         else
-            prefix(pos:pos+3) = "|  "
-         end if
-         pos = pos + 3
-      end do
-
-      ! Add branch characters
-      if (is_last_child(depth + 1)) then
-         prefix(pos:pos+2) = "`--"
-      else
-         prefix(pos:pos+2) = "|--"
-      end if
-      pos = pos + 3
-
-      ! Print part index with item counts
-      write(stderr, '(A,A,I0,A,I0,A)') prefix(1:pos-1), '* (', &
-         assign_arrays%partree(child_idx)%items1_count, '/', &
-         assign_arrays%partree(child_idx)%items2_count, ')'
-
-      ! Recursively print this child's children
-      call print_part_recursive_array(assign_arrays, child_idx, depth + 1, is_last_child)
-   end do
 end subroutine
 
 subroutine print_chain_tree_array(assign_arrays)
@@ -684,10 +635,8 @@ subroutine print_chain_tree_array(assign_arrays)
    allocate(is_last_child(100))
    is_last_child = .false.
 
-   write(stderr, *)
-   write(stderr, '(A)') '*'
-
    ! Print children recursively (root is always at index 1)
+   write(stderr, '(A)') '*'
    call print_chain_recursive_array(assign_arrays, 1, 0, is_last_child)
    write(stderr, *)
 
@@ -702,59 +651,9 @@ subroutine print_chain_tree_array(assign_arrays)
    else
       write(stderr, '(A,I0)') "Total local combinations: ", int(assign_arrays%local_combinations)
    end if
+   write(stderr, *)
 
    deallocate(is_last_child)
-end subroutine
-
-recursive subroutine print_chain_recursive_array(assign_arrays, chain_idx, depth, is_last_child)
-   type(array_trees_t), intent(in) :: assign_arrays
-   integer, intent(in) :: chain_idx, depth
-   logical, dimension(:), intent(inout) :: is_last_child
-   integer :: child_idx, split_part_idx, i, j, pos
-   character(len=200) :: prefix
-
-   if (chain_idx == 0) return
-
-   ! Process all children using direct array access instead of linked traversal
-   do i = 1, assign_arrays%assigntree(chain_idx)%num_children
-      child_idx = assign_arrays%assigntree(chain_idx)%child_indices(i)
-
-      ! Check if this is the last child
-      is_last_child(depth + 1) = (i == assign_arrays%assigntree(chain_idx)%num_children)
-
-      ! Build prefix for this level
-      prefix = ""
-      pos = 1
-      do j = 1, depth
-         if (is_last_child(j)) then
-            prefix(pos:pos+3) = "   "
-         else
-            prefix(pos:pos+3) = "|  "
-         end if
-         pos = pos + 3
-      end do
-
-      ! Add branch characters
-      if (is_last_child(depth + 1)) then
-         prefix(pos:pos+2) = "`--"
-      else
-         prefix(pos:pos+2) = "|--"
-      end if
-      pos = pos + 3
-
-      ! Print the split part index with item counts
-      split_part_idx = assign_arrays%assigntree(child_idx)%split_part_idx
-      if (split_part_idx > 0) then
-         write(stderr, '(A,A,I0,A,I0,A)') prefix(1:pos-1), '* (', &
-            assign_arrays%partree(split_part_idx)%items1_count, '/', &
-            assign_arrays%partree(split_part_idx)%items2_count, ')'
-      else
-         write(stderr, '(A,A)') prefix(1:pos-1), '(no split part)'
-      end if
-
-      ! Recursively print this child's children
-      call print_chain_recursive_array(assign_arrays, child_idx, depth + 1, is_last_child)
-   end do
 end subroutine
 
 subroutine print_part_signatures_array(assign_arrays)
@@ -765,7 +664,6 @@ subroutine print_part_signatures_array(assign_arrays)
       return
    end if
 
-   write(stderr, *)
    write(stderr, '(A)') repeat("=", 25)
    write(stderr, '(A)') "  Part Signatures"
    write(stderr, '(A)') repeat("=", 25)
@@ -773,7 +671,6 @@ subroutine print_part_signatures_array(assign_arrays)
 
    ! Print signatures for all parts (root is always at index 1)
    call print_signatures_recursive_array(assign_arrays, 1)
-
    write(stderr, *)
 end subroutine
 
@@ -819,7 +716,6 @@ subroutine print_leaf_items_array(assign_arrays)
       return
    end if
 
-   write(stderr, *)
    write(stderr, '(A)') repeat("=", 25)
    write(stderr, '(A)') "   Leaf Items"
    write(stderr, '(A)') repeat("=", 25)
@@ -827,7 +723,6 @@ subroutine print_leaf_items_array(assign_arrays)
 
    ! Print leaf items recursively (root is always at index 1)
    call print_leaf_items_recursive_array(assign_arrays, 1)
-
    write(stderr, *)
 end subroutine
 
@@ -857,7 +752,6 @@ subroutine print_chain_details_array(assign_arrays)
    type(array_trees_t), intent(in) :: assign_arrays
    integer :: i, link_idx, j, k, part_idx
 
-   write(stderr, *)
    write(stderr, '(A)') repeat("=", 40)
    write(stderr, '(A)') "        Chain Details"
    write(stderr, '(A)') repeat("=", 40)
@@ -902,7 +796,6 @@ subroutine print_first_level_items_array(assign_arrays)
       return
    end if
 
-   write(stderr, *)
    write(stderr, '(A)') repeat("=", 25)
    write(stderr, '(A)') "  First Level Items"
    write(stderr, '(A)') repeat("=", 25)
@@ -916,6 +809,93 @@ subroutine print_first_level_items_array(assign_arrays)
    end do
 
    write(stderr, *)
+end subroutine
+
+recursive subroutine print_part_recursive_array(assign_arrays, part_idx, depth, is_last_child)
+   type(array_trees_t), intent(in) :: assign_arrays
+   integer, intent(in) :: part_idx, depth
+   logical, dimension(:), intent(inout) :: is_last_child
+   integer :: child_idx, i, j
+
+   if (part_idx == 0) return
+
+   ! Process all children using direct array access
+   do i = 1, assign_arrays%partree(part_idx)%num_children
+      child_idx = assign_arrays%partree(part_idx)%child_indices(i)
+
+      ! Check if this is the last child
+      is_last_child(depth + 1) = (i == assign_arrays%partree(part_idx)%num_children)
+
+      ! Print prefix components directly
+      do j = 1, depth
+         if (is_last_child(j)) then
+            write(stderr, '(A)', advance='no') "   "
+         else
+            write(stderr, '(A)', advance='no') "|  "
+         end if
+      end do
+
+      ! Add branch characters
+      if (is_last_child(depth + 1)) then
+         write(stderr, '(A)', advance='no') "`--"
+      else
+         write(stderr, '(A)', advance='no') "|--"
+      end if
+
+      ! Print part index with item counts
+      write(stderr, '(A,I0,A,I0,A)') '* (', &
+         assign_arrays%partree(child_idx)%items1_count, '/', &
+         assign_arrays%partree(child_idx)%items2_count, ')'
+
+      ! Recursively print this child's children
+      call print_part_recursive_array(assign_arrays, child_idx, depth + 1, is_last_child)
+   end do
+end subroutine
+
+recursive subroutine print_chain_recursive_array(assign_arrays, chain_idx, depth, is_last_child)
+   type(array_trees_t), intent(in) :: assign_arrays
+   integer, intent(in) :: chain_idx, depth
+   logical, dimension(:), intent(inout) :: is_last_child
+   integer :: child_idx, split_part_idx, i, j
+
+   if (chain_idx == 0) return
+
+   ! Process all children using direct array access instead of linked traversal
+   do i = 1, assign_arrays%assigntree(chain_idx)%num_children
+      child_idx = assign_arrays%assigntree(chain_idx)%child_indices(i)
+
+      ! Check if this is the last child
+      is_last_child(depth + 1) = (i == assign_arrays%assigntree(chain_idx)%num_children)
+
+      ! Print prefix components directly
+      do j = 1, depth
+         if (is_last_child(j)) then
+            write(stderr, '(A)', advance='no') "   "
+         else
+            write(stderr, '(A)', advance='no') "|  "
+         end if
+      end do
+
+      ! Add branch characters
+      if (is_last_child(depth + 1)) then
+         write(stderr, '(A)', advance='no') "`--"
+      else
+         write(stderr, '(A)', advance='no') "|--"
+      end if
+
+      ! Print the split part index with item counts
+      split_part_idx = assign_arrays%assigntree(child_idx)%split_part_idx
+      if (split_part_idx > 0) then
+         write(stderr, '(A,I0,A,I0,A)') '* (', &
+            assign_arrays%partree(split_part_idx)%items1_count, '/', &
+            assign_arrays%partree(split_part_idx)%items2_count, ')'
+      else
+         write(stderr, '(A)') '(no split part)'
+      end if
+
+      ! Recursively print this child's children
+      call print_chain_recursive_array(assign_arrays, child_idx, depth + 1, is_last_child)
+   end do
 end subroutine
 
 end module
