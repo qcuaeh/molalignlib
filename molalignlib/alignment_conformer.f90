@@ -24,10 +24,10 @@ use permutation
 use euclidean
 use assignment_atoms
 use adjacency
-use biasing_isomer
 use pruning_atoms
 use lcrs_trees
 use lcrs_arrays
+use hna
 use assignment_tree
 use assignment_conformer
 use recording
@@ -36,20 +36,19 @@ implicit none
 
 contains
 
-subroutine optimize_atomperm_conform( atomset1, atomset2, adjcs1, adjcs2, atomtypes, coords1, coords2, registry)
+subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atomtypes, coords1, coords2, registry)
    integer, dimension(:), intent(in) :: atomset1, atomset2
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(partition_t), intent(in) :: atomtypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
-   type(registry_t), target, intent(out) :: registry
+   type(registry_t), target, intent(inout) :: registry
 
    ! Local variables
    integer, dimension(:), allocatable :: atomperm1, new_atomperm
    real(rk), dimension(:,:), allocatable :: coords2r
-   real(rk) :: permdist, new_permdist
    real(rk), dimension(4) :: rotation, total_rotation
+   real(rk) :: steps, permdist, new_permdist
    integer, pointer :: num_trials, lead_count
-   integer :: steps
    type(assigntree_node_t), pointer :: hnachain
    type(array_trees_t) :: assign_arrays
 
@@ -61,14 +60,16 @@ subroutine optimize_atomperm_conform( atomset1, atomset2, adjcs1, adjcs2, atomty
       call print_chain_tree_array( assign_arrays)
    end if
 
-   if ((stoch_flag .and. .not. count_flag) .or. (stoch_flag .and. count_flag .and. &
+   ! Reset registry for new conformer
+   call reset_registry( registry)
+
+   if ((stoch_flag .and. .not. adaptive_flag) .or. (stoch_flag .and. adaptive_flag .and. &
          assign_arrays%global_combinations > count_thres*assign_arrays%local_combinations)) then
 
       ! Initialize random number generator
       call random_initialize()
 
       ! Initialize local minima registry
-      call init_registry( registry, num_records)
       num_trials => registry%num_trials
       lead_count => registry%records(1)%count
 
@@ -112,7 +113,7 @@ subroutine optimize_atomperm_conform( atomset1, atomset2, adjcs1, adjcs2, atomty
          end if
 
          ! Update results
-         call insert_record_homo( registry, atomperm1, permdist, steps, total_rotation)
+         call insert_record_atomperm( registry, atomperm1, steps, total_rotation, 0, permdist)
 
       end do
 
@@ -129,9 +130,9 @@ subroutine optimize_atomperm_conform( atomset1, atomset2, adjcs1, adjcs2, atomty
       permdist = sqdistsum( atomset1, atomperm1, coords1, coords2r)
       
       ! Initialize registry with a single record
-      call init_registry( registry, 1)
       registry%occ_records = 1
       registry%records(1)%atomperm1 = atomperm1
+      registry%records(1)%permdiff = 0
       registry%records(1)%permdist = permdist
       registry%records(1)%count = 1
       registry%records(1)%steps = 1
@@ -140,7 +141,7 @@ subroutine optimize_atomperm_conform( atomset1, atomset2, adjcs1, adjcs2, atomty
    end if
 end subroutine
 
-subroutine assign_atomperm_conform( adjcs1, adjcs2, atomtypes, coords1, coords2, atomperm1)
+subroutine assign_atomperm_conformer( adjcs1, adjcs2, atomtypes, coords1, coords2, atomperm1)
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(partition_t), intent(in) :: atomtypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2

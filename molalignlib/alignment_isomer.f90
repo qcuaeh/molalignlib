@@ -36,7 +36,7 @@ subroutine optimize_atomperm_isomer(atomset1, atomset2, atomtypes, adjcs1, adjcs
    type(partition_t), intent(in) :: atomtypes
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
-   type(registry_t), target, intent(out) :: registry
+   type(registry_t), target, intent(inout) :: registry
 
    ! Local variables
    integer, dimension(:), allocatable :: atomperm1
@@ -44,7 +44,6 @@ subroutine optimize_atomperm_isomer(atomset1, atomset2, atomtypes, adjcs1, adjcs
    real(rk) :: permdist
    real(rk), dimension(4) :: rotation, total_rotation
    integer, pointer :: num_trials, lead_count
-   integer :: steps
    integer :: permdiff
    type(int_matrix), dimension(:), allocatable :: biases
    logical, dimension(:,:), allocatable :: adjmat1, adjmat2
@@ -62,8 +61,7 @@ subroutine optimize_atomperm_isomer(atomset1, atomset2, atomtypes, adjcs1, adjcs
    call random_initialize()
 
    ! Initialize local minima registry (dual mode: adjacency + position)
-!   call init_registry(registry, num_records)
-   call init_registry(registry, num_records)
+   call reset_registry(registry)
    num_trials => registry%num_trials
    lead_count => registry%records(1)%count
 
@@ -87,10 +85,9 @@ subroutine optimize_atomperm_isomer(atomset1, atomset2, atomtypes, adjcs1, adjcs
 
       permdiff = adjacencydiff(atomset1, atomperm1, adjcs1, adjcs2)
       permdist = sqdistsum(atomset1, atomperm1, coords1, coords2r)
-      steps = 1
 
       ! Update results
-      call insert_record_hetero(registry, atomperm1, moldiffs, permdist, steps, total_rotation)
+      call insert_record_moldiff(registry, moldiffs, atomperm1, 1, total_rotation, permdist)
 
    end do
 end subroutine

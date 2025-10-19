@@ -67,7 +67,7 @@ stdin_flag = .false.
 tree_flag = .false.
 mass_flag = .false.
 stoch_flag = .true.
-count_flag = .true.
+adaptive_flag = .true.
 bond_flag = .false.
 mapping_flag = .false.
 label_flag = .false.
@@ -97,7 +97,7 @@ do while (get_arg(arg))
       stoch_flag = .false.
    case ('-stochastic')
       stoch_flag = .true.
-      count_flag = .false.
+      adaptive_flag = .false.
    case ('-label')
       label_flag = .true.
    case ('-heavy')
@@ -106,11 +106,11 @@ do while (get_arg(arg))
       mass_flag = .true.
    case ('-mirror')
       mirror_flag = .true.
-   case ('-thres')
+   case ('-count')
       call read_optarg( arg, count_thres)
    case ('-trials')
       call read_optarg( arg, max_trials)
-   case ('-n')
+   case ('-records')
       call read_optarg( arg, num_records)
    case ('-coords')
       coords_flag = .true.
@@ -238,7 +238,8 @@ if (align_flag) then
    if (remap_flag) then
 
       ! Remap atoms to minimize the MSD
-      call optimize_atomperm_conform( atomset1, atomset2, adjcs1, adjcs2, atomtypes, &
+      call allocate_registry( registry, num_records)
+      call optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atomtypes, &
             coords1w, coords2w, registry)
 
       ! Print optimization stats
@@ -296,7 +297,7 @@ else
    coords2w = get_weighted_coords( atoms2, weights2)
 
    if (remap_flag) then
-      call assign_atomperm_conform( adjcs1, adjcs2, atomtypes, coords1w, coords2w, atomperm1)
+      call assign_atomperm_conformer( adjcs1, adjcs2, atomtypes, coords1w, coords2w, atomperm1)
       rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2))
    else
       allocate (atomperm1(size( coords1w, 2)))

@@ -48,17 +48,17 @@ type(adjc_t), dimension(:), allocatable :: adjcs1, adjcs2
 type(adjc_t), dimension(:), allocatable :: adjcs1_mod, adjcs2_mod
 logical, dimension(:,:), allocatable :: adjmat1, adjmat2
 type(partition_t) :: atomtypes
-type(registry_t) :: registry, conform_registry
-real(rk) :: rmsd
+type(registry_t) :: iso_registry, confo_registry, temp_registry
 real(rk) :: center1(3), center2(3), rotquat(4)
 real(rk), dimension(:), allocatable :: weights1, weights2
 real(rk), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, coords2r
 integer, dimension(:), pointer :: atomset1, atomset2
 integer, dimension(:), allocatable :: atomset1_alloc, atomset2_alloc
 integer, dimension(:), allocatable :: atomperm1
-integer :: adjd
 integer :: unitin1, unitin2, unitout
-integer :: i, j, k
+integer :: adjd
+real(rk) :: rmsd
+integer :: i
 logical :: union_flag
 logical :: intersection_flag
 
@@ -73,7 +73,7 @@ coords_flag = .false.
 stdin_flag = .false.
 mass_flag = .false.
 stoch_flag = .true.
-count_flag = .true.
+adaptive_flag = .true.
 mapping_flag = .false.
 label_flag = .false.
 random_flag = .false.
@@ -84,7 +84,7 @@ intersection_flag = .false.
 
 extin = 'xyz'
 extout = 'xyz'
-num_records = 1
+num_records = 10
 count_thres = 100
 unitout = stdout
 max_trials = huge(ik)
@@ -109,11 +109,11 @@ do while (get_arg(arg))
       mass_flag = .true.
    case ('-mirror')
       mirror_flag = .true.
-   case ('-thres')
+   case ('-count')
       call read_optarg(arg, count_thres)
    case ('-trials')
       call read_optarg(arg, max_trials)
-   case ('-n')
+   case ('-records')
       call read_optarg(arg, num_records)
    case ('-coords')
       coords_flag = .true.
@@ -243,76 +243,87 @@ if (align_flag) then
 
    if (remap_flag) then
 
+      ! Allocate registries
+      call allocate_registry(iso_registry, num_records)
+      call allocate_registry(confo_registry, num_records)
+      call allocate_registry(temp_registry, 1)
+
       ! Remap atoms to minimize adjacency difference and MSD
       call optimize_atomperm_isomer(atomset1, atomset2, atomtypes, adjcs1, adjcs2, &
-                                     coords1w, coords2w, registry)
+                                     coords1w, coords2w, iso_registry)
 
-      ! Print optimization stats
+      ! Print isomer optimization stats
       if (stats_flag) then
-         call print_records(registry)
+         call print_records(iso_registry)
       end if
 
-      do i = 1, registry%occ_records
+      do i = 1, iso_registry%occ_records
 
-         atomperm1 = registry%records(i)%atomperm1
+         atomperm1 = iso_registry%records(i)%atomperm1
 
          ! Modify bonds according to selected strategy
-         if (allocated(registry%records(i)%moldiffs)) then
-
+         if (iso_registry%records(i)%permdiff == 0) then
+            ! Already conformers, use original adjacencies
+            call optimize_atomperm_conformer(atomset1, atomset2, adjcs1, adjcs2, atomtypes, &
+                                          coords1w, coords2w, temp_registry)
+         else
             if (union_flag) then
                ! Add all differing bonds to both molecules
                adjmat1 = adjcs_to_adjmat(adjcs1)
                adjmat2 = adjcs_to_adjmat(adjcs2)
-               call bonds_union(adjmat1, adjmat2, atomperm1, registry%records(i)%moldiffs)
+               call bonds_union(adjmat1, adjmat2, atomperm1, iso_registry%records(i)%moldiffs)
                call adjmat_to_adjcs(adjmat1, adjcs1_mod)
                call adjmat_to_adjcs(adjmat2, adjcs2_mod)
-               call optimize_atomperm_conform(atomset1, atomset2, adjcs1_mod, adjcs2_mod, atomtypes, &
-                                             coords1w, coords2w, conform_registry)
+               call optimize_atomperm_conformer(atomset1, atomset2, adjcs1_mod, adjcs2_mod, atomtypes, &
+                                             coords1w, coords2w, temp_registry)
             else if (intersection_flag) then
                ! Remove all differing bonds from both molecules
                adjmat1 = adjcs_to_adjmat(adjcs1)
                adjmat2 = adjcs_to_adjmat(adjcs2)
-               call bonds_intersection(adjmat1, adjmat2, atomperm1, registry%records(i)%moldiffs)
+               call bonds_intersection(adjmat1, adjmat2, atomperm1, iso_registry%records(i)%moldiffs)
                call adjmat_to_adjcs(adjmat1, adjcs1_mod)
                call adjmat_to_adjcs(adjmat2, adjcs2_mod)
-               call optimize_atomperm_conform(atomset1, atomset2, adjcs1_mod, adjcs2_mod, atomtypes, &
-                                             coords1w, coords2w, conform_registry)
+               call optimize_atomperm_conformer(atomset1, atomset2, adjcs1_mod, adjcs2_mod, atomtypes, &
+                                             coords1w, coords2w, temp_registry)
             else
                ! Default: match mol2 to mol1
                adjmat2 = adjcs_to_adjmat(adjcs2)
-               call match_bonds_to_mol1(adjmat2, registry%records(i)%moldiffs)
+               call match_bonds_to_mol1(adjmat2, iso_registry%records(i)%moldiffs)
                call adjmat_to_adjcs(adjmat2, adjcs2_mod)
-               call optimize_atomperm_conform(atomset1, atomset2, adjcs1, adjcs2_mod, atomtypes, &
-                                             coords1w, coords2w, conform_registry)
+               call optimize_atomperm_conformer(atomset1, atomset2, adjcs1, adjcs2_mod, atomtypes, &
+                                             coords1w, coords2w, temp_registry)
             end if
-         else
-            ! Already conformers, use original adjacencies
-            call optimize_atomperm_conform(atomset1, atomset2, adjcs1, adjcs2, atomtypes, &
-                                          coords1w, coords2w, conform_registry)
          end if
 
-         ! Process conformer optimization results
-         do k = 1, conform_registry%occ_records
-            atomperm1 = conform_registry%records(k)%atomperm1
-            rotquat = least_rotquat(atomset1, atomperm1, coords1w, coords2w)
-            coords2r = rotated_coords(coords2, rotquat, center1)
-            rmsd = sqrt(sqdistmean(atomset1, atomperm1, weights1, coords1, coords2r))
-            adjd = adjacencydiff(atomset1, atomperm1, adjcs1, adjcs2)
+         call insert_record_atomperm(confo_registry, &
+               temp_registry%records(1)%atomperm1, &
+               temp_registry%records(1)%steps, &
+               temp_registry%records(1)%rotation, &
+               adjacencydiff(atomset1, temp_registry%records(1)%atomperm1, adjcs1, adjcs2), &
+               temp_registry%records(1)%permdist)
 
-            if (mapping_flag) then
-               do j = 1, size(atomperm1)
-                  write (stdout,'(I0," -> ",I0)') j, atomperm1(j)
-               end do
-            end if
+      end do
 
-            if (coords_flag) then
-               title2 = 'RMSD=' // str(rmsd) // ' Δadj=' // str(adjd)
-               call set_coords(atoms2, coords2r)
-               call writefile(unitout, extout, title2, atoms2, bonds2, atomperm1)
-            else
-               write (stdout,'(A,A,I0,A)') str(rmsd), '(', adjd, ')'
-            end if
-         end do
+      ! Print conformer optimization stats
+      if (stats_flag) then
+         call print_records(confo_registry)
+      end if
+
+      ! Process conformer optimization results
+      do i = 1, confo_registry%occ_records
+         atomperm1 = confo_registry%records(i)%atomperm1
+         rotquat = least_rotquat(atomset1, atomperm1, coords1w, coords2w)
+         coords2r = rotated_coords(coords2, rotquat, center1)
+         rmsd = sqrt(sqdistmean(atomset1, atomperm1, weights1, coords1, coords2r))
+         adjd = adjacencydiff(atomset1, atomperm1, adjcs1, adjcs2)
+
+         if (coords_flag) then
+            title2 = 'RMSD=' // str(rmsd) // ' Δadj=' // str(adjd)
+            call set_coords(atoms2, coords2r)
+            call writefile(unitout, extout, title2, atoms2, bonds2, atomperm1)
+         else
+            write (stdout,'(A,A,I0,A)') str(rmsd), '(', adjd, ')'
+         end if
       end do
 
    else
@@ -356,11 +367,6 @@ else
       call writefile(unitout, extout, title2, atoms2, bonds2, atomperm1)
    else
       write (stdout,'(A,A,I0,A)') str(rmsd), '(', adjd, ')'
-      if (mapping_flag) then
-         do j = 1, size(atomperm1)
-            write (stdout,'(I0," -> ",I0)') j, atomperm1(j)
-         end do
-      end if
    end if
 
 end if

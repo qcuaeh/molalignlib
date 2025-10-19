@@ -11,7 +11,7 @@ logical :: mass_flag
 logical :: align_flag
 logical :: remap_flag
 logical :: stoch_flag
-logical :: count_flag
+logical :: adaptive_flag
 logical :: coords_flag
 logical :: stdin_flag
 logical :: stats_flag

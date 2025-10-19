@@ -25,15 +25,17 @@ private
 
 public record_t
 public registry_t
-public insert_record_homo
-public insert_record_hetero
+public insert_record_atomperm
+public insert_record_moldiff
 public print_records
-public init_registry
+public allocate_registry
+public reset_registry
 
 type :: record_t
    integer :: count
-   real(rk) :: steps
+   integer :: permdiff
    real(rk) :: permdist
+   real(rk) :: steps
    real(rk) :: rotation(4)
    integer, dimension(:), allocatable :: atomperm1
    integer, dimension(:,:), allocatable :: moldiffs    ! List of differing bond pairs [2, nbonds]
@@ -49,7 +51,7 @@ end type
 
 contains
 
-subroutine init_registry(registry, num_records)
+subroutine allocate_registry(registry, num_records)
    type(registry_t), intent(inout) :: registry
    integer, intent(in) :: num_records
 
@@ -58,21 +60,28 @@ subroutine init_registry(registry, num_records)
    end if
 
    allocate (registry%records(num_records))
+end subroutine
+
+subroutine reset_registry(registry)
+   type(registry_t), intent(inout) :: registry
+
    registry%occ_records = 0
    registry%num_trials = 0
    registry%total_steps = 0
    registry%overflow = .false.
    registry%records%count = 0
+   registry%records%steps = 0
+   registry%records%permdiff = huge(ik)
    registry%records%permdist = huge(rk)
 end subroutine
 
-subroutine insert_record_homo(registry, atomperm1, permdist, steps, rotation)
+subroutine insert_record_atomperm(registry, atomperm1, steps, rotation, permdiff, permdist)
    ! Group by atomperm1, sort by permdist
    type(registry_t), target, intent(inout) :: registry
    integer, dimension(:), intent(in) :: atomperm1
-   integer, intent(in) :: steps
+   real(rk), intent(in) :: steps, rotation(4)
+   integer, intent(in) :: permdiff
    real(rk), intent(in) :: permdist
-   real(rk), intent(in) :: rotation(4)
    ! Local variables
    type(record_t), pointer :: record
    integer :: i, j, insert_pos
@@ -85,7 +94,7 @@ subroutine insert_record_homo(registry, atomperm1, permdist, steps, rotation)
       record => registry%records(i)
       if (all(atomperm1 == record%atomperm1)) then
          record%count = record%count + 1
-         record%steps = record%steps + (steps - record%steps) / record%count
+         record%steps = record%steps + (steps - record%steps)/record%count
          return
       end if
    end do
@@ -93,9 +102,15 @@ subroutine insert_record_homo(registry, atomperm1, permdist, steps, rotation)
    ! Find insertion point: sort by permdist
    insert_pos = registry%occ_records + 1
    do i = 1, registry%occ_records
-      if (permdist < registry%records(i)%permdist) then
+      record => registry%records(i)
+      if (permdiff < record%permdiff) then
          insert_pos = i
          exit
+      else if (permdiff == record%permdiff) then
+         if (permdist < record%permdist) then
+            insert_pos = i
+            exit
+         end if
       end if
    end do
 
@@ -110,6 +125,7 @@ subroutine insert_record_homo(registry, atomperm1, permdist, steps, rotation)
       record => registry%records(insert_pos)
       record%atomperm1 = atomperm1
       record%count = 1
+      record%permdiff = permdiff
       record%permdist = permdist
       record%rotation = rotation
       record%steps = steps
@@ -123,95 +139,102 @@ subroutine insert_record_homo(registry, atomperm1, permdist, steps, rotation)
    end if
 end subroutine
 
-subroutine insert_record_hetero(registry, atomperm1, moldiffs, permdist, steps, rotation)
-   ! Group by differing bonds, sort by permdiff then permdist
-   ! moldiffs must be pre-sorted
+subroutine insert_record_moldiff(registry, moldiffs, atomperm1, steps, rotation, permdist)
    type(registry_t), target, intent(inout) :: registry
+   integer, dimension(:,:), intent(in) :: moldiffs
    integer, dimension(:), intent(in) :: atomperm1
-   integer, dimension(:,:), intent(in) :: moldiffs  ! Must be sorted [2, nbonds]
    integer, intent(in) :: steps
-   real(rk), intent(in) :: permdist
    real(rk), intent(in) :: rotation(4)
-   ! Local variables
+   real(rk), intent(in) :: permdist
    type(record_t), pointer :: record
-   integer :: i, j, insert_pos, num_diff
-   logical :: bonds_match
+   type(record_t) :: temp_record
+   integer :: i, j, insert_pos, permdiff, match_pos
+   logical :: bonds_match, found_match
 
    registry%num_trials = registry%num_trials + 1
    registry%total_steps = registry%total_steps + steps
 
-   num_diff = size(moldiffs, 2)
+   permdiff = size(moldiffs, 2)
+   found_match = .false.
+   match_pos = 0
 
-   ! Check for existing record with same set of differing bonds
-   ! Both arrays are sorted, so simple equality check works
    do i = 1, registry%occ_records
       record => registry%records(i)
 
-      ! Check if the differing bond sets match
-      if (allocated(record%moldiffs)) then
-         if (num_diff == size(record%moldiffs, 2)) then
-            ! Compare all bond pairs
-            bonds_match = all(moldiffs(1, :) == record%moldiffs(1, :)) .and. &
-                          all(moldiffs(2, :) == record%moldiffs(2, :))
+      if (permdiff == record%permdiff) then
+         bonds_match = all(moldiffs(1, :) == record%moldiffs(1, :)) .and. &
+                       all(moldiffs(2, :) == record%moldiffs(2, :))
 
-            if (bonds_match) then
-               ! Found matching bond difference set - increment count
-               record%count = record%count + 1
+         if (bonds_match) then
+            found_match = .true.
+            match_pos = i
+            record%count = record%count + 1
+            record%steps = record%steps + (steps - record%steps)/record%count
 
-               ! Keep the permutation with minimum permdist
-               if (permdist < record%permdist) then
-                  ! Found better permutation for this bond difference set
-                  record%atomperm1 = atomperm1
-                  record%permdist = permdist
-                  record%rotation = rotation
-                  record%steps = (record%steps * (record%count - 1) + steps) / record%count
-               else
-                  ! Keep existing permutation, but update average steps
-                  record%steps = record%steps + (steps - record%steps) / record%count
+            if (permdist < record%permdist) then
+               temp_record = record
+               temp_record%atomperm1 = atomperm1
+               temp_record%permdist = permdist
+               temp_record%rotation = rotation
+
+               do j = i, registry%occ_records - 1
+                  registry%records(j) = registry%records(j + 1)
+               end do
+               registry%occ_records = registry%occ_records - 1
+
+               insert_pos = registry%occ_records + 1
+               do j = 1, registry%occ_records
+                  if (permdiff < registry%records(j)%permdiff .or. &
+                      (permdiff == registry%records(j)%permdiff .and. &
+                       permdist < registry%records(j)%permdist)) then
+                     insert_pos = j
+                     exit
+                  end if
+               end do
+
+               if (insert_pos <= size(registry%records)) then
+                  do j = min(registry%occ_records, size(registry%records) - 1), insert_pos, -1
+                     registry%records(j + 1) = registry%records(j)
+                  end do
+
+                  registry%records(insert_pos) = temp_record
+
+                  if (registry%occ_records < size(registry%records)) then
+                     registry%occ_records = registry%occ_records + 1
+                  else
+                     registry%overflow = .true.
+                  end if
                end if
-               return
             end if
+            return
          end if
       end if
    end do
 
-   ! Find insertion point: sort by number of differing bonds first, then by permdist
    insert_pos = registry%occ_records + 1
    do i = 1, registry%occ_records
-      if (allocated(registry%records(i)%moldiffs)) then
-         if (num_diff < size(registry%records(i)%moldiffs, 2) .or. &
-             (num_diff == size(registry%records(i)%moldiffs, 2) .and. &
-              permdist < registry%records(i)%permdist)) then
-            insert_pos = i
-            exit
-         end if
-      else
-         ! Unallocated moldiffs means permutation record (shouldn't happen in practice)
-         ! Treat as having 0 differing bonds
-         if (num_diff < 0) then
-            insert_pos = i
-            exit
-         end if
+      if (permdiff < registry%records(i)%permdiff .or. &
+          (permdiff == registry%records(i)%permdiff .and. &
+           permdist < registry%records(i)%permdist)) then
+         insert_pos = i
+         exit
       end if
    end do
 
-   ! Only insert if position is within bounds
    if (insert_pos <= size(registry%records)) then
-      ! Shift records to make room (if full, last one gets dropped)
       do j = min(registry%occ_records, size(registry%records) - 1), insert_pos, -1
          registry%records(j + 1) = registry%records(j)
       end do
 
-      ! Initialize new record (bonds already sorted)
       record => registry%records(insert_pos)
       record%atomperm1 = atomperm1
       record%count = 1
-      record%moldiffs = moldiffs  ! Automatic allocation
+      record%moldiffs = moldiffs
+      record%permdiff = permdiff
       record%permdist = permdist
       record%rotation = rotation
       record%steps = steps
 
-      ! Update record count and overflow status
       if (registry%occ_records < size(registry%records)) then
          registry%occ_records = registry%occ_records + 1
       else
@@ -223,35 +246,27 @@ end subroutine
 subroutine print_records(registry)
    type(registry_t), intent(in) :: registry
    type(record_t) :: record
-   character(49) :: line
-   integer :: i, num_diff
+   character(:), allocatable :: line
+   integer :: i
 
-   line = repeat('-', 49)
-   write (stderr, '(2x,a,4x,a,5x,a,4x,a,5x,a,6x,a)') '#', 'Count', 'Steps', 'Rotθ', 'Δadj', 'Δxyz'
+   line = repeat('-', 39)
+   write (stderr, '(2x,a,4x,a,4x,a,4x,a,5x,a,6x,a)') '#', 'Count', 'Steps', 'Δadj', 'Δxyz'
    write (stderr, '(a)') line
    do i = 1, registry%occ_records
       record = registry%records(i)
-
-      ! Get number of differing bonds
-      if (allocated(record%moldiffs)) then
-         num_diff = size(record%moldiffs, 2)
-      else
-         num_diff = 0
-      end if
-
-      write (stderr, '(i3,4x,i4,4x,f5.1,5x,f5.1,3x,i4,4x,f8.4)') &
-         i, record%count, record%steps, angle(record%rotation), num_diff, record%permdist
+      write (stderr, '(i3,4x,i4,4x,f5.1,3x,i4,4x,f8.4)') &
+         i, record%count, record%steps, record%permdiff, record%permdist
    end do
    write (stderr, '(a)') line
 
    write (stderr, *)
-   write (stderr, '(a,1x,i0)') 'Random trials =', registry%num_trials
-   write (stderr, '(a,1x,i0)') 'Minimization steps =', registry%total_steps
+   write (stderr, '(a,1x,i0)') 'Random trials:', registry%num_trials
+   write (stderr, '(a,1x,i0)') 'Minimization steps:', registry%total_steps
 
    if (registry%overflow) then
-      write (stderr, '(a,1x,i0)') 'Visited local minima >', registry%occ_records
+      write (stderr, '(a,1x,i0)') 'Visited local minima: >', registry%occ_records
    else
-      write (stderr, '(a,1x,i0)') 'Visited local minima =', registry%occ_records
+      write (stderr, '(a,1x,i0)') 'Visited local minima:', registry%occ_records
    end if
 
    write (stderr, *)

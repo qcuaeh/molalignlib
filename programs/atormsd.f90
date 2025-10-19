@@ -99,11 +99,11 @@ do while (get_arg(arg))
       mass_flag = .true.
    case ('-mirror')
       mirror_flag = .true.
-   case ('-thres')
+   case ('-count')
       call read_optarg(arg, count_thres)
    case ('-trials')
       call read_optarg( arg, max_trials)
-   case ('-n')
+   case ('-records')
       call read_optarg( arg, num_records)
    case ('-coords')
       coords_flag = .true.
@@ -207,7 +207,8 @@ if (align_flag) then
 
       ! Remap atoms to minimize the MSD
       call prune_procedure( atomtypes, coords1, coords2, prunes)
-      call optimize_atomperm_cluster( atomset1, atomset2, atomtypes, prunes, coords1w, coords2w, registry)
+      call allocate_registry( registry, num_records)
+      call optimize_atomperm_atoms( atomset1, atomset2, atomtypes, prunes, coords1w, coords2w, registry)
 
       ! Print optimization stats
       if (stats_flag) then
