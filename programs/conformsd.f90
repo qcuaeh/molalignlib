@@ -77,7 +77,7 @@ iterate_flag = .true.
 extin = 'xyz'
 extout = 'xyz'
 num_records = 1
-count_thres = 10
+count_thres = 100
 unitout = stdout
 max_trials = huge( ik)
 
