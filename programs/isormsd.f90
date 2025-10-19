@@ -45,8 +45,8 @@ type(strlist_type) :: posargs(2)
 type(atom_t), dimension(:), allocatable :: atoms1, atoms2
 type(bond_t), dimension(:), allocatable :: bonds1, bonds2
 type(adjc_t), dimension(:), allocatable :: adjcs1, adjcs2
-type(adjc_t), dimension(:), allocatable :: adjcs2_mod
-logical, dimension(:,:), allocatable :: adjmat2
+type(adjc_t), dimension(:), allocatable :: adjcs1_mod, adjcs2_mod
+logical, dimension(:,:), allocatable :: adjmat1, adjmat2
 type(partition_t) :: atomtypes
 type(registry_t) :: registry, conform_registry
 real(rk) :: rmsd
@@ -59,6 +59,8 @@ integer, dimension(:), allocatable :: atomperm1
 integer :: adjd
 integer :: unitin1, unitin2, unitout
 integer :: i, j, k
+logical :: union_flag
+logical :: intersection_flag
 
 ! Set default options
 
@@ -75,6 +77,8 @@ label_flag = .false.
 random_flag = .false.
 iterate_flag = .true.
 bond_flag = .false.
+union_flag = .false.
+intersection_flag = .false.
 
 extin = 'xyz'
 extout = 'xyz'
@@ -124,6 +128,10 @@ do while (get_arg(arg))
       random_flag = .true.
    case ('-bond')
       bond_flag = .true.
+   case ('-union')
+      union_flag = .true.
+   case ('-intersection')
+      intersection_flag = .true.
    case default
       call read_posarg(arg, posargs)
    end select
@@ -246,23 +254,39 @@ if (align_flag) then
 
          atomperm1 = registry%records(i)%atomperm1
 
-         ! Modify molecule 2's bonds to match molecule 1 (making them conformers)
+         ! Modify bonds according to selected strategy
          if (allocated(registry%records(i)%moldiffs)) then
-            ! Convert to matrix for bond modification
-            adjmat2 = adjcs_to_adjmat(adjcs2)
 
-            call match_bonds_to_mol1(adjmat2, registry%records(i)%moldiffs)
-
-            ! Convert modified adjacency matrix back to adjacency list
-            call adjmat_to_adjcs(adjmat2, adjcs2_mod)
-
-            ! Optimize atom permutation as conformers
-            call optimize_atomperm_conform(atomset1, atomset2, adjcs1, adjcs2_mod, atomtypes, &
-                                           coords1w, coords2w, conform_registry)
+            if (union_flag) then
+               ! Add all differing bonds to both molecules
+               adjmat1 = adjcs_to_adjmat(adjcs1)
+               adjmat2 = adjcs_to_adjmat(adjcs2)
+               call bonds_union(adjmat1, adjmat2, atomperm1, registry%records(i)%moldiffs)
+               call adjmat_to_adjcs(adjmat1, adjcs1_mod)
+               call adjmat_to_adjcs(adjmat2, adjcs2_mod)
+               call optimize_atomperm_conform(atomset1, atomset2, adjcs1_mod, adjcs2_mod, atomtypes, &
+                                             coords1w, coords2w, conform_registry)
+            else if (intersection_flag) then
+               ! Remove all differing bonds from both molecules
+               adjmat1 = adjcs_to_adjmat(adjcs1)
+               adjmat2 = adjcs_to_adjmat(adjcs2)
+               call bonds_intersection(adjmat1, adjmat2, atomperm1, registry%records(i)%moldiffs)
+               call adjmat_to_adjcs(adjmat1, adjcs1_mod)
+               call adjmat_to_adjcs(adjmat2, adjcs2_mod)
+               call optimize_atomperm_conform(atomset1, atomset2, adjcs1_mod, adjcs2_mod, atomtypes, &
+                                             coords1w, coords2w, conform_registry)
+            else
+               ! Default: match mol2 to mol1
+               adjmat2 = adjcs_to_adjmat(adjcs2)
+               call match_bonds_to_mol1(adjmat2, registry%records(i)%moldiffs)
+               call adjmat_to_adjcs(adjmat2, adjcs2_mod)
+               call optimize_atomperm_conform(atomset1, atomset2, adjcs1, adjcs2_mod, atomtypes, &
+                                             coords1w, coords2w, conform_registry)
+            end if
          else
             ! Already conformers, use original adjacencies
             call optimize_atomperm_conform(atomset1, atomset2, adjcs1, adjcs2, atomtypes, &
-                                           coords1w, coords2w, conform_registry)
+                                          coords1w, coords2w, conform_registry)
          end if
 
          ! Process conformer optimization results
