@@ -1,7 +1,7 @@
 module lcrs_arrays
 use parameters
 use lcrs_trees
-use molecule
+use adjacency
 implicit none
 private
 public convert_trees_to_arrays

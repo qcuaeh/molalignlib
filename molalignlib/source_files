@@ -11,10 +11,10 @@ eigen_jacobi.f90
 #lap_hungarian.f90
 lap_jvc_dense.f90
 lap_jvc_sparse.f90
-chemistry.f90
-molecule.f90
 euclidean.f90
+chemistry.f90
 adjacency.f90
+molecule.f90
 file_path.f90
 file_read.f90
 file_write.f90
@@ -24,8 +24,8 @@ lcrs_arrays.f90
 partitioning.f90
 partitioning_ll.f90
 hna.f90
-biasing.f90
-pruning.f90
+biasing_isomer.f90
+pruning_atoms.f90
 assignment_tree.f90
 assignment_atoms.f90
 assignment_bonds.f90

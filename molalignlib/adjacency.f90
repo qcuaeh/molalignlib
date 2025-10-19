@@ -3,8 +3,6 @@ use parameters
 use derived_types
 use permutation
 use euclidean
-use chemistry
-use molecule
 use sorting
 implicit none
 private
@@ -19,6 +17,10 @@ public match_bonds_to_mol1
 interface adjacencydiff
    module procedure adjacencydiff_perm
 end interface
+
+type, public :: adjc_t
+   integer, allocatable :: adjlist(:)
+end type
 
 contains
 

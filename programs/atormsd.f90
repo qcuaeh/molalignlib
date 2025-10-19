@@ -29,8 +29,8 @@ use file_path
 use file_read
 use file_write
 use argparse
-use biasing
-use pruning
+use biasing_isomer
+use pruning_atoms
 use recording
 use alignment_atoms
 use options

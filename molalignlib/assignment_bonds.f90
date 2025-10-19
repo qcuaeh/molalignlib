@@ -4,7 +4,6 @@ use derived_types
 use permutation
 use euclidean
 use chemistry
-use molecule
 use adjacency
 use random
 implicit none

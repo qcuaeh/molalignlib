@@ -18,10 +18,9 @@ module alignment_isomer
 use parameters
 use derived_types
 use random
-use molecule
 use euclidean
 use adjacency
-use biasing
+use biasing_isomer
 use partitioning
 use recording
 use assignment_atoms

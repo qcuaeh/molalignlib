@@ -24,8 +24,8 @@ use permutation
 use euclidean
 use assignment_atoms
 use adjacency
-use biasing
-use pruning
+use biasing_isomer
+use pruning_atoms
 use lcrs_trees
 use lcrs_arrays
 use assignment_tree

@@ -676,7 +676,7 @@ end subroutine
 
 recursive subroutine recurse_assign_atoms_local_pruned(coords1, coords2, assign_arrays, &
          branch_idx, total_budget, best_perm, accumulated_dist, success)
-   ! DFS exploration with pruning - finds permutation that minimizes total distance
+   ! DFS exploration with pruning_atoms - finds permutation that minimizes total distance
    ! OPTIMIZED: Incremental distance calculation to avoid redundant sqdistsum calls
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_arrays
@@ -787,7 +787,7 @@ recursive subroutine recurse_assign_atoms_local_pruned(coords1, coords2, assign_
 end subroutine
 
 subroutine assign_atoms_local_pruned(coords1, coords2, assign_arrays, atomperm1, permdist)
-   ! DFS exploration with pruning threshold - finds assignment within threshold
+   ! DFS exploration with pruning_atoms threshold - finds assignment within threshold
    ! OPTIMIZED: Uses incremental distance calculation
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_arrays

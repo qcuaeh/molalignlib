@@ -14,13 +14,13 @@
 ! You should have received a copy of the GNU General Public License
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-module biasing
+module biasing_isomer
 use parameters
 use derived_types
 use sorting
 use utils
 use permutation
-use molecule
+use adjacency
 use lcrs_trees
 use partitioning
 use hna

@@ -17,7 +17,6 @@
 module alignment_atoms
 use parameters
 use random
-use molecule
 use chemistry
 use permutation
 use euclidean
@@ -25,7 +24,7 @@ use assignment_atoms
 use lcrs_trees
 use hna
 use partitioning
-use pruning
+use pruning_atoms
 use recording
 use options
 implicit none

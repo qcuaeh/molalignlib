@@ -1,7 +1,7 @@
 module assignment_tree
 use parameters
 use random
-use molecule
+use adjacency
 use lcrs_trees
 use lcrs_arrays
 use hna

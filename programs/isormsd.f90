@@ -29,12 +29,12 @@ use file_path
 use file_read
 use file_write
 use argparse
-use biasing
+use biasing_isomer
 use recording
 use alignment_isomer
 use assignment_conformer
 use alignment_conformer
-use pruning
+use pruning_atoms
 use options
 implicit none
 

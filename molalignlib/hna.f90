@@ -1,7 +1,7 @@
 module hna
 use parameters
 use derived_types
-use molecule
+use adjacency
 use lcrs_trees
 implicit none
 private

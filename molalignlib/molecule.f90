@@ -1,6 +1,7 @@
 module molecule
 use parameters
 use chemistry
+use adjacency
 implicit none
 private
 public set_coords
@@ -28,10 +29,6 @@ type, public :: bond_t
    integer :: typeid
    integer :: atomidx1
    integer :: atomidx2
-end type
-
-type, public :: adjc_t
-   integer, allocatable :: adjlist(:)
 end type
 
 interface get_weighted_coords
