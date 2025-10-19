@@ -48,8 +48,6 @@ type(adjc_t), dimension(:), allocatable :: adjcs1, adjcs2
 type(adjc_t), dimension(:), allocatable :: adjcs2_mod
 logical, dimension(:,:), allocatable :: adjmat2
 type(partition_t) :: atomtypes
-type(assigntree_node_t), pointer :: hnachain
-type(array_trees_t) :: assign_arrays
 type(registry_t) :: registry, conform_registry
 real(rk) :: rmsd
 real(rk) :: center1(3), center2(3), rotquat(4)
@@ -188,9 +186,17 @@ if (bond_flag) then
    call adjacency_from_distance(atomset1, atoms1, adjcs1)
    call adjacency_from_distance(atomset2, atoms2, adjcs2)
 else
-   if (size(bonds1) < 1 .and. size(bonds2) < 1) then
-      write (stdout,'(A)') 'ERROR: Molecules have no bonds!'
-      stop
+   if (size(bonds1) < 1 .or. size(bonds2) < 1) then
+      if (size(bonds1) < 1 .and. size(bonds2) < 1) then
+         write (stdout,'(A)') 'ERROR: Molecules have no bonds!'
+         stop
+      else if (size(bonds1) < 1) then
+         write (stdout,'(A)') 'ERROR: First molecule has no bonds!'
+         stop
+      else if (size(bonds2) < 1) then
+         write (stdout,'(A)') 'ERROR: Second molecule has no bonds!'
+         stop
+      end if
    end if
    call adjacency_from_bonds(atomset1, atoms1, bonds1, adjcs1)
    call adjacency_from_bonds(atomset2, atoms2, bonds2, adjcs2)
