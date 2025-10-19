@@ -206,7 +206,7 @@ if (align_flag) then
    if (remap_flag) then
 
       ! Remap atoms to minimize the MSD
-      call prune_procedure( atomtypes, atoms1, atoms2, prunes)
+      call prune_procedure( atomtypes, coords1, coords2, prunes)
       call optimize_atomperm_cluster( atomset1, atomset2, atomtypes, prunes, coords1w, coords2w, registry)
 
       ! Print optimization stats
@@ -257,7 +257,7 @@ else
    coords2w = get_weighted_coords( atoms2, weights2)
 
    if (remap_flag) then
-      call prune_procedure( atomtypes, atoms1, atoms2, prunes)
+      call prune_procedure( atomtypes, coords1, coords2, prunes)
       call assign_atoms_pruned( atomtypes, coords1w, coords2w, prunes, atomperm1)
       rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2))
    else

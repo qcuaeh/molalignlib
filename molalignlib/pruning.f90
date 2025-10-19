@@ -27,22 +27,22 @@ real(rk) :: prune_tol
 procedure(prune_proc), pointer :: prune_procedure
 
 abstract interface
-   subroutine prune_proc( atomtypes, atoms1, atoms2, prunes)
+   subroutine prune_proc( atomtypes, coords1, coords2, prunes)
       use parameters
       use derived_types
       use molecule
       use lcrs_trees
       type(partition_t), intent(in) :: atomtypes
-      type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
+      real(rk), dimension(:,:), intent(in) :: coords1, coords2
       type(bool_matrix), dimension(:), allocatable, intent(out) :: prunes
    end subroutine
 end interface
 
 contains
 
-subroutine prune_none( atomtypes, atoms1, atoms2, prunes)
+subroutine prune_none( atomtypes, coords1, coords2, prunes)
    type(partition_t), intent(in) :: atomtypes
-   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
+   real(rk), dimension(:,:), intent(in) :: coords1, coords2
    type(bool_matrix), dimension(:), allocatable, intent(out) :: prunes
    ! Local variables
    integer :: h, i, j
@@ -62,18 +62,15 @@ subroutine prune_none( atomtypes, atoms1, atoms2, prunes)
 
 end subroutine
 
-subroutine prune_rd( atomtypes, atoms1, atoms2, prunes)
+subroutine prune_rd( atomtypes, coords1, coords2, prunes)
    type(partition_t), intent(in) :: atomtypes
-   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
+   real(rk), dimension(:,:), intent(in) :: coords1, coords2
    type(bool_matrix), dimension(:), allocatable, intent(out) :: prunes
    ! Local variables
    type(real_listlist), allocatable, dimension(:) :: dists1, dists2
-   real(rk), dimension(:,:), allocatable :: coords1, coords2
    integer :: num_items1, num_items2
    integer :: h, i, j, k, iatom, jatom
 
-   coords1 = get_coords(atoms1)
-   coords2 = get_coords(atoms2)
    allocate (dists1(size(coords1, dim=2)))
    allocate (dists2(size(coords2, dim=2)))
    allocate (prunes(atomtypes%num_parts))
