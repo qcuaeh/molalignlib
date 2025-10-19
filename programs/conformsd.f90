@@ -44,10 +44,8 @@ type(atom_t), dimension(:), allocatable :: atoms1, atoms2
 type(bond_t), dimension(:), allocatable :: bonds1, bonds2
 type(adjc_t), dimension(:), allocatable :: adjcs1, adjcs2
 type(partition_t) :: atomtypes
-type(assigntree_node_t), pointer :: hnachain
-type(array_trees_t) :: assign_arrays
 type(registry_t) :: registry
-real(rk) :: rmsd, permdist
+real(rk) :: rmsd
 real(rk) :: center1(3), center2(3), rotquat(4)
 real(rk), dimension(:), allocatable :: weights1, weights2
 real(rk), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, coords2r
@@ -239,55 +237,27 @@ if (align_flag) then
 
    if (remap_flag) then
 
-      ! Pre-compute assignment tree for decision making
-      call compute_consistent_hna_partition( adjcs1, adjcs2, atomtypes, hnachain)
-      call build_assignment_tree( adjcs1, adjcs2, hnachain%last_link, assign_arrays)
+      ! Remap atoms to minimize the MSD
+      call optimize_atomperm_conform( atomset1, atomset2, adjcs1, adjcs2, atomtypes, &
+            coords1w, coords2w, registry)
 
-      if (tree_flag) then
-         call print_chain_tree_array( assign_arrays)
+      ! Print optimization stats
+      if (stats_flag) then
+         call print_records( registry)
       end if
 
-      if ((stoch_flag .and. .not. count_flag) .or. (stoch_flag .and. count_flag .and. &
-            assign_arrays%global_combinations > count_thres*assign_arrays%local_combinations)) then
-
-         ! Remap atoms to minimize the MSD (tree will be rebuilt inside)
-         call optimize_atomperm_conform( atomset1, atomset2, adjcs1, adjcs2, atomtypes, coords1w, coords2w, registry)
-
-         ! Print optimization stats
-         if (stats_flag) then
-            call print_records( registry)
-         end if
-
-         do i = 1, registry%occ_records
-            atomperm1 = registry%records(i)%atomperm1
-!            rotquat = registry%records(i)%rotquat
-            rotquat = least_rotquat( atomset1, atomperm1, coords1w, coords2w)
-            coords2r = rotated_coords( coords2, rotquat, center1)
-            rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2r))
-
-            if (mapping_flag) then
-               do j = 1, size(atomperm1)
-                  write (stdout,'(I0," -> ",I0)') j, atomperm1(j)
-               end do
-            end if
-
-            if (coords_flag) then
-               title2 = 'RMSD=' // str( rmsd)
-               coords2r = rotated_coords( coords2, rotquat, center1)
-               call set_coords( atoms2, coords2r)
-               call writefile( unitout, extout, title2, atoms2, bonds2, atomperm1)
-            else
-               write (stdout,'(A)') str( rmsd)
-            end if
-
-         end do
-
-      else
-
-         call assign_atoms_global( coords1w, coords2w, assign_arrays, atomperm1)
+      do i = 1, registry%occ_records
+         atomperm1 = registry%records(i)%atomperm1
+!         rotquat = registry%records(i)%rotquat
          rotquat = least_rotquat( atomset1, atomperm1, coords1w, coords2w)
          coords2r = rotated_coords( coords2, rotquat, center1)
          rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2r))
+
+         if (mapping_flag) then
+            do j = 1, size(atomperm1)
+               write (stdout,'(I0," -> ",I0)') j, atomperm1(j)
+            end do
+         end if
 
          if (coords_flag) then
             title2 = 'RMSD=' // str( rmsd)
@@ -296,14 +266,9 @@ if (align_flag) then
             call writefile( unitout, extout, title2, atoms2, bonds2, atomperm1)
          else
             write (stdout,'(A)') str( rmsd)
-            if (mapping_flag) then
-               do j = 1, size(atomperm1)
-                  write (stdout,'(I0," -> ",I0)') j, atomperm1(j)
-               end do
-            end if
          end if
 
-      end if
+      end do
 
    else
 
@@ -331,7 +296,9 @@ else
    coords2w = get_weighted_coords( atoms2, weights2)
 
    if (remap_flag) then
-      call assign_atomperm_conform( adjcs1, adjcs2, atomtypes, coords1w, coords2w, atomperm1, permdist)
+      call optimize_atomperm_conform( atomset1, atomset2, adjcs1, adjcs2, atomtypes, &
+            coords1w, coords2w, registry)
+      atomperm1 = registry%records(1)%atomperm1
       rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2))
    else
       allocate (atomperm1(size( coords1w, 2)))

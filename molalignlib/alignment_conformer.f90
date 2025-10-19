@@ -19,7 +19,6 @@ use parameters
 use derived_types
 use utils
 use random
-use molecule
 use chemistry
 use permutation
 use euclidean
@@ -53,85 +52,95 @@ subroutine optimize_atomperm_conform( atomset1, atomset2, adjcs1, adjcs2, atomty
    integer :: steps
    type(assigntree_node_t), pointer :: hnachain
    type(array_trees_t) :: assign_arrays
+   logical :: stoch_flag, count_flag
 
-   ! Pre-compute assignment tree
+   stoch_flag = .true.
+   count_flag = .true.
+
+   ! Pre-compute assignment tree for decision making
    call compute_consistent_hna_partition( adjcs1, adjcs2, atomtypes, hnachain)
    call build_assignment_tree( adjcs1, adjcs2, hnachain%last_link, assign_arrays)
 
-   ! Initialize random number generator
-   call random_initialize()
+   if (tree_flag) then
+      call print_chain_tree_array( assign_arrays)
+   end if
 
-   ! Initialize local minima registry
-   call init_registry( registry, num_records)
-   num_trials => registry%num_trials
-   lead_count => registry%records(1)%count
+   if ((stoch_flag .and. .not. count_flag) .or. (stoch_flag .and. count_flag .and. &
+         assign_arrays%global_combinations > count_thres*assign_arrays%local_combinations)) then
 
-   ! Optimize atom permutation
-   do while (lead_count < count_thres .and. num_trials < max_trials)
+      ! Initialize random number generator
+      call random_initialize()
 
-      ! Get randomly rotated coords2
-      total_rotation = randrotquat()
-      coords2r = rotated_coords( coords2, total_rotation)
+      ! Initialize local minima registry
+      call init_registry( registry, num_records)
+      num_trials => registry%num_trials
+      lead_count => registry%records(1)%count
 
-      ! Assign atoms with current orientation
-      if (PRUNE_ASSIGNMENT_TREE) then
-         call assign_atoms_greedy( coords1, coords2r, assign_arrays, atomperm1, permdist)
-         call assign_atoms_local_pruned( coords1, coords2r, assign_arrays, atomperm1, permdist)
-      else
-         call assign_atoms_local( coords1, coords2r, assign_arrays, atomperm1, permdist)
-      end if
-      rotation = least_rotquat( atomset1, atomperm1, coords1, coords2r)
-      total_rotation = quatmul( total_rotation, rotation)
-      call rotate_coords( atomset2, coords2r, rotation)
-      permdist = sqdistsum( atomset1, atomperm1, coords1, coords2r)
-      steps = 1
+      ! Optimize atom permutation
+      do while (lead_count < count_thres .and. num_trials < max_trials)
 
-      if (iterate_flag) then
-         do
-            if (PRUNE_ASSIGNMENT_TREE) then
-               new_permdist = permdist
-               call assign_atoms_local_pruned( coords1, coords2r, assign_arrays, new_atomperm, new_permdist)
-            else
-               call assign_atoms_local( coords1, coords2r, assign_arrays, new_atomperm, new_permdist)
-            end if
-!            write (stdout,*) permdist, new_permdist
-            if (all(atomperm1 == new_atomperm)) exit
-            atomperm1 = new_atomperm
-            rotation = least_rotquat( atomset1, atomperm1, coords1, coords2r)
-            total_rotation = quatmul( total_rotation, rotation)
-            call rotate_coords( atomset2, coords2r, rotation)
-            permdist = sqdistsum( atomset1, atomperm1, coords1, coords2r)
-            steps = steps + 1
-         end do
-      end if
+         ! Get randomly rotated coords2
+         total_rotation = randrotquat()
+         coords2r = rotated_coords( coords2, total_rotation)
 
-      ! Update results
-      call insert_record_homo( registry, atomperm1, permdist, steps, total_rotation)
+         ! Assign atoms with current orientation
+         if (PRUNE_ASSIGNMENT_TREE) then
+            call assign_atoms_greedy( coords1, coords2r, assign_arrays, atomperm1, permdist)
+            call assign_atoms_local_pruned( coords1, coords2r, assign_arrays, atomperm1, permdist)
+         else
+            call assign_atoms_local( coords1, coords2r, assign_arrays, atomperm1, permdist)
+         end if
+         rotation = least_rotquat( atomset1, atomperm1, coords1, coords2r)
+         total_rotation = quatmul( total_rotation, rotation)
+         call rotate_coords( atomset2, coords2r, rotation)
+         permdist = sqdistsum( atomset1, atomperm1, coords1, coords2r)
+         steps = 1
 
-   end do
-end subroutine
+         if (iterate_flag) then
+            do
+               if (PRUNE_ASSIGNMENT_TREE) then
+                  new_permdist = permdist
+                  call assign_atoms_local_pruned( coords1, coords2r, assign_arrays, new_atomperm, new_permdist)
+               else
+                  call assign_atoms_local( coords1, coords2r, assign_arrays, new_atomperm, new_permdist)
+               end if
+!               write (stdout,*) permdist, new_permdist
+               if (all(atomperm1 == new_atomperm)) exit
+               atomperm1 = new_atomperm
+               rotation = least_rotquat( atomset1, atomperm1, coords1, coords2r)
+               total_rotation = quatmul( total_rotation, rotation)
+               call rotate_coords( atomset2, coords2r, rotation)
+               permdist = sqdistsum( atomset1, atomperm1, coords1, coords2r)
+               steps = steps + 1
+            end do
+         end if
 
-subroutine assign_atomperm_conform( adjcs1, adjcs2, atomtypes, coords1, coords2, atomperm1, permdist)
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
-   type(partition_t), intent(in) :: atomtypes
-   real(rk), dimension(:,:), intent(in) :: coords1, coords2
-   integer, dimension(:), allocatable, intent(out) :: atomperm1
-   real(rk), intent(out) :: permdist
+         ! Update results
+         call insert_record_homo( registry, atomperm1, permdist, steps, total_rotation)
 
-   ! Local variables
-   type(assigntree_node_t), pointer :: hnachain
-   type(array_trees_t) :: assign_arrays
+      end do
 
-   ! Pre-compute assignment tree
-   call compute_consistent_hna_partition( adjcs1, adjcs2, atomtypes, hnachain)
-   call build_assignment_tree( adjcs1, adjcs2, hnachain%last_link, assign_arrays)
-
-   ! Assign atoms using greedy and local pruned methods
-   if (PRUNE_ASSIGNMENT_TREE) then
-      call assign_atoms_greedy( coords1, coords2, assign_arrays, atomperm1, permdist)
-      call assign_atoms_local_pruned( coords1, coords2, assign_arrays, atomperm1, permdist)
    else
-      call assign_atoms_local( coords1, coords2, assign_arrays, atomperm1, permdist)
+
+      ! Assign atoms using global assignment
+      call assign_atoms_global( coords1, coords2, assign_arrays, atomperm1)
+      
+      ! Calculate optimal rotation
+      rotation = least_rotquat( atomset1, atomperm1, coords1, coords2)
+      
+      ! Rotate coords2 and calculate permdist
+      coords2r = rotated_coords( coords2, rotation)
+      permdist = sqdistsum( atomset1, atomperm1, coords1, coords2r)
+      
+      ! Initialize registry with a single record
+      call init_registry( registry, 1)
+      registry%occ_records = 1
+      registry%records(1)%atomperm1 = atomperm1
+      registry%records(1)%permdist = permdist
+      registry%records(1)%count = 1
+      registry%records(1)%steps = 1
+      registry%records(1)%rotation = rotation
+
    end if
 end subroutine
 
