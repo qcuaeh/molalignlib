@@ -296,9 +296,7 @@ else
    coords2w = get_weighted_coords( atoms2, weights2)
 
    if (remap_flag) then
-      call optimize_atomperm_conform( atomset1, atomset2, adjcs1, adjcs2, atomtypes, &
-            coords1w, coords2w, registry)
-      atomperm1 = registry%records(1)%atomperm1
+      call assign_atomperm_conform( adjcs1, adjcs2, atomtypes, coords1w, coords2w, atomperm1)
       rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2))
    else
       allocate (atomperm1(size( coords1w, 2)))

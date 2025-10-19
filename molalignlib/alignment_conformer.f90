@@ -52,10 +52,6 @@ subroutine optimize_atomperm_conform( atomset1, atomset2, adjcs1, adjcs2, atomty
    integer :: steps
    type(assigntree_node_t), pointer :: hnachain
    type(array_trees_t) :: assign_arrays
-   logical :: stoch_flag, count_flag
-
-   stoch_flag = .true.
-   count_flag = .true.
 
    ! Pre-compute assignment tree for decision making
    call compute_consistent_hna_partition( adjcs1, adjcs2, atomtypes, hnachain)
@@ -141,6 +137,30 @@ subroutine optimize_atomperm_conform( atomset1, atomset2, adjcs1, adjcs2, atomty
       registry%records(1)%steps = 1
       registry%records(1)%rotation = rotation
 
+   end if
+end subroutine
+
+subroutine assign_atomperm_conform( adjcs1, adjcs2, atomtypes, coords1, coords2, atomperm1)
+   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   type(partition_t), intent(in) :: atomtypes
+   real(rk), dimension(:,:), intent(in) :: coords1, coords2
+   integer, dimension(:), allocatable, intent(out) :: atomperm1
+
+   ! Local variables
+   type(assigntree_node_t), pointer :: hnachain
+   type(array_trees_t) :: assign_arrays
+   real(rk) :: permdist
+
+   ! Pre-compute assignment tree
+   call compute_consistent_hna_partition( adjcs1, adjcs2, atomtypes, hnachain)
+   call build_assignment_tree( adjcs1, adjcs2, hnachain%last_link, assign_arrays)
+
+   ! Assign atoms using greedy and local pruned methods
+   if (PRUNE_ASSIGNMENT_TREE) then
+      call assign_atoms_greedy( coords1, coords2, assign_arrays, atomperm1, permdist)
+      call assign_atoms_local_pruned( coords1, coords2, assign_arrays, atomperm1, permdist)
+   else
+      call assign_atoms_local( coords1, coords2, assign_arrays, atomperm1, permdist)
    end if
 end subroutine
 

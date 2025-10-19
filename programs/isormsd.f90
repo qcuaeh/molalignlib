@@ -72,6 +72,8 @@ remap_flag = .false.
 coords_flag = .false.
 stdin_flag = .false.
 mass_flag = .false.
+stoch_flag = .true.
+count_flag = .true.
 mapping_flag = .false.
 label_flag = .false.
 random_flag = .false.
@@ -339,16 +341,8 @@ else
    coords2w = get_weighted_coords(atoms2, weights2)
 
    if (remap_flag) then
-      call optimize_atomperm_isomer(atomset1, atomset2, atomtypes, adjcs1, adjcs2, &
-                                     coords1w, coords2w, registry)
-
-      if (stats_flag) then
-         call print_records(registry)
-      end if
-
-      atomperm1 = registry%records(1)%atomperm1
-      rmsd = sqrt(sqdistmean(atomset1, atomperm1, weights1, coords1, coords2))
-      adjd = adjacencydiff(atomset1, atomperm1, adjcs1, adjcs2)
+      write (stdout, '(A)') 'ERROR: Remapping without alignment is not implemented'
+      stop
    else
       allocate (atomperm1(size( coords1w, 2)))
       call init_identity_permutation( atomperm1)
