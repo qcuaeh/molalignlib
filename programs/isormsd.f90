@@ -198,13 +198,13 @@ if (bond_flag) then
 else
    if (size(bonds1) < 1 .or. size(bonds2) < 1) then
       if (size(bonds1) < 1 .and. size(bonds2) < 1) then
-         write (stdout,'(A)') 'ERROR: Molecules have no bonds!'
+         write (stdout,'(A)') 'Error: Molecules have no bonds!'
          stop
       else if (size(bonds1) < 1) then
-         write (stdout,'(A)') 'ERROR: First molecule has no bonds!'
+         write (stdout,'(A)') 'Error: First molecule has no bonds!'
          stop
       else if (size(bonds2) < 1) then
-         write (stdout,'(A)') 'ERROR: Second molecule has no bonds!'
+         write (stdout,'(A)') 'Error: Second molecule has no bonds!'
          stop
       end if
    end if
@@ -352,7 +352,7 @@ else
    coords2w = get_weighted_coords(atoms2, weights2)
 
    if (remap_flag) then
-      write (stdout, '(A)') 'ERROR: Remapping without alignment is not implemented'
+      write (stdout, '(A)') 'Error: Remapping without alignment is not implemented'
       stop
    else
       allocate (atomperm1(size( coords1w, 2)))

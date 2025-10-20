@@ -214,7 +214,7 @@ subroutine solve_lap_pruned(n, s1, s2, x1, x2, prun, partperm, dist)
       stop
    end if
 
-   if (DO_DEBUG_TESTS) then
+   if (DEBUG_TESTS) then
       if (.not. is_permutation(partperm)) then
          error stop 'Assignment is not a permutation'
       end if
@@ -379,7 +379,7 @@ subroutine solve_lap_nearest(n, s1, s2, x1, x2, partperm, dist)
       stop
    end if
 
-   if (DO_DEBUG_TESTS) then
+   if (DEBUG_TESTS) then
       if (.not. is_permutation(partperm)) then
          error stop 'Assignment is not a permutation'
       end if

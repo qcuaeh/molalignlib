@@ -125,19 +125,19 @@ subroutine subperm_add(subperm, i1, i2)
    integer, intent(in) :: i1, i2
    integer :: n
 
-   if (DO_DEBUG_TESTS) then
+   if (DEBUG_TESTS) then
    block
       integer :: i
       ! Check if i1 is already in atomset
       do i = 1, subperm%atomset_size
          if (subperm%atomset(i) == i1) then
-            error stop "subperm index conflict: i1 already in atomset"
+            error stop 'Index i1 is already in atomset'
          end if
       end do
       ! Check if i2 is already assigned to something in atomset
       do i = 1, subperm%atomset_size
          if (subperm%atomperm(subperm%atomset(i)) == i2) then
-            error stop "subperm index conflict: i2 already assigned"
+            error stop 'Index i2 is already assigned'
          end if
       end do
    end block

@@ -88,9 +88,9 @@ subroutine minimize_adjdiff(atomset1, atomtypes, scnatypes, adjcs1, adjcs2, adjm
               atomperm2, tracked, permdiff, permdist, ntrack, track, coords1, coords2)
    end do
 
-   if (DO_DEBUG_TESTS) then
+   if (DEBUG_TESTS) then
       if (adjacencydiff(atomset1, atomperm1, adjcs1, adjcs2) /= permdiff) then
-         error stop 'incorrect edge difference'
+         error stop 'permdiff is not equal to the final adjacency difference'
       end if
    end if
 

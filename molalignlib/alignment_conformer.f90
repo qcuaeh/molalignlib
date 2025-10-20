@@ -81,7 +81,7 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
          coords2r = rotated_coords( coords2, total_rotation)
 
          ! Assign atoms with current orientation
-         if (PRUNE_ASSIGNMENT_TREE) then
+         if (prune_flag) then
             call assign_atoms_greedy( coords1, coords2r, assign_arrays, atomperm1, permdist)
             call assign_atoms_local_pruned( coords1, coords2r, assign_arrays, atomperm1, permdist)
          else
@@ -95,7 +95,7 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
 
          if (iterate_flag) then
             do
-               if (PRUNE_ASSIGNMENT_TREE) then
+               if (prune_flag) then
                   new_permdist = permdist
                   call assign_atoms_local_pruned( coords1, coords2r, assign_arrays, new_atomperm, new_permdist)
                else
@@ -157,7 +157,7 @@ subroutine assign_atomperm_conformer( adjcs1, adjcs2, atomtypes, coords1, coords
    call build_assignment_tree( adjcs1, adjcs2, hnachain%last_link, assign_arrays)
 
    ! Assign atoms using greedy and local pruned methods
-   if (PRUNE_ASSIGNMENT_TREE) then
+   if (prune_flag) then
       call assign_atoms_greedy( coords1, coords2, assign_arrays, atomperm1, permdist)
       call assign_atoms_local_pruned( coords1, coords2, assign_arrays, atomperm1, permdist)
    else

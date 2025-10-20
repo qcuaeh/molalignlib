@@ -19,6 +19,7 @@ logical :: tree_flag
 logical :: bond_flag
 logical :: mapping_flag
 logical :: fileout_flag
+logical :: prune_flag
 
 ! Bounds
 integer :: count_thres

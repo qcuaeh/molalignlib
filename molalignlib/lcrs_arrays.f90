@@ -469,62 +469,62 @@ subroutine validate_conversion(part_tree, assign_tree, assign_arrays)
 
    ! Validate counts
    if (assign_arrays%total_parts /= part_tree%total_parts) then
-      write(stderr, '(A,I0,A,I0)') "ERROR: Part count mismatch: ", &
+      write(stderr, '(A,I0,A,I0)') "Error: Part count mismatch: ", &
          assign_arrays%total_parts, " vs ", part_tree%total_parts
       validation_passed = .false.
    end if
 
    if (assign_arrays%total_items1 /= part_tree%total_items1) then
-      write(stderr, '(A,I0,A,I0)') "ERROR: Items1 count mismatch: ", &
+      write(stderr, '(A,I0,A,I0)') "Error: Items1 count mismatch: ", &
          assign_arrays%total_items1, " vs ", part_tree%total_items1
       validation_passed = .false.
    end if
 
    if (assign_arrays%total_items2 /= part_tree%total_items2) then
-      write(stderr, '(A,I0,A,I0)') "ERROR: Items2 count mismatch: ", &
+      write(stderr, '(A,I0,A,I0)') "Error: Items2 count mismatch: ", &
          assign_arrays%total_items2, " vs ", part_tree%total_items2
       validation_passed = .false.
    end if
 
    if (assign_arrays%total_chains /= assign_tree%total_chains) then
-      write(stderr, '(A,I0,A,I0)') "ERROR: Chain count mismatch: ", &
+      write(stderr, '(A,I0,A,I0)') "Error: Chain count mismatch: ", &
          assign_arrays%total_chains, " vs ", assign_tree%total_chains
       validation_passed = .false.
    end if
 
    if (assign_arrays%total_links /= assign_tree%total_links) then
-      write(stderr, '(A,I0,A,I0)') "ERROR: Link count mismatch: ", &
+      write(stderr, '(A,I0,A,I0)') "Error: Link count mismatch: ", &
          assign_arrays%total_links, " vs ", assign_tree%total_links
       validation_passed = .false.
    end if
 
    if (assign_arrays%total_partref_entries /= assign_tree%total_partrefs) then
-      write(stderr, '(A,I0,A,I0)') "ERROR: Partref count mismatch: ", &
+      write(stderr, '(A,I0,A,I0)') "Error: Partref count mismatch: ", &
          assign_arrays%total_partref_entries, " vs ", assign_tree%total_partrefs
       validation_passed = .false.
    end if
 
    ! NEW: Validate 2D itemdir array dimensions
    if (size(assign_arrays%itemdir1_entries, 1) /= assign_arrays%total_links) then
-      write(stderr, '(A,I0,A,I0)') "ERROR: Itemdir1 links dimension mismatch: ", &
+      write(stderr, '(A,I0,A,I0)') "Error: Itemdir1 links dimension mismatch: ", &
          size(assign_arrays%itemdir1_entries, 1), " vs ", assign_arrays%total_links
       validation_passed = .false.
    end if
 
    if (size(assign_arrays%itemdir1_entries, 2) /= assign_arrays%num_atoms1) then
-      write(stderr, '(A,I0,A,I0)') "ERROR: Itemdir1 atoms dimension mismatch: ", &
+      write(stderr, '(A,I0,A,I0)') "Error: Itemdir1 atoms dimension mismatch: ", &
          size(assign_arrays%itemdir1_entries, 2), " vs ", assign_arrays%num_atoms1
       validation_passed = .false.
    end if
 
    if (size(assign_arrays%itemdir2_entries, 1) /= assign_arrays%total_links) then
-      write(stderr, '(A,I0,A,I0)') "ERROR: Itemdir2 links dimension mismatch: ", &
+      write(stderr, '(A,I0,A,I0)') "Error: Itemdir2 links dimension mismatch: ", &
          size(assign_arrays%itemdir2_entries, 1), " vs ", assign_arrays%total_links
       validation_passed = .false.
    end if
 
    if (size(assign_arrays%itemdir2_entries, 2) /= assign_arrays%num_atoms2) then
-      write(stderr, '(A,I0,A,I0)') "ERROR: Itemdir2 atoms dimension mismatch: ", &
+      write(stderr, '(A,I0,A,I0)') "Error: Itemdir2 atoms dimension mismatch: ", &
          size(assign_arrays%itemdir2_entries, 2), " vs ", assign_arrays%num_atoms2
       validation_passed = .false.
    end if

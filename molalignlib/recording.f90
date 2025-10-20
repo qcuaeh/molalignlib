@@ -56,7 +56,7 @@ subroutine allocate_registry(registry, num_records)
    integer, intent(in) :: num_records
 
    if (num_records < 1) then
-      error stop 'num_records < 1'
+      error stop 'num_records is less than 1'
    end if
 
    allocate (registry%records(num_records))

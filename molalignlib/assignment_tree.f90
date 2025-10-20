@@ -35,9 +35,11 @@ subroutine update_hna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
    do while (associated(item))
       signature = itemdir1(adjcs1(item%idx)%adjlist)
       child_part => find_child_part(part, signature)
-      if (.not. associated(child_part)) then
-         call print_part_signature(signature)
-         error stop 'part not found'
+      if (DEBUG_TESTS) then
+         if (.not. associated(child_part)) then
+            call print_part_signature(signature)
+            error stop 'Child part not found'
+         end if
       end if
       if (.not. associated(child_part%last_item1)) then
          child_part%last_item1 => child_part%first_item1
@@ -54,9 +56,11 @@ subroutine update_hna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
    do while (associated(item))
       signature = itemdir2(adjcs2(item%idx)%adjlist)
       child_part => find_child_part(part, signature)
-      if (.not. associated(child_part)) then
-         call print_part_signature(signature)
-         error stop 'part not found'
+      if (DEBUG_TESTS) then
+         if (.not. associated(child_part)) then
+            call print_part_signature(signature)
+            error stop 'Child part not found'
+         end if
       end if
       if (.not. associated(child_part%last_item2)) then
          child_part%last_item2 => child_part%first_item2
@@ -119,10 +123,6 @@ subroutine split_part_indexed(part, link, index1, index2)
    type(partree_node_t), pointer :: child_part1, child_part2
    type(item_node_t), pointer :: item1, item2
    integer :: current_index
-
-   ! Validate indices
-   if (index1 < 1 .or. index1 > part%num_items1) error stop "index1 out of range"
-   if (index2 < 1 .or. index2 > part%num_items2) error stop "index2 out of range"
 
    ! Get pointers to first and second child parts
    child_part1 => part%first_child_part
@@ -342,11 +342,11 @@ subroutine split_part_first(part, link)
 
    ! Verify that both molecules are conformers
    if (part%num_items1 /= part%num_items2) then
-      write(stderr, '(A)') "ERROR: Molecules are not conformers!"
+      write(stderr, '(A)') "Error: Molecules are not conformers!"
       stop
    end if
 
-   if (DO_DEBUG_TESTS) then
+   if (DEBUG_TESTS) then
       ! Verify that the item chains are properly linked
       item1 => part%first_item1%next_item
       item2 => part%first_item2%next_item
@@ -355,7 +355,7 @@ subroutine split_part_first(part, link)
          item2 => item2%next_item
       end do
       if (associated(item1) .neqv. associated(item2)) then
-         error stop "FATAL: Item chains have different lengths."
+         error stop 'Item chains have different lengths.'
       end if
    end if
 

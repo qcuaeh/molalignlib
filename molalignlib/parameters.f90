@@ -7,10 +7,7 @@ use iso_fortran_env, only: int32, int64, real32, real64
 implicit none
 
 ! Debug flags
-logical, parameter :: DO_DEBUG_TESTS = .false.
-
-! Optimization flags
-logical, parameter :: PRUNE_ASSIGNMENT_TREE = .true.
+logical, parameter :: DEBUG_TESTS = .false.
 
 ! Numerical kinds
 integer, parameter :: ik = int32 ! 32-bit integer kind

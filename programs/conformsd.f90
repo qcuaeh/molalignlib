@@ -73,6 +73,7 @@ mapping_flag = .false.
 label_flag = .false.
 random_flag = .false.
 iterate_flag = .true.
+prune_flag = .false.
 
 extin = 'xyz'
 extout = 'xyz'
@@ -91,6 +92,8 @@ do while (get_arg(arg))
       align_flag = .true.
    case ('-remap')
       remap_flag = .true.
+   case ('-prune')
+      prune_flag = .true.
    case ('-mapping')
       mapping_flag = .true.
    case ('-exhaustive')
@@ -192,13 +195,13 @@ if (bond_flag) then
 else
    if (size(bonds1) < 1 .or. size(bonds2) < 1) then
       if (size(bonds1) < 1 .and. size(bonds2) < 1) then
-         write (stdout,'(A)') 'ERROR: Molecules have no bonds!'
+         write (stdout,'(A)') 'Error: Molecules have no bonds!'
          stop
       else if (size(bonds1) < 1) then
-         write (stdout,'(A)') 'ERROR: First molecule has no bonds!'
+         write (stdout,'(A)') 'Error: First molecule has no bonds!'
          stop
       else if (size(bonds2) < 1) then
-         write (stdout,'(A)') 'ERROR: Second molecule has no bonds!'
+         write (stdout,'(A)') 'Error: Second molecule has no bonds!'
          stop
       end if
    end if
