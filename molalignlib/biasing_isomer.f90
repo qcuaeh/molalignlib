@@ -30,24 +30,80 @@ implicit none
 
 contains
 
-subroutine compute_hna_biases(adjcs1, adjcs2, atomtypes, biases, scnatypes)
-! Iteratively compute HNA types
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+subroutine init_costs(atomtypes, costs)
    type(partition_t), intent(in) :: atomtypes
-   type(int_matrix), dimension(:), allocatable, intent(out) :: biases
-   type(partition_t), intent(out) :: scnatypes
+   type(real_matrix), dimension(:), allocatable, intent(out) :: costs
    ! Local variables
-   type(assigntree_node_t), pointer :: hnachain
-   integer :: h, i, j, iatom, jatom
-   integer :: num_splits
-!   integer :: link_idx
+   integer :: h
 
-   allocate(biases(atomtypes%num_parts))
+   allocate(costs(atomtypes%num_parts))
 
    do h = 1, atomtypes%num_parts
-      allocate(biases(h)%a(atomtypes%parts(h)%num_items1, atomtypes%parts(h)%num_items2))
-      biases(h)%a = 0
+      allocate(costs(h)%a(atomtypes%parts(h)%num_items1, atomtypes%parts(h)%num_items2))
+      costs(h)%a = 0
    end do
+end subroutine
+
+real(rk) function longest_distance(atomtypes, coords1, coords2)
+   type(partition_t), target, intent(in) :: atomtypes
+   real(rk), dimension(:,:), intent(in) :: coords1, coords2
+   ! Local variables
+   type(partition_part_t), pointer :: part
+   real(rk) :: length, maxlength1, maxlength2
+   integer :: h, i
+
+   maxlength1 = 0
+   maxlength2 = 0
+   do h = 1, atomtypes%num_parts
+      part => atomtypes%parts(h)
+      do i = 1, part%num_items1
+         length = sqrt(sum(coords1(:,part%items1(i))**2))
+         if (length > maxlength1) then
+            maxlength1 = length
+         end if
+      end do
+      do i = 1, part%num_items2
+         length = sqrt(sum(coords2(:,part%items2(i))**2))
+         if (length > maxlength2) then
+            maxlength2 = length
+         end if
+      end do
+   end do
+
+   longest_distance = maxlength1 + maxlength2
+end function
+
+subroutine add_euclidean_costs(atomtypes, coords1, coords2, factor, costs)
+   type(partition_t), target, intent(in) :: atomtypes
+   real(rk), dimension(:,:), intent(in) :: coords1, coords2
+   real(rk), intent(in) :: factor
+   type(real_matrix), dimension(:), allocatable, intent(inout) :: costs
+   ! Local variables
+   type(partition_part_t), pointer :: part
+   integer :: h, i, j
+
+   do h = 1, atomtypes%num_parts
+      part => atomtypes%parts(h)
+      do j = 1, part%num_items2
+         do i = 1, part%num_items1
+            costs(h)%a(i,j) = costs(h)%a(i,j) + factor * &
+                  sum((coords1(:,part%items1(i)) - coords2(:,part%items2(j)))**2)
+         end do
+      end do
+   end do
+end subroutine
+
+subroutine add_hna_costs(atomtypes, adjcs1, adjcs2, scnatypes, costs)
+! Iteratively compute HNA types
+   type(partition_t), target, intent(in) :: atomtypes
+   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   type(partition_t), intent(out) :: scnatypes
+   type(real_matrix), dimension(:), allocatable, intent(inout) :: costs
+   ! Local variables
+   type(partition_part_t), pointer :: part
+   type(assigntree_node_t), pointer :: hnachain
+   integer :: h, i, j, iatom, jatom, num_splits
+!   integer :: link_idx
 
    ! Initialize HNA chain with element types
    hnachain => chain_from_partition(atomtypes)
@@ -64,17 +120,18 @@ subroutine compute_hna_biases(adjcs1, adjcs2, atomtypes, biases, scnatypes)
       ! Exit loop if no splits occurred in the last iteration
       if (num_splits == 0) exit
 
-      ! Update biases with HNAs at current level
+      ! Update costs with HNAs at current level
       do h = 1, atomtypes%num_parts
-         do j = 1, atomtypes%parts(h)%num_items2
-            jatom = atomtypes%parts(h)%items2(j)
-            do i = 1, atomtypes%parts(h)%num_items1
-               iatom = atomtypes%parts(h)%items1(i)
+         part => atomtypes%parts(h)
+         do j = 1, part%num_items2
+            jatom = part%items2(j)
+            do i = 1, part%num_items1
+               iatom = part%items1(i)
                if (.not. associated( &
                   hnachain%last_link%itemdir1(iatom)%ptr, &
                   hnachain%last_link%itemdir2(jatom)%ptr) &
                ) then
-                  biases(h)%a(i, j) = biases(h)%a(i, j) + 1
+                  costs(h)%a(i, j) = costs(h)%a(i, j) + 1
                end if
             end do
          end do
@@ -86,7 +143,7 @@ subroutine compute_hna_biases(adjcs1, adjcs2, atomtypes, biases, scnatypes)
 !   do h = 1, atomtypes%num_parts
 !      write(stderr, *)
 !      do j = 1, atomtypes%parts(h)%num_items2
-!         write(stderr, '(*(i2))') biases(h)%a(:atomtypes%parts(h)%num_items1, j)
+!         write(stderr, '(*(i2))') costs(h)%a(:atomtypes%parts(h)%num_items1, j)
 !      end do
 !   end do
 

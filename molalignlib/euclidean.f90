@@ -34,7 +34,6 @@ public rotated_coords
 public translate_coords
 public least_rotquat
 public least_sqdistsum
-public compute_distance_matrix
 
 interface sqdistsum
    module procedure sqdistsum_base
@@ -412,20 +411,5 @@ function least_rotquat_subperm(atomset1, atomperm1, coords1, coords2) result(rot
 !   sqdistsum = max(leasteigval(residuals), 0._rk)
    rotquat = leasteigvec(residuals)
 end function
-
-! Compute euclidean cost matrix
-subroutine compute_distance_matrix( part, coords1, coords2, dists)
-   real(rk), dimension(:,:), intent(out) :: dists
-   type(partition_part_t), intent(in) :: part
-   real(rk), dimension(:,:), intent(in) :: coords1, coords2
-   ! Local variables
-   integer :: i, j
-
-   do j = 1, part%num_items2
-      do i = 1, part%num_items1
-         dists(i, j) = sum((coords1(:, part%items1(i)) - coords2(:, part%items2(j)))**2)
-      end do
-   end do
-end subroutine
 
 end module

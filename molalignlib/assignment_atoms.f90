@@ -26,55 +26,34 @@ use lap_jvc_sparse
 use options
 implicit none
 private
-public assign_atoms_biased
+public assign_atoms
 public assign_atoms_pruned
 public assign_atoms_nearest
 
 contains
 
-subroutine assign_atoms_biased( atomtypes, biases, coords1, coords2, atomperm1)
+subroutine assign_atoms( atomtypes, costs, atomperm1)
 !------------------------------------------------------------------------
 ! Finds the optimal mapping between points with fixed orientation
 ! Uses JVC algorithm (assumes num_items1 == num_items2 for all parts)
 !------------------------------------------------------------------------
    type(partition_t), target, intent(in) :: atomtypes
-   type(int_matrix), dimension(:), intent(in) :: biases
-   real(rk), dimension(:,:), intent(in) :: coords1, coords2
-   integer, dimension(:), allocatable, intent(out) :: atomperm1
+   type(real_matrix), dimension(:), intent(in) :: costs
+   integer, dimension(:), allocatable, intent(inout) :: atomperm1
    ! Local variables
    type(partition_part_t), pointer :: part
    integer, dimension(:), allocatable :: partperm
-   real(rk), dimension(:,:), allocatable :: dists, costs
-   integer :: maxnum_items
-   real(rk) :: normfac, lapcost
+   real(rk) :: lapcost
    integer :: h
 
-   ! Since num_items1 == num_items2, we only need one size
-   maxnum_items = maxval(atomtypes%parts%num_items1)
-
-   allocate (atomperm1(size(coords1, 2)))
-   allocate (partperm(maxnum_items))
-   allocate (dists(maxnum_items, maxnum_items))
-   allocate (costs(maxnum_items, maxnum_items))
-
-   ! Initialize atomperm1 as identity permutation
-   call init_identity_permutation(atomperm1)
+   allocate (partperm(maxval(atomtypes%parts%num_items1)))
 
    ! Optimize atomperm1 for each block
    do h = 1, atomtypes%num_parts
       part => atomtypes%parts(h)
-
-      call compute_distance_matrix(part, coords1, coords2, dists)
-      normfac = 1./maxval(dists(1:part%num_items1, 1:part%num_items1))
-
-      ! Build cost matrix: distances + biases
-      costs(1:part%num_items1, 1:part%num_items1) = biases(h)%a &
-            + normfac*dists(1:part%num_items1, 1:part%num_items1)
-
-      ! Solve assignment problem using JVC algorithm
 !      call assndx(1, costs, part%num_items1, part%num_items1, partperm, lapcost)
-      call jvc_dense(costs, part%num_items1, partperm, lapcost)
-
+      ! Solve assignment problem using JVC algorithm
+      call jvc_dense(costs(h)%a, part%num_items1, partperm, lapcost)
       ! Map the solution back to original atom indices
       atomperm1(part%items1) = part%items2(partperm(1:part%num_items1))
    end do
