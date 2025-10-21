@@ -60,7 +60,7 @@ subroutine optimize_atomperm_isomer(atomset1, atomset2, atomtypes, adjcs1, adjcs
 
    ! Compute constant costs
    call init_costs(atomtypes, fixed_costs)
-   call add_hna_costs(atomtypes, adjcs1, adjcs2, scnatypes, fixed_costs)
+   call add_mlna_costs(atomtypes, adjcs1, adjcs2, scnatypes, fixed_costs)
    euclidean_scale = 0.99_rk/longest_distance(atomtypes, coords1, coords2)**2
 
    ! Initialize random number generator

@@ -112,7 +112,7 @@ subroutine collect_leaf_assignments(assign_arrays, part_idx, subperm)
    end do
 end subroutine
 
-subroutine update_hna_part(assign_arrays, part_idx, read_link_idx, write_link_idx, subperm)
+subroutine update_mlna_part(assign_arrays, part_idx, read_link_idx, write_link_idx, subperm)
 ! ULTRA-OPTIMIZED: Array-based version with direct 2D adjacency access for maximum performance
 ! UPDATED: Now collects assignment pairs from newly created leaf parts into subperm
    type(array_trees_t), intent(inout) :: assign_arrays
@@ -259,8 +259,8 @@ end subroutine
 
 subroutine assign_branch_atoms(assign_arrays, split_part_idx, child_branch_idx, &
       first_link_idx, chosen_item1_idx, chosen_item2_idx, subperm)
-   ! Combined procedure: assignment + HNA recomputation
-   ! Makes assignment (chosen_item1_idx-th item1 with chosen_item2_idx-th item2) then recomputes HNAs for the branch
+   ! Combined procedure: assignment + MLNA recomputation
+   ! Makes assignment (chosen_item1_idx-th item1 with chosen_item2_idx-th item2) then recomputes MLNAs for the branch
    type(array_trees_t), intent(inout) :: assign_arrays
    integer, intent(in) :: split_part_idx, child_branch_idx, first_link_idx, chosen_item1_idx, chosen_item2_idx
    type(subperm_t), intent(inout) :: subperm
@@ -272,7 +272,7 @@ subroutine assign_branch_atoms(assign_arrays, split_part_idx, child_branch_idx, 
    call assign_pair_to_children(assign_arrays, split_part_idx, first_link_idx, &
          chosen_item1_idx, chosen_item2_idx, subperm)
 
-   ! === PART 2: SCNA RECOMPUTATION (inlined update_hna_partition) ===
+   ! === PART 2: SCNA RECOMPUTATION (inlined update_mlna_partition) ===
    num_links = assign_arrays%assigntree(child_branch_idx)%num_links
    link_offset = assign_arrays%assigntree(child_branch_idx)%link_offset
 
@@ -283,7 +283,7 @@ subroutine assign_branch_atoms(assign_arrays, split_part_idx, child_branch_idx, 
       partref_offset = assign_arrays%chain(link_idx)%partref_offset
 
       do part_idx = 1, num_parts
-         call update_hna_part(assign_arrays, &
+         call update_mlna_part(assign_arrays, &
                assign_arrays%partref_entries(partref_offset + part_idx), &
                link_idx, next_link_idx, subperm)
       end do
@@ -599,7 +599,7 @@ recursive subroutine recurse_assign_atoms_local(coords1, coords2, assign_arrays,
          branch_perm%atomset_size = 0
          branch_dist = 0
 
-         ! Make assignment and recompute HNAs (using first item1, index=1)
+         ! Make assignment and recompute MLNAs (using first item1, index=1)
          call assign_branch_atoms(assign_arrays, split_part_idx, child_branch_idx, &
                                    first_link_idx, 1, j, branch_perm)
 
@@ -733,7 +733,7 @@ recursive subroutine recurse_assign_atoms_local_pruned(coords1, coords2, assign_
          branch_perm%atomset_size = 0
          branch_dist = 0
 
-         ! Make assignment and recompute HNAs operation (using first item1, index=1)
+         ! Make assignment and recompute MLNAs operation (using first item1, index=1)
          call assign_branch_atoms(assign_arrays, split_part_idx, child_branch_idx, first_link_idx, 1, j, &
             branch_perm)
 

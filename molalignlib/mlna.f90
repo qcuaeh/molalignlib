@@ -1,17 +1,17 @@
-module hna
+module mlna
 use parameters
 use derived_types
 use adjacency
 use lcrs_trees
 implicit none
 private
-public refine_hna_part
-public refine_hna_partition
-public compute_consistent_hna_partition
+public refine_mlna_part
+public refine_mlna_partition
+public compute_scna_partition
 
 contains
 
-subroutine refine_hna_part(atoms1, atoms2, itemdir1, itemdir2, part, link)
+subroutine refine_mlna_part(atoms1, atoms2, itemdir1, itemdir2, part, link)
 ! Create children for different signatures - caller decides what to do with them
 ! Note: part is always a leaf part with no existing children
    type(adjc_t), dimension(:), intent(in) :: atoms1, atoms2
@@ -57,10 +57,10 @@ subroutine refine_hna_part(atoms1, atoms2, itemdir1, itemdir2, part, link)
    end do
 end subroutine
 
-subroutine refine_hna_partition(atoms1, atoms2, hnachain, num_splits)
-! Compute next level HNA types - always keeps all children (original behavior)
+subroutine refine_mlna_partition(atoms1, atoms2, mlnachain, num_splits)
+! Compute next level MLNA types - always keeps all children (original behavior)
    type(adjc_t), dimension(:), intent(in) :: atoms1, atoms2
-   type(assigntree_node_t), pointer, intent(inout) :: hnachain
+   type(assigntree_node_t), pointer, intent(inout) :: mlnachain
    integer, intent(out) :: num_splits
    ! Local variables
    type(chain_node_t), pointer :: link, new_link
@@ -69,14 +69,14 @@ subroutine refine_hna_partition(atoms1, atoms2, hnachain, num_splits)
    num_splits = 0
 
    ! Save the last link before creating a new one
-   link => hnachain%last_link
-   new_link => new_chain_link(hnachain)
+   link => mlnachain%last_link
+   new_link => new_chain_link(mlnachain)
 
    ! Process all parts in the current partition
    partref => link%first_partref
    do while (associated(partref))
       ! Create children based on signatures
-      call refine_hna_part(atoms1, atoms2, link%itemdir1, link%itemdir2, partref%part, new_link)
+      call refine_mlna_part(atoms1, atoms2, link%itemdir1, link%itemdir2, partref%part, new_link)
 
       ! Count splits (children beyond the original part)
       num_splits = num_splits + partref%part%num_children - 1
@@ -85,20 +85,20 @@ subroutine refine_hna_partition(atoms1, atoms2, hnachain, num_splits)
    end do
 end subroutine
 
-subroutine compute_consistent_hna_partition(atoms1, atoms2, atomtypes, hnachain)
-! Iteratively compute HNA types until convergence
+subroutine compute_scna_partition(atoms1, atoms2, atomtypes, mlnachain)
+! Iteratively compute MLNA types until convergence
    type(adjc_t), dimension(:), intent(in) :: atoms1, atoms2
    type(partition_t), intent(in) :: atomtypes
-   type(assigntree_node_t), pointer, intent(out) :: hnachain
+   type(assigntree_node_t), pointer, intent(out) :: mlnachain
    ! Local variables
    integer :: num_splits
 
-!   hnachain => collect_atomtypes_linked( atoms1, atoms2)
-   hnachain => chain_from_partition( atomtypes)
+!   mlnachain => collect_atomtypes_linked( atoms1, atoms2)
+   mlnachain => chain_from_partition( atomtypes)
 
    do
-      ! Call refine_hna_partition and get the number of splits
-      call refine_hna_partition(atoms1, atoms2, hnachain, num_splits)
+      ! Call refine_mlna_partition and get the number of splits
+      call refine_mlna_partition(atoms1, atoms2, mlnachain, num_splits)
 
       ! Exit loop if no splits occurred
       if (num_splits == 0) exit

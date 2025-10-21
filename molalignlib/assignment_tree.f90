@@ -4,14 +4,14 @@ use random
 use adjacency
 use lcrs_trees
 use lcrs_arrays
-use hna
+use mlna
 implicit none
 private
 public build_assignment_tree
 
 contains
 
-subroutine update_hna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
+subroutine update_mlna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
 ! Update item values of existing item nodes instead of adding new item nodes
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(part_nodeptr_t), dimension(:), intent(in) :: itemdir1, itemdir2
@@ -73,8 +73,8 @@ subroutine update_hna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
    end do
 end subroutine
 
-subroutine update_hna_partition(adjcs1, adjcs2, link)
-! Compute next level HNA types - always keeps all children (original behavior)
+subroutine update_mlna_partition(adjcs1, adjcs2, link)
+! Compute next level MLNA types - always keeps all children (original behavior)
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(chain_node_t), pointer, intent(inout) :: link
    ! Local variables
@@ -85,13 +85,13 @@ subroutine update_hna_partition(adjcs1, adjcs2, link)
    do while (associated(partref))
 !      write (stderr,'(A,1X,A)') 'Part', address(partref%part)
       ! Distribute items based on signatures
-      call update_hna_part(adjcs1, adjcs2, link%itemdir1, link%itemdir2, partref%part, link%next_link)
+      call update_mlna_part(adjcs1, adjcs2, link%itemdir1, link%itemdir2, partref%part, link%next_link)
       partref => partref%nextref
    end do
 end subroutine
 
 subroutine assign_branch_atoms(adjcs1, adjcs2, branch)
-! Iteratively compute HNA types until convergence
+! Iteratively compute MLNA types until convergence
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(assigntree_node_t), pointer, intent(inout) :: branch
    ! Local variables
@@ -106,10 +106,10 @@ subroutine assign_branch_atoms(adjcs1, adjcs2, branch)
    link_idx = 1
    link => branch%first_link
    do while (associated(link))
-      ! Recompute next level HNAs
+      ! Recompute next level MLNAs
 !      write (stderr,'(A,1X,I0)') 'Link', link_idx
 !      call print_link_itemdir(link)
-      call update_hna_partition(adjcs1, adjcs2, link)
+      call update_mlna_partition(adjcs1, adjcs2, link)
       link_idx = link_idx + 1
       link => link%next_link
    end do
@@ -267,10 +267,10 @@ function would_part_split(adjcs1, adjcs2, itemdir1, itemdir2, part) result(would
    end do
 end function
 
-subroutine recompute_consistent_hna_partition(adjcs1, adjcs2, hnachain, branch, branch_parts, num_splits)
-! Compute next level HNA types - only keeps children if real split occurred
+subroutine recompute_scna_partition(adjcs1, adjcs2, mlnachain, branch, branch_parts, num_splits)
+! Compute next level MLNA types - only keeps children if real split occurred
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
-   type(assigntree_node_t), pointer, intent(inout) :: hnachain
+   type(assigntree_node_t), pointer, intent(inout) :: mlnachain
    type(assigntree_node_t), pointer, intent(inout) :: branch
    type(chain_node_t), pointer, intent(inout) :: branch_parts
    integer, intent(out) :: num_splits
@@ -286,7 +286,7 @@ subroutine recompute_consistent_hna_partition(adjcs1, adjcs2, hnachain, branch, 
    any_splits = .false.
 
    ! Get the current level link
-   level_link => hnachain%last_link
+   level_link => mlnachain%last_link
 
    ! Allocate array to cache split results
    allocate(will_split(level_link%num_parts))
@@ -301,15 +301,15 @@ subroutine recompute_consistent_hna_partition(adjcs1, adjcs2, hnachain, branch, 
 
    ! Only create new links if splits will occur
    if (any_splits) then
-      ! Create new level link for hnachain
-      next_level_link => new_chain_link(hnachain)
+      ! Create new level link for mlnachain
+      next_level_link => new_chain_link(mlnachain)
 
       ! Process all parts using cached split results
       partref => level_link%first_partref
       do i = 1, level_link%num_parts
          if (will_split(i)) then
             ! Create children based on signatures
-            call refine_hna_part(adjcs1, adjcs2, level_link%itemdir1, level_link%itemdir2, partref%part, next_level_link)
+            call refine_mlna_part(adjcs1, adjcs2, level_link%itemdir1, level_link%itemdir2, partref%part, next_level_link)
             ! Link part to branch link
             call link_part(branch%last_link, partref%part)
             ! Add part children to branch part list
@@ -383,9 +383,9 @@ subroutine split_part_first(part, link)
 end subroutine
 
 ! Modified split_dependent_parts incorporating split_single_part functionality
-recursive subroutine split_dependent_parts(adjcs1, adjcs2, hnachain, branch, branch_parts, branching_part, part_to_split)
+recursive subroutine split_dependent_parts(adjcs1, adjcs2, mlnachain, branch, branch_parts, branching_part, part_to_split)
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
-   type(assigntree_node_t), pointer, intent(inout) :: hnachain
+   type(assigntree_node_t), pointer, intent(inout) :: mlnachain
    type(assigntree_node_t), pointer, intent(inout) :: branch
    type(chain_node_t), pointer, intent(inout) :: branch_parts
    type(partree_node_t), pointer, intent(in) :: branching_part
@@ -400,8 +400,8 @@ recursive subroutine split_dependent_parts(adjcs1, adjcs2, hnachain, branch, bra
 
    ! Incorporate split_single_part logic
    ! Save the last link before creating a new one
-   level_link => hnachain%last_link
-   next_level_link => new_chain_link(hnachain)
+   level_link => mlnachain%last_link
+   next_level_link => new_chain_link(mlnachain)
 
    ! Create a new child branch for this splitting part
    branch => new_child_chain(branch, part_to_split)
@@ -426,10 +426,10 @@ recursive subroutine split_dependent_parts(adjcs1, adjcs2, hnachain, branch, bra
       child_part => child_part%next_sibling_part
    end do
 
-   ! Compute self-consistent HNAs
+   ! Compute self-consistent MLNAs
    do
-      ! Call recompute_consistent_hna_partition and get the number of splits
-      call recompute_consistent_hna_partition(adjcs1, adjcs2, hnachain, branch, branch_parts, num_splits)
+      ! Call recompute_scna_partition and get the number of splits
+      call recompute_scna_partition(adjcs1, adjcs2, mlnachain, branch, branch_parts, num_splits)
 
       ! Exit loop if no splits occurred
       if (num_splits == 0) exit
@@ -437,7 +437,7 @@ recursive subroutine split_dependent_parts(adjcs1, adjcs2, hnachain, branch, bra
 
    ! Find a degenerate descendant part to split
    next_part_to_split => null()
-   partref => hnachain%last_link%first_partref
+   partref => mlnachain%last_link%first_partref
    do while (associated(partref) .and. .not. associated(next_part_to_split))
       if (partref%part%num_items1 >= 2) then
          if (isdescendant(partref%part, branching_part)) then
@@ -450,14 +450,14 @@ recursive subroutine split_dependent_parts(adjcs1, adjcs2, hnachain, branch, bra
    ! Perform split if target found
    if (associated(next_part_to_split)) then
       ! Call itself again to split the next degenerate descendant part
-      call split_dependent_parts(adjcs1, adjcs2, hnachain, branch, branch_parts, branching_part, next_part_to_split)
+      call split_dependent_parts(adjcs1, adjcs2, mlnachain, branch, branch_parts, branching_part, next_part_to_split)
    end if
 end subroutine
 
 ! Updated split_independent_parts to use the merged function signature
-recursive subroutine split_independent_parts(adjcs1, adjcs2, hnachain, branch, branch_parts)
+recursive subroutine split_independent_parts(adjcs1, adjcs2, mlnachain, branch, branch_parts)
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
-   type(assigntree_node_t), pointer, intent(inout) :: hnachain, branch
+   type(assigntree_node_t), pointer, intent(inout) :: mlnachain, branch
    type(chain_node_t), pointer, intent(in) :: branch_parts
    ! Local variables
    type(chain_node_t), pointer :: new_branch_parts
@@ -473,22 +473,22 @@ recursive subroutine split_independent_parts(adjcs1, adjcs2, hnachain, branch, b
          ! Create a new part registry for this branch part
          new_branch_parts => new_bare_link()
          ! Split the target part and continue splitting descendants until convergence
-         call split_dependent_parts(adjcs1, adjcs2, hnachain, new_branch, new_branch_parts, partref%part, partref%part)
+         call split_dependent_parts(adjcs1, adjcs2, mlnachain, new_branch, new_branch_parts, partref%part, partref%part)
          ! Recursively process the resulting branch parts
-         call split_independent_parts(adjcs1, adjcs2, hnachain, new_branch, new_branch_parts)
+         call split_independent_parts(adjcs1, adjcs2, mlnachain, new_branch, new_branch_parts)
       end if
       partref => partref%nextref
    end do
 end subroutine
 
-subroutine build_assignment_tree( adjcs1, adjcs2, hnalink, assign_arrays)
+subroutine build_assignment_tree( adjcs1, adjcs2, mlnalink, assign_arrays)
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
-   type(chain_node_t), pointer, intent(in) :: hnalink
+   type(chain_node_t), pointer, intent(in) :: mlnalink
    type(array_trees_t), intent(out) :: assign_arrays
    ! Local variables
    type(partree_node_t), pointer :: part_tree
    type(assigntree_node_t), pointer :: assign_tree
-   type(assigntree_node_t), pointer :: hnachain
+   type(assigntree_node_t), pointer :: mlnachain
    type(chain_node_t), pointer :: branch_parts
    type(partree_node_t), pointer :: child_part
    type(chain_node_t), pointer :: first_link
@@ -496,11 +496,11 @@ subroutine build_assignment_tree( adjcs1, adjcs2, hnalink, assign_arrays)
 
    part_tree => new_root_part()
    branch_parts => new_bare_link()
-   assign_tree => new_root_chain( size(hnalink%itemdir1), size(hnalink%itemdir2))
-   hnachain => new_root_chain( size(hnalink%itemdir1), size(hnalink%itemdir2))
-   first_link => new_chain_link( hnachain)
+   assign_tree => new_root_chain( size(mlnalink%itemdir1), size(mlnalink%itemdir2))
+   mlnachain => new_root_chain( size(mlnalink%itemdir1), size(mlnalink%itemdir2))
+   first_link => new_chain_link( mlnachain)
 
-   partref => hnalink%first_partref
+   partref => mlnalink%first_partref
    do while (associated( partref))
       child_part => new_child_part( part_tree)
       call link_part( first_link, child_part)
@@ -509,7 +509,7 @@ subroutine build_assignment_tree( adjcs1, adjcs2, hnalink, assign_arrays)
       partref => partref%nextref
    end do
 
-   call split_independent_parts( adjcs1, adjcs2, hnachain, assign_tree, branch_parts)
+   call split_independent_parts( adjcs1, adjcs2, mlnachain, assign_tree, branch_parts)
 !   call distribute_items( adjcs1, adjcs2, assign_tree)
    call convert_trees_to_arrays( adjcs1, adjcs2, part_tree, assign_tree, assign_arrays)
 !   call validate_conversion(part_tree, assign_tree, assign_arrays)

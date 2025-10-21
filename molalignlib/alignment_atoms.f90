@@ -22,7 +22,7 @@ use permutation
 use euclidean
 use assignment_atoms
 use lcrs_trees
-use hna
+use mlna
 use partitioning
 use pruning_atoms
 use recording

@@ -27,7 +27,7 @@ use adjacency
 use pruning_atoms
 use lcrs_trees
 use lcrs_arrays
-use hna
+use mlna
 use assignment_tree
 use assignment_conformer
 use recording
@@ -49,12 +49,12 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
    real(rk), dimension(4) :: rotation, total_rotation
    real(rk) :: steps, permdist, new_permdist
    integer, pointer :: num_trials, lead_count
-   type(assigntree_node_t), pointer :: hnachain
+   type(assigntree_node_t), pointer :: mlnachain
    type(array_trees_t) :: assign_arrays
 
    ! Pre-compute assignment tree for decision making
-   call compute_consistent_hna_partition( adjcs1, adjcs2, atomtypes, hnachain)
-   call build_assignment_tree( adjcs1, adjcs2, hnachain%last_link, assign_arrays)
+   call compute_scna_partition( adjcs1, adjcs2, atomtypes, mlnachain)
+   call build_assignment_tree( adjcs1, adjcs2, mlnachain%last_link, assign_arrays)
 
    if (tree_flag) then
       call print_chain_tree_array( assign_arrays)
@@ -148,13 +148,13 @@ subroutine assign_atomperm_conformer( adjcs1, adjcs2, atomtypes, coords1, coords
    integer, dimension(:), allocatable, intent(out) :: atomperm1
 
    ! Local variables
-   type(assigntree_node_t), pointer :: hnachain
+   type(assigntree_node_t), pointer :: mlnachain
    type(array_trees_t) :: assign_arrays
    real(rk) :: permdist
 
    ! Pre-compute assignment tree
-   call compute_consistent_hna_partition( adjcs1, adjcs2, atomtypes, hnachain)
-   call build_assignment_tree( adjcs1, adjcs2, hnachain%last_link, assign_arrays)
+   call compute_scna_partition( adjcs1, adjcs2, atomtypes, mlnachain)
+   call build_assignment_tree( adjcs1, adjcs2, mlnachain%last_link, assign_arrays)
 
    ! Assign atoms using greedy and local pruned methods
    if (prune_flag) then

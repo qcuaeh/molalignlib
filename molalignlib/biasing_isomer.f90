@@ -23,7 +23,7 @@ use permutation
 use adjacency
 use lcrs_trees
 use partitioning
-use hna
+use mlna
 use euclidean
 use options
 implicit none
@@ -93,20 +93,20 @@ subroutine add_euclidean_costs(atomtypes, coords1, coords2, factor, costs)
    end do
 end subroutine
 
-subroutine add_hna_costs(atomtypes, adjcs1, adjcs2, scnatypes, costs)
-! Iteratively compute HNA types
+subroutine add_mlna_costs(atomtypes, adjcs1, adjcs2, scnatypes, costs)
+! Iteratively compute MLNA types
    type(partition_t), target, intent(in) :: atomtypes
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(partition_t), intent(out) :: scnatypes
    type(real_matrix), dimension(:), allocatable, intent(inout) :: costs
    ! Local variables
    type(partition_part_t), pointer :: part
-   type(assigntree_node_t), pointer :: hnachain
+   type(assigntree_node_t), pointer :: mlnachain
    integer :: h, i, j, iatom, jatom, num_splits
 !   integer :: link_idx
 
-   ! Initialize HNA chain with element types
-   hnachain => chain_from_partition(atomtypes)
+   ! Initialize MLNA chain with element types
+   mlnachain => chain_from_partition(atomtypes)
 
 !   link_idx = 0
    do
@@ -114,13 +114,13 @@ subroutine add_hna_costs(atomtypes, adjcs1, adjcs2, scnatypes, costs)
 !      write(stderr, *)
 !      write(stderr, '(a)') repeat('-- link_idx '//str(link_idx)//' --', 6)
 
-      ! Call refine_hna_partition and get the number of splits
-      call refine_hna_partition(adjcs1, adjcs2, hnachain, num_splits)
+      ! Call refine_mlna_partition and get the number of splits
+      call refine_mlna_partition(adjcs1, adjcs2, mlnachain, num_splits)
 
       ! Exit loop if no splits occurred in the last iteration
       if (num_splits == 0) exit
 
-      ! Update costs with HNAs at current level
+      ! Update costs with MLNAs at current level
       do h = 1, atomtypes%num_parts
          part => atomtypes%parts(h)
          do j = 1, part%num_items2
@@ -128,8 +128,8 @@ subroutine add_hna_costs(atomtypes, adjcs1, adjcs2, scnatypes, costs)
             do i = 1, part%num_items1
                iatom = part%items1(i)
                if (.not. associated( &
-                  hnachain%last_link%itemdir1(iatom)%ptr, &
-                  hnachain%last_link%itemdir2(jatom)%ptr) &
+                  mlnachain%last_link%itemdir1(iatom)%ptr, &
+                  mlnachain%last_link%itemdir2(jatom)%ptr) &
                ) then
                   costs(h)%a(i, j) = costs(h)%a(i, j) + 1
                end if
@@ -147,10 +147,10 @@ subroutine add_hna_costs(atomtypes, adjcs1, adjcs2, scnatypes, costs)
 !      end do
 !   end do
 
-   ! Extract scnatypes from the final HNA partition
-   call link_to_partition(hnachain%last_link, scnatypes)
+   ! Extract scnatypes from the final MLNA partition
+   call link_to_partition(mlnachain%last_link, scnatypes)
 
-   call delete_chain(hnachain)  ! Cleanup
+   call delete_chain(mlnachain)  ! Cleanup
 end subroutine
 
 end module
