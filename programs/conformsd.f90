@@ -38,7 +38,7 @@ implicit none
 
 character(:), allocatable :: title1, title2
 character(:), allocatable :: arg, fileout_path, dummy
-character(:), allocatable :: extin1, extin2, extout, extin
+character(:), allocatable :: extin1, extin2, extout
 type(strlist_type) :: posargs(2)
 type(atom_t), dimension(:), allocatable :: atoms1, atoms2
 type(bond_t), dimension(:), allocatable :: bonds1, bonds2
@@ -53,7 +53,7 @@ integer, dimension(:), pointer :: atomset1, atomset2
 integer, dimension(:), allocatable :: atomset1_alloc, atomset2_alloc
 integer, dimension(:), allocatable :: atomperm1
 integer :: unitin1, unitin2, unitout
-integer :: i, j
+integer :: i
 
 ! Set default options
 
@@ -63,20 +63,16 @@ mirror_flag = .false.
 align_flag = .false.
 remap_flag = .false.
 coords_flag = .false.
-stdin_flag = .false.
 tree_flag = .false.
 mass_flag = .false.
 stoch_flag = .true.
 adaptive_flag = .true.
 bond_flag = .false.
-mapping_flag = .false.
 label_flag = .false.
 random_flag = .false.
-iterate_flag = .true.
-prune_flag = .false.
+full_flag = .false.
+permutation_flag = .false.
 
-extin = 'xyz'
-extout = 'xyz'
 num_records = 1
 count_thres = 100
 unitout = stdout
@@ -92,10 +88,10 @@ do while (get_arg(arg))
       align_flag = .true.
    case ('-remap')
       remap_flag = .true.
-   case ('-prune')
-      prune_flag = .true.
-   case ('-mapping')
-      mapping_flag = .true.
+   case ('-permutation')
+      permutation_flag = .true.
+   case ('-full')
+      full_flag = .true.
    case ('-exhaustive')
       stoch_flag = .false.
    case ('-stochastic')
@@ -117,13 +113,7 @@ do while (get_arg(arg))
       call read_optarg( arg, num_records)
    case ('-coords')
       coords_flag = .true.
-   case ('-out')
-      fileout_flag = .true.
       call read_optarg( arg, fileout_path)
-   case ('-stdin')
-      stdin_flag = .true.
-   case ('-extin')
-      call read_optarg( arg, extin)
    case ('-tree')
       tree_flag = .true.
    case ('-stats')
@@ -137,31 +127,24 @@ do while (get_arg(arg))
    end select
 end do
 
-if (stdin_flag) then
-   extin1 = extin
-   extin2 = extin
-   unitin1 = stdin
-   unitin2 = stdin
-else
-   select case (ipos)
-   case (0)
-      write (stderr, '(A)') 'Error: Missing file paths'
-      stop 1
-   case (1)
-      write (stderr, '(A)') 'Error: Too few file paths'
-      stop 1
-   case (2)
-      call split_path( posargs(1)%arg, dummy, dummy, extin1)
-      call split_path( posargs(2)%arg, dummy, dummy, extin2)
-      call open2read( posargs(1)%arg, unitin1)
-      call open2read( posargs(2)%arg, unitin2)
-   case default
-      write (stderr, '(A)') 'Error: Too many file paths'
-      stop 1
-   end select
-end if
+select case (ipos)
+case (0)
+   write (stderr, '(A)') 'Error: Missing file paths'
+   stop 1
+case (1)
+   write (stderr, '(A)') 'Error: Too few file paths'
+   stop 1
+case (2)
+   call split_path( posargs(1)%arg, dummy, dummy, extin1)
+   call split_path( posargs(2)%arg, dummy, dummy, extin2)
+   call open2read( posargs(1)%arg, unitin1)
+   call open2read( posargs(2)%arg, unitin2)
+case default
+   write (stderr, '(A)') 'Error: Too many file paths'
+   stop 1
+end select
 
-if (fileout_flag) then
+if (coords_flag) then
    call split_path( fileout_path, dummy, dummy, extout)
    call open2write( fileout_path, unitout)
 end if
@@ -257,12 +240,6 @@ if (align_flag) then
          coords2r = rotated_coords( coords2, rotquat, center1)
          rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2r))
 
-         if (mapping_flag) then
-            do j = 1, size(atomperm1)
-               write (stdout,'(I0," -> ",I0)') j, atomperm1(j)
-            end do
-         end if
-
          if (coords_flag) then
             title2 = 'RMSD=' // str( rmsd)
             coords2r = rotated_coords( coords2, rotquat, center1)
@@ -270,6 +247,9 @@ if (align_flag) then
             call writefile( unitout, extout, title2, atoms2, bonds2, atomperm1)
          else
             write (stdout,'(A)') str( rmsd)
+            if (permutation_flag) then
+               call print_permutation(atomperm1)
+            end if
          end if
 
       end do
@@ -315,6 +295,9 @@ else
       call writefile( unitout, extout, title2, atoms2, bonds2, atomperm1)
    else
       write (stdout,'(A)') str( rmsd)
+      if (remap_flag .and. permutation_flag) then
+         call print_permutation(atomperm1)
+      end if
    end if
 
 end if

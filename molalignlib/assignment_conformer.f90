@@ -9,7 +9,7 @@ implicit none
 private
 public assign_atoms_greedy
 public assign_atoms_global
-public assign_atoms_local
+public assign_atoms_local_full
 public assign_atoms_local_pruned
 
 ! Maximum number of children for a part
@@ -555,7 +555,7 @@ subroutine assign_atoms_global(coords1, coords2, assign_arrays, atomperm1)
 !   write(stderr, '(A)') repeat("=", 60)
 end subroutine
 
-recursive subroutine recurse_assign_atoms_local(coords1, coords2, assign_arrays, &
+recursive subroutine recurse_assign_atoms_local_full(coords1, coords2, assign_arrays, &
                                                     branch_idx, best_perm, accumulated_dist)
    ! DFS exploration of all assignment possibilities - finds permutation that minimizes total distance
    ! OPTIMIZED: Incremental distance calculation to avoid redundant O(n) sqdistsum calls
@@ -607,7 +607,7 @@ recursive subroutine recurse_assign_atoms_local(coords1, coords2, assign_arrays,
          branch_dist = branch_dist + sqdistsum(branch_perm%atomset, branch_perm%atomperm, coords1, coords2)
 
          ! Recursively explore subtree - distance is accumulated in branch_dist
-         call recurse_assign_atoms_local(coords1, coords2, assign_arrays, &
+         call recurse_assign_atoms_local_full(coords1, coords2, assign_arrays, &
                                             child_branch_idx, branch_perm, branch_dist)
 
          ! branch_dist now contains total accumulated distance - no recalculation needed!
@@ -631,7 +631,7 @@ recursive subroutine recurse_assign_atoms_local(coords1, coords2, assign_arrays,
    end do
 end subroutine
 
-subroutine assign_atoms_local(coords1, coords2, assign_arrays, atomperm1, total_dist)
+subroutine assign_atoms_local_full(coords1, coords2, assign_arrays, atomperm1, total_dist)
    ! DFS exploration wrapper - finds optimal assignment among all possibilities
    ! OPTIMIZED: Uses incremental distance calculation
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
@@ -657,7 +657,7 @@ subroutine assign_atoms_local(coords1, coords2, assign_arrays, atomperm1, total_
    total_dist = sqdistsum(best_perm%atomset, best_perm%atomperm, coords1, coords2)
 
    ! Perform DFS exploration to find optimal assignment (starting from root chain at index 1)
-   call recurse_assign_atoms_local(coords1, coords2, assign_arrays, 1, best_perm, total_dist)
+   call recurse_assign_atoms_local_full(coords1, coords2, assign_arrays, 1, best_perm, total_dist)
 
    ! Convert subperm type to permutation array
    allocate (atomperm1(best_perm%atomperm_size))

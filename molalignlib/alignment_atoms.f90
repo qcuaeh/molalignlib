@@ -63,17 +63,15 @@ subroutine optimize_atomperm_atoms(atomset1, atomset2, atomtypes, prunes, coords
       total_rotation = quatmul( total_rotation, rotation)
       steps = 1
 
-      if (iterate_flag) then
-         do
-            call assign_atoms_pruned( atomtypes, coords1, coords2r, prunes, new_atomperm)
-            if (all(new_atomperm == atomperm1)) exit
-            atomperm1 = new_atomperm
-            rotation = least_rotquat( atomset1, atomperm1, coords1, coords2r)
-            call rotate_coords( atomset1, coords2r, rotation)
-            total_rotation = quatmul( total_rotation, rotation)
-            steps = steps + 1
-         end do
-      end if
+      do
+         call assign_atoms_pruned( atomtypes, coords1, coords2r, prunes, new_atomperm)
+         if (all(new_atomperm == atomperm1)) exit
+         atomperm1 = new_atomperm
+         rotation = least_rotquat( atomset1, atomperm1, coords1, coords2r)
+         call rotate_coords( atomset1, coords2r, rotation)
+         total_rotation = quatmul( total_rotation, rotation)
+         steps = steps + 1
+      end do
 
       ! Push local minimum to registry
       permdist = sqrt( sqdistsum( atomset1, atomperm1, coords1, coords2r))

@@ -49,7 +49,7 @@ subroutine writefile(unit, extout, title, atoms, bonds, atomperm1)
       call writefile_xyz(unit, title, atoms, bonds, atomperm1)
    case ('mol2')
       call writefile_mol2(unit, title, atoms, bonds, atomperm1)
-   case ('mol','sdf')
+   case ('sdf')
       call writefile_sdf(unit, title, atoms, bonds, atomperm1)
    case default
       write (stderr, '(A,A,A)') 'Error: File format "', extout, '" is not supported'

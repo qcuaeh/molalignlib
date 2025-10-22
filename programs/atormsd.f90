@@ -38,7 +38,7 @@ implicit none
 
 character(:), allocatable :: title1, title2
 character(:), allocatable :: arg, fileout_path, dummy
-character(:), allocatable :: extin1, extin2, extout, extin
+character(:), allocatable :: extin1, extin2, extout
 type(strlist_type) :: posargs(2)
 type(atom_t), dimension(:), allocatable :: atoms1, atoms2
 type(bond_t), dimension(:), allocatable :: bonds1, bonds2
@@ -62,14 +62,11 @@ mirror_flag = .false.
 align_flag = .false.
 remap_flag = .false.
 coords_flag = .false.
-stdin_flag = .false.
 mass_flag = .false.
 label_flag = .false.
 random_flag = .false.
-iterate_flag = .true.
+permutation_flag = .false.
 
-extin = 'xyz'
-extout = 'xyz'
 num_records = 1
 count_thres = 10
 unitout = stdout
@@ -86,6 +83,8 @@ do while (get_arg(arg))
       align_flag = .true.
    case ('-remap')
       remap_flag = .true.
+   case ('-permutation')
+      permutation_flag = .true.
    case ('-near')
       prune_procedure => prune_none
    case ('-prune')
@@ -108,12 +107,8 @@ do while (get_arg(arg))
    case ('-coords')
       coords_flag = .true.
    case ('-out')
-      fileout_flag = .true.
+      coords_flag = .true.
       call read_optarg( arg, fileout_path)
-   case ('-stdin')
-      stdin_flag = .true.
-   case ('-extin')
-      call read_optarg( arg, extin)
    case ('-stats')
       stats_flag = .true.
    case ('-random')
@@ -123,31 +118,24 @@ do while (get_arg(arg))
    end select
 end do
 
-if (stdin_flag) then
-   extin1 = extin
-   extin2 = extin
-   unitin1 = stdin
-   unitin2 = stdin
-else
-   select case (ipos)
-   case (0)
-      write (stderr, '(A)') 'Error: Missing file paths'
-      stop 1
-   case (1)
-      write (stderr, '(A)') 'Error: Too few file paths'
-      stop 1
-   case (2)
-      call split_path( posargs(1)%arg, dummy, dummy, extin1)
-      call split_path( posargs(2)%arg, dummy, dummy, extin2)
-      call open2read( posargs(1)%arg, unitin1)
-      call open2read( posargs(2)%arg, unitin2)
-   case default
-      write (stderr, '(A)') 'Error: Too many file paths'
-      stop 1
-   end select
-end if
+select case (ipos)
+case (0)
+   write (stderr, '(A)') 'Error: Missing file paths'
+   stop 1
+case (1)
+   write (stderr, '(A)') 'Error: Too few file paths'
+   stop 1
+case (2)
+   call split_path( posargs(1)%arg, dummy, dummy, extin1)
+   call split_path( posargs(2)%arg, dummy, dummy, extin2)
+   call open2read( posargs(1)%arg, unitin1)
+   call open2read( posargs(2)%arg, unitin2)
+case default
+   write (stderr, '(A)') 'Error: Too many file paths'
+   stop 1
+end select
 
-if (fileout_flag) then
+if (coords_flag) then
    call split_path( fileout_path, dummy, dummy, extout)
    call open2write( fileout_path, unitout)
 end if
@@ -229,6 +217,9 @@ if (align_flag) then
             call writefile( unitout, extout, title2, atoms2, bonds2, atomperm1)
          else
             write (unitout,'(A)') str( rmsd)
+            if (permutation_flag) then
+               call print_permutation(atomperm1)
+            end if
          end if
       end do
 
@@ -274,6 +265,9 @@ else
       call writefile( unitout, extout, title2, atoms2, bonds2, atomperm1)
    else
       write (unitout,'(A)') str( rmsd)
+      if (remap_flag .and. permutation_flag) then
+         call print_permutation(atomperm1)
+      end if
    end if
 
 end if

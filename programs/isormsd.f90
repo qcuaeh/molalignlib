@@ -40,7 +40,7 @@ implicit none
 
 character(:), allocatable :: title1, title2
 character(:), allocatable :: arg, fileout_path, dummy
-character(:), allocatable :: extin1, extin2, extout, extin
+character(:), allocatable :: extin1, extin2, extout
 type(strlist_type) :: posargs(2)
 type(atom_t), dimension(:), allocatable :: atoms1, atoms2
 type(bond_t), dimension(:), allocatable :: bonds1, bonds2
@@ -59,8 +59,8 @@ integer :: unitin1, unitin2, unitout
 integer :: adjd
 real(rk) :: rmsd
 integer :: i
-logical :: union_flag
-logical :: intersection_flag
+logical :: add_flag
+logical :: remove_flag
 
 ! Set default options
 
@@ -70,21 +70,17 @@ mirror_flag = .false.
 align_flag = .false.
 remap_flag = .false.
 coords_flag = .false.
-stdin_flag = .false.
 mass_flag = .false.
 stoch_flag = .true.
 adaptive_flag = .true.
-mapping_flag = .false.
 label_flag = .false.
 random_flag = .false.
-iterate_flag = .true.
 bond_flag = .false.
-union_flag = .false.
-intersection_flag = .false.
+add_flag = .false.
+remove_flag = .false.
+permutation_flag = .false.
 
-extin = 'xyz'
-extout = 'xyz'
-num_records = 10
+num_records = 1
 count_thres = 100
 unitout = stdout
 max_trials = huge(ik)
@@ -99,8 +95,8 @@ do while (get_arg(arg))
       align_flag = .true.
    case ('-remap')
       remap_flag = .true.
-   case ('-mapping')
-      mapping_flag = .true.
+   case ('-permutation')
+      permutation_flag = .true.
    case ('-label')
       label_flag = .true.
    case ('-heavy')
@@ -117,53 +113,40 @@ do while (get_arg(arg))
       call read_optarg(arg, num_records)
    case ('-coords')
       coords_flag = .true.
-   case ('-out')
-      fileout_flag = .true.
       call read_optarg(arg, fileout_path)
-   case ('-stdin')
-      stdin_flag = .true.
-   case ('-extin')
-      call read_optarg(arg, extin)
    case ('-stats')
       stats_flag = .true.
    case ('-random')
       random_flag = .true.
    case ('-bond')
       bond_flag = .true.
-   case ('-union')
-      union_flag = .true.
-   case ('-intersection')
-      intersection_flag = .true.
+   case ('-add')
+      add_flag = .true.
+   case ('-remove')
+      remove_flag = .true.
    case default
       call read_posarg(arg, posargs)
    end select
 end do
 
-if (stdin_flag) then
-   extin1 = extin
-   extin2 = extin
-   unitin1 = stdin
-   unitin2 = stdin
-else
-   select case (ipos)
-   case (0)
-      write (stderr, '(A)') 'Error: Missing file paths'
-      stop 1
-   case (1)
-      write (stderr, '(A)') 'Error: Too few file paths'
-      stop 1
-   case (2)
-      call split_path(posargs(1)%arg, dummy, dummy, extin1)
-      call split_path(posargs(2)%arg, dummy, dummy, extin2)
-      call open2read(posargs(1)%arg, unitin1)
-      call open2read(posargs(2)%arg, unitin2)
-   case default
-      write (stderr, '(A)') 'Error: Too many file paths'
-      stop 1
-   end select
-end if
+select case (ipos)
+case (0)
+   write (stderr, '(A)') 'Error: Missing file paths'
+   stop 1
+case (1)
+   write (stderr, '(A)') 'Error: Too few file paths'
+   stop 1
+case (2)
+   call split_path(posargs(1)%arg, dummy, dummy, extin1)
+   call split_path(posargs(2)%arg, dummy, dummy, extin2)
+   call open2read(posargs(1)%arg, unitin1)
+   call open2read(posargs(2)%arg, unitin2)
+case default
+   write (stderr, '(A)') 'Error: Too many file paths'
+   stop 1
+end select
 
-if (fileout_flag) then
+if (coords_flag) then
    call split_path(fileout_path, dummy, dummy, extout)
    call open2write(fileout_path, unitout)
 end if
@@ -267,7 +250,7 @@ if (align_flag) then
             call optimize_atomperm_conformer(atomset1, atomset2, adjcs1, adjcs2, atomtypes, &
                                           coords1w, coords2w, temp_registry)
          else
-            if (union_flag) then
+            if (add_flag) then
                ! Add all differing bonds to both molecules
                adjmat1 = adjcs_to_adjmat(adjcs1)
                adjmat2 = adjcs_to_adjmat(adjcs2)
@@ -276,7 +259,7 @@ if (align_flag) then
                call adjmat_to_adjcs(adjmat2, adjcs2_mod)
                call optimize_atomperm_conformer(atomset1, atomset2, adjcs1_mod, adjcs2_mod, atomtypes, &
                                              coords1w, coords2w, temp_registry)
-            else if (intersection_flag) then
+            else if (remove_flag) then
                ! Remove all differing bonds from both molecules
                adjmat1 = adjcs_to_adjmat(adjcs1)
                adjmat2 = adjcs_to_adjmat(adjcs2)
@@ -323,6 +306,9 @@ if (align_flag) then
             call writefile(unitout, extout, title2, atoms2, bonds2, atomperm1)
          else
             write (stdout,'(A,A,I0,A)') str(rmsd), '(', adjd, ')'
+            if (permutation_flag) then
+               call print_permutation(atomperm1)
+            end if
          end if
       end do
 
