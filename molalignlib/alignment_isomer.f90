@@ -80,6 +80,7 @@ subroutine optimize_atomperm_isomer(atomset1, atomset2, atomtypes, adjcs1, adjcs
       costs = fixed_costs
 
       ! Assign atoms with current orientation using costs
+!      call add_random_costs(atomtypes, coords1, coords2r, costs)
       call add_euclidean_costs(atomtypes, coords1, coords2r, euclidean_scale, costs)
       call assign_atoms(atomtypes, costs, atomperm1)
       call minimize_adjdiff(atomset1, atomtypes, scnatypes, adjcs1, adjcs2, adjmat2, &

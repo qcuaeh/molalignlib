@@ -26,6 +26,7 @@ use partitioning
 use mlna
 use euclidean
 use options
+use randlib
 implicit none
 
 contains
@@ -73,10 +74,10 @@ real(rk) function longest_distance(atomtypes, coords1, coords2)
    longest_distance = maxlength1 + maxlength2
 end function
 
-subroutine add_euclidean_costs(atomtypes, coords1, coords2, factor, costs)
+subroutine add_euclidean_costs(atomtypes, coords1, coords2, euclidean_scale, costs)
    type(partition_t), target, intent(in) :: atomtypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
-   real(rk), intent(in) :: factor
+   real(rk), intent(in) :: euclidean_scale
    type(real_matrix), dimension(:), allocatable, intent(inout) :: costs
    ! Local variables
    type(partition_part_t), pointer :: part
@@ -86,8 +87,26 @@ subroutine add_euclidean_costs(atomtypes, coords1, coords2, factor, costs)
       part => atomtypes%parts(h)
       do j = 1, part%num_items2
          do i = 1, part%num_items1
-            costs(h)%a(i,j) = costs(h)%a(i,j) + factor * &
+            costs(h)%a(i,j) = costs(h)%a(i,j) + euclidean_scale * &
                   sum((coords1(:,part%items1(i)) - coords2(:,part%items2(j)))**2)
+         end do
+      end do
+   end do
+end subroutine
+
+subroutine add_random_costs(atomtypes, coords1, coords2, costs)
+   type(partition_t), target, intent(in) :: atomtypes
+   real(rk), dimension(:,:), intent(in) :: coords1, coords2
+   type(real_matrix), dimension(:), allocatable, intent(inout) :: costs
+   ! Local variables
+   type(partition_part_t), pointer :: part
+   integer :: h, i, j
+
+   do h = 1, atomtypes%num_parts
+      part => atomtypes%parts(h)
+      do j = 1, part%num_items2
+         do i = 1, part%num_items1
+            costs(h)%a(i,j) = costs(h)%a(i,j) + random_uniform_integer(0, 1)
          end do
       end do
    end do
