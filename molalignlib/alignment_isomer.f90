@@ -44,7 +44,6 @@ subroutine optimize_atomperm_isomer(atomset1, atomset2, atomtypes, adjcs1, adjcs
    real(rk), dimension(4) :: rotation, total_rotation
    real(rk) :: euclidean_scale, permdist
    integer :: permdiff
-   integer, pointer :: num_trials, lead_count
    type(real_matrix), dimension(:), allocatable :: costs, fixed_costs
    logical, dimension(:,:), allocatable :: adjmat1, adjmat2
    integer, dimension(:,:), allocatable :: moldiffs
@@ -63,16 +62,14 @@ subroutine optimize_atomperm_isomer(atomset1, atomset2, atomtypes, adjcs1, adjcs
    call add_mlna_costs(atomtypes, adjcs1, adjcs2, scnatypes, fixed_costs)
    euclidean_scale = 0.99_rk/longest_distance(atomtypes, coords1, coords2)**2
 
+   ! Initialize local minima registry
+   call reset_registry(registry)
+
    ! Initialize random number generator
    call random_initialize()
 
-   ! Initialize local minima registry (dual mode: adjacency + position)
-   call reset_registry(registry)
-   num_trials => registry%num_trials
-   lead_count => registry%records(1)%count
-
    ! Optimize atom permutation
-   do while (lead_count < count_thres .and. num_trials < max_trials)
+   do while (registry%records(1)%count < iso_thres .and. registry%num_trials < max_trials)
 
       ! Get randomly rotated coords2
       total_rotation = randrotquat()

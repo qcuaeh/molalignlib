@@ -14,13 +14,15 @@ logical :: adaptive_flag
 logical :: coords_flag
 logical :: stats_flag
 logical :: tree_flag
-logical :: bond_flag
-logical :: permutation_flag
+logical :: rebond_flag
+logical :: atomorder_flag
 logical :: full_flag
 
 ! Bounds
-integer :: count_thres
 integer :: max_trials
 integer :: num_records
+integer :: ato_thres
+integer :: iso_thres
+integer :: confo_thres
 
 end module

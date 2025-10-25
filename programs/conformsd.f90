@@ -37,7 +37,7 @@ use options
 implicit none
 
 character(:), allocatable :: title1, title2
-character(:), allocatable :: arg, fileout_path, dummy
+character(:), allocatable :: arg, coords_path, dummy
 character(:), allocatable :: extin1, extin2, extout
 type(strlist_type) :: posargs(2)
 type(atom_t), dimension(:), allocatable :: atoms1, atoms2
@@ -67,14 +67,14 @@ tree_flag = .false.
 mass_flag = .false.
 stoch_flag = .true.
 adaptive_flag = .true.
-bond_flag = .false.
+rebond_flag = .false.
 label_flag = .false.
 random_flag = .false.
 full_flag = .false.
-permutation_flag = .false.
+atomorder_flag = .false.
 
 num_records = 1
-count_thres = 100
+confo_thres = 100
 unitout = stdout
 max_trials = huge( ik)
 
@@ -88,8 +88,8 @@ do while (get_arg(arg))
       align_flag = .true.
    case ('-remap')
       remap_flag = .true.
-   case ('-permutation')
-      permutation_flag = .true.
+   case ('-atomorder')
+      atomorder_flag = .true.
    case ('-full')
       full_flag = .true.
    case ('-exhaustive')
@@ -105,23 +105,23 @@ do while (get_arg(arg))
       mass_flag = .true.
    case ('-mirror')
       mirror_flag = .true.
-   case ('-count')
-      call read_optarg( arg, count_thres)
+   case ('-thres')
+      call read_optarg( arg, confo_thres)
    case ('-trials')
       call read_optarg( arg, max_trials)
    case ('-records')
       call read_optarg( arg, num_records)
    case ('-coords')
       coords_flag = .true.
-      call read_optarg( arg, fileout_path)
+      call read_optarg( arg, coords_path)
    case ('-tree')
       tree_flag = .true.
    case ('-stats')
       stats_flag = .true.
    case ('-random')
       random_flag = .true.
-   case ('-bond')
-      bond_flag = .true.
+   case ('-rebond')
+      rebond_flag = .true.
    case default
       call read_posarg( arg, posargs)
    end select
@@ -145,8 +145,8 @@ case default
 end select
 
 if (coords_flag) then
-   call split_path( fileout_path, dummy, dummy, extout)
-   call open2write( fileout_path, unitout)
+   call split_path( coords_path, dummy, dummy, extout)
+   call open2write( coords_path, unitout)
 end if
 
 ! Read coordinates
@@ -172,20 +172,20 @@ if (any(atomtypes%parts%num_items1 /= atomtypes%parts%num_items2)) then
    stop 1
 end if
 
-if (bond_flag) then
+if (rebond_flag) then
    call adjacency_from_distance( atomset1, atoms1, adjcs1)
    call adjacency_from_distance( atomset2, atoms2, adjcs2)
 else
    if (size(bonds1) < 1 .or. size(bonds2) < 1) then
       if (size(bonds1) < 1 .and. size(bonds2) < 1) then
          write (stdout,'(A)') 'Error: Molecules have no bonds!'
-         stop
+         stop 1
       else if (size(bonds1) < 1) then
          write (stdout,'(A)') 'Error: First molecule has no bonds!'
-         stop
+         stop 1
       else if (size(bonds2) < 1) then
          write (stdout,'(A)') 'Error: Second molecule has no bonds!'
-         stop
+         stop 1
       end if
    end if
    call adjacency_from_bonds( atomset1, atoms1, bonds1, adjcs1)
@@ -246,10 +246,12 @@ if (align_flag) then
             call set_coords( atoms2, coords2r)
             call writefile( unitout, extout, title2, atoms2, bonds2, atomperm1)
          else
-            write (stdout,'(A)') str( rmsd)
-            if (permutation_flag) then
+            write (stdout,'(A)',advance='no') str( rmsd)
+            if (atomorder_flag) then
+               write (stdout,'(1X)',advance='no')
                call print_permutation(atomperm1)
             end if
+            write (stdout, *)
          end if
 
       end do
@@ -294,10 +296,12 @@ else
       call set_coords( atoms2, coords2r)
       call writefile( unitout, extout, title2, atoms2, bonds2, atomperm1)
    else
-      write (stdout,'(A)') str( rmsd)
-      if (remap_flag .and. permutation_flag) then
+      write (stdout,'(A)',advance='no') str( rmsd)
+      if (remap_flag .and. atomorder_flag) then
+         write (stdout,'(1X)',advance='no')
          call print_permutation(atomperm1)
       end if
+      write (stdout, *)
    end if
 
 end if

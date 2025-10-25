@@ -190,7 +190,7 @@ subroutine solve_lap_pruned(n, s1, s2, x1, x2, prun, partperm, dist)
 
    if (ierr /= 0) then
       write (stderr, '(a)') 'Error: Assignment failed'
-      stop
+      stop 1
    end if
 
    if (DEBUG_TESTS) then
@@ -355,7 +355,7 @@ subroutine solve_lap_nearest(n, s1, s2, x1, x2, partperm, dist)
 
    if (ierr /= 0) then
       write (stderr, '(a)') 'Error: Assignment failed'
-      stop
+      stop 1
    end if
 
    if (DEBUG_TESTS) then

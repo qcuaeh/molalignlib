@@ -37,10 +37,10 @@ subroutine print_permutation(permutation)
    integer, dimension(:), intent(in) :: permutation
    integer :: i
 
-   do i = 1, size(permutation)
-      write (stdout, '(I0," -> ",I0)') i, permutation(i)
+   write (stdout,'(I0)',advance='no') permutation(1)
+   do i = 2, size(permutation)
+      write (stdout,'(",",I0)',advance='no') permutation(i)
    end do
-   write (stdout, *)
 end subroutine
 
 subroutine init_identity_permutation(permutation)

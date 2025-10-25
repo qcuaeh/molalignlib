@@ -37,7 +37,7 @@ use options
 implicit none
 
 character(:), allocatable :: title1, title2
-character(:), allocatable :: arg, fileout_path, dummy
+character(:), allocatable :: arg, coords_path, dummy
 character(:), allocatable :: extin1, extin2, extout
 type(strlist_type) :: posargs(2)
 type(atom_t), dimension(:), allocatable :: atoms1, atoms2
@@ -65,10 +65,10 @@ coords_flag = .false.
 mass_flag = .false.
 label_flag = .false.
 random_flag = .false.
-permutation_flag = .false.
+atomorder_flag = .false.
 
 num_records = 1
-count_thres = 10
+ato_thres = 10
 unitout = stdout
 max_trials = huge( rk)
 prune_procedure => prune_none
@@ -83,8 +83,8 @@ do while (get_arg(arg))
       align_flag = .true.
    case ('-remap')
       remap_flag = .true.
-   case ('-permutation')
-      permutation_flag = .true.
+   case ('-atomorder')
+      atomorder_flag = .true.
    case ('-near')
       prune_procedure => prune_none
    case ('-prune')
@@ -98,17 +98,15 @@ do while (get_arg(arg))
       mass_flag = .true.
    case ('-mirror')
       mirror_flag = .true.
-   case ('-count')
-      call read_optarg(arg, count_thres)
+   case ('-thres')
+      call read_optarg(arg, ato_thres)
    case ('-trials')
       call read_optarg( arg, max_trials)
    case ('-records')
       call read_optarg( arg, num_records)
    case ('-coords')
       coords_flag = .true.
-   case ('-out')
-      coords_flag = .true.
-      call read_optarg( arg, fileout_path)
+      call read_optarg( arg, coords_path)
    case ('-stats')
       stats_flag = .true.
    case ('-random')
@@ -136,8 +134,8 @@ case default
 end select
 
 if (coords_flag) then
-   call split_path( fileout_path, dummy, dummy, extout)
-   call open2write( fileout_path, unitout)
+   call split_path( coords_path, dummy, dummy, extout)
+   call open2write( coords_path, unitout)
 end if
 
 ! Read coordinates
@@ -216,10 +214,12 @@ if (align_flag) then
             call set_coords( atoms2, coords2r)
             call writefile( unitout, extout, title2, atoms2, bonds2, atomperm1)
          else
-            write (unitout,'(A)') str( rmsd)
-            if (permutation_flag) then
+            write (stdout,'(A)',advance='no') str( rmsd)
+            if (atomorder_flag) then
+               write (stdout,'(1X)',advance='no')
                call print_permutation(atomperm1)
             end if
+            write (stdout, *)
          end if
       end do
 
@@ -264,10 +264,12 @@ else
       call set_coords( atoms2, coords2r)
       call writefile( unitout, extout, title2, atoms2, bonds2, atomperm1)
    else
-      write (unitout,'(A)') str( rmsd)
-      if (remap_flag .and. permutation_flag) then
+      write (stdout,'(A)',advance='no') str( rmsd)
+      if (remap_flag .and. atomorder_flag) then
+         write (stdout,'(1X)',advance='no')
          call print_permutation(atomperm1)
       end if
+      write (stdout, *)
    end if
 
 end if

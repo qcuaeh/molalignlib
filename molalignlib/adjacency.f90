@@ -12,17 +12,28 @@ public adjmat_to_adjcs
 public adjacencydiff
 public adjacencydelta
 public compute_differing_bonds
-public match_bonds_to_mol1
-public bonds_union
-public bonds_intersection
+public match_bonds2
+public add_bonds
+public delete_bonds
+public bond_modifier_interface
+
+type, public :: adjc_t
+   integer, allocatable :: adjlist(:)
+end type
 
 interface adjacencydiff
    module procedure adjacencydiff_perm
 end interface
 
-type, public :: adjc_t
-   integer, allocatable :: adjlist(:)
-end type
+abstract interface
+   subroutine bond_modifier_interface(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, adjcs2_mod)
+      import
+      type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+      integer, dimension(:), intent(in) :: atomperm1
+      integer, dimension(:,:), intent(in) :: moldiffs
+      type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs1_mod, adjcs2_mod
+   end subroutine
+end interface
 
 contains
 
@@ -228,13 +239,20 @@ subroutine compute_differing_bonds(atomset1, atomperm1, adjmat1, adjmat2, moldif
    deallocate(temp_bonds)
 end subroutine
 
-subroutine match_bonds_to_mol1(adjmat2, moldiffs)
+subroutine match_bonds2(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, adjcs2_mod)
    ! Modify mol2's bonds to match mol1's connectivity
    ! If bond exists in mol2: remove it (exists in mol2 but not mol1)
    ! If bond doesn't exist in mol2: add it (exists in mol1 but not mol2)
-   logical, dimension(:,:), intent(inout) :: adjmat2
+   ! Note: adjcs1 and atomperm1 are not used but present for interface compatibility
+   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   integer, dimension(:), intent(in) :: atomperm1
    integer, dimension(:,:), intent(in) :: moldiffs
+   type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs1_mod, adjcs2_mod
+   logical, dimension(:,:), allocatable :: adjmat2
    integer :: i, atom1, atom2
+
+   ! Convert adjcs2 to matrix, modify it, and convert back
+   adjmat2 = adjcs_to_adjmat(adjcs2)
 
    do i = 1, size(moldiffs, 2)
       atom1 = moldiffs(1, i)
@@ -244,20 +262,30 @@ subroutine match_bonds_to_mol1(adjmat2, moldiffs)
       adjmat2(atom1, atom2) = .not. adjmat2(atom1, atom2)
       adjmat2(atom2, atom1) = .not. adjmat2(atom2, atom1)
    end do
+
+   ! adjcs1 remains unchanged
+   allocate(adjcs1_mod(size(adjcs1)))
+   adjcs1_mod = adjcs1
+
+   ! Convert modified adjmat2 back to adjcs
+   call adjmat_to_adjcs(adjmat2, adjcs2_mod)
 end subroutine
 
-subroutine bonds_union(adjmat1, adjmat2, atomperm1, moldiffs)
-   logical, dimension(:,:), intent(inout) :: adjmat1, adjmat2
+subroutine add_bonds(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, adjcs2_mod)
+   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    integer, dimension(:), intent(in) :: atomperm1
    integer, dimension(:,:), intent(in) :: moldiffs
+   type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs1_mod, adjcs2_mod
+   logical, dimension(:,:), allocatable :: adjmat1, adjmat2
    integer :: i, atom1_mol2, atom2_mol2, atom1_mol1, atom2_mol1
    integer, dimension(:), allocatable :: inv_perm
 
-   ! Create inverse permutation to map molecule 2 indices back to molecule 1
-   allocate(inv_perm(size(atomperm1)))
-   do i = 1, size(atomperm1)
-      inv_perm(atomperm1(i)) = i
-   end do
+   ! Convert to matrices
+   adjmat1 = adjcs_to_adjmat(adjcs1)
+   adjmat2 = adjcs_to_adjmat(adjcs2)
+
+   ! Get inverse permutation to map molecule 2 indices back to molecule 1
+   inv_perm = inverse_permutation(atomperm1)
 
    do i = 1, size(moldiffs, 2)
       atom1_mol2 = moldiffs(1, i)
@@ -274,21 +302,26 @@ subroutine bonds_union(adjmat1, adjmat2, atomperm1, moldiffs)
       adjmat1(atom2_mol1, atom1_mol1) = .true.
    end do
 
-   deallocate(inv_perm)
+   ! Convert back to adjacency lists
+   call adjmat_to_adjcs(adjmat1, adjcs1_mod)
+   call adjmat_to_adjcs(adjmat2, adjcs2_mod)
 end subroutine
 
-subroutine bonds_intersection(adjmat1, adjmat2, atomperm1, moldiffs)
-   logical, dimension(:,:), intent(inout) :: adjmat1, adjmat2
+subroutine delete_bonds(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, adjcs2_mod)
+   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    integer, dimension(:), intent(in) :: atomperm1
    integer, dimension(:,:), intent(in) :: moldiffs
+   type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs1_mod, adjcs2_mod
+   logical, dimension(:,:), allocatable :: adjmat1, adjmat2
    integer :: i, atom1_mol2, atom2_mol2, atom1_mol1, atom2_mol1
    integer, dimension(:), allocatable :: inv_perm
 
-   ! Create inverse permutation to map molecule 2 indices back to molecule 1
-   allocate(inv_perm(size(atomperm1)))
-   do i = 1, size(atomperm1)
-      inv_perm(atomperm1(i)) = i
-   end do
+   ! Convert to matrices
+   adjmat1 = adjcs_to_adjmat(adjcs1)
+   adjmat2 = adjcs_to_adjmat(adjcs2)
+
+   ! Get inverse permutation to map molecule 2 indices back to molecule 1
+   inv_perm = inverse_permutation(atomperm1)
 
    do i = 1, size(moldiffs, 2)
       atom1_mol2 = moldiffs(1, i)
@@ -305,7 +338,9 @@ subroutine bonds_intersection(adjmat1, adjmat2, atomperm1, moldiffs)
       adjmat1(atom2_mol1, atom1_mol1) = .false.
    end do
 
-   deallocate(inv_perm)
+   ! Convert back to adjacency lists
+   call adjmat_to_adjcs(adjmat1, adjcs1_mod)
+   call adjmat_to_adjcs(adjmat2, adjcs2_mod)
 end subroutine
 
 end module

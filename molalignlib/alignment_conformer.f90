@@ -48,7 +48,6 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
    real(rk), dimension(:,:), allocatable :: coords2r
    real(rk), dimension(4) :: rotation, total_rotation
    real(rk) :: steps, permdist, new_permdist
-   integer, pointer :: num_trials, lead_count
    type(assigntree_node_t), pointer :: mlnachain
    type(array_trees_t) :: assign_arrays
 
@@ -64,17 +63,13 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
    call reset_registry( registry)
 
    if ((stoch_flag .and. .not. adaptive_flag) .or. (stoch_flag .and. adaptive_flag .and. &
-         assign_arrays%global_combinations > count_thres*assign_arrays%local_combinations)) then
+         assign_arrays%global_combinations > confo_thres*assign_arrays%local_combinations)) then
 
       ! Initialize random number generator
       call random_initialize()
 
-      ! Initialize local minima registry
-      num_trials => registry%num_trials
-      lead_count => registry%records(1)%count
-
       ! Optimize atom permutation
-      do while (lead_count < count_thres .and. num_trials < max_trials)
+      do while (registry%records(1)%count < confo_thres .and. registry%num_trials < max_trials)
 
          ! Get randomly rotated coords2
          total_rotation = randrotquat()

@@ -43,14 +43,14 @@ subroutine optimize_atomperm_atoms(atomset1, atomset2, atomtypes, prunes, coords
    real(rk), dimension(:,:), allocatable :: coords2r
    real(rk) :: permdist, steps, rotation(4), total_rotation(4)
 
-   ! Initialize random number generator
-   call random_initialize()
-
    ! Initialize local minima registry
    call reset_registry( registry)
 
+   ! Initialize random number generator
+   call random_initialize()
+
    ! Optimize atom permutation
-   do while (registry%records(1)%count < count_thres .and. registry%num_trials < max_trials)
+   do while (registry%records(1)%count < ato_thres .and. registry%num_trials < max_trials)
 
       ! Aply a random total_rotation to coords2
       total_rotation = randrotquat()
