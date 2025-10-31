@@ -87,14 +87,14 @@ subroutine collect_atomtypes(atomset1, atomset2, atoms1, atoms2, atomtypes)
 
    ! Local variables
    type(atomtype_table_t) :: atomtypetable
-   integer :: i, num_atoms1, num_atoms2
-   integer :: partidx, current_part
-   integer :: max_parts
    ! Small temporary arrays - only O(max_parts) size
    integer, dimension(:), allocatable :: part_count1, part_count2
    integer, dimension(:), allocatable :: part_fill1, part_fill2
    ! Item directories - O(num_atoms) size, unavoidable
    integer, dimension(:), allocatable :: itemdir1_temp, itemdir2_temp
+   integer :: num_atoms1, num_atoms2
+   integer :: current_part, max_parts
+   integer :: atomidx, partidx, i
 
    if (label_flag) then
       compare_atoms => compare_atoms_labeled
@@ -121,31 +121,29 @@ subroutine collect_atomtypes(atomset1, atomset2, atoms1, atoms2, atomtypes)
 
    ! SINGLE PASS: Process all atoms, build assignments AND count sizes
    ! First molecule
-   do i = 1, num_atoms1
-      if (any(atomset1 == i)) then
-         partidx = find_atomtype(atomtypetable, atoms1(i)%elnum, atoms1(i)%typeid)
-         if (partidx == 0) then
-            current_part = current_part + 1
-            call add_atomtype(atomtypetable, atoms1(i)%elnum, atoms1(i)%typeid, current_part)
-            partidx = current_part
-         end if
-         itemdir1_temp(i) = partidx
-         part_count1(partidx) = part_count1(partidx) + 1
+   do i = 1, size(atomset1)
+      atomidx = atomset1(i)
+      partidx = find_atomtype(atomtypetable, atoms1(atomidx)%elnum, atoms1(atomidx)%typeid)
+      if (partidx == 0) then
+         current_part = current_part + 1
+         call add_atomtype(atomtypetable, atoms1(atomidx)%elnum, atoms1(atomidx)%typeid, current_part)
+         partidx = current_part
       end if
+      itemdir1_temp(atomidx) = partidx
+      part_count1(partidx) = part_count1(partidx) + 1
    end do
 
    ! Second molecule
-   do i = 1, num_atoms2
-      if (any(atomset2 == i)) then
-         partidx = find_atomtype(atomtypetable, atoms2(i)%elnum, atoms2(i)%typeid)
-         if (partidx == 0) then
-            current_part = current_part + 1
-            call add_atomtype(atomtypetable, atoms2(i)%elnum, atoms2(i)%typeid, current_part)
-            partidx = current_part
-         end if
-         itemdir2_temp(i) = partidx
-         part_count2(partidx) = part_count2(partidx) + 1
+   do i = 1, size(atomset2)
+      atomidx = atomset2(i)
+      partidx = find_atomtype(atomtypetable, atoms2(atomidx)%elnum, atoms2(atomidx)%typeid)
+      if (partidx == 0) then
+         current_part = current_part + 1
+         call add_atomtype(atomtypetable, atoms2(atomidx)%elnum, atoms2(atomidx)%typeid, current_part)
+         partidx = current_part
       end if
+      itemdir2_temp(atomidx) = partidx
+      part_count2(partidx) = part_count2(partidx) + 1
    end do
 
    ! Now allocate final structure with exact sizes (no waste!)

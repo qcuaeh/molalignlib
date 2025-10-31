@@ -43,7 +43,7 @@ type, public :: chain_item_t
 end type
 
 type, public :: assigntree_item_t
-   integer :: tot_items1, tot_items2
+   integer :: num_atoms1, num_atoms2
    integer :: num_links, num_children
    ! Cross-tree reference (0 = null)
    integer :: split_part_idx      ! points to part array
@@ -67,14 +67,9 @@ type, public :: array_trees_t
    type(partree_item_t), allocatable :: partree(:)
    type(assigntree_item_t), allocatable :: assigntree(:)
    ! Flattened variable-length data - all pure integer arrays!
-   integer, allocatable :: itemdir1_entries(:,:)  ! [link_idx, atom_idx] - adjcs1 itemdir 2D array
-   integer, allocatable :: itemdir2_entries(:,:)  ! [link_idx, atom_idx] - adjcs2 itemdir 2D array
+   integer, allocatable :: itemdir1_entries(:,:)  ! [link_idx, atom_idx]
+   integer, allocatable :: itemdir2_entries(:,:)  ! [link_idx, atom_idx]
    integer, allocatable :: partref_entries(:)     ! Part indices for partrefs
-   ! Adjacency information stored directly for fastest access
-   integer, allocatable :: adj_lists1(:,:)     ! Direct 2D adjacency lists for adjcs1 [atom_idx, neighbor_idx]
-   integer, allocatable :: adj_lists2(:,:)     ! Direct 2D adjacency lists for adjcs2 [atom_idx, neighbor_idx]
-   integer, allocatable :: adj_counts1(:)      ! Count for each adjcs1 atom's adjacency list
-   integer, allocatable :: adj_counts2(:)      ! Count for each adjcs2 atom's adjacency list
    ! Metadata
    integer :: num_atoms1, num_atoms2  ! number of atoms in each molecule
    integer :: total_items1, total_items2, total_parts
@@ -87,8 +82,7 @@ end type
 
 contains
 
-subroutine convert_trees_to_arrays(adjcs1, adjcs2, part_tree, assign_tree, assign_arrays)
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+subroutine convert_trees_to_arrays(part_tree, assign_tree, assign_arrays)
    type(partree_node_t), pointer, intent(in) :: part_tree
    type(assigntree_node_t), pointer, intent(in) :: assign_tree
    type(array_trees_t), intent(out) :: assign_arrays
@@ -96,16 +90,14 @@ subroutine convert_trees_to_arrays(adjcs1, adjcs2, part_tree, assign_tree, assig
    integer :: partref_idx, link_idx, item1_idx, item2_idx
 
    ! Get totals from the tree counters
+   assign_arrays%num_atoms1 = assign_tree%num_atoms1
+   assign_arrays%num_atoms2 = assign_tree%num_atoms2
    assign_arrays%total_parts = part_tree%total_parts
    assign_arrays%total_items1 = part_tree%total_items1
    assign_arrays%total_items2 = part_tree%total_items2
    assign_arrays%total_chains = assign_tree%total_chains
    assign_arrays%total_links = assign_tree%total_links
    assign_arrays%total_partref_entries = assign_tree%total_partrefs
-
-   ! Store molecule sizes
-   assign_arrays%num_atoms1 = size(adjcs1)
-   assign_arrays%num_atoms2 = size(adjcs2)
 
    ! Allocate all arrays with exact sizes (existing allocation code)
    allocate(assign_arrays%atomidcs1(assign_arrays%total_items1))
@@ -119,12 +111,6 @@ subroutine convert_trees_to_arrays(adjcs1, adjcs2, part_tree, assign_tree, assig
    allocate(assign_arrays%itemdir1_entries(assign_arrays%total_links, assign_arrays%num_atoms1))
    allocate(assign_arrays%itemdir2_entries(assign_arrays%total_links, assign_arrays%num_atoms2))
 
-   ! Allocate adjacency arrays - 2D format for direct access using MAX_COORD
-   allocate(assign_arrays%adj_lists1(assign_arrays%num_atoms1, MAX_COORD))
-   allocate(assign_arrays%adj_lists2(assign_arrays%num_atoms2, MAX_COORD))
-   allocate(assign_arrays%adj_counts1(assign_arrays%num_atoms1))
-   allocate(assign_arrays%adj_counts2(assign_arrays%num_atoms2))
-
    ! OPTIMIZATION: Use intrinsic array operations instead of explicit loops
    assign_arrays%partref_entries = 0
    assign_arrays%atomidcs1 = 0
@@ -133,15 +119,6 @@ subroutine convert_trees_to_arrays(adjcs1, adjcs2, part_tree, assign_tree, assig
    ! NEW: Initialize 2D itemdir arrays
    assign_arrays%itemdir1_entries = 0
    assign_arrays%itemdir2_entries = 0
-
-   ! Initialize adjacency arrays
-   assign_arrays%adj_lists1 = 0
-   assign_arrays%adj_lists2 = 0
-   assign_arrays%adj_counts1 = 0
-   assign_arrays%adj_counts2 = 0
-
-   ! Populate adjacency information
-   call populate_adjacency_arrays(adjcs1, adjcs2, assign_arrays)
 
    ! Convert part tree starting from root with global item tracking
    item1_idx = 0
@@ -152,44 +129,7 @@ subroutine convert_trees_to_arrays(adjcs1, adjcs2, part_tree, assign_tree, assig
    partref_idx = 0
    link_idx = 0
    call convert_chains_recurse(assign_tree, assign_arrays, partref_idx, link_idx, &
-                               assign_arrays%local_combinations, assign_arrays%global_combinations)
-end subroutine
-
-subroutine populate_adjacency_arrays(adjcs1, adjcs2, assign_arrays)
-   ! Populate the 2D adjacency arrays directly - each atom gets its own row
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
-   type(array_trees_t), intent(inout) :: assign_arrays
-   integer :: i, j
-
-   ! Populate adjcs1 adjacency information - direct 2D storage
-   do i = 1, assign_arrays%num_atoms1
-      assign_arrays%adj_counts1(i) = size(adjcs1(i)%adjlist)
-
-      ! Copy adjacency list directly to 2D array
-      do j = 1, size(adjcs1(i)%adjlist)
-         assign_arrays%adj_lists1(i, j) = adjcs1(i)%adjlist(j)
-      end do
-
-      ! Zero out unused entries (though not strictly necessary)
-      do j = size(adjcs1(i)%adjlist) + 1, MAX_COORD
-         assign_arrays%adj_lists1(i, j) = 0
-      end do
-   end do
-
-   ! Populate adjcs2 adjacency information - direct 2D storage
-   do i = 1, assign_arrays%num_atoms2
-      assign_arrays%adj_counts2(i) = size(adjcs2(i)%adjlist)
-
-      ! Copy adjacency list directly to 2D array
-      do j = 1, size(adjcs2(i)%adjlist)
-         assign_arrays%adj_lists2(i, j) = adjcs2(i)%adjlist(j)
-      end do
-
-      ! Zero out unused entries (though not strictly necessary)
-      do j = size(adjcs2(i)%adjlist) + 1, MAX_COORD
-         assign_arrays%adj_lists2(i, j) = 0
-      end do
-   end do
+         assign_arrays%local_combinations, assign_arrays%global_combinations)
 end subroutine
 
 subroutine convert_signature(part, assign_arrays, part_idx)
@@ -361,8 +301,8 @@ recursive subroutine convert_chains_recurse(chain, assign_arrays, partref_idx, l
    ! Convert this chain (existing conversion logic)
    chain_idx = chain%global_idx
 
-   assign_arrays%assigntree(chain_idx)%tot_items1 = chain%tot_items1
-   assign_arrays%assigntree(chain_idx)%tot_items2 = chain%tot_items2
+   assign_arrays%assigntree(chain_idx)%num_atoms1 = chain%num_atoms1
+   assign_arrays%assigntree(chain_idx)%num_atoms2 = chain%num_atoms2
    assign_arrays%assigntree(chain_idx)%num_links = chain%num_links
    assign_arrays%assigntree(chain_idx)%num_children = chain%num_children
 

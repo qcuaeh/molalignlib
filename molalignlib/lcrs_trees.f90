@@ -63,11 +63,11 @@ end type
 
 ! Assignment tree node
 type, public :: assigntree_node_t
-   integer :: tot_items1
-   integer :: tot_items2
    integer :: num_links
    integer :: num_children
    integer :: global_idx
+   integer, pointer :: num_atoms1 => null()
+   integer, pointer :: num_atoms2 => null()
    integer, pointer :: total_chains => null()
    integer, pointer :: total_links => null()
    integer, pointer :: total_partrefs => null()
@@ -617,16 +617,17 @@ subroutine print_link_itemdir(link)
    write(stderr, *)
 end subroutine
 
-function new_bare_chain(tot_items1, tot_items2) result(chain)
-   integer, intent(in) :: tot_items1, tot_items2
+function new_bare_chain() result(chain)
    type(assigntree_node_t), pointer :: chain
 
    allocate(chain)
+
+   ! Counters will be set when added to tree
    chain%num_links = 0
    chain%num_children = 0
-   chain%global_idx = 0  ! Will be set when added to tree
-   chain%tot_items1 = tot_items1
-   chain%tot_items2 = tot_items2
+   chain%global_idx = 0
+   chain%num_atoms1 => null()
+   chain%num_atoms2 => null()
    chain%total_chains => null()
    chain%total_links => null()
    chain%total_partrefs => null()
@@ -637,19 +638,23 @@ function new_bare_chain(tot_items1, tot_items2) result(chain)
    chain%last_link => null()
 end function
 
-function new_root_chain(tot_items1, tot_items2) result(chain)
-   integer, intent(in) :: tot_items1, tot_items2
+function new_root_chain(num_atoms1, num_atoms2) result(chain)
+   integer, intent(in) :: num_atoms1, num_atoms2
    type(assigntree_node_t), pointer :: chain
 
-   chain => new_bare_chain(tot_items1, tot_items2)
+   chain => new_bare_chain()
    chain%parent_chain => null()
    chain%split_part => null()
    chain%global_idx = 1
 
    ! Allocate counters for root and assign initial values
+   allocate(chain%num_atoms1)
+   allocate(chain%num_atoms2)
    allocate(chain%total_chains)
    allocate(chain%total_links)
    allocate(chain%total_partrefs)
+   chain%num_atoms1 = num_atoms1
+   chain%num_atoms2 = num_atoms2
    chain%total_chains = 1
    chain%total_links = 0    ! No links initially
    chain%total_partrefs = 0 ! No partrefs initially
@@ -683,14 +688,14 @@ function new_chain_link(chain) result(link)
    link%global_idx = chain%total_links
 
    ! Allocate item directories
-   allocate(link%itemdir1(chain%tot_items1))
-   allocate(link%itemdir2(chain%tot_items2))
+   allocate(link%itemdir1(chain%num_atoms1))
+   allocate(link%itemdir2(chain%num_atoms2))
 
    ! Initialize all pointers to null
-   do i = 1, chain%tot_items1
+   do i = 1, chain%num_atoms1
       link%itemdir1(i)%ptr => null()
    end do
-   do i = 1, chain%tot_items2
+   do i = 1, chain%num_atoms2
       link%itemdir2(i)%ptr => null()
    end do
 
@@ -826,13 +831,15 @@ function new_child_chain(chain, split_part) result(new_chain)
    type(assigntree_node_t), pointer :: new_chain
 
    ! Create new child chain
-   new_chain => new_bare_chain(chain%tot_items1, chain%tot_items2)
+   new_chain => new_bare_chain()
    new_chain%split_part => split_part
 
    ! Set up parent-child relationship
    new_chain%parent_chain => chain
 
    ! Point to parent's counters
+   new_chain%num_atoms1 => chain%num_atoms1
+   new_chain%num_atoms2 => chain%num_atoms2
    new_chain%total_chains => chain%total_chains
    new_chain%total_links => chain%total_links
    new_chain%total_partrefs => chain%total_partrefs

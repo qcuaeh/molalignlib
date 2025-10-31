@@ -511,7 +511,7 @@ subroutine build_assignment_tree( adjcs1, adjcs2, mlnalink, assign_arrays)
 
    call split_independent_parts( adjcs1, adjcs2, mlnachain, assign_tree, branch_parts)
 !   call distribute_items( adjcs1, adjcs2, assign_tree)
-   call convert_trees_to_arrays( adjcs1, adjcs2, part_tree, assign_tree, assign_arrays)
+   call convert_trees_to_arrays( part_tree, assign_tree, assign_arrays)
 !   call validate_conversion(part_tree, assign_tree, assign_arrays)
 end subroutine
 

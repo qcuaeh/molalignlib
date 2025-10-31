@@ -49,8 +49,7 @@ real(rk) :: rmsd
 real(rk) :: center1(3), center2(3), rotquat(4)
 real(rk), dimension(:), allocatable :: weights1, weights2
 real(rk), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, coords2r
-integer, dimension(:), pointer :: atomset1, atomset2
-integer, dimension(:), allocatable :: atomset1_alloc, atomset2_alloc
+integer, dimension(:), allocatable :: atomset1, atomset2
 integer, dimension(:), allocatable :: atomperm1
 integer :: unitin1, unitin2, unitout
 integer :: i
@@ -144,12 +143,12 @@ call readfile( unitin2, extin2, title2, atoms2, bonds2)
 
 if (heavy_flag) then
    ! Include only heavy atoms
-   call include_heavy_atoms( atoms1, atomset1, atomset1_alloc)
-   call include_heavy_atoms( atoms2, atomset2, atomset2_alloc)
+   call include_heavy_atoms( atoms1, atomset1)
+   call include_heavy_atoms( atoms2, atomset2)
 else
    ! Include all atoms
-   call include_all_atoms( atoms1, atomset1, atomset1_alloc)
-   call include_all_atoms( atoms2, atomset2, atomset2_alloc)
+   call include_all_atoms( atoms1, atomset1)
+   call include_all_atoms( atoms2, atomset2)
 end if
 
 ! Collect atom types in a partition

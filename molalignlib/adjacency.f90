@@ -21,6 +21,11 @@ type, public :: adjc_t
    integer, allocatable :: adjlist(:)
 end type
 
+interface adjmat_to_adjcs
+   module procedure adjmat_to_adjcs_all
+   module procedure adjmat_to_adjcs_atomset
+end interface
+
 interface adjacencydiff
    module procedure adjacencydiff_perm
 end interface
@@ -54,26 +59,53 @@ function adjcs_to_adjmat(adjcs) result(adjmat)
    end do
 end function
 
-subroutine adjmat_to_adjcs(adjmat, adjcs)
+subroutine adjmat_to_adjcs_all(adjmat, adjcs)
    logical, dimension(:,:), intent(in) :: adjmat
    type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs
-   integer :: i, j, n, count
+   integer :: i, j, num_atoms, nadj
    integer, dimension(:), allocatable :: temp_list
 
-   n = size(adjmat, 1)
-   allocate(adjcs(n))
-   allocate(temp_list(n))
+   num_atoms = size(adjmat, 1)
+   allocate(adjcs(num_atoms))
+   allocate(temp_list(num_atoms))
 
-   do i = 1, n
-      count = 0
-      do j = 1, n
+   do i = 1, num_atoms
+      nadj = 0
+      do j = 1, num_atoms
          if (adjmat(i, j)) then
-            count = count + 1
-            temp_list(count) = j
+            nadj = nadj + 1
+            temp_list(nadj) = j
          end if
       end do
-      allocate(adjcs(i)%adjlist(count))
-      adjcs(i)%adjlist = temp_list(1:count)
+      allocate(adjcs(i)%adjlist(nadj))
+      adjcs(i)%adjlist = temp_list(1:nadj)
+   end do
+
+   deallocate(temp_list)
+end subroutine
+
+subroutine adjmat_to_adjcs_atomset(atomset, adjmat, adjcs)
+   integer, dimension(:), intent(in) :: atomset
+   logical, dimension(:,:), intent(in) :: adjmat
+   type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs
+   integer :: i, nadj, atomidx
+   integer, dimension(:), allocatable :: temp_list
+
+   allocate(adjcs(size(adjmat, 1)))
+   allocate(temp_list(size(atomset)))
+
+   ! Populate adjacency lists for all atoms
+   do atomidx = 1, size(adjmat, dim=1)
+      nadj = 0
+      ! Only include bonds to atoms in atomset
+      do i = 1, size(atomset)
+         if (adjmat(atomidx, atomset(i))) then
+            nadj = nadj + 1
+            temp_list(nadj) = atomset(i)
+         end if
+      end do
+      allocate(adjcs(atomidx)%adjlist(nadj))
+      adjcs(atomidx)%adjlist = temp_list(1:nadj)
    end do
 
    deallocate(temp_list)

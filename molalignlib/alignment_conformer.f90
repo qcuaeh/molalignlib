@@ -36,7 +36,8 @@ implicit none
 
 contains
 
-subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atomtypes, coords1, coords2, registry)
+subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atomtypes, &
+      coords1, coords2, registry)
    integer, dimension(:), intent(in) :: atomset1, atomset2
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(partition_t), intent(in) :: atomtypes
@@ -77,10 +78,13 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
 
          ! Assign atoms with current orientation
          if (full_flag) then
-            call assign_atoms_local_full( coords1, coords2r, assign_arrays, atomperm1, permdist)
+            call assign_atoms_local_full( adjcs1, adjcs2, coords1, coords2r, assign_arrays, &
+                  atomperm1, permdist)
          else
-            call assign_atoms_greedy( coords1, coords2r, assign_arrays, atomperm1, permdist)
-            call assign_atoms_local_pruned( coords1, coords2r, assign_arrays, atomperm1, permdist)
+            call assign_atoms_greedy( adjcs1, adjcs2, coords1, coords2r, assign_arrays, &
+                  atomperm1, permdist)
+            call assign_atoms_local_pruned( adjcs1, adjcs2, coords1, coords2r, assign_arrays, &
+                  atomperm1, permdist)
          end if
          rotation = least_rotquat( atomset1, atomperm1, coords1, coords2r)
          total_rotation = quatmul( total_rotation, rotation)
@@ -90,10 +94,12 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
 
          do
             if (full_flag) then
-               call assign_atoms_local_full( coords1, coords2r, assign_arrays, new_atomperm, new_permdist)
+               call assign_atoms_local_full( adjcs1, adjcs2, coords1, coords2r, assign_arrays, &
+                     new_atomperm, new_permdist)
             else
                new_permdist = permdist
-               call assign_atoms_local_pruned( coords1, coords2r, assign_arrays, new_atomperm, new_permdist)
+               call assign_atoms_local_pruned( adjcs1, adjcs2, coords1, coords2r, assign_arrays, &
+                     new_atomperm, new_permdist)
             end if
 !            write (stdout,*) permdist, new_permdist
             if (all(atomperm1 == new_atomperm)) exit
@@ -113,7 +119,7 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
    else
 
       ! Assign atoms using global assignment
-      call assign_atoms_global( coords1, coords2, assign_arrays, atomperm1)
+      call assign_atoms_global( adjcs1, adjcs2, coords1, coords2, assign_arrays, atomperm1)
       
       ! Calculate optimal rotation
       rotation = least_rotquat( atomset1, atomperm1, coords1, coords2)
@@ -155,10 +161,13 @@ subroutine assign_atomperm_conformer( adjcs1, adjcs2, atomtypes, coords1, coords
 
    ! Assign atoms using greedy and local pruned methods
    if (full_flag) then
-      call assign_atoms_local_full( coords1, coords2, assign_arrays, atomperm1, permdist)
+      call assign_atoms_local_full( adjcs1, adjcs2, coords1, coords2, assign_arrays, &
+            atomperm1, permdist)
    else
-      call assign_atoms_greedy( coords1, coords2, assign_arrays, atomperm1, permdist)
-      call assign_atoms_local_pruned( coords1, coords2, assign_arrays, atomperm1, permdist)
+      call assign_atoms_greedy( adjcs1, adjcs2, coords1, coords2, assign_arrays, &
+            atomperm1, permdist)
+      call assign_atoms_local_pruned( adjcs1, adjcs2, coords1, coords2, assign_arrays, &
+            atomperm1, permdist)
    end if
 end subroutine
 

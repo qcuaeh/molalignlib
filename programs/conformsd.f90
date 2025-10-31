@@ -49,8 +49,7 @@ real(rk) :: rmsd
 real(rk) :: center1(3), center2(3), rotquat(4)
 real(rk), dimension(:), allocatable :: weights1, weights2
 real(rk), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, coords2r
-integer, dimension(:), pointer :: atomset1, atomset2
-integer, dimension(:), allocatable :: atomset1_alloc, atomset2_alloc
+integer, dimension(:), allocatable :: atomset1, atomset2
 integer, dimension(:), allocatable :: atomperm1
 integer :: unitin1, unitin2, unitout
 integer :: i
@@ -155,12 +154,12 @@ call readfile( unitin2, extin2, title2, atoms2, bonds2)
 
 if (heavy_flag) then
    ! Include only heavy atoms
-   call include_heavy_atoms( atoms1, atomset1, atomset1_alloc)
-   call include_heavy_atoms( atoms2, atomset2, atomset2_alloc)
+   call include_heavy_atoms( atoms1, atomset1)
+   call include_heavy_atoms( atoms2, atomset2)
 else
    ! Include all atoms
-   call include_all_atoms( atoms1, atomset1, atomset1_alloc)
-   call include_all_atoms( atoms2, atomset2, atomset2_alloc)
+   call include_all_atoms( atoms1, atomset1)
+   call include_all_atoms( atoms2, atomset2)
 end if
 
 ! Collect atom types in a partition
@@ -172,9 +171,10 @@ if (any(atomtypes%parts%num_items1 /= atomtypes%parts%num_items2)) then
    stop 1
 end if
 
+! Set adjacency lists
 if (rebond_flag) then
-   call adjacency_from_distance( atomset1, atoms1, adjcs1)
-   call adjacency_from_distance( atomset2, atoms2, adjcs2)
+   call adjacency_from_atoms( atomset1, atoms1, adjcs1)
+   call adjacency_from_atoms( atomset2, atoms2, adjcs2)
 else
    if (size(bonds1) < 1 .or. size(bonds2) < 1) then
       if (size(bonds1) < 1 .and. size(bonds2) < 1) then
@@ -188,8 +188,8 @@ else
          stop 1
       end if
    end if
-   call adjacency_from_bonds( atomset1, atoms1, bonds1, adjcs1)
-   call adjacency_from_bonds( atomset2, atoms2, bonds2, adjcs2)
+   call adjacency_from_bonds( atomset1, bonds1, size(atoms1), adjcs1)
+   call adjacency_from_bonds( atomset2, bonds2, size(atoms2), adjcs2)
 end if
 
 ! Get user defined atom weights

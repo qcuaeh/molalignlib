@@ -8,7 +8,7 @@ public set_coords
 public include_all_atoms
 public include_heavy_atoms
 public adjacency_from_bonds
-public adjacency_from_distance
+public adjacency_from_atoms
 public get_coords
 public get_mirrored_coords
 public get_weighted_coords
@@ -38,39 +38,34 @@ end interface
 
 contains
 
-subroutine include_all_atoms(atoms, atomset, subset_alloc)
+subroutine include_all_atoms(atoms, atomset)
    type(atom_t), dimension(:), intent(inout) :: atoms
-   integer, dimension(:), pointer, intent(out) :: atomset
-   integer, dimension(:), allocatable, target, intent(out) :: subset_alloc
+   integer, dimension(:), allocatable, intent(out) :: atomset
    ! Local variables
    integer :: i
 
-   allocate (subset_alloc(size(atoms)))
-   atomset => subset_alloc
+   allocate (atomset(size(atoms)))
 
    do i = 1, size(atoms)
-      subset_alloc(i) = i
+      atomset(i) = i
    end do
 end subroutine
 
-subroutine include_heavy_atoms(atoms, atomset, subset_alloc)
+subroutine include_heavy_atoms(atoms, atomset)
    type(atom_t), dimension(:), intent(inout) :: atoms
-   integer, dimension(:), pointer, intent(out) :: atomset
-   integer, dimension(:), allocatable, target, intent(out) :: subset_alloc
+   integer, dimension(:), allocatable, intent(out) :: atomset
    ! Local variables
-   integer :: atomidx, n
+   integer :: nel, atomidx
 
-   allocate (subset_alloc(size(atoms)))
+   allocate (atomset(count(atoms%elnum > 1)))
 
-   n = 0
+   nel = 0
    do atomidx = 1, size(atoms)
       if (atoms(atomidx)%elnum > 1) then
-         n = n + 1
-         subset_alloc(n) = atomidx
+         nel = nel + 1
+         atomset(nel) = atomidx
       end if
    end do
-
-   atomset => subset_alloc(1:n)
 end subroutine
 
 subroutine set_coords(atoms, coords)
@@ -84,81 +79,66 @@ subroutine set_coords(atoms, coords)
    end do
 end subroutine
 
-subroutine adjacency_from_bonds(atomset, atoms, bonds, adjcs)
+subroutine adjacency_from_bonds(atomset, bonds, num_atoms, adjcs)
    integer, dimension(:), intent(in) :: atomset
-   type(atom_t), dimension(:), intent(in) :: atoms
    type(bond_t), dimension(:), intent(in) :: bonds
+   integer, intent(in) :: num_atoms
    type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs
    ! Local variables
-   integer, allocatable ::  nadjs(:)
-   integer, allocatable :: adjlist(:,:)
-   integer :: i, idx1, idx2
+   logical, dimension(:,:), allocatable :: adjmat
+   integer :: i, atomidx1, atomidx2
 
-   allocate (adjcs(size(atoms)))
-   allocate (nadjs(size(atoms)))
-   allocate (adjlist(MAX_COORD, size(atoms)))
+   allocate (adjmat(num_atoms, num_atoms))
+   adjmat = .false.
 
-   nadjs = 0
+   ! Build adjacency matrix from bonds
    do i = 1, size(bonds)
-      idx1 = bonds(i)%atomidx1
-      idx2 = bonds(i)%atomidx2
-      if (any(atomset == idx1) .and. any(atomset == idx2)) then
-         nadjs(idx1) = nadjs(idx1) + 1
-         nadjs(idx2) = nadjs(idx2) + 1
-         adjlist(nadjs(idx1), idx1) = idx2
-         adjlist(nadjs(idx2), idx2) = idx1
-      end if
+      atomidx1 = bonds(i)%atomidx1
+      atomidx2 = bonds(i)%atomidx2
+      adjmat(atomidx1, atomidx2) = .true.
+      adjmat(atomidx2, atomidx1) = .true.
    end do
 
-   do i = 1, size(adjcs)
-      adjcs(i)%adjlist = adjlist(1:nadjs(i), i)
-   end do
+   ! Convert to adjacency lists
+!   call adjmat_to_adjcs(adjmat, adjcs)
+   call adjmat_to_adjcs(atomset, adjmat, adjcs)
+
+   deallocate (adjmat)
 end subroutine
 
-subroutine adjacency_from_distance(atomset, atoms, adjcs)
+subroutine adjacency_from_atoms(atomset, atoms, adjcs)
    integer, dimension(:), intent(in) :: atomset
    type(atom_t), dimension(:), intent(in) :: atoms
    type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs
    ! Local variables
-   integer, allocatable :: nadjs(:)
-   integer, allocatable :: adjlist(:,:)
+   logical, dimension(:,:), allocatable :: adjmat
    integer :: i, j
    real(rk), allocatable :: atom_radii(:)
    real(rk) :: atom_dist
 
-   allocate (adjcs(size(atoms)))
-   allocate (nadjs(size(atoms)))
-   allocate (adjlist(MAX_COORD, size(atoms)))
+   ! Build adjacency matrix for all atoms
+   allocate (adjmat(size(atoms), size(atoms)))
+   adjmat = .false.
 
    ! Set atom radii
    atom_radii = 0.75*covalent_radii(atoms%elnum) + 0.25*vdw_radii(atoms%elnum)
 
-   ! Register adjacency matrix i,j if atoms i and j are closer
-   ! than the sum of their adjacency radius
-   nadjs = 0
+   ! Calculate adjacency based on distance for all atom pairs
    do i = 1, size(atoms)
-      if (any(atomset == i)) then
-         do j = i + 1, size(atoms)
-            if (any(atomset == j)) then
-               atom_dist = sqrt(sum((atoms(i)%coords - atoms(j)%coords)**2))
-               if (atom_dist < atom_radii(i) + atom_radii(j)) then
-                  nadjs(i) = nadjs(i) + 1
-                  nadjs(j) = nadjs(j) + 1
-                  if (nadjs(i) > MAX_COORD .or. nadjs(j) > MAX_COORD) then
-                     write (stderr, '(A)') 'Error: Maximum coordination number exceeded'
-                     stop 1
-                  end if
-                  adjlist(nadjs(i), i) = j
-                  adjlist(nadjs(j), j) = i
-               end if
-            end if
-         end do
-      end if
+      do j = i + 1, size(atoms)
+         atom_dist = sqrt(sum((atoms(i)%coords - atoms(j)%coords)**2))
+         if (atom_dist < atom_radii(i) + atom_radii(j)) then
+            adjmat(i, j) = .true.
+            adjmat(j, i) = .true.
+         end if
+      end do
    end do
 
-   do i = 1, size(adjcs)
-      adjcs(i)%adjlist = adjlist(1:nadjs(i), i)
-   end do
+   ! Convert to adjacency lists
+!   call adjmat_to_adjcs(adjmat, adjcs)
+   call adjmat_to_adjcs(atomset, adjmat, adjcs)
+
+   deallocate (adjmat)
 end subroutine
 
 function get_coords(atoms) result(coords)
@@ -228,15 +208,14 @@ function get_centroid(atomset, atoms, weights) result(centroid)
    ! Local variables
    real(rk) :: centroid(3)
    real(rk) :: total_weight, total_coords(3)
-   integer :: i
+   integer :: atomidx, i
 
    total_weight = 0
    total_coords = 0
-   do i = 1, size(atoms)
-      if (any(atomset == i)) then
-         total_weight = total_weight + weights(i)
-         total_coords = total_coords + weights(i)*atoms(i)%coords
-      end if
+   do i = 1, size(atomset)
+      atomidx = atomset(i)
+      total_weight = total_weight + weights(atomidx)
+      total_coords = total_coords + weights(atomidx)*atoms(atomidx)%coords
    end do
    centroid = total_coords/total_weight
 end function
@@ -263,10 +242,10 @@ subroutine print_bonds(bonds)
    ! Local variables
    integer :: i
 
-   write (stderr, '(a)') "idx1 idx2"
+   write (stderr, '(a)') "atomidx1 atomidx2"
 
    do i = 1, size(bonds)
-      write (stderr, '(I3,2X,I3)') bonds(i)%atomidx1, bonds(i)%atomidx2 
+      write (stderr, '(I3,2X,I3)') bonds(i)%atomidx1, bonds(i)%atomidx2
    end do
 end subroutine
 
