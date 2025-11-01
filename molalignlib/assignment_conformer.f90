@@ -1,11 +1,27 @@
+! MolAlignLib
+! Copyright (C) 2022 José M. Vásquez
+
+! This program is free software: you can redistribute it and/or modify
+! it under the terms of the GNU General Public License as published by
+! the Free Software Foundation, either version 3 of the License, or
+! (at your option) any later version.
+
+! This program is distributed in the hope that it will be useful,
+! but WITHOUT ANY WARRANTY; without even the implied warranty of
+! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+! GNU General Public License for more details.
+
+! You should have received a copy of the GNU General Public License
+! along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 module assignment_conformer
 use parameters
 use random
-use derived_types
+use types_basic
 use permutation
 use adjacency
 use euclidean
-use lcrs_arrays
+use types_indexed
 implicit none
 private
 public assign_atoms_greedy
@@ -113,7 +129,8 @@ subroutine collect_leaf_assignments(assign_arrays, part_idx, subperm)
    end do
 end subroutine
 
-subroutine update_mlna_part(adjcs1, adjcs2, assign_arrays, part_idx, read_link_idx, write_link_idx, subperm)
+subroutine update_hna_part(adjcs1, adjcs2, assign_arrays, part_idx, read_link_idx, &
+      write_link_idx, subperm)
 ! ULTRA-OPTIMIZED: Array-based version with direct 2D adjacency access for maximum performance
 ! UPDATED: Now collects assignment pairs from newly created leaf parts into subperm
    type(adjcs_t), intent(in) :: adjcs1, adjcs2
@@ -121,9 +138,10 @@ subroutine update_mlna_part(adjcs1, adjcs2, assign_arrays, part_idx, read_link_i
    integer, intent(in) :: part_idx, read_link_idx, write_link_idx
    type(subperm_t), intent(inout) :: subperm
    integer, dimension(MAX_CHILDREN) :: items1_trackers, items2_trackers
-   integer :: i, j, target_relative_idx, target_part_idx, item_idx, target_idx, part_ref_idx, adj_atom
-   integer :: items1_offset, items1_count, items2_offset, items2_count
-   integer :: num_children
+   integer :: target_relative_idx, target_part_idx, item_idx, target_idx, part_ref_idx
+   integer :: items1_offset, items1_count, items2_offset, items2_count, num_children
+   integer :: adj_atom
+   integer :: i, j
 
    ! Extract commonly used values for readability
    items1_offset = assign_arrays%partree(part_idx)%items1_offset
@@ -161,7 +179,8 @@ subroutine update_mlna_part(adjcs1, adjcs2, assign_arrays, part_idx, read_link_i
 
       ! Add item to target child using relative index directly
       items1_trackers(target_relative_idx) = items1_trackers(target_relative_idx) + 1
-      target_idx = assign_arrays%partree(target_part_idx)%items1_offset + items1_trackers(target_relative_idx)
+      target_idx = assign_arrays%partree(target_part_idx)%items1_offset &
+                 + items1_trackers(target_relative_idx)
       assign_arrays%atomidcs1(target_idx) = item_idx
 
       ! Update itemdir using 2D array - no offset calculation needed
@@ -191,7 +210,8 @@ subroutine update_mlna_part(adjcs1, adjcs2, assign_arrays, part_idx, read_link_i
 
       ! Add item to target child using relative index directly
       items2_trackers(target_relative_idx) = items2_trackers(target_relative_idx) + 1
-      target_idx = assign_arrays%partree(target_part_idx)%items2_offset + items2_trackers(target_relative_idx)
+      target_idx = assign_arrays%partree(target_part_idx)%items2_offset &
+                 + items2_trackers(target_relative_idx)
       assign_arrays%atomidcs2(target_idx) = item_idx
 
       ! Update itemdir using 2D array - no offset calculation needed
@@ -261,21 +281,23 @@ end subroutine
 
 subroutine assign_branch_atoms(adjcs1, adjcs2, assign_arrays, split_part_idx, child_branch_idx, &
       first_link_idx, chosen_item1_idx, chosen_item2_idx, subperm)
-   ! Combined procedure: assignment + MLNA recomputation
-   ! Makes assignment (chosen_item1_idx-th item1 with chosen_item2_idx-th item2) then recomputes MLNAs for the branch
+   ! Combined procedure: assignment + HNA recomputation
+   ! Makes assignment (chosen_item1_idx-th item1 with chosen_item2_idx-th item2)
+   ! then recomputes HNAs for the branch
    type(adjcs_t), intent(in) :: adjcs1, adjcs2
    type(array_trees_t), intent(inout) :: assign_arrays
-   integer, intent(in) :: split_part_idx, child_branch_idx, first_link_idx, chosen_item1_idx, chosen_item2_idx
+   integer, intent(in) :: split_part_idx, child_branch_idx, first_link_idx, chosen_item1_idx, &
+         chosen_item2_idx
    type(subperm_t), intent(inout) :: subperm
-   integer :: i, link_idx, part_idx
-   integer :: num_links, link_offset, next_link_idx
-   integer :: num_parts, partref_offset
+   integer :: link_idx, next_link_idx, part_idx
+   integer :: num_links, num_parts, link_offset, partref_offset
+   integer :: i
 
    ! === PART 1: PAIR ASSIGNMENT ===
    call assign_pair_to_children(assign_arrays, split_part_idx, first_link_idx, &
          chosen_item1_idx, chosen_item2_idx, subperm)
 
-   ! === PART 2: SCNA RECOMPUTATION (inlined update_mlna_partition) ===
+   ! === PART 2: SCNA RECOMPUTATION (inlined update_hna_partition) ===
    num_links = assign_arrays%assigntree(child_branch_idx)%num_links
    link_offset = assign_arrays%assigntree(child_branch_idx)%link_offset
 
@@ -286,7 +308,7 @@ subroutine assign_branch_atoms(adjcs1, adjcs2, assign_arrays, split_part_idx, ch
       partref_offset = assign_arrays%chain(link_idx)%partref_offset
 
       do part_idx = 1, num_parts
-         call update_mlna_part(adjcs1, adjcs2, assign_arrays, &
+         call update_hna_part(adjcs1, adjcs2, assign_arrays, &
                assign_arrays%partref_entries(partref_offset + part_idx), &
                link_idx, next_link_idx, subperm)
       end do
@@ -413,7 +435,7 @@ subroutine assign_atoms_greedy(adjcs1, adjcs2, coords1, coords2, assign_arrays, 
    type(subperm_t) :: greedy_perm
 
    ! Initialize greedy assignment
-   call subperm_init(greedy_perm, assign_arrays%num_atoms1)
+   call subperm_init(greedy_perm, assign_arrays%atoms1_size)
 
    ! Initialize assignment with preassigned pairs
    call collect_leaf_assignments(assign_arrays, 1, greedy_perm)
@@ -432,7 +454,7 @@ subroutine assign_atoms_greedy(adjcs1, adjcs2, coords1, coords2, assign_arrays, 
 !block
 !   write(stderr, '(A)') repeat("=", 60)
 !   write(stderr, '(A,I0,A,I0,A)') "Atoms assigned: ", greedy_perm%atomset_size, " out of ", &
-!         assign_arrays%num_atoms1, " total atoms"
+!         assign_arrays%atoms1_size, " total atoms"
 !   write(stderr, '(A,F10.4)') "Greedy assignment total squared distance: ", permdist
 !   write(stderr, '(A)') repeat("=", 60)
 !end block
@@ -502,8 +524,8 @@ recursive subroutine recurse_assign_atoms_global(adjcs1, adjcs2, coords1, coords
             child_branch_idx, first_link_idx, 1, j, this_perm)
 
       ! Recursively try assignments for remaining split parts
-      call recurse_assign_atoms_global(adjcs1, adjcs2, coords1, coords2, assign_arrays, &
-            split_parts, num_split_parts, current_split_idx + 1, this_perm, best_perm, min_dist)
+      call recurse_assign_atoms_global(adjcs1, adjcs2, coords1, coords2, assign_arrays, split_parts, &
+            num_split_parts, current_split_idx + 1, this_perm, best_perm, min_dist)
 
       ! Restore permutation state
       this_perm = saved_treeperm
@@ -526,13 +548,13 @@ subroutine assign_atoms_global(adjcs1, adjcs2, coords1, coords2, assign_arrays, 
    type(subperm_t) :: this_perm, best_perm
    real(rk) :: min_dist
    integer, allocatable :: split_parts(:)
-   integer :: num_split_parts, num_atoms
+   integer :: num_split_parts, atoms_size
 
-   num_atoms = assign_arrays%num_atoms1
+   atoms_size = assign_arrays%atoms1_size
 
    ! Initialize permutations
-   call subperm_init(this_perm, num_atoms)
-   call subperm_init(best_perm, num_atoms)
+   call subperm_init(this_perm, atoms_size)
+   call subperm_init(best_perm, atoms_size)
 
    ! Initialize both permutations with preassigned pairs
    call collect_leaf_assignments(assign_arrays, 1, this_perm)
@@ -562,7 +584,7 @@ subroutine assign_atoms_global(adjcs1, adjcs2, coords1, coords2, assign_arrays, 
 !   write(stderr, '(A)') repeat("=", 60)
 !   write(stderr, '(A,I0)') "Split parts found: ", num_split_parts
 !   write(stderr, '(A,I0)') "Total permutations explored: ", combination_count
-!   write(stderr, '(A,I0,A,I0,A)') "Atoms assigned: ", best_perm%atomset_size, " out of ", num_atoms, " total atoms"
+!   write(stderr, '(A,I0,A,I0,A)') "Atoms assigned: ", best_perm%atomset_size, " out of ", atoms_size, " total atoms"
 !   write(stderr, '(A,F10.4)') "Minimum total squared distance: ", min_dist
 !   write(stderr, '(A)') repeat("=", 60)
 end subroutine
@@ -582,9 +604,9 @@ recursive subroutine recurse_assign_atoms_local_full(adjcs1, adjcs2, coords1, co
    integer :: link_idx, branch_link_offset, branch_num_links
    type(subperm_t) :: best_branch_perm, branch_perm
    real(rk) :: branch_dist, min_branch_dist
-   integer :: num_atoms
+   integer :: atoms_size
 
-   num_atoms = assign_arrays%num_atoms1
+   atoms_size = assign_arrays%atoms1_size
 
    ! Check if this is a leaf level (no more child branches)
    if (assign_arrays%assigntree(branch_idx)%num_children == 0) then
@@ -603,8 +625,8 @@ recursive subroutine recurse_assign_atoms_local_full(adjcs1, adjcs2, coords1, co
       items2_count = assign_arrays%partree(split_part_idx)%items2_count
       min_branch_dist = huge(rk)
 
-      call subperm_init(best_branch_perm, num_atoms)
-      call subperm_init(branch_perm, num_atoms)
+      call subperm_init(best_branch_perm, atoms_size)
+      call subperm_init(branch_perm, atoms_size)
 
       ! Try pairing first item1 with each item2 to find best assignment for this branch
       do j = 1, items2_count
@@ -612,7 +634,7 @@ recursive subroutine recurse_assign_atoms_local_full(adjcs1, adjcs2, coords1, co
          branch_perm%atomset_size = 0
          branch_dist = 0
 
-         ! Make assignment and recompute MLNAs (using first item1, index=1)
+         ! Make assignment and recompute HNAs (using first item1, index=1)
          call assign_branch_atoms(adjcs1, adjcs2, assign_arrays, split_part_idx, &
                child_branch_idx, first_link_idx, 1, j, branch_perm)
 
@@ -656,12 +678,12 @@ subroutine assign_atoms_local_full(adjcs1, adjcs2, coords1, coords2, assign_arra
    real(rk), intent(out) :: total_dist
    ! Local variables
    type(subperm_t) :: best_perm
-   integer :: num_atoms
+   integer :: atoms_size
 
-   num_atoms = assign_arrays%num_atoms1
+   atoms_size = assign_arrays%atoms1_size
 
    ! Initialize optimal assignment
-   call subperm_init(best_perm, num_atoms)
+   call subperm_init(best_perm, atoms_size)
 
    ! Initialize optimal assignment with preassigned pairs
    call collect_leaf_assignments(assign_arrays, 1, best_perm)
@@ -685,14 +707,14 @@ subroutine assign_atoms_local_full(adjcs1, adjcs2, coords1, coords2, assign_arra
 !   assigned_count = best_perm%atomset_size
 !   write(stderr, '(A)') repeat("=", 60)
 !   write(stderr, '(A,I0)') "Assignment combinations probed: ", combination_count
-!   write(stderr, '(A,I0,A,I0,A)') "Atoms assigned: ", assigned_count, " out of ", num_atoms, " total atoms"
+!   write(stderr, '(A,I0,A,I0,A)') "Atoms assigned: ", assigned_count, " out of ", atoms_size, " total atoms"
 !   write(stderr, '(A,F10.4)') "Minimum total squared distance: ", total_dist
 !   write(stderr, '(A)') repeat("=", 60)
 !end block
 end subroutine
 
-recursive subroutine recurse_assign_atoms_local_pruned(adjcs1, adjcs2, coords1, coords2, assign_arrays, &
-         branch_idx, total_budget, best_perm, accumulated_dist, success)
+recursive subroutine recurse_assign_atoms_local_pruned(adjcs1, adjcs2, coords1, coords2, &
+         assign_arrays, branch_idx, total_budget, best_perm, accumulated_dist, success)
    ! DFS exploration with pruning_atoms - finds permutation that minimizes total distance
    ! OPTIMIZED: Incremental distance calculation to avoid redundant sqdistsum calls
    type(adjcs_t), intent(in) :: adjcs1, adjcs2
@@ -710,9 +732,9 @@ recursive subroutine recurse_assign_atoms_local_pruned(adjcs1, adjcs2, coords1, 
    real(rk) :: branch_dist, min_branch_dist
    logical :: branch_success, child_success
    real(rk) :: remaining_budget
-   integer :: num_atoms
+   integer :: atoms_size
 
-   num_atoms = assign_arrays%num_atoms1
+   atoms_size = assign_arrays%atoms1_size
 
    ! Check if this is a leaf level (no more child branches)
    if (assign_arrays%assigntree(branch_idx)%num_children == 0) then
@@ -742,8 +764,8 @@ recursive subroutine recurse_assign_atoms_local_pruned(adjcs1, adjcs2, coords1, 
       min_branch_dist = huge(rk)  ! Best distance for this specific branch
       branch_success = .false.
 
-      call subperm_init(best_branch_perm, num_atoms)
-      call subperm_init(branch_perm, num_atoms)
+      call subperm_init(best_branch_perm, atoms_size)
+      call subperm_init(branch_perm, atoms_size)
 
       ! Try pairing first item1 with each item2 to find best assignment for this branch
       do j = 1, items2_count
@@ -751,7 +773,7 @@ recursive subroutine recurse_assign_atoms_local_pruned(adjcs1, adjcs2, coords1, 
          branch_perm%atomset_size = 0
          branch_dist = 0
 
-         ! Make assignment and recompute MLNAs operation (using first item1, index=1)
+         ! Make assignment and recompute HNAs operation (using first item1, index=1)
          call assign_branch_atoms(adjcs1, adjcs2, assign_arrays, split_part_idx, child_branch_idx, &
                first_link_idx, 1, j, branch_perm)
 
@@ -817,13 +839,13 @@ subroutine assign_atoms_local_pruned(adjcs1, adjcs2, coords1, coords2, assign_ar
    real(rk) :: total_budget
    type(subperm_t) :: best_perm
    logical :: success
-   integer :: num_atoms
+   integer :: atoms_size
 
    total_budget = permdist + MSD_TOL
-   num_atoms = assign_arrays%num_atoms1
+   atoms_size = assign_arrays%atoms1_size
 
    ! Initialize optimal assignment
-   call subperm_init(best_perm, num_atoms)
+   call subperm_init(best_perm, atoms_size)
 
    ! Initialize assignment with preassigned pairs
    call collect_leaf_assignments(assign_arrays, 1, best_perm)
@@ -852,7 +874,7 @@ subroutine assign_atoms_local_pruned(adjcs1, adjcs2, coords1, coords2, assign_ar
 !   write(stderr, '(A)') repeat("=", 60)
 !   write(stderr, '(A,F10.4)') "Pruning threshold: ", total_budget
 !   write(stderr, '(A,I0)') "Assignment combinations probed (pruned): ", combination_count
-!   write(stderr, '(A,I0,A,I0,A)') "Atoms assigned: ", assigned_count, " out of ", num_atoms, " total atoms"
+!   write(stderr, '(A,I0,A,I0,A)') "Atoms assigned: ", assigned_count, " out of ", atoms_size, " total atoms"
 !
 !   if (success) then
 !      write(stderr, '(A,F10.4)') "Final total squared distance: ", permdist

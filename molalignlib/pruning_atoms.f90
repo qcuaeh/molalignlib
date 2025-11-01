@@ -16,10 +16,10 @@
 
 module pruning_atoms
 use parameters
-use derived_types
+use types_basic
 use sorting
 use molecule
-use lcrs_trees
+use types_linked
 use options
 implicit none
 
@@ -29,9 +29,9 @@ procedure(prune_proc), pointer :: prune_procedure
 abstract interface
    subroutine prune_proc( atomtypes, coords1, coords2, prunes)
       use parameters
-      use derived_types
+      use types_basic
       use molecule
-      use lcrs_trees
+      use types_linked
       type(partition_t), intent(in) :: atomtypes
       real(rk), dimension(:,:), intent(in) :: coords1, coords2
       type(bool_matrix), dimension(:), allocatable, intent(out) :: prunes

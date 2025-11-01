@@ -16,7 +16,7 @@
 
 module alignment_isomer
 use parameters
-use derived_types
+use types_basic
 use random
 use euclidean
 use adjacency
@@ -59,7 +59,7 @@ subroutine optimize_atomperm_isomer(atomset1, atomset2, atomtypes, adjcs1, adjcs
 
    ! Compute constant costs
    call init_costs(atomtypes, fixed_costs)
-   call add_mlna_costs(atomtypes, adjcs1, adjcs2, scnatypes, fixed_costs)
+   call add_hna_costs(atomtypes, adjcs1, adjcs2, scnatypes, fixed_costs)
    euclidean_scale = 0.99_rk/longest_distance(atomtypes, coords1, coords2)**2
 
    ! Initialize local minima registry
@@ -69,7 +69,7 @@ subroutine optimize_atomperm_isomer(atomset1, atomset2, atomtypes, adjcs1, adjcs
    call random_initialize()
 
    ! Optimize atom permutation
-   do while (registry%records(1)%count < iso_thres .and. registry%num_trials < max_trials)
+   do while (registry%records(1)%freq < iso_thres .and. registry%num_trials < max_trials)
 
       ! Get randomly rotated coords2
       total_rotation = randrotquat()

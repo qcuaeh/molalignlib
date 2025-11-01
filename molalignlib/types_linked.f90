@@ -1,6 +1,22 @@
-module lcrs_trees
+! MolAlignLib
+! Copyright (C) 2022 José M. Vásquez
+
+! This program is free software: you can redistribute it and/or modify
+! it under the terms of the GNU General Public License as published by
+! the Free Software Foundation, either version 3 of the License, or
+! (at your option) any later version.
+
+! This program is distributed in the hope that it will be useful,
+! but WITHOUT ANY WARRANTY; without even the implied warranty of
+! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+! GNU General Public License for more details.
+
+! You should have received a copy of the GNU General Public License
+! along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+module types_linked
 use parameters
-use derived_types
+use types_basic
 implicit none
 private
 ! Public procedures 
@@ -66,8 +82,8 @@ type, public :: assigntree_node_t
    integer :: num_links
    integer :: num_children
    integer :: global_idx
-   integer, pointer :: num_atoms1 => null()
-   integer, pointer :: num_atoms2 => null()
+   integer, pointer :: atoms1_size => null()
+   integer, pointer :: atoms2_size => null()
    integer, pointer :: total_chains => null()
    integer, pointer :: total_links => null()
    integer, pointer :: total_partrefs => null()
@@ -626,8 +642,8 @@ function new_bare_chain() result(chain)
    chain%num_links = 0
    chain%num_children = 0
    chain%global_idx = 0
-   chain%num_atoms1 => null()
-   chain%num_atoms2 => null()
+   chain%atoms1_size => null()
+   chain%atoms2_size => null()
    chain%total_chains => null()
    chain%total_links => null()
    chain%total_partrefs => null()
@@ -638,8 +654,8 @@ function new_bare_chain() result(chain)
    chain%last_link => null()
 end function
 
-function new_root_chain(num_atoms1, num_atoms2) result(chain)
-   integer, intent(in) :: num_atoms1, num_atoms2
+function new_root_chain(atoms1_size, atoms2_size) result(chain)
+   integer, intent(in) :: atoms1_size, atoms2_size
    type(assigntree_node_t), pointer :: chain
 
    chain => new_bare_chain()
@@ -648,13 +664,13 @@ function new_root_chain(num_atoms1, num_atoms2) result(chain)
    chain%global_idx = 1
 
    ! Allocate counters for root and assign initial values
-   allocate(chain%num_atoms1)
-   allocate(chain%num_atoms2)
+   allocate(chain%atoms1_size)
+   allocate(chain%atoms2_size)
    allocate(chain%total_chains)
    allocate(chain%total_links)
    allocate(chain%total_partrefs)
-   chain%num_atoms1 = num_atoms1
-   chain%num_atoms2 = num_atoms2
+   chain%atoms1_size = atoms1_size
+   chain%atoms2_size = atoms2_size
    chain%total_chains = 1
    chain%total_links = 0    ! No links initially
    chain%total_partrefs = 0 ! No partrefs initially
@@ -688,14 +704,14 @@ function new_chain_link(chain) result(link)
    link%global_idx = chain%total_links
 
    ! Allocate item directories
-   allocate(link%itemdir1(chain%num_atoms1))
-   allocate(link%itemdir2(chain%num_atoms2))
+   allocate(link%itemdir1(chain%atoms1_size))
+   allocate(link%itemdir2(chain%atoms2_size))
 
    ! Initialize all pointers to null
-   do i = 1, chain%num_atoms1
+   do i = 1, chain%atoms1_size
       link%itemdir1(i)%ptr => null()
    end do
-   do i = 1, chain%num_atoms2
+   do i = 1, chain%atoms2_size
       link%itemdir2(i)%ptr => null()
    end do
 
@@ -838,8 +854,8 @@ function new_child_chain(chain, split_part) result(new_chain)
    new_chain%parent_chain => chain
 
    ! Point to parent's counters
-   new_chain%num_atoms1 => chain%num_atoms1
-   new_chain%num_atoms2 => chain%num_atoms2
+   new_chain%atoms1_size => chain%atoms1_size
+   new_chain%atoms2_size => chain%atoms2_size
    new_chain%total_chains => chain%total_chains
    new_chain%total_links => chain%total_links
    new_chain%total_partrefs => chain%total_partrefs

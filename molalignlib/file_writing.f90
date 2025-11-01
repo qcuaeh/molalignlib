@@ -14,7 +14,7 @@
 ! You should have received a copy of the GNU General Public License
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-module file_write
+module file_writing
 use parameters
 use permutation
 use chemistry
@@ -65,14 +65,14 @@ subroutine writefile_xyz(unit, title, atoms, bonds, atomperm1)
    integer, dimension(:), intent(in) :: atomperm1
    ! Local varibles
    type(atom_t) :: iatom
-   integer :: num_atoms, i
+   integer :: atoms_size, i
 
-   num_atoms = size(atoms)
+   atoms_size = size(atoms)
 
-   write (unit, '(I0)') num_atoms
+   write (unit, '(I0)') atoms_size
    write (unit, '(A)') title
 
-   do i = 1, num_atoms
+   do i = 1, atoms_size
       iatom = atoms(atomperm1(i))
       write (unit, '(A,3(2X,F12.6))') element_symbols(iatom%elnum), iatom%coords
    end do
@@ -88,13 +88,13 @@ subroutine writefile_mol2(unit, title, atoms, bonds, atomperm1)
    ! Local variables
    type(atom_t) :: iatom
    integer, dimension(:), allocatable :: atomperm2
-   integer :: num_atoms, num_bonds, atomidx1, atomidx2, i
+   integer :: atoms_size, bonds_size, atomidx1, atomidx2, i
    character(4) :: atom_type
 
    atomperm2 = inverse_permutation(atomperm1)
 
-   num_atoms = size(atoms)
-   num_bonds = size(bonds)
+   atoms_size = size(atoms)
+   bonds_size = size(bonds)
 
    write (unit, '(A)') '@<TRIPOS>MOLECULE'
    if (title /= '') then
@@ -102,12 +102,12 @@ subroutine writefile_mol2(unit, title, atoms, bonds, atomperm1)
    else
       write (unit, '(A)') 'Untitled'
    end if
-   write (unit, '(5(I4,1X))') num_atoms, num_bonds, 0, 0, 0
+   write (unit, '(5(I4,1X))') atoms_size, bonds_size, 0, 0, 0
    write (unit, '(A)') 'SMALL'
    write (unit, '(A)') 'NO_CHARGES'
 
    write (unit, '(A)') '@<TRIPOS>ATOM'
-   do i = 1, num_atoms
+   do i = 1, atoms_size
       iatom = atoms(atomperm1(i))
       if (iatom%elnum > 1) then
          atom_type = 'Hev'
@@ -119,7 +119,7 @@ subroutine writefile_mol2(unit, title, atoms, bonds, atomperm1)
    end do
 
    write (unit, '(A)') '@<TRIPOS>BOND'
-   do i = 1, num_bonds
+   do i = 1, bonds_size
       atomidx1 = atomperm2(bonds(i)%atomidx1)
       atomidx2 = atomperm2(bonds(i)%atomidx2)
       write (unit, '(I4,1X,2(1X,I4),1X,A2)') i, atomidx1, atomidx2, 'un'
@@ -136,12 +136,12 @@ subroutine writefile_sdf(unit, title, atoms, bonds, atomperm1)
    ! Local variables
    type(atom_t) :: iatom
    integer, dimension(:), allocatable :: atomperm2
-   integer :: num_atoms, num_bonds, atomidx1, atomidx2, i
+   integer :: atoms_size, bonds_size, atomidx1, atomidx2, i
 
    atomperm2 = inverse_permutation(atomperm1)
 
-   num_atoms = size(atoms)
-   num_bonds = size(bonds)
+   atoms_size = size(atoms)
+   bonds_size = size(bonds)
 
    ! Header block (3 lines)
    if (title /= '') then
@@ -155,11 +155,11 @@ subroutine writefile_sdf(unit, title, atoms, bonds, atomperm1)
    ! Counts line: aaabbblllfffcccsssxxxrrrpppiiimmmvvvvvv
    ! Format: I3,I3,I3,I3,I3,I3,I3,I3,I3,I3,I3,V3000
    write (unit, '(I3,I3,I3,I3,I3,I3,I3,I3,I3,I3,I3,A6)') &
-      num_atoms, num_bonds, 0, 0, 0, 0, 0, 0, 0, 0, 999, ' V2000'
+      atoms_size, bonds_size, 0, 0, 0, 0, 0, 0, 0, 0, 999, ' V2000'
 
    ! Atom block
    ! Format: xxxxx.xxxxyyyyy.yyyyzzzzz.zzzz aaaddcccssshhhbbbvvvHHHrrriiimmmnnneee
-   do i = 1, num_atoms
+   do i = 1, atoms_size
       iatom = atoms(atomperm1(i))
       write (unit, '(3F10.4,1X,A3,I2,11I3)') &
          iatom%coords, element_symbols(iatom%elnum), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
@@ -167,7 +167,7 @@ subroutine writefile_sdf(unit, title, atoms, bonds, atomperm1)
 
    ! Bond block
    ! Format: 111222tttsssxxxrrrccc
-   do i = 1, num_bonds
+   do i = 1, bonds_size
       atomidx1 = atomperm2(bonds(i)%atomidx1)
       atomidx2 = atomperm2(bonds(i)%atomidx2)
       write (unit, '(I3,I3,I3,I3,I3,I3,I3)') atomidx1, atomidx2, 1, 0, 0, 0, 0

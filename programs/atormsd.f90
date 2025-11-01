@@ -25,9 +25,8 @@ use utils
 use chemistry
 use adjacency
 use permutation
-use file_path
-use file_read
-use file_write
+use file_reading
+use file_writing
 use argparse
 use biasing_isomer
 use pruning_atoms

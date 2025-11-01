@@ -16,7 +16,7 @@
 
 module assignment_atoms
 use parameters
-use derived_types
+use types_basic
 use random
 use euclidean
 use permutation

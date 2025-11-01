@@ -1,6 +1,22 @@
+! MolAlignLib
+! Copyright (C) 2022 José M. Vásquez
+
+! This program is free software: you can redistribute it and/or modify
+! it under the terms of the GNU General Public License as published by
+! the Free Software Foundation, either version 3 of the License, or
+! (at your option) any later version.
+
+! This program is distributed in the hope that it will be useful,
+! but WITHOUT ANY WARRANTY; without even the implied warranty of
+! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+! GNU General Public License for more details.
+
+! You should have received a copy of the GNU General Public License
+! along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 module adjacency
 use parameters
-use derived_types
+use types_basic
 use permutation
 use euclidean
 use sorting
@@ -47,13 +63,13 @@ function adjcs_to_adjmat(adjcs) result(adjmat)
 ! Convert adjacency lists to adjacency matrix
    type(adjcs_t), intent(in) :: adjcs
    logical, dimension(:,:), allocatable :: adjmat
-   integer :: i, j, k, num_atoms
+   integer :: i, j, k, atoms_size
 
-   num_atoms = size(adjcs%cns)
-   allocate(adjmat(num_atoms, num_atoms))
+   atoms_size = size(adjcs%cns)
+   allocate(adjmat(atoms_size, atoms_size))
    adjmat = .false.
 
-   do i = 1, num_atoms
+   do i = 1, atoms_size
       do j = 1, adjcs%cns(i)
          k = adjcs%lists(j, i)
          adjmat(i, k) = .true.
@@ -64,16 +80,16 @@ end function
 subroutine adjmat_to_adjcs_all(adjmat, adjcs)
    logical, dimension(:,:), intent(in) :: adjmat
    type(adjcs_t), intent(out) :: adjcs
-   integer :: i, j, num_atoms, nadj
+   integer :: i, j, atoms_size, nadj
 
-   num_atoms = size(adjmat, 1)
-   allocate(adjcs%cns(num_atoms))
-   allocate(adjcs%lists(MAX_COORD, num_atoms))
+   atoms_size = size(adjmat, 1)
+   allocate(adjcs%cns(atoms_size))
+   allocate(adjcs%lists(MAX_COORD, atoms_size))
    adjcs%lists = 0
 
-   do i = 1, num_atoms
+   do i = 1, atoms_size
       nadj = 0
-      do j = 1, num_atoms
+      do j = 1, atoms_size
          if (adjmat(i, j)) then
             nadj = nadj + 1
             if (nadj > MAX_COORD) then
@@ -93,15 +109,15 @@ subroutine adjmat_to_adjcs_atomset(atomset, adjmat, adjcs)
    integer, dimension(:), intent(in) :: atomset
    logical, dimension(:,:), intent(in) :: adjmat
    type(adjcs_t), intent(out) :: adjcs
-   integer :: i, nadj, atomidx, num_atoms
+   integer :: i, nadj, atomidx, atoms_size
 
-   num_atoms = size(adjmat, 1)
-   allocate(adjcs%cns(num_atoms))
-   allocate(adjcs%lists(MAX_COORD, num_atoms))
+   atoms_size = size(adjmat, 1)
+   allocate(adjcs%cns(atoms_size))
+   allocate(adjcs%lists(MAX_COORD, atoms_size))
    adjcs%lists = 0
 
    ! Populate adjacency lists for all atoms
-   do atomidx = 1, num_atoms
+   do atomidx = 1, atoms_size
       nadj = 0
       ! Only include bonds to atoms in atomset
       do i = 1, size(atomset)
@@ -230,14 +246,14 @@ subroutine compute_differing_bonds(atomset1, atomperm1, adjmat1, adjmat2, moldif
 
    ! Local variables
    integer :: i, j, idx1, idx2, mapped_idx1, mapped_idx2
-   integer :: num_atoms, max_edges, bond_count
+   integer :: atoms_size, max_edges, bond_count
    integer, dimension(:,:), allocatable :: temp_bonds
    integer :: atom1, atom2
    logical :: bond_in_mol1, bond_in_mol2
 
-   num_atoms = size(atomset1)
+   atoms_size = size(atomset1)
    ! Maximum possible differing edges
-   max_edges = num_atoms * (num_atoms - 1) / 2
+   max_edges = atoms_size * (atoms_size - 1) / 2
 
    allocate(temp_bonds(2, max_edges))
    bond_count = 0
@@ -290,9 +306,9 @@ subroutine match_bonds2(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, adjcs2_
    integer, dimension(:,:), intent(in) :: moldiffs
    type(adjcs_t), intent(out) :: adjcs1_mod, adjcs2_mod
    logical, dimension(:,:), allocatable :: adjmat2
-   integer :: i, atom1, atom2, num_atoms
+   integer :: i, atom1, atom2, atoms_size
 
-   num_atoms = size(adjcs2%cns)
+   atoms_size = size(adjcs2%cns)
 
    ! Convert adjcs2 to matrix, modify it, and convert back
    adjmat2 = adjcs_to_adjmat(adjcs2)

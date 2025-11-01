@@ -1,11 +1,26 @@
-module lcrs_arrays
+! MolAlignLib
+! Copyright (C) 2022 José M. Vásquez
+
+! This program is free software: you can redistribute it and/or modify
+! it under the terms of the GNU General Public License as published by
+! the Free Software Foundation, either version 3 of the License, or
+! (at your option) any later version.
+
+! This program is distributed in the hope that it will be useful,
+! but WITHOUT ANY WARRANTY; without even the implied warranty of
+! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+! GNU General Public License for more details.
+
+! You should have received a copy of the GNU General Public License
+! along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+module types_indexed
 use parameters
-use lcrs_trees
+use types_linked
 use adjacency
 implicit none
 private
 public convert_trees_to_arrays
-public validate_conversion
 public print_tree_items_array
 public print_part_tree_array
 public print_leaf_items_array
@@ -43,7 +58,7 @@ type, public :: chain_item_t
 end type
 
 type, public :: assigntree_item_t
-   integer :: num_atoms1, num_atoms2
+   integer :: atoms1_size, atoms2_size
    integer :: num_links, num_children
    ! Cross-tree reference (0 = null)
    integer :: split_part_idx      ! points to part array
@@ -71,7 +86,7 @@ type, public :: array_trees_t
    integer, allocatable :: itemdir2_entries(:,:)  ! [link_idx, atom_idx]
    integer, allocatable :: partref_entries(:)     ! Part indices for partrefs
    ! Metadata
-   integer :: num_atoms1, num_atoms2  ! number of atoms in each molecule
+   integer :: atoms1_size, atoms2_size  ! number of atoms in each molecule
    integer :: total_items1, total_items2, total_parts
    integer :: total_links, total_chains
    integer :: total_partref_entries
@@ -90,8 +105,8 @@ subroutine convert_trees_to_arrays(part_tree, assign_tree, assign_arrays)
    integer :: partref_idx, link_idx, item1_idx, item2_idx
 
    ! Get totals from the tree counters
-   assign_arrays%num_atoms1 = assign_tree%num_atoms1
-   assign_arrays%num_atoms2 = assign_tree%num_atoms2
+   assign_arrays%atoms1_size = assign_tree%atoms1_size
+   assign_arrays%atoms2_size = assign_tree%atoms2_size
    assign_arrays%total_parts = part_tree%total_parts
    assign_arrays%total_items1 = part_tree%total_items1
    assign_arrays%total_items2 = part_tree%total_items2
@@ -108,8 +123,8 @@ subroutine convert_trees_to_arrays(part_tree, assign_tree, assign_arrays)
    allocate(assign_arrays%partref_entries(assign_arrays%total_partref_entries))
 
    ! NEW: Allocate 2D itemdir arrays - one for each molecule
-   allocate(assign_arrays%itemdir1_entries(assign_arrays%total_links, assign_arrays%num_atoms1))
-   allocate(assign_arrays%itemdir2_entries(assign_arrays%total_links, assign_arrays%num_atoms2))
+   allocate(assign_arrays%itemdir1_entries(assign_arrays%total_links, assign_arrays%atoms1_size))
+   allocate(assign_arrays%itemdir2_entries(assign_arrays%total_links, assign_arrays%atoms2_size))
 
    ! OPTIMIZATION: Use intrinsic array operations instead of explicit loops
    assign_arrays%partref_entries = 0
@@ -301,8 +316,8 @@ recursive subroutine convert_chains_recurse(chain, assign_arrays, partref_idx, l
    ! Convert this chain (existing conversion logic)
    chain_idx = chain%global_idx
 
-   assign_arrays%assigntree(chain_idx)%num_atoms1 = chain%num_atoms1
-   assign_arrays%assigntree(chain_idx)%num_atoms2 = chain%num_atoms2
+   assign_arrays%assigntree(chain_idx)%atoms1_size = chain%atoms1_size
+   assign_arrays%assigntree(chain_idx)%atoms2_size = chain%atoms2_size
    assign_arrays%assigntree(chain_idx)%num_links = chain%num_links
    assign_arrays%assigntree(chain_idx)%num_children = chain%num_children
 
@@ -395,85 +410,6 @@ recursive subroutine convert_chains_recurse(chain, assign_arrays, partref_idx, l
 
       child_chain => child_chain%next_sibling_chain
    end do
-end subroutine
-
-subroutine validate_conversion(part_tree, assign_tree, assign_arrays)
-   type(partree_node_t), pointer, intent(in) :: part_tree
-   type(assigntree_node_t), pointer, intent(in) :: assign_tree
-   type(array_trees_t), intent(in) :: assign_arrays
-   logical :: validation_passed
-
-   validation_passed = .true.
-
-   write(stderr, '(A)') "=== CONVERSION VALIDATION ==="
-
-   ! Validate counts
-   if (assign_arrays%total_parts /= part_tree%total_parts) then
-      write(stderr, '(A,I0,A,I0)') "Error: Part count mismatch: ", &
-         assign_arrays%total_parts, " vs ", part_tree%total_parts
-      validation_passed = .false.
-   end if
-
-   if (assign_arrays%total_items1 /= part_tree%total_items1) then
-      write(stderr, '(A,I0,A,I0)') "Error: Items1 count mismatch: ", &
-         assign_arrays%total_items1, " vs ", part_tree%total_items1
-      validation_passed = .false.
-   end if
-
-   if (assign_arrays%total_items2 /= part_tree%total_items2) then
-      write(stderr, '(A,I0,A,I0)') "Error: Items2 count mismatch: ", &
-         assign_arrays%total_items2, " vs ", part_tree%total_items2
-      validation_passed = .false.
-   end if
-
-   if (assign_arrays%total_chains /= assign_tree%total_chains) then
-      write(stderr, '(A,I0,A,I0)') "Error: Chain count mismatch: ", &
-         assign_arrays%total_chains, " vs ", assign_tree%total_chains
-      validation_passed = .false.
-   end if
-
-   if (assign_arrays%total_links /= assign_tree%total_links) then
-      write(stderr, '(A,I0,A,I0)') "Error: Link count mismatch: ", &
-         assign_arrays%total_links, " vs ", assign_tree%total_links
-      validation_passed = .false.
-   end if
-
-   if (assign_arrays%total_partref_entries /= assign_tree%total_partrefs) then
-      write(stderr, '(A,I0,A,I0)') "Error: Partref count mismatch: ", &
-         assign_arrays%total_partref_entries, " vs ", assign_tree%total_partrefs
-      validation_passed = .false.
-   end if
-
-   ! NEW: Validate 2D itemdir array dimensions
-   if (size(assign_arrays%itemdir1_entries, 1) /= assign_arrays%total_links) then
-      write(stderr, '(A,I0,A,I0)') "Error: Itemdir1 links dimension mismatch: ", &
-         size(assign_arrays%itemdir1_entries, 1), " vs ", assign_arrays%total_links
-      validation_passed = .false.
-   end if
-
-   if (size(assign_arrays%itemdir1_entries, 2) /= assign_arrays%num_atoms1) then
-      write(stderr, '(A,I0,A,I0)') "Error: Itemdir1 atoms dimension mismatch: ", &
-         size(assign_arrays%itemdir1_entries, 2), " vs ", assign_arrays%num_atoms1
-      validation_passed = .false.
-   end if
-
-   if (size(assign_arrays%itemdir2_entries, 1) /= assign_arrays%total_links) then
-      write(stderr, '(A,I0,A,I0)') "Error: Itemdir2 links dimension mismatch: ", &
-         size(assign_arrays%itemdir2_entries, 1), " vs ", assign_arrays%total_links
-      validation_passed = .false.
-   end if
-
-   if (size(assign_arrays%itemdir2_entries, 2) /= assign_arrays%num_atoms2) then
-      write(stderr, '(A,I0,A,I0)') "Error: Itemdir2 atoms dimension mismatch: ", &
-         size(assign_arrays%itemdir2_entries, 2), " vs ", assign_arrays%num_atoms2
-      validation_passed = .false.
-   end if
-
-   if (validation_passed) then
-      write(stderr, '(A)') "✓ Conversion validation PASSED"
-   else
-      write(stderr, '(A)') "✗ Conversion validation FAILED"
-   end if
 end subroutine
 
 subroutine print_tree_items_array(assign_arrays)
@@ -582,14 +518,14 @@ subroutine print_chain_tree_array(assign_arrays)
 
    ! Print assignment statistics
    if (assign_arrays%global_combinations > 2**24) then
-      write(stderr, '(A,ES8.2)') "Global combinations: ", assign_arrays%global_combinations
+      write(stderr, '(A,ES8.2)') "Total combinations: ", assign_arrays%global_combinations
    else
-      write(stderr, '(A,I0)') "Global combinations: ", int(assign_arrays%global_combinations)
+      write(stderr, '(A,I0)') "Total combinations: ", int(assign_arrays%global_combinations)
    end if
    if (assign_arrays%local_combinations > 2**24) then
-      write(stderr, '(A,ES8.2)') "Total local combinations: ", assign_arrays%local_combinations
+      write(stderr, '(A,ES8.2)') "Reduced combinations: ", assign_arrays%local_combinations
    else
-      write(stderr, '(A,I0)') "Total local combinations: ", int(assign_arrays%local_combinations)
+      write(stderr, '(A,I0)') "Reduced combinations: ", int(assign_arrays%local_combinations)
    end if
    write(stderr, *)
 

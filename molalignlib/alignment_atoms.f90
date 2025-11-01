@@ -21,7 +21,7 @@ use chemistry
 use permutation
 use euclidean
 use assignment_atoms
-use lcrs_trees
+use types_linked
 use partitioning
 use pruning_atoms
 use recording
@@ -49,7 +49,7 @@ subroutine optimize_atomperm_atoms(atomset1, atomset2, atomtypes, prunes, coords
    call random_initialize()
 
    ! Optimize atom permutation
-   do while (registry%records(1)%count < ato_thres .and. registry%num_trials < max_trials)
+   do while (registry%records(1)%freq < ato_thres .and. registry%num_trials < max_trials)
 
       ! Aply a random total_rotation to coords2
       total_rotation = randrotquat()

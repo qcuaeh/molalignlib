@@ -16,7 +16,7 @@
 
 module euclidean
 use parameters
-use derived_types
+use types_basic
 use permutation
 use random
 use eigen
@@ -251,15 +251,15 @@ subroutine compute_residuals_matrix(coordsp, coordsm, residuals)
 ! Reference: Acta Cryst. (1989). A45, 208-210
    real(rk), dimension(:,:), intent(in) :: coordsp, coordsm
    real(rk), dimension(4,4), intent(out) :: residuals
-   integer :: i, num_atoms
+   integer :: i, atoms_size
 
-   num_atoms = size(coordsp, dim=2)
+   atoms_size = size(coordsp, dim=2)
 
    ! Initialize residuals matrix
    residuals = 0.0_rk
 
    ! Calculate upper matrix elements
-   do i = 1, num_atoms
+   do i = 1, atoms_size
       residuals(1, 1) = residuals(1, 1) + (coordsm(1, i)**2 + coordsm(2, i)**2 + coordsm(3, i)**2)
       residuals(1, 2) = residuals(1, 2) + (coordsp(2, i)*coordsm(3, i) - coordsm(2, i)*coordsp(3, i))
       residuals(1, 3) = residuals(1, 3) + (coordsm(1, i)*coordsp(3, i) - coordsp(1, i)*coordsm(3, i))
@@ -290,14 +290,14 @@ function least_rotquat_base(coords1, coords2) result(rotquat)
    real(rk), dimension(4) :: rotquat
    real(rk), dimension(:,:), allocatable :: coordsp, coordsm
    real(rk) :: residuals(4, 4)
-   integer :: i, num_atoms
+   integer :: i, atoms_size
 
-   num_atoms = size(coords1, dim=2)
+   atoms_size = size(coords1, dim=2)
 
-   allocate (coordsp(3, num_atoms))
-   allocate (coordsm(3, num_atoms))
+   allocate (coordsp(3, atoms_size))
+   allocate (coordsm(3, atoms_size))
 
-   do i = 1, num_atoms
+   do i = 1, atoms_size
       coordsp(:, i) = coords1(:, i) + coords2(:, i)
       coordsm(:, i) = coords1(:, i) - coords2(:, i)
    end do
@@ -317,14 +317,14 @@ function least_rotquat_perm(atomperm1, coords1, coords2) result(rotquat)
    real(rk), dimension(4) :: rotquat
    real(rk), dimension(:,:), allocatable :: coordsp, coordsm
    real(rk) :: residuals(4, 4)
-   integer :: i, num_atoms
+   integer :: i, atoms_size
 
-   num_atoms = size(atomperm1)
+   atoms_size = size(atomperm1)
 
-   allocate (coordsp(3, num_atoms))
-   allocate (coordsm(3, num_atoms))
+   allocate (coordsp(3, atoms_size))
+   allocate (coordsm(3, atoms_size))
 
-   do i = 1, num_atoms
+   do i = 1, atoms_size
       coordsp(:, i) = coords1(:, i) + coords2(:, atomperm1(i))
       coordsm(:, i) = coords1(:, i) - coords2(:, atomperm1(i))
    end do

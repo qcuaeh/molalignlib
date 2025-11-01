@@ -16,7 +16,7 @@
 
 module alignment_conformer
 use parameters
-use derived_types
+use types_basic
 use utils
 use random
 use chemistry
@@ -25,10 +25,9 @@ use euclidean
 use assignment_atoms
 use adjacency
 use pruning_atoms
-use lcrs_trees
-use lcrs_arrays
+use types_linked
+use types_indexed
 use partitioning
-use assignment_tree
 use assignment_conformer
 use recording
 use options
@@ -49,12 +48,12 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
    real(rk), dimension(:,:), allocatable :: coords2r
    real(rk), dimension(4) :: rotation, total_rotation
    real(rk) :: steps, permdist, new_permdist
-   type(assigntree_node_t), pointer :: mlnachain
+   type(assigntree_node_t), pointer :: hnachain
    type(array_trees_t) :: assign_arrays
 
    ! Pre-compute assignment tree for decision making
-   call compute_scna_partition( adjcs1, adjcs2, atomtypes, mlnachain)
-   call build_assignment_tree( adjcs1, adjcs2, mlnachain%last_link, assign_arrays)
+   call compute_scna_partition( adjcs1, adjcs2, atomtypes, hnachain)
+   call build_assignment_tree( adjcs1, adjcs2, hnachain%last_link, assign_arrays)
 
    if (tree_flag) then
       call print_chain_tree_array( assign_arrays)
@@ -70,7 +69,7 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
       call random_initialize()
 
       ! Optimize atom permutation
-      do while (registry%records(1)%count < confo_thres .and. registry%num_trials < max_trials)
+      do while (registry%records(1)%freq < confo_thres .and. registry%num_trials < max_trials)
 
          ! Get randomly rotated coords2
          total_rotation = randrotquat()
@@ -133,7 +132,7 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
       registry%records(1)%atomperm1 = atomperm1
       registry%records(1)%permdiff = 0
       registry%records(1)%permdist = permdist
-      registry%records(1)%count = 1
+      registry%records(1)%freq = 1
       registry%records(1)%steps = 1
       registry%records(1)%rotation = rotation
 
@@ -147,13 +146,13 @@ subroutine assign_atomperm_conformer( adjcs1, adjcs2, atomtypes, coords1, coords
    integer, dimension(:), allocatable, intent(out) :: atomperm1
 
    ! Local variables
-   type(assigntree_node_t), pointer :: mlnachain
+   type(assigntree_node_t), pointer :: hnachain
    type(array_trees_t) :: assign_arrays
    real(rk) :: permdist
 
    ! Pre-compute assignment tree
-   call compute_scna_partition( adjcs1, adjcs2, atomtypes, mlnachain)
-   call build_assignment_tree( adjcs1, adjcs2, mlnachain%last_link, assign_arrays)
+   call compute_scna_partition( adjcs1, adjcs2, atomtypes, hnachain)
+   call build_assignment_tree( adjcs1, adjcs2, hnachain%last_link, assign_arrays)
 
    if (tree_flag) then
       call print_chain_tree_array( assign_arrays)

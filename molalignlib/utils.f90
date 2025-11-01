@@ -19,17 +19,18 @@ use parameters
 implicit none
 private
 public str
-public uniform_weights
 public lowercase
 public uppercase
+public split_path
+public uniform_weights
 
 interface str
    module procedure str_int
    module procedure str_real
 end interface
 
-character(26), parameter :: LOWERCHARSET = 'abcdefghijklmnopqrstuvwxyz'
-character(26), parameter :: UPPERCHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+character(26), parameter :: UPCHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+character(26), parameter :: LOWCHARSET = 'abcdefghijklmnopqrstuvwxyz'
 
 contains
 
@@ -63,8 +64,8 @@ function lowercase(x) result(l)
    integer :: i, j
    l = x
    do j = 1, len(x)
-      i = index(UPPERCHARSET, x(j:j))
-      if (i > 0) l(j:j) = LOWERCHARSET(i:i)
+      i = index(UPCHARSET, x(j:j))
+      if (i > 0) l(j:j) = LOWCHARSET(i:i)
    end do
 end function
 
@@ -74,9 +75,41 @@ function uppercase(x) result(u)
    integer :: i, j
    u = x
    do j = 1, len(x)
-      i = index(LOWERCHARSET, x(j:j))
-      if (i > 0) u(j:j) = UPPERCHARSET(i:i)
+      i = index(LOWCHARSET, x(j:j))
+      if (i > 0) u(j:j) = UPCHARSET(i:i)
    end do
 end function
+
+subroutine split_path(filepath, dirname, filename, extension)
+   character(*), intent(in) :: filepath
+   character(:), allocatable, intent(out) :: dirname, filename, extension
+   ! Local variables
+   character(:), allocatable :: basename
+   integer :: pos
+   pos = index(filepath, '/', back=.true.)
+   if (pos /= 0) then
+      dirname = filepath(:pos-1)
+      basename = filepath(pos+1:)
+      if (len(basename) == 0) then
+         write (stderr, '(A,1X,A)') 'Error: File name is missing'
+         stop 1
+      end if
+   else
+      dirname = '.'
+      basename = filepath
+   end if
+   pos = index(basename, '.', back=.true.)
+   if (pos /= 0) then
+      filename = basename(:pos-1)
+      extension = basename(pos+1:)
+      if (len(filename) == 0 .or. len(extension) == 0) then
+         write (stderr, '(A,1X,A)') 'Error: Invalid file name', basename
+         stop 1
+      end if
+   else
+      write (stderr, '(A,1X,A)') 'Error: File extension is missing', basename
+      stop 1
+   end if
+end subroutine
 
 end module

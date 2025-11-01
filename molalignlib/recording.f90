@@ -32,7 +32,7 @@ public allocate_registry
 public reset_registry
 
 type :: record_t
-   integer :: count
+   integer :: freq
    integer :: permdiff
    real(rk) :: permdist
    real(rk) :: steps
@@ -69,7 +69,7 @@ subroutine reset_registry(registry)
    registry%num_trials = 0
    registry%total_steps = 0
    registry%overflow = .false.
-   registry%records%count = 0
+   registry%records%freq = 0
    registry%records%steps = 0
    registry%records%permdiff = huge(ik)
    registry%records%permdist = huge(rk)
@@ -93,8 +93,8 @@ subroutine insert_record_atomperm(registry, atomperm1, steps, rotation, permdiff
    do i = 1, registry%occ_records
       record => registry%records(i)
       if (all(atomperm1 == record%atomperm1)) then
-         record%count = record%count + 1
-         record%steps = record%steps + (steps - record%steps)/record%count
+         record%freq = record%freq + 1
+         record%steps = record%steps + (steps - record%steps)/record%freq
          return
       end if
    end do
@@ -124,13 +124,13 @@ subroutine insert_record_atomperm(registry, atomperm1, steps, rotation, permdiff
       ! Initialize new record (no moldiffs for permutation grouping)
       record => registry%records(insert_pos)
       record%atomperm1 = atomperm1
-      record%count = 1
+      record%freq = 1
       record%permdiff = permdiff
       record%permdist = permdist
       record%rotation = rotation
       record%steps = steps
 
-      ! Update record count and overflow status
+      ! Update record freq and overflow status
       if (registry%occ_records < size(registry%records)) then
          registry%occ_records = registry%occ_records + 1
       else
@@ -168,8 +168,8 @@ subroutine insert_record_moldiff(registry, moldiffs, atomperm1, steps, rotation,
          if (bonds_match) then
             found_match = .true.
             match_pos = i
-            record%count = record%count + 1
-            record%steps = record%steps + (steps - record%steps)/record%count
+            record%freq = record%freq + 1
+            record%steps = record%steps + (steps - record%steps)/record%freq
 
             if (permdist < record%permdist) then
                temp_record = record
@@ -228,7 +228,7 @@ subroutine insert_record_moldiff(registry, moldiffs, atomperm1, steps, rotation,
 
       record => registry%records(insert_pos)
       record%atomperm1 = atomperm1
-      record%count = 1
+      record%freq = 1
       record%moldiffs = moldiffs
       record%permdiff = permdiff
       record%permdist = permdist
@@ -250,12 +250,12 @@ subroutine print_records(registry)
    integer :: i
 
    line = repeat('-', 39)
-   write (stderr, '(2x,a,4x,a,4x,a,4x,a,5x,a,6x,a)') '#', 'Count', 'Steps', 'Δadj', 'Δxyz'
+   write (stderr, '(2x,a,4x,a,5x,a,4x,a,5x,a,6x,a)') '#', 'Freq', 'Steps', 'Δadj', 'Δxyz'
    write (stderr, '(a)') line
    do i = 1, registry%occ_records
       record = registry%records(i)
       write (stderr, '(i3,4x,i4,4x,f5.1,3x,i4,4x,f8.4)') &
-         i, record%count, record%steps, record%permdiff, record%permdist
+         i, record%freq, record%steps, record%permdiff, record%permdist
    end do
    write (stderr, '(a)') line
 

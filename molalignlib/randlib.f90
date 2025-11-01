@@ -695,33 +695,6 @@
 
 !*********************************************************************
 
-      SUBROUTINE user_set_all(seed1,seed2,generator)
-! .. Implicit None Statement ..
-        IMPLICIT NONE
-! ..
-! .. Scalar Arguments ..
-        INTEGER, OPTIONAL, INTENT (IN) :: generator
-        INTEGER, INTENT (IN) :: seed1, seed2
-! ..
-! .. Intrinsic Functions ..
-        INTRINSIC PRESENT
-! ..
-! .. Executable Statements ..
-
-        CALL set_all_seeds(seed1,seed2)
-
-        IF (PRESENT(generator)) THEN
-          CALL set_current_generator(generator)
-
-        ELSE
-          CALL set_current_generator(1)
-
-        END IF
-
-      END SUBROUTINE user_set_all
-
-!*********************************************************************
-
       FUNCTION random_uniform_real()
 ! .. Use Statements ..
         USE parameters
