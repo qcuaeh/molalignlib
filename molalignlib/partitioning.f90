@@ -2,17 +2,21 @@ module partitioning
 use parameters
 use derived_types
 use chemistry
+use adjacency
 use molecule
 use lcrs_trees
 use options
 implicit none
 private
 public collect_atomtypes
+public refine_mlna_part
+public refine_mlna_partition
+public compute_scna_partition
 
 type :: atomtype_item_t
    integer :: elnum
    integer :: typeid
-   integer :: partidx
+   type(partree_node_t), pointer :: part
 end type
 
 type :: atomtype_table_t
@@ -20,182 +24,205 @@ type :: atomtype_table_t
    type(atomtype_item_t), dimension(:), allocatable :: items
 end type
 
-abstract interface
-   logical function compare_atoms_interface(item, elnum, typeid)
-      import atomtype_item_t
-      type(atomtype_item_t), intent(in) :: item
-      integer, intent(in) :: elnum, typeid
-   end function
-end interface
-
-procedure(compare_atoms_interface), pointer :: compare_atoms
-
 contains
 
-logical function compare_atoms_simple(item, elnum, typeid) result(equal)
-   type(atomtype_item_t), intent(in) :: item
-   integer, intent(in) :: elnum, typeid
-
-   equal = item%elnum == elnum
-end function
-
-logical function compare_atoms_labeled(item, elnum, typeid) result(equal)
-   type(atomtype_item_t), intent(in) :: item
-   integer, intent(in) :: elnum, typeid
-
-   if (item%elnum == elnum) then
-      if (item%typeid == typeid) then
-         equal = .true.
-         return
-      end if
-   end if
-
-   equal = .false.
-end function
-
-subroutine add_atomtype(atomtypetable, elnum, typeid, partidx)
+subroutine add_atomtype(atomtypetable, atom, part)
    type(atomtype_table_t), intent(inout) :: atomtypetable
-   integer, intent(in) :: elnum, typeid, partidx
+   type(atom_t), intent(in) :: atom
+   type(partree_node_t), pointer, intent(in) :: part
 
    atomtypetable%num_items = atomtypetable%num_items + 1
-   atomtypetable%items(atomtypetable%num_items)%elnum = elnum
-   atomtypetable%items(atomtypetable%num_items)%typeid = typeid
-   atomtypetable%items(atomtypetable%num_items)%partidx = partidx
+   atomtypetable%items(atomtypetable%num_items)%elnum = atom%elnum
+   atomtypetable%items(atomtypetable%num_items)%typeid = atom%typeid
+   atomtypetable%items(atomtypetable%num_items)%part => part
 end subroutine
 
-function find_atomtype(atomtypetable, elnum, typeid) result(partidx)
+function find_atomtype(atomtypetable, atom) result(part)
    type(atomtype_table_t), intent(in) :: atomtypetable
-   integer, intent(in) :: elnum, typeid
-   integer :: partidx
+   type(atom_t), intent(in) :: atom
+   type(partree_node_t), pointer :: part
    integer :: i
 
    do i = 1, atomtypetable%num_items
-      if (compare_atoms(atomtypetable%items(i), elnum, typeid)) then
-         partidx = atomtypetable%items(i)%partidx
-         return
+      if (atomtypetable%items(i)%elnum == atom%elnum) then
+         if (.not. label_flag .or. atomtypetable%items(i)%typeid == atom%typeid) then
+            part => atomtypetable%items(i)%part
+            return
+         end if
       end if
    end do
 
-   partidx = 0  ! Not found
+   part => null()
 end function
 
-subroutine collect_atomtypes(atomset1, atomset2, atoms1, atoms2, atomtypes)
-! Single-pass approach using reverse mapping - no large 2D arrays needed
+subroutine build_atomtypes_tree(atomset1, atomset2, atoms1, atoms2, chain_root, root_part)
+! Partition atoms by atomic number and label using linked list structures
    integer, dimension(:), intent(in) :: atomset1, atomset2
    type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
-   type(partition_t), intent(out) :: atomtypes
-
+   type(assigntree_node_t), pointer, intent(out) :: chain_root
+   type(partree_node_t), pointer, intent(out) :: root_part
    ! Local variables
+   type(partree_node_t), pointer :: child_part
+   type(chain_node_t), pointer :: new_link
    type(atomtype_table_t) :: atomtypetable
-   ! Small temporary arrays - only O(max_parts) size
-   integer, dimension(:), allocatable :: part_count1, part_count2
-   integer, dimension(:), allocatable :: part_fill1, part_fill2
-   ! Item directories - O(num_atoms) size, unavoidable
-   integer, dimension(:), allocatable :: itemdir1_temp, itemdir2_temp
-   integer :: num_atoms1, num_atoms2
-   integer :: current_part, max_parts
-   integer :: atomidx, partidx, i
-
-   if (label_flag) then
-      compare_atoms => compare_atoms_labeled
-   else
-      compare_atoms => compare_atoms_simple
-   end if
+   integer :: num_atoms1, num_atoms2, i, atomidx
 
    num_atoms1 = size(atoms1)
    num_atoms2 = size(atoms2)
-   max_parts = num_atoms1 + num_atoms2  ! Maximum possible partitions
 
-   ! Allocate temporary storage
-   allocate(part_count1(max_parts))
-   allocate(part_count2(max_parts))
-   allocate(atomtypetable%items(max_parts))
-   allocate(itemdir1_temp(num_atoms1))
-   allocate(itemdir2_temp(num_atoms2))
+   root_part => new_root_part()
+   chain_root => new_root_chain(num_atoms1, num_atoms2)
+   new_link => new_chain_link(chain_root)
 
-   ! Initialize
-   part_count1 = 0
-   part_count2 = 0
+   allocate(atomtypetable%items(num_atoms1 + num_atoms2))
    atomtypetable%num_items = 0
-   current_part = 0
 
-   ! SINGLE PASS: Process all atoms, build assignments AND count sizes
    ! First molecule
    do i = 1, size(atomset1)
       atomidx = atomset1(i)
-      partidx = find_atomtype(atomtypetable, atoms1(atomidx)%elnum, atoms1(atomidx)%typeid)
-      if (partidx == 0) then
-         current_part = current_part + 1
-         call add_atomtype(atomtypetable, atoms1(atomidx)%elnum, atoms1(atomidx)%typeid, current_part)
-         partidx = current_part
+      child_part => find_atomtype(atomtypetable, atoms1(atomidx))
+      if (.not. associated(child_part)) then
+         child_part => new_child_part(root_part)
+         call link_part(new_link, child_part)
+         call add_atomtype(atomtypetable, atoms1(atomidx), child_part)
       end if
-      itemdir1_temp(atomidx) = partidx
-      part_count1(partidx) = part_count1(partidx) + 1
+      call add_new_item1(child_part, atomidx)
+      new_link%itemdir1(atomidx)%ptr => child_part
    end do
 
    ! Second molecule
    do i = 1, size(atomset2)
       atomidx = atomset2(i)
-      partidx = find_atomtype(atomtypetable, atoms2(atomidx)%elnum, atoms2(atomidx)%typeid)
-      if (partidx == 0) then
-         current_part = current_part + 1
-         call add_atomtype(atomtypetable, atoms2(atomidx)%elnum, atoms2(atomidx)%typeid, current_part)
-         partidx = current_part
+      child_part => find_atomtype(atomtypetable, atoms2(atomidx))
+      if (.not. associated(child_part)) then
+         child_part => new_child_part(root_part)
+         call link_part(new_link, child_part)
+         call add_atomtype(atomtypetable, atoms2(atomidx), child_part)
       end if
-      itemdir2_temp(atomidx) = partidx
-      part_count2(partidx) = part_count2(partidx) + 1
+      call add_new_item2(child_part, atomidx)
+      new_link%itemdir2(atomidx)%ptr => child_part
    end do
 
-   ! Now allocate final structure with exact sizes (no waste!)
-   atomtypes%num_parts = current_part
-   allocate(atomtypes%parts(atomtypes%num_parts))
-   allocate(atomtypes%itemdir1(num_atoms1))
-   allocate(atomtypes%itemdir2(num_atoms2))
+   deallocate(atomtypetable%items)
+end subroutine
 
-   ! Copy item directories
-   atomtypes%itemdir1 = itemdir1_temp
-   atomtypes%itemdir2 = itemdir2_temp
+subroutine collect_atomtypes(atomset1, atomset2, atoms1, atoms2, atomtypes)
+! Partition atoms by atomic number and label
+! Uses linked list structures internally, then converts to partition array
+   integer, dimension(:), intent(in) :: atomset1, atomset2
+   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
+   type(partition_t), intent(out) :: atomtypes
+   ! Local variables
+   type(assigntree_node_t), pointer :: chain_root
+   type(partree_node_t), pointer :: root_part
+   type(chain_node_t), pointer :: first_link
 
-   ! Allocate each partition with exact size
-   do i = 1, atomtypes%num_parts
-      atomtypes%parts(i)%num_items1 = part_count1(i)
-      atomtypes%parts(i)%num_items2 = part_count2(i)
-      atomtypes%parts(i)%num_children = 0
+   ! Create linked list structures
+   call build_atomtypes_tree(atomset1, atomset2, atoms1, atoms2, chain_root, root_part)
 
-      allocate(atomtypes%parts(i)%items1(part_count1(i)))
-      allocate(atomtypes%parts(i)%items2(part_count2(i)))
-      allocate(atomtypes%parts(i)%signature(0))
-      allocate(atomtypes%parts(i)%children(0))
-   end do
+   ! Get the first (and only) link from the chain
+   first_link => chain_root%first_link
 
-   ! FAST FILL: Use assignments to populate final arrays efficiently
-   allocate(part_fill1(current_part))
-   allocate(part_fill2(current_part))
-   part_fill1 = 0  ! Current fill position for each partition
-   part_fill2 = 0
+   ! Convert link to partition array structure
+   call link_to_partition(first_link, atomtypes)
 
-   ! Fill first molecule using reverse mapping
-   do i = 1, num_atoms1
-      if (any(atomset1 == i)) then
-         partidx = itemdir1_temp(i)
-         part_fill1(partidx) = part_fill1(partidx) + 1
-         atomtypes%parts(partidx)%items1(part_fill1(partidx)) = i
+   ! Clean up tree structures
+   call delete_chain(chain_root)
+   call delete_part_tree(root_part)
+end subroutine
+
+subroutine refine_mlna_part(atoms1, atoms2, itemdir1, itemdir2, part, link)
+! Create children for different signatures - caller decides what to do with them
+! Note: part is always a leaf part with no existing children
+   type(adjc_t), dimension(:), intent(in) :: atoms1, atoms2
+   type(part_nodeptr_t), dimension(:), intent(in) :: itemdir1, itemdir2
+   type(partree_node_t), pointer, intent(inout) :: part
+   type(chain_node_t), pointer, intent(inout) :: link
+   ! Local variables
+   type(item_node_t), pointer :: item
+   type(partree_node_t), pointer :: child_part
+   type(part_nodeptr_t), target :: signature_alloc(MAX_COORD)
+   type(part_nodeptr_t), pointer :: signature(:)
+
+   ! Process first molecule items - create children for each unique signature
+   item => part%first_item1
+   do while (associated(item))
+      signature => signature_alloc(1:size(atoms1(item%idx)%adjlist))
+      signature = itemdir1(atoms1(item%idx)%adjlist)
+      child_part => find_child_part(part, signature)
+      if (.not. associated(child_part)) then
+         child_part => new_child_part(part)
+         allocate (child_part%signature, source=signature)
+         call link_part(link, child_part)
       end if
+      call add_new_item1(child_part, item%idx)
+      link%itemdir1(item%idx)%ptr => child_part
+      item => item%next_item
    end do
 
-   ! Fill second molecule using reverse mapping
-   do i = 1, num_atoms2
-      if (any(atomset2 == i)) then
-         partidx = itemdir2_temp(i)
-         part_fill2(partidx) = part_fill2(partidx) + 1
-         atomtypes%parts(partidx)%items2(part_fill2(partidx)) = i
+   ! Process second molecule items - create children for each unique signature
+   item => part%first_item2
+   do while (associated(item))
+      signature => signature_alloc(1:size(atoms2(item%idx)%adjlist))
+      signature = itemdir2(atoms2(item%idx)%adjlist)
+      child_part => find_child_part(part, signature)
+      if (.not. associated(child_part)) then
+         child_part => new_child_part(part)
+         allocate (child_part%signature, source=signature)
+         call link_part(link, child_part)
       end if
+      call add_new_item2(child_part, item%idx)
+      link%itemdir2(item%idx)%ptr => child_part
+      item => item%next_item
    end do
+end subroutine
 
-   ! Clean up small temporary arrays
-   deallocate(part_count1, part_count2)
-   deallocate(itemdir1_temp, itemdir2_temp)
-   deallocate(part_fill1, part_fill2)
+subroutine refine_mlna_partition(atoms1, atoms2, mlnachain, num_splits)
+! Compute next level MLNA types - always keeps all children (original behavior)
+   type(adjc_t), dimension(:), intent(in) :: atoms1, atoms2
+   type(assigntree_node_t), pointer, intent(inout) :: mlnachain
+   integer, intent(out) :: num_splits
+   ! Local variables
+   type(chain_node_t), pointer :: link, new_link
+   type(partref_node_t), pointer :: partref
+
+   num_splits = 0
+
+   ! Save the last link before creating a new one
+   link => mlnachain%last_link
+   new_link => new_chain_link(mlnachain)
+
+   ! Process all parts in the current partition
+   partref => link%first_partref
+   do while (associated(partref))
+      ! Create children based on signatures
+      call refine_mlna_part(atoms1, atoms2, link%itemdir1, link%itemdir2, partref%part, new_link)
+
+      ! Count splits (children beyond the original part)
+      num_splits = num_splits + partref%part%num_children - 1
+
+      partref => partref%nextref
+   end do
+end subroutine
+
+subroutine compute_scna_partition(atoms1, atoms2, atomtypes, mlnachain)
+! Iteratively compute MLNA types until convergence
+   type(adjc_t), dimension(:), intent(in) :: atoms1, atoms2
+   type(partition_t), intent(in) :: atomtypes
+   type(assigntree_node_t), pointer, intent(out) :: mlnachain
+   ! Local variables
+   integer :: num_splits
+
+!   mlnachain => collect_atomtypes_linked( atoms1, atoms2)
+   mlnachain => chain_from_partition( atomtypes)
+
+   do
+      ! Call refine_mlna_partition and get the number of splits
+      call refine_mlna_partition(atoms1, atoms2, mlnachain, num_splits)
+
+      ! Exit loop if no splits occurred
+      if (num_splits == 0) exit
+   end do
 end subroutine
 
 end module

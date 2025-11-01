@@ -27,7 +27,7 @@ use adjacency
 use pruning_atoms
 use lcrs_trees
 use lcrs_arrays
-use mlna
+use partitioning
 use assignment_tree
 use assignment_conformer
 use recording

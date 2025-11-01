@@ -22,8 +22,6 @@ argparse.f90
 lcrs_trees.f90
 lcrs_arrays.f90
 partitioning.f90
-partitioning_ll.f90
-mlna.f90
 biasing_isomer.f90
 pruning_atoms.f90
 assignment_tree.f90

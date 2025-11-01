@@ -4,7 +4,7 @@ use random
 use adjacency
 use lcrs_trees
 use lcrs_arrays
-use mlna
+use partitioning
 implicit none
 private
 public build_assignment_tree

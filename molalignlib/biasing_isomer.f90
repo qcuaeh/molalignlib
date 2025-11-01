@@ -23,7 +23,6 @@ use permutation
 use adjacency
 use lcrs_trees
 use partitioning
-use mlna
 use euclidean
 use options
 use randlib
