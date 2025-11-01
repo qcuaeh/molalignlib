@@ -13,7 +13,7 @@ contains
 
 subroutine update_mlna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
 ! Update item values of existing item nodes instead of adding new item nodes
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   type(adjcs_t), intent(in) :: adjcs1, adjcs2
    type(part_nodeptr_t), dimension(:), intent(in) :: itemdir1, itemdir2
    type(partree_node_t), pointer, intent(inout) :: part
    type(chain_node_t), pointer, intent(inout) :: link
@@ -33,7 +33,7 @@ subroutine update_mlna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
    ! Process first molecule items - update existing item nodes
    item => part%first_item1
    do while (associated(item))
-      signature = itemdir1(adjcs1(item%idx)%adjlist)
+      signature = itemdir1(adjcs1%lists(:adjcs1%cns(item%idx), item%idx))
       child_part => find_child_part(part, signature)
       if (DEBUG_TESTS) then
          if (.not. associated(child_part)) then
@@ -54,7 +54,7 @@ subroutine update_mlna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
    ! Process second molecule items - update existing item nodes
    item => part%first_item2
    do while (associated(item))
-      signature = itemdir2(adjcs2(item%idx)%adjlist)
+      signature = itemdir2(adjcs2%lists(:adjcs2%cns(item%idx), item%idx))
       child_part => find_child_part(part, signature)
       if (DEBUG_TESTS) then
          if (.not. associated(child_part)) then
@@ -75,7 +75,7 @@ end subroutine
 
 subroutine update_mlna_partition(adjcs1, adjcs2, link)
 ! Compute next level MLNA types - always keeps all children (original behavior)
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   type(adjcs_t), intent(in) :: adjcs1, adjcs2
    type(chain_node_t), pointer, intent(inout) :: link
    ! Local variables
    type(partref_node_t), pointer :: partref
@@ -92,7 +92,7 @@ end subroutine
 
 subroutine assign_branch_atoms(adjcs1, adjcs2, branch)
 ! Iteratively compute MLNA types until convergence
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   type(adjcs_t), intent(in) :: adjcs1, adjcs2
    type(assigntree_node_t), pointer, intent(inout) :: branch
    ! Local variables
    type(chain_node_t), pointer :: link
@@ -196,7 +196,7 @@ subroutine split_part_indexed(part, link, index1, index2)
 end subroutine
 
 recursive subroutine distribute_items(adjcs1, adjcs2, branch)
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   type(adjcs_t), intent(in) :: adjcs1, adjcs2
    type(assigntree_node_t), pointer, intent(inout) :: branch
    type(assigntree_node_t), pointer :: child_branch
    type(partree_node_t), pointer :: child_part
@@ -223,13 +223,13 @@ end subroutine
 
 function would_part_split(adjcs1, adjcs2, itemdir1, itemdir2, part) result(would_split)
 ! Check if a part would split by comparing signatures
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   type(adjcs_t), intent(in) :: adjcs1, adjcs2
    type(part_nodeptr_t), dimension(:), intent(in) :: itemdir1, itemdir2
    type(partree_node_t), pointer, intent(inout) :: part
    ! Local variables
    logical :: would_split
    type(item_node_t), pointer :: item1, item2
-   type(part_nodeptr_t), dimension(:), allocatable :: signature, first_signature
+   type(part_nodeptr_t), dimension(:), allocatable :: signature, reference
 
    would_split = .false.
    item1 => part%first_item1
@@ -237,10 +237,10 @@ function would_part_split(adjcs1, adjcs2, itemdir1, itemdir2, part) result(would
 
    ! Set first signature from first available item
    if (associated(item1)) then
-      first_signature = itemdir1(adjcs1(item1%idx)%adjlist)
+      reference = itemdir1(adjcs1%lists(:adjcs1%cns(item1%idx), item1%idx))
       item1 => item1%next_item
    else if (associated(item2)) then
-      first_signature = itemdir2(adjcs2(item2%idx)%adjlist)
+      reference = itemdir2(adjcs2%lists(:adjcs2%cns(item2%idx), item2%idx))
       item2 => item2%next_item
    else
       return  ! No items to process
@@ -248,8 +248,8 @@ function would_part_split(adjcs1, adjcs2, itemdir1, itemdir2, part) result(would
 
    ! Check remaining items in first molecule
    do while (associated(item1))
-      signature = itemdir1(adjcs1(item1%idx)%adjlist)
-      if (.not. (signature .equiv. first_signature)) then
+      signature = itemdir1(adjcs1%lists(:adjcs1%cns(item1%idx), item1%idx))
+      if (.not. (signature .equiv. reference)) then
          would_split = .true.
          return
       end if
@@ -258,8 +258,8 @@ function would_part_split(adjcs1, adjcs2, itemdir1, itemdir2, part) result(would
 
    ! Check remaining items in second molecule
    do while (associated(item2))
-      signature = itemdir2(adjcs2(item2%idx)%adjlist)
-      if (.not. (signature .equiv. first_signature)) then
+      signature = itemdir2(adjcs2%lists(:adjcs2%cns(item2%idx), item2%idx))
+      if (.not. (signature .equiv. reference)) then
          would_split = .true.
          return
       end if
@@ -269,7 +269,7 @@ end function
 
 subroutine recompute_scna_partition(adjcs1, adjcs2, mlnachain, branch, branch_parts, num_splits)
 ! Compute next level MLNA types - only keeps children if real split occurred
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   type(adjcs_t), intent(in) :: adjcs1, adjcs2
    type(assigntree_node_t), pointer, intent(inout) :: mlnachain
    type(assigntree_node_t), pointer, intent(inout) :: branch
    type(chain_node_t), pointer, intent(inout) :: branch_parts
@@ -384,7 +384,7 @@ end subroutine
 
 ! Modified split_dependent_parts incorporating split_single_part functionality
 recursive subroutine split_dependent_parts(adjcs1, adjcs2, mlnachain, branch, branch_parts, branching_part, part_to_split)
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   type(adjcs_t), intent(in) :: adjcs1, adjcs2
    type(assigntree_node_t), pointer, intent(inout) :: mlnachain
    type(assigntree_node_t), pointer, intent(inout) :: branch
    type(chain_node_t), pointer, intent(inout) :: branch_parts
@@ -456,7 +456,7 @@ end subroutine
 
 ! Updated split_independent_parts to use the merged function signature
 recursive subroutine split_independent_parts(adjcs1, adjcs2, mlnachain, branch, branch_parts)
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   type(adjcs_t), intent(in) :: adjcs1, adjcs2
    type(assigntree_node_t), pointer, intent(inout) :: mlnachain, branch
    type(chain_node_t), pointer, intent(in) :: branch_parts
    ! Local variables
@@ -482,7 +482,7 @@ recursive subroutine split_independent_parts(adjcs1, adjcs2, mlnachain, branch, 
 end subroutine
 
 subroutine build_assignment_tree( adjcs1, adjcs2, mlnalink, assign_arrays)
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   type(adjcs_t), intent(in) :: adjcs1, adjcs2
    type(chain_node_t), pointer, intent(in) :: mlnalink
    type(array_trees_t), intent(out) :: assign_arrays
    ! Local variables

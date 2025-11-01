@@ -114,7 +114,7 @@ end subroutine
 subroutine add_mlna_costs(atomtypes, adjcs1, adjcs2, scnatypes, costs)
 ! Iteratively compute MLNA types
    type(partition_t), target, intent(in) :: atomtypes
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   type(adjcs_t), intent(in) :: adjcs1, adjcs2
    type(partition_t), intent(out) :: scnatypes
    type(real_matrix), dimension(:), allocatable, intent(inout) :: costs
    ! Local variables

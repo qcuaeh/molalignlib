@@ -39,7 +39,7 @@ contains
 subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atomtypes, &
       coords1, coords2, registry)
    integer, dimension(:), intent(in) :: atomset1, atomset2
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   type(adjcs_t), intent(in) :: adjcs1, adjcs2
    type(partition_t), intent(in) :: atomtypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    type(registry_t), target, intent(inout) :: registry
@@ -141,7 +141,7 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
 end subroutine
 
 subroutine assign_atomperm_conformer( adjcs1, adjcs2, atomtypes, coords1, coords2, atomperm1)
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   type(adjcs_t), intent(in) :: adjcs1, adjcs2
    type(partition_t), intent(in) :: atomtypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    integer, dimension(:), allocatable, intent(out) :: atomperm1

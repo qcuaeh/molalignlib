@@ -116,7 +116,7 @@ end subroutine
 subroutine update_mlna_part(adjcs1, adjcs2, assign_arrays, part_idx, read_link_idx, write_link_idx, subperm)
 ! ULTRA-OPTIMIZED: Array-based version with direct 2D adjacency access for maximum performance
 ! UPDATED: Now collects assignment pairs from newly created leaf parts into subperm
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   type(adjcs_t), intent(in) :: adjcs1, adjcs2
    type(array_trees_t), intent(inout) :: assign_arrays
    integer, intent(in) :: part_idx, read_link_idx, write_link_idx
    type(subperm_t), intent(inout) :: subperm
@@ -144,8 +144,8 @@ subroutine update_mlna_part(adjcs1, adjcs2, assign_arrays, part_idx, read_link_i
 
       ! ULTRA-OPTIMIZED: Generate compact signature using direct 2D adjacency access
       signature_length = 0
-      do j = 1, size(adjcs1(item_idx)%adjlist)
-         adj_atom = adjcs1(item_idx)%adjlist(j)
+      do j = 1, adjcs1%cns(item_idx)
+         adj_atom = adjcs1%lists(j, item_idx)
          part_ref_idx = assign_arrays%itemdir1_entries(read_link_idx, adj_atom)
          if (part_ref_idx /= 0) then
             signature_length = signature_length + 1
@@ -174,8 +174,8 @@ subroutine update_mlna_part(adjcs1, adjcs2, assign_arrays, part_idx, read_link_i
 
       ! ULTRA-OPTIMIZED: Generate compact signature using direct 2D adjacency access
       signature_length = 0
-      do j = 1, size(adjcs2(item_idx)%adjlist)
-         adj_atom = adjcs2(item_idx)%adjlist(j)
+      do j = 1, adjcs2%cns(item_idx)
+         adj_atom = adjcs2%lists(j, item_idx)
          part_ref_idx = assign_arrays%itemdir2_entries(read_link_idx, adj_atom)
          if (part_ref_idx /= 0) then
             signature_length = signature_length + 1
@@ -263,7 +263,7 @@ subroutine assign_branch_atoms(adjcs1, adjcs2, assign_arrays, split_part_idx, ch
       first_link_idx, chosen_item1_idx, chosen_item2_idx, subperm)
    ! Combined procedure: assignment + MLNA recomputation
    ! Makes assignment (chosen_item1_idx-th item1 with chosen_item2_idx-th item2) then recomputes MLNAs for the branch
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   type(adjcs_t), intent(in) :: adjcs1, adjcs2
    type(array_trees_t), intent(inout) :: assign_arrays
    integer, intent(in) :: split_part_idx, child_branch_idx, first_link_idx, chosen_item1_idx, chosen_item2_idx
    type(subperm_t), intent(inout) :: subperm
@@ -331,7 +331,7 @@ recursive subroutine recurse_assign_atoms_greedy(adjcs1, adjcs2, coords1, coords
          assign_arrays, branch_idx, greedy_perm)
    ! Greedy exploration - always picks the closest pair at each split
    ! Similar to recurse_assign_atoms_random but chooses minimum distance instead of random
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   type(adjcs_t), intent(in) :: adjcs1, adjcs2
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_arrays
    integer, intent(in) :: branch_idx
@@ -404,7 +404,7 @@ end subroutine
 subroutine assign_atoms_greedy(adjcs1, adjcs2, coords1, coords2, assign_arrays, &
       atomperm1, permdist)
    ! Greedy exploration wrapper - generates assignment by always choosing closest pairs
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   type(adjcs_t), intent(in) :: adjcs1, adjcs2
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_arrays
    integer, dimension(:), allocatable, intent(out) :: atomperm1
@@ -442,7 +442,7 @@ recursive subroutine recurse_assign_atoms_global(adjcs1, adjcs2, coords1, coords
       assign_arrays, split_parts, num_split_parts, current_split_idx, this_perm, &
       best_perm, min_dist)
    ! Recursively try all assignments for all split parts
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   type(adjcs_t), intent(in) :: adjcs1, adjcs2
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_arrays
    integer, intent(in) :: split_parts(:), num_split_parts, current_split_idx
@@ -518,7 +518,7 @@ end subroutine
 
 subroutine assign_atoms_global(adjcs1, adjcs2, coords1, coords2, assign_arrays, atomperm1)
    ! DFS exploration of all permutations
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   type(adjcs_t), intent(in) :: adjcs1, adjcs2
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_arrays
    integer, dimension(:), allocatable, intent(out) :: atomperm1
@@ -571,7 +571,7 @@ recursive subroutine recurse_assign_atoms_local_full(adjcs1, adjcs2, coords1, co
       assign_arrays, branch_idx, best_perm, accumulated_dist)
    ! DFS exploration of all assignment possibilities - finds permutation that minimizes total distance
    ! OPTIMIZED: Incremental distance calculation to avoid redundant O(n) sqdistsum calls
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   type(adjcs_t), intent(in) :: adjcs1, adjcs2
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_arrays
    integer, intent(in) :: branch_idx
@@ -649,7 +649,7 @@ subroutine assign_atoms_local_full(adjcs1, adjcs2, coords1, coords2, assign_arra
       atomperm1, total_dist)
    ! DFS exploration wrapper - finds optimal assignment among all possibilities
    ! OPTIMIZED: Uses incremental distance calculation
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   type(adjcs_t), intent(in) :: adjcs1, adjcs2
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_arrays
    integer, dimension(:), allocatable, intent(out) :: atomperm1
@@ -695,7 +695,7 @@ recursive subroutine recurse_assign_atoms_local_pruned(adjcs1, adjcs2, coords1, 
          branch_idx, total_budget, best_perm, accumulated_dist, success)
    ! DFS exploration with pruning_atoms - finds permutation that minimizes total distance
    ! OPTIMIZED: Incremental distance calculation to avoid redundant sqdistsum calls
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   type(adjcs_t), intent(in) :: adjcs1, adjcs2
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_arrays
    integer, intent(in) :: branch_idx
@@ -808,7 +808,7 @@ subroutine assign_atoms_local_pruned(adjcs1, adjcs2, coords1, coords2, assign_ar
       atomperm1, permdist)
    ! DFS exploration with pruning_atoms threshold - finds assignment within threshold
    ! OPTIMIZED: Uses incremental distance calculation
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   type(adjcs_t), intent(in) :: adjcs1, adjcs2
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: assign_arrays
    integer, dimension(:), allocatable, intent(out) :: atomperm1

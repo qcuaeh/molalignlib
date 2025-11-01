@@ -42,7 +42,7 @@ character(:), allocatable :: extin1, extin2, extout
 type(strlist_type) :: posargs(2)
 type(atom_t), dimension(:), allocatable :: atoms1, atoms2
 type(bond_t), dimension(:), allocatable :: bonds1, bonds2
-type(adjc_t), dimension(:), allocatable :: adjcs1, adjcs2
+type(adjcs_t) :: adjcs1, adjcs2
 type(partition_t) :: atomtypes
 type(registry_t) :: registry
 real(rk) :: rmsd

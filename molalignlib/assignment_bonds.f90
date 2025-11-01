@@ -27,7 +27,7 @@ subroutine minimize_adjdiff(atomset1, atomtypes, scnatypes, adjcs1, adjcs2, adjm
 
    integer, dimension(:), intent(in) :: atomset1
    type(partition_t), intent(in) :: atomtypes, scnatypes
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   type(adjcs_t), intent(in) :: adjcs1, adjcs2
    logical, dimension(:,:), intent(in) :: adjmat2
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    integer, dimension(:), intent(inout) :: atomperm1
@@ -38,18 +38,16 @@ subroutine minimize_adjdiff(atomset1, atomtypes, scnatypes, adjcs1, adjcs2, adjm
    logical, dimension(:), allocatable :: tracked
    integer, dimension(:), allocatable :: atomperm2
    real(rk) :: permdist
-   integer :: num_atoms, i
+   integer :: i
 
    ! Variables for random selection
    integer, dimension(:), allocatable :: untracked_atoms
    integer :: num_untracked, random_idx, start_atom
 
-   num_atoms = size(adjcs1)
-
-   allocate(track(num_atoms))
-   allocate(tracked(num_atoms))
-   allocate(atomperm2(num_atoms))
-   allocate(untracked_atoms(num_atoms))
+   allocate(track(size(atomperm1)))
+   allocate(tracked(size(atomperm1)))
+   allocate(atomperm2(size(atomperm1)))
+   allocate(untracked_atoms(size(atomperm1)))
 
    ! Set atoms block indices
    blkidx1 = atomtypes%itemdir1
@@ -68,10 +66,10 @@ subroutine minimize_adjdiff(atomset1, atomtypes, scnatypes, adjcs1, adjcs2, adjm
 
    ! Process all atoms by randomly selecting untracked ones
    ! Each random selection implicitly starts a new fragment
-   do while (ntrack < num_atoms)
+   do while (ntrack < size(atomperm1))
       ! Build list of untracked atoms
       num_untracked = 0
-      do i = 1, num_atoms
+      do i = 1, size(atomperm1)
          if (.not. tracked(i)) then
             num_untracked = num_untracked + 1
             untracked_atoms(num_untracked) = i
@@ -103,7 +101,7 @@ subroutine match_neighbors(node, adjcs1, adjcs2, atomperm1, tracked, nmatch, mat
                 nmismatch1, mismatches1, nmismatch2, mismatches2)
 ! Classify the atoms connected to node as matches or unmatched
    integer, intent(in) :: node
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   type(adjcs_t), intent(in) :: adjcs1, adjcs2
    integer, dimension(:), intent(in) :: atomperm1
    logical, dimension(:), intent(in) :: tracked
    integer, intent(out) :: nmatch, nmismatch1, nmismatch2
@@ -117,21 +115,21 @@ subroutine match_neighbors(node, adjcs1, adjcs2, atomperm1, tracked, nmatch, mat
    nmismatch2 = 0
 
    ! Classify neighbors of node in structure 1
-   do i = 1, size(adjcs1(node)%adjlist)
-      if (any(adjcs2(mapped_node)%adjlist(:) == atomperm1(adjcs1(node)%adjlist(i)))) then
+   do i = 1, adjcs1%cns(node)
+      if (any(adjcs2%lists(1:adjcs2%cns(mapped_node), mapped_node) == atomperm1(adjcs1%lists(i, node)))) then
          nmatch = nmatch + 1
-         matches(nmatch) = adjcs1(node)%adjlist(i)
+         matches(nmatch) = adjcs1%lists(i, node)
       else
          nmismatch1 = nmismatch1 + 1
-         mismatches1(nmismatch1) = adjcs1(node)%adjlist(i)
+         mismatches1(nmismatch1) = adjcs1%lists(i, node)
       end if
    end do
 
    ! Find neighbors in structure 2 that don't match
-   do i = 1, size(adjcs2(mapped_node)%adjlist)
-      if (.not. any(atomperm1(matches(:nmatch)) == adjcs2(mapped_node)%adjlist(i))) then
+   do i = 1, adjcs2%cns(mapped_node)
+      if (.not. any(atomperm1(matches(:nmatch)) == adjcs2%lists(i, mapped_node))) then
          nmismatch2 = nmismatch2 + 1
-         mismatches2(nmismatch2) = adjcs2(mapped_node)%adjlist(i)
+         mismatches2(nmismatch2) = adjcs2%lists(i, mapped_node)
       end if
    end do
 end subroutine
@@ -140,7 +138,7 @@ recursive subroutine recurse_minimize_adjdiff(node, adjcs1, adjcs2, adjmat2, ato
                 atomperm2, tracked, permdiff, permdist, ntrack, track, coords1, coords2)
 ! Backtracks structure to find assignments that minimize permdiff
    integer, intent(in) :: node
-   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   type(adjcs_t), intent(in) :: adjcs1, adjcs2
    logical, dimension(:,:), intent(in) :: adjmat2
    integer, dimension(:), intent(inout) :: atomperm1, atomperm2
    logical, dimension(:), intent(inout) :: tracked
@@ -156,19 +154,17 @@ recursive subroutine recurse_minimize_adjdiff(node, adjcs1, adjcs2, adjmat2, ato
    integer :: moldiff_branch, ntrack_branch
    logical, dimension(:), allocatable :: tracked_branch, matched1, matched2
    real(rk) :: moldist_branch
-   integer :: i, j, num_atoms
+   integer :: i, j
 
-   num_atoms = size(adjcs1)
-
-   allocate(matches(num_atoms))
-   allocate(mismatches1(num_atoms))
-   allocate(mismatches2(num_atoms))
-   allocate(mapping_branch(num_atoms))
-   allocate(unmapping_branch(num_atoms))
-   allocate(track_branch(num_atoms))
-   allocate(tracked_branch(num_atoms))
-   allocate(matched1(num_atoms))
-   allocate(matched2(num_atoms))
+   allocate(matches(size(atomperm1)))
+   allocate(mismatches1(size(atomperm1)))
+   allocate(mismatches2(size(atomperm1)))
+   allocate(mapping_branch(size(atomperm1)))
+   allocate(unmapping_branch(size(atomperm1)))
+   allocate(track_branch(size(atomperm1)))
+   allocate(tracked_branch(size(atomperm1)))
+   allocate(matched1(size(atomperm1)))
+   allocate(matched2(size(atomperm1)))
 
    ! Reserve node as tracked
    ntrack = ntrack + 1

@@ -131,24 +131,22 @@ subroutine collect_atomtypes(atomset1, atomset2, atoms1, atoms2, atomtypes)
    call delete_part_tree(root_part)
 end subroutine
 
-subroutine refine_mlna_part(atoms1, atoms2, itemdir1, itemdir2, part, link)
+subroutine refine_mlna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
 ! Create children for different signatures - caller decides what to do with them
 ! Note: part is always a leaf part with no existing children
-   type(adjc_t), dimension(:), intent(in) :: atoms1, atoms2
+   type(adjcs_t), intent(in) :: adjcs1, adjcs2
    type(part_nodeptr_t), dimension(:), intent(in) :: itemdir1, itemdir2
    type(partree_node_t), pointer, intent(inout) :: part
    type(chain_node_t), pointer, intent(inout) :: link
    ! Local variables
    type(item_node_t), pointer :: item
    type(partree_node_t), pointer :: child_part
-   type(part_nodeptr_t), target :: signature_alloc(MAX_COORD)
-   type(part_nodeptr_t), pointer :: signature(:)
+   type(part_nodeptr_t), dimension(:), allocatable :: signature
 
    ! Process first molecule items - create children for each unique signature
    item => part%first_item1
    do while (associated(item))
-      signature => signature_alloc(1:size(atoms1(item%idx)%adjlist))
-      signature = itemdir1(atoms1(item%idx)%adjlist)
+      signature = itemdir1(adjcs1%lists(:adjcs1%cns(item%idx), item%idx))
       child_part => find_child_part(part, signature)
       if (.not. associated(child_part)) then
          child_part => new_child_part(part)
@@ -163,8 +161,7 @@ subroutine refine_mlna_part(atoms1, atoms2, itemdir1, itemdir2, part, link)
    ! Process second molecule items - create children for each unique signature
    item => part%first_item2
    do while (associated(item))
-      signature => signature_alloc(1:size(atoms2(item%idx)%adjlist))
-      signature = itemdir2(atoms2(item%idx)%adjlist)
+      signature = itemdir2(adjcs2%lists(:adjcs2%cns(item%idx), item%idx))
       child_part => find_child_part(part, signature)
       if (.not. associated(child_part)) then
          child_part => new_child_part(part)
@@ -177,9 +174,9 @@ subroutine refine_mlna_part(atoms1, atoms2, itemdir1, itemdir2, part, link)
    end do
 end subroutine
 
-subroutine refine_mlna_partition(atoms1, atoms2, mlnachain, num_splits)
+subroutine refine_mlna_partition(adjcs1, adjcs2, mlnachain, num_splits)
 ! Compute next level MLNA types - always keeps all children (original behavior)
-   type(adjc_t), dimension(:), intent(in) :: atoms1, atoms2
+   type(adjcs_t), intent(in) :: adjcs1, adjcs2
    type(assigntree_node_t), pointer, intent(inout) :: mlnachain
    integer, intent(out) :: num_splits
    ! Local variables
@@ -196,7 +193,7 @@ subroutine refine_mlna_partition(atoms1, atoms2, mlnachain, num_splits)
    partref => link%first_partref
    do while (associated(partref))
       ! Create children based on signatures
-      call refine_mlna_part(atoms1, atoms2, link%itemdir1, link%itemdir2, partref%part, new_link)
+      call refine_mlna_part(adjcs1, adjcs2, link%itemdir1, link%itemdir2, partref%part, new_link)
 
       ! Count splits (children beyond the original part)
       num_splits = num_splits + partref%part%num_children - 1
@@ -205,20 +202,20 @@ subroutine refine_mlna_partition(atoms1, atoms2, mlnachain, num_splits)
    end do
 end subroutine
 
-subroutine compute_scna_partition(atoms1, atoms2, atomtypes, mlnachain)
+subroutine compute_scna_partition(adjcs1, adjcs2, atomtypes, mlnachain)
 ! Iteratively compute MLNA types until convergence
-   type(adjc_t), dimension(:), intent(in) :: atoms1, atoms2
+   type(adjcs_t), intent(in) :: adjcs1, adjcs2
    type(partition_t), intent(in) :: atomtypes
    type(assigntree_node_t), pointer, intent(out) :: mlnachain
    ! Local variables
    integer :: num_splits
 
-!   mlnachain => collect_atomtypes_linked( atoms1, atoms2)
+!   mlnachain => collect_atomtypes_linked( adjcs1, adjcs2)
    mlnachain => chain_from_partition( atomtypes)
 
    do
       ! Call refine_mlna_partition and get the number of splits
-      call refine_mlna_partition(atoms1, atoms2, mlnachain, num_splits)
+      call refine_mlna_partition(adjcs1, adjcs2, mlnachain, num_splits)
 
       ! Exit loop if no splits occurred
       if (num_splits == 0) exit
