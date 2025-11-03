@@ -46,8 +46,10 @@ subroutine readfile(unit, extin, title, atoms, bonds)
    select case (extin)
    case ('xyz')
       call readfile_xyz(unit, title, atoms, bonds)
-   case ('mol', 'sdf')
-      call readfile_mol_sdf(unit, title, atoms, bonds)
+   case ('mol')
+      call readfile_mol(unit, title, atoms, bonds)
+   case ('sdf')
+      call readfile_sdf(unit, title, atoms, bonds)
    case ('mol2')
       call readfile_mol2(unit, title, atoms, bonds)
    case default
@@ -112,7 +114,7 @@ subroutine readfile_xyz(unit, title, atoms, bonds)
    end do
 end subroutine
 
-subroutine readfile_mol_sdf(unit, title, atoms, bonds)
+subroutine readfile_mol(unit, title, atoms, bonds)
    integer, intent(in) :: unit
    character(:), allocatable, intent(out) :: title
    type(atom_t), dimension(:), allocatable, target, intent(out) :: atoms
@@ -125,27 +127,27 @@ subroutine readfile_mol_sdf(unit, title, atoms, bonds)
    ! Read header block (3 lines)
    read (unit, '(A)', iostat=stat) buffer
    if (stat /= 0) then
-      write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
+      write (stderr, '(A)') 'Error: Invalid MOL format'
       stop 1
    end if
    title = trim(buffer)
 
    read (unit, '(A)', iostat=stat) buffer
    if (stat /= 0) then
-      write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
+      write (stderr, '(A)') 'Error: Invalid MOL format'
       stop 1
    end if
 
    read (unit, '(A)', iostat=stat) buffer
    if (stat /= 0) then
-      write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
+      write (stderr, '(A)') 'Error: Invalid MOL format'
       stop 1
    end if
 
    ! Read counts line and determine format version
    read (unit, '(A)', iostat=stat) buffer
    if (stat /= 0) then
-      write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
+      write (stderr, '(A)') 'Error: Invalid MOL format'
       stop 1
    end if
 
@@ -163,9 +165,35 @@ subroutine readfile_mol_sdf(unit, title, atoms, bonds)
       write (stderr, '(A)') 'Error: File contains no atoms'
       stop 1
    end if
+end subroutine
 
-   ! Handle potential SDF property data
-   call skip_sdf_properties(unit)
+subroutine readfile_sdf(unit, title, atoms, bonds)
+   integer, intent(in) :: unit
+   character(:), allocatable, intent(out) :: title
+   type(atom_t), dimension(:), allocatable, intent(out) :: atoms
+   type(bond_t), dimension(:), allocatable, intent(out) :: bonds
+   ! Local variables
+   character(ll) :: buffer
+   integer :: stat
+
+   ! Read the molecule using MOL format reader
+   call readfile_mol(unit, title, atoms, bonds)
+
+   ! Continue reading until we reach $$$$ or end of file
+   do
+      read (unit, '(A)', iostat=stat) buffer
+      if (stat < 0) then
+         ! End of file reached, this is acceptable here
+         exit
+      else if (stat > 0) then
+         write (stderr, '(A)') 'Error: Reading SDF property data'
+         stop 1
+      end if
+      if (trim(buffer) == '$$$$') then
+         ! End of molecule reached
+         exit
+      end if
+   end do
 end subroutine
 
 subroutine read_v2000_format(unit, counts_line, atoms, bonds)
@@ -395,30 +423,6 @@ subroutine read_v3000_format(unit, counts_line, atoms, bonds)
          stop 1
       end if
       if (index(buffer, 'END CTAB') > 0) exit
-   end do
-end subroutine
-
-subroutine skip_sdf_properties(unit)
-   integer, intent(in) :: unit
-   character(ll) :: buffer
-   integer :: stat
-   logical :: end_of_molecule
-
-   ! Skip any property data until we reach $$ or end of file
-   end_of_molecule = .false.
-   do while (.not. end_of_molecule)
-      read (unit, '(A)', iostat=stat) buffer
-      if (stat < 0) then
-         ! End of file reached - this is acceptable (pure MOL file or end of SDF)
-         exit
-      else if (stat > 0) then
-         write (stderr, '(A)') 'Error: Reading MOL/SDF property data'
-         stop 1
-      end if
-
-      if (trim(buffer) == '$$') then
-         end_of_molecule = .true.
-      end if
    end do
 end subroutine
 
