@@ -30,7 +30,7 @@ implicit none
 
 contains
 
-subroutine optimize_atomperm_isomer(atomset1, atomset2, atomtypes, adjcs1, adjcs2, &
+subroutine optimize_atomperm_isomer( atomset1, atomset2, atomtypes, adjcs1, adjcs2, &
                                      coords1, coords2, registry)
    integer, dimension(:), intent(in) :: atomset1, atomset2
    type(partition_t), intent(in) :: atomtypes
@@ -39,7 +39,7 @@ subroutine optimize_atomperm_isomer(atomset1, atomset2, atomtypes, adjcs1, adjcs
    type(registry_t), target, intent(inout) :: registry
 
    ! Local variables
-   integer, dimension(:), allocatable :: atomperm1
+   integer, dimension(:), allocatable :: atomperm1, new_atomperm
    real(rk), dimension(:,:), allocatable :: coords2r
    real(rk), dimension(4) :: rotation, total_rotation
    real(rk) :: euclidean_scale, permdist
@@ -50,20 +50,21 @@ subroutine optimize_atomperm_isomer(atomset1, atomset2, atomtypes, adjcs1, adjcs
    type(partition_t) :: scnatypes
 
    ! Convert adjacency lists to adjacency matrix
-   adjmat1 = adjcs_to_adjmat(adjcs1)
-   adjmat2 = adjcs_to_adjmat(adjcs2)
+   adjmat1 = adjcs_to_adjmat( adjcs1)
+   adjmat2 = adjcs_to_adjmat( adjcs2)
 
    ! Initialize atomperm1 as an identity permutation
    allocate (atomperm1(size(coords1, 2)))
-   call init_identity_permutation(atomperm1)
+   allocate (new_atomperm(size(coords1, 2)))
+   call init_identity_permutation( atomperm1)
 
    ! Compute constant costs
-   call init_costs(atomtypes, fixed_costs)
-   call add_hna_costs(atomtypes, adjcs1, adjcs2, scnatypes, fixed_costs)
-   euclidean_scale = 0.99_rk/longest_distance(atomtypes, coords1, coords2)**2
+   call init_costs( atomtypes, fixed_costs)
+   call add_hna_costs( atomtypes, adjcs1, adjcs2, scnatypes, fixed_costs)
+   euclidean_scale = 0.99_rk/longest_distance( atomtypes, coords1, coords2)**2
 
    ! Initialize local minima registry
-   call reset_registry(registry)
+   call reset_registry( registry)
 
    ! Initialize random number generator
    call random_initialize()
@@ -73,27 +74,24 @@ subroutine optimize_atomperm_isomer(atomset1, atomset2, atomtypes, adjcs1, adjcs
 
       ! Get randomly rotated coords2
       total_rotation = randrotquat()
-      coords2r = rotated_coords(coords2, total_rotation)
-      costs = fixed_costs
+      coords2r = rotated_coords( coords2, total_rotation)
 
       ! Assign atoms with current orientation using costs
-!      call add_random_costs(atomtypes, coords1, coords2r, costs)
-      call add_euclidean_costs(atomtypes, coords1, coords2r, euclidean_scale, costs)
-      call assign_atoms(atomtypes, costs, atomperm1)
-      call minimize_adjdiff(atomset1, atomtypes, scnatypes, adjcs1, adjcs2, adjmat2, &
+      costs = fixed_costs
+      call add_euclidean_costs( atomtypes, coords1, coords2r, euclidean_scale, costs)
+!      call add_random_costs( atomtypes, coords1, coords2r, costs)
+      call assign_atoms( atomtypes, costs, atomperm1)
+      call minimize_adjdiff( atomset1, atomtypes, scnatypes, adjcs1, adjcs2, adjmat2, &
             coords1, coords2, atomperm1)
-      call compute_differing_bonds(atomset1, atomperm1, adjmat1, adjmat2, moldiffs)
+      rotation = least_rotquat( atomset1, atomperm1, coords1, coords2r)
+      total_rotation = quatmul( total_rotation, rotation)
+      call rotate_coords( atomset2, coords2r, rotation)
+      permdiff = adjacencydiff( atomset1, atomperm1, adjcs1, adjcs2)
 
-      ! Optimize rotation
-      rotation = least_rotquat(atomset1, atomperm1, coords1, coords2r)
-      total_rotation = quatmul(total_rotation, rotation)
-      call rotate_coords(atomset2, coords2r, rotation)
-
-      permdiff = adjacencydiff(atomset1, atomperm1, adjcs1, adjcs2)
-      permdist = sqdistsum(atomset1, atomperm1, coords1, coords2r)
-
-      ! Update results
-      call insert_record_moldiff(registry, moldiffs, atomperm1, 1, total_rotation, permdist)
+      ! Insert atom permutation into registry
+      permdist = sqdistsum( atomset1, atomperm1, coords1, coords2r)
+      call compute_differing_bonds( atomset1, atomperm1, adjmat1, adjmat2, moldiffs)
+      call insert_record_moldiff( registry, moldiffs, atomperm1, 1, total_rotation, permdist)
 
    end do
 end subroutine

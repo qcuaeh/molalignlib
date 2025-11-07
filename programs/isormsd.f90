@@ -104,14 +104,14 @@ do while (get_arg(arg))
    case ('-mirror')
       mirror_flag = .true.
    case ('-thres')
-      call read_optarg(arg, iso_thres)
+      call read_optarg( arg, iso_thres)
    case ('-trials')
-      call read_optarg(arg, max_trials)
+      call read_optarg( arg, max_trials)
    case ('-records')
-      call read_optarg(arg, num_records)
+      call read_optarg( arg, num_records)
    case ('-coords')
       coords_flag = .true.
-      call read_optarg(arg, coords_path)
+      call read_optarg( arg, coords_path)
    case ('-stats')
       stats_flag = .true.
    case ('-random')
@@ -125,7 +125,7 @@ do while (get_arg(arg))
    case ('-confodel')
       modify_bonds => delete_bonds
    case default
-      call read_posarg(arg, posargs)
+      call read_posarg( arg, posargs)
    end select
 end do
 
@@ -137,36 +137,36 @@ case (1)
    write (stderr, '(A)') 'Error: Too few file paths'
    stop 1
 case (2)
-   call split_path(posargs(1)%arg, dummy, dummy, extin1)
-   call split_path(posargs(2)%arg, dummy, dummy, extin2)
-   call open2read(posargs(1)%arg, unitin1)
-   call open2read(posargs(2)%arg, unitin2)
+   call split_path( posargs(1)%arg, dummy, dummy, extin1)
+   call split_path( posargs(2)%arg, dummy, dummy, extin2)
+   call open2read( posargs(1)%arg, unitin1)
+   call open2read( posargs(2)%arg, unitin2)
 case default
    write (stderr, '(A)') 'Error: Too many file paths'
    stop 1
 end select
 
 if (coords_flag) then
-   call split_path(coords_path, dummy, dummy, extout)
-   call open2write(coords_path, unitout)
+   call split_path( coords_path, dummy, dummy, extout)
+   call open2write( coords_path, unitout)
 end if
 
 ! Read coordinates
-call readfile(unitin1, extin1, title1, atoms1, bonds1)
-call readfile(unitin2, extin2, title2, atoms2, bonds2)
+call readfile( unitin1, extin1, title1, atoms1, bonds1)
+call readfile( unitin2, extin2, title2, atoms2, bonds2)
 
 if (heavy_flag) then
    ! Include only heavy atoms
-   call include_heavy_atoms(atoms1, atomset1)
-   call include_heavy_atoms(atoms2, atomset2)
+   call include_heavy_atoms( atoms1, atomset1)
+   call include_heavy_atoms( atoms2, atomset2)
 else
    ! Include all atoms
-   call include_all_atoms(atoms1, atomset1)
-   call include_all_atoms(atoms2, atomset2)
+   call include_all_atoms( atoms1, atomset1)
+   call include_all_atoms( atoms2, atomset2)
 end if
 
 ! Collect atom types in a partition
-call collect_atomtypes(atomset1, atomset2, atoms1, atoms2, atomtypes)
+call collect_atomtypes( atomset1, atomset2, atoms1, atoms2, atomtypes)
 
 ! Abort if atom types do not match
 if (any(atomtypes%parts%num_items1 /= atomtypes%parts%num_items2)) then
@@ -176,8 +176,8 @@ end if
 
 ! Set adjacency lists
 if (rebond_flag) then
-   call adjacency_from_atoms(atomset1, atoms1, adjcs1)
-   call adjacency_from_atoms(atomset2, atoms2, adjcs2)
+   call adjacency_from_atoms( atomset1, atoms1, adjcs1)
+   call adjacency_from_atoms( atomset2, atoms2, adjcs2)
 else
    if (size(bonds1) < 1 .or. size(bonds2) < 1) then
       if (size(bonds1) < 1 .and. size(bonds2) < 1) then
@@ -191,8 +191,8 @@ else
          stop 1
       end if
    end if
-   call adjacency_from_bonds(atomset1, bonds1, size(atoms1), adjcs1)
-   call adjacency_from_bonds(atomset2, bonds2, size(atoms2), adjcs2)
+   call adjacency_from_bonds( atomset1, bonds1, size(atoms1), adjcs1)
+   call adjacency_from_bonds( atomset2, bonds2, size(atoms2), adjcs2)
 end if
 
 ! Get user defined atom weights
@@ -200,8 +200,8 @@ if (mass_flag) then
    weights1 = atomic_masses(atoms1%elnum)
    weights2 = atomic_masses(atoms2%elnum)
 else
-   weights1 = uniform_weights(1._rk, size(atoms1))
-   weights2 = uniform_weights(1._rk, size(atoms2))
+   weights1 = uniform_weights( 1._rk, size(atoms1))
+   weights2 = uniform_weights( 1._rk, size(atoms2))
 end if
 
 ! Get mol1 coordinates
@@ -209,63 +209,65 @@ coords1 = get_coords(atoms1)
 
 ! Get mol2 coordinates
 if (mirror_flag) then
-   coords2 = get_mirrored_coords(atoms2)
+   coords2 = get_mirrored_coords( atoms2)
 else
-   coords2 = get_coords(atoms2)
+   coords2 = get_coords( atoms2)
 end if
 
 if (align_flag) then
 
-   center1 = get_centroid(atomset1, atoms1, weights1)
-   center2 = get_centroid(atomset2, atoms2, weights2)
-   call translate_coords(coords2, center1 - center2)
+   center1 = get_centroid( atomset1, atoms1, weights1)
+   center2 = get_centroid( atomset2, atoms2, weights2)
+   call translate_coords( coords2, center1 - center2)
 
    ! Get weighted-centered coordinates
-   coords1w = get_weighted_coords(atoms1, weights1, center1)
-   coords2w = get_weighted_coords(atoms2, weights2, center2)
+   coords1w = get_weighted_coords( atoms1, weights1, center1)
+   coords2w = get_weighted_coords( atoms2, weights2, center2)
 
    if (remap_flag) then
 
       ! Allocate registries
-      call allocate_registry(iso_registry, num_records)
+      call allocate_registry( iso_registry, num_records)
 
       ! Remap atoms to minimize adjacency difference and MSD
-      call optimize_atomperm_isomer(atomset1, atomset2, atomtypes, adjcs1, adjcs2, &
-                                     coords1w, coords2w, iso_registry)
+      call optimize_atomperm_isomer( atomset1, atomset2, atomtypes, adjcs1, adjcs2, &
+            coords1w, coords2w, iso_registry)
 
       ! Print isomer optimization stats
       if (stats_flag) then
-         call print_records(iso_registry)
+         call print_records( iso_registry)
       end if
 
       ! Check if conformer optimization is needed
       if (associated(modify_bonds)) then
 
-         call allocate_registry(confo_registry, num_records)
-         call allocate_registry(temp_registry, 1)
+         call allocate_registry( confo_registry, num_records)
+         call allocate_registry( temp_registry, 1)
 
          do i = 1, iso_registry%occ_records
 
             atomperm1 = iso_registry%records(i)%atomperm1
 
             ! Apply bond modification strategy
-            call modify_bonds(adjcs1, adjcs2, atomperm1, iso_registry%records(i)%moldiffs, &
-                             adjcs1_mod, adjcs2_mod)
-            call optimize_atomperm_conformer(atomset1, atomset2, adjcs1_mod, adjcs2_mod, atomtypes, &
-                                          coords1w, coords2w, temp_registry)
+            call modify_bonds( adjcs1, adjcs2, atomperm1, &
+                  iso_registry%records(i)%moldiffs, adjcs1_mod, adjcs2_mod)
+            call optimize_atomperm_conformer( atomset1, atomset2, adjcs1_mod, &
+                  adjcs2_mod, atomtypes, coords1w, coords2w, temp_registry)
 
-            call insert_record_atomperm(confo_registry, &
-                  temp_registry%records(1)%atomperm1, &
-                  temp_registry%records(1)%steps, &
-                  temp_registry%records(1)%rotation, &
-                  adjacencydiff(atomset1, temp_registry%records(1)%atomperm1, adjcs1, adjcs2), &
-                  temp_registry%records(1)%permdist)
+            call insert_record_atomperm( &
+               confo_registry, &
+               temp_registry%records(1)%atomperm1, &
+               temp_registry%records(1)%steps, &
+               temp_registry%records(1)%rotation, &
+               adjacencydiff(atomset1, temp_registry%records(1)%atomperm1, adjcs1, adjcs2), &
+               temp_registry%records(1)%permdist &
+            )
 
          end do
 
          ! Print conformer optimization stats
          if (stats_flag) then
-            call print_records(confo_registry)
+            call print_records( confo_registry)
          end if
 
          ! Point to conformer registry for output
@@ -282,19 +284,19 @@ if (align_flag) then
       do i = 1, output_registry%occ_records
          atomperm1 = output_registry%records(i)%atomperm1
          rotquat = output_registry%records(i)%rotation
-         coords2r = rotated_coords(coords2, rotquat, center1)
-         rmsd = sqrt(sqdistmean(atomset1, atomperm1, weights1, coords1, coords2r))
-         adjd = adjacencydiff(atomset1, atomperm1, adjcs1, adjcs2)
+         coords2r = rotated_coords( coords2, rotquat, center1)
+         rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2r))
+         adjd = adjacencydiff( atomset1, atomperm1, adjcs1, adjcs2)
 
          if (coords_flag) then
             title2 = 'RMSD=' // str(rmsd) // ' Δadj=' // str(adjd)
-            call set_coords(atoms2, coords2r)
-            call writefile(unitout, extout, title2, atoms2, bonds2, atomperm1)
+            call set_coords( atoms2, coords2r)
+            call writefile( unitout, extout, title2, atoms2, bonds2, atomperm1)
          else
             write (stdout,'(A,"(",I0,")")',advance='no') str(rmsd), adjd
             if (atomorder_flag) then
                write (stdout,'(1X)',advance='no')
-               call print_permutation(atomperm1)
+               call print_permutation( atomperm1)
             end if
             write (stdout, *)
          end if
@@ -304,15 +306,15 @@ if (align_flag) then
 
       allocate (atomperm1(size( coords1w, 2)))
       call init_identity_permutation( atomperm1)
-      rotquat = least_rotquat(atomset1, atomperm1, coords1w, coords2w)
-      coords2r = rotated_coords(coords2, rotquat, center1)
-      rmsd = sqrt(sqdistmean(atomset1, atomperm1, weights1, coords1, coords2r))
-      adjd = adjacencydiff(atomset1, atomperm1, adjcs1, adjcs2)
+      rotquat = least_rotquat( atomset1, atomperm1, coords1w, coords2w)
+      coords2r = rotated_coords( coords2, rotquat, center1)
+      rmsd = sqrt(sqdistmean( atomset1, atomperm1, weights1, coords1, coords2r))
+      adjd = adjacencydiff( atomset1, atomperm1, adjcs1, adjcs2)
 
       if (coords_flag) then
          title2 = 'RMSD=' // str(rmsd) // ' Δadj=' // str(adjd)
-         call set_coords(atoms2, coords2r)
-         call writefile(unitout, extout, title2, atoms2, bonds2, atomperm1)
+         call set_coords( atoms2, coords2r)
+         call writefile( unitout, extout, title2, atoms2, bonds2, atomperm1)
       else
          write (stdout,'(A,"(",I0,")")') str(rmsd), adjd
       end if
@@ -322,23 +324,23 @@ if (align_flag) then
 else
 
    ! Get weighted coordinates
-   coords1w = get_weighted_coords(atoms1, weights1)
-   coords2w = get_weighted_coords(atoms2, weights2)
+   coords1w = get_weighted_coords( atoms1, weights1)
+   coords2w = get_weighted_coords( atoms2, weights2)
 
    if (remap_flag) then
       write (stdout, '(A)') 'Error: Remapping without alignment is not implemented'
       stop 1
    else
-      allocate (atomperm1(size( coords1w, 2)))
+      allocate (atomperm1(size(coords1w, 2)))
       call init_identity_permutation( atomperm1)
-      rmsd = sqrt(sqdistmean(atomset1, atomperm1, weights1, coords1, coords2))
-      adjd = adjacencydiff(atomset1, atomperm1, adjcs1, adjcs2)
+      rmsd = sqrt(sqdistmean( atomset1, atomperm1, weights1, coords1, coords2))
+      adjd = adjacencydiff( atomset1, atomperm1, adjcs1, adjcs2)
    end if
 
    if (coords_flag) then
       title2 = 'RMSD=' // str(rmsd) // ' Δadj=' // str(adjd)
-      call set_coords(atoms2, coords2)
-      call writefile(unitout, extout, title2, atoms2, bonds2, atomperm1)
+      call set_coords( atoms2, coords2)
+      call writefile( unitout, extout, title2, atoms2, bonds2, atomperm1)
    else
       write (stdout,'(A,A,I0,A)') str(rmsd), '(', adjd, ')'
    end if
