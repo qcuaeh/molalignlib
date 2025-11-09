@@ -20,7 +20,9 @@ use types_linked
 use adjacency
 implicit none
 private
-public convert_trees_to_arrays
+public cache_adjacency_lists
+public cache_partition_tree
+public cache_assignment_tree
 public print_tree_items_array
 public print_part_tree_array
 public print_leaf_items_array
@@ -85,6 +87,11 @@ type, public :: array_trees_t
    integer, allocatable :: itemdir1_entries(:,:)  ! [link_idx, atom_idx]
    integer, allocatable :: itemdir2_entries(:,:)  ! [link_idx, atom_idx]
    integer, allocatable :: partref_entries(:)     ! Part indices for partrefs
+   ! Adjacency information stored directly for fastest access
+   integer, allocatable :: adjcs1_cn(:)         ! Count for each adjcs1 atom's adjacency list
+   integer, allocatable :: adjcs2_cn(:)         ! Count for each adjcs2 atom's adjacency list
+   integer, allocatable :: adjcs1_list(:,:)     ! Direct 2D adjacency lists for adjcs1 [atom_idx, neighbor_idx]
+   integer, allocatable :: adjcs2_list(:,:)     ! Direct 2D adjacency lists for adjcs2 [atom_idx, neighbor_idx]
    ! Metadata
    integer :: atoms1_size, atoms2_size  ! number of atoms in each molecule
    integer :: total_items1, total_items2, total_parts
@@ -97,59 +104,96 @@ end type
 
 contains
 
-subroutine convert_trees_to_arrays(part_tree, assign_tree, assign_arrays)
-   type(partree_node_t), pointer, intent(in) :: part_tree
-   type(assigntree_node_t), pointer, intent(in) :: assign_tree
-   type(array_trees_t), intent(out) :: assign_arrays
-   ! Local variables
-   integer :: partref_idx, link_idx, item1_idx, item2_idx
+subroutine cache_adjacency_lists(adjcs1, adjcs2, cache_arrays)
+   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   type(array_trees_t), intent(inout) :: cache_arrays
+   integer :: i, atoms1_size, atoms2_size
 
-   ! Get totals from the tree counters
-   assign_arrays%atoms1_size = assign_tree%atoms1_size
-   assign_arrays%atoms2_size = assign_tree%atoms2_size
-   assign_arrays%total_parts = part_tree%total_parts
-   assign_arrays%total_items1 = part_tree%total_items1
-   assign_arrays%total_items2 = part_tree%total_items2
-   assign_arrays%total_chains = assign_tree%total_chains
-   assign_arrays%total_links = assign_tree%total_links
-   assign_arrays%total_partref_entries = assign_tree%total_partrefs
+   atoms1_size = size(adjcs1)
+   atoms2_size = size(adjcs2)
 
-   ! Allocate all arrays with exact sizes (existing allocation code)
-   allocate(assign_arrays%atomidcs1(assign_arrays%total_items1))
-   allocate(assign_arrays%atomidcs2(assign_arrays%total_items2))
-   allocate(assign_arrays%partree(assign_arrays%total_parts))
-   allocate(assign_arrays%chain(assign_arrays%total_links))
-   allocate(assign_arrays%assigntree(assign_arrays%total_chains))
-   allocate(assign_arrays%partref_entries(assign_arrays%total_partref_entries))
+   ! Allocate adjacency arrays
+   allocate(cache_arrays%adjcs1_cn(atoms1_size))
+   allocate(cache_arrays%adjcs2_cn(atoms2_size))
+   allocate(cache_arrays%adjcs1_list(atoms1_size, MAX_COORD))
+   allocate(cache_arrays%adjcs2_list(atoms2_size, MAX_COORD))
 
-   ! NEW: Allocate 2D itemdir arrays - one for each molecule
-   allocate(assign_arrays%itemdir1_entries(assign_arrays%total_links, assign_arrays%atoms1_size))
-   allocate(assign_arrays%itemdir2_entries(assign_arrays%total_links, assign_arrays%atoms2_size))
+   ! Initialize adjacency lists to zero
+   cache_arrays%adjcs1_list = 0
+   cache_arrays%adjcs2_list = 0
 
-   ! OPTIMIZATION: Use intrinsic array operations instead of explicit loops
-   assign_arrays%partref_entries = 0
-   assign_arrays%atomidcs1 = 0
-   assign_arrays%atomidcs2 = 0
+   ! Copy adjacency data for molecule 1
+   do i = 1, atoms1_size
+      cache_arrays%adjcs1_cn(i) = adjcs1(i)%cn
+      cache_arrays%adjcs1_list(i, 1:adjcs1(i)%cn) = adjcs1(i)%list(1:adjcs1(i)%cn)
+   end do
 
-   ! NEW: Initialize 2D itemdir arrays
-   assign_arrays%itemdir1_entries = 0
-   assign_arrays%itemdir2_entries = 0
-
-   ! Convert part tree starting from root with global item tracking
-   item1_idx = 0
-   item2_idx = 0
-   call convert_parts_recurse(part_tree, assign_arrays, item1_idx, item2_idx)
-
-   ! Convert chain tree and count statistics in single traversal
-   partref_idx = 0
-   link_idx = 0
-   call convert_chains_recurse(assign_tree, assign_arrays, partref_idx, link_idx, &
-         assign_arrays%local_combinations, assign_arrays%global_combinations)
+   ! Copy adjacency data for molecule 2
+   do i = 1, atoms2_size
+      cache_arrays%adjcs2_cn(i) = adjcs2(i)%cn
+      cache_arrays%adjcs2_list(i, 1:adjcs2(i)%cn) = adjcs2(i)%list(1:adjcs2(i)%cn)
+   end do
 end subroutine
 
-subroutine convert_signature(part, assign_arrays, part_idx)
-   type(partree_node_t), pointer, intent(in) :: part
-   type(array_trees_t), intent(inout) :: assign_arrays
+subroutine cache_partition_tree(partition_tree, cache_arrays)
+   type(partition_node_t), pointer, intent(in) :: partition_tree
+   type(array_trees_t), intent(inout) :: cache_arrays
+   integer :: item1_idx, item2_idx
+
+   ! Set part tree metadata
+   cache_arrays%total_parts = partition_tree%total_parts
+   cache_arrays%total_items1 = partition_tree%total_items1
+   cache_arrays%total_items2 = partition_tree%total_items2
+
+   ! Allocate part tree arrays
+   allocate(cache_arrays%atomidcs1(cache_arrays%total_items1))
+   allocate(cache_arrays%atomidcs2(cache_arrays%total_items2))
+   allocate(cache_arrays%partree(cache_arrays%total_parts))
+
+   ! Initialize arrays
+   cache_arrays%atomidcs1 = 0
+   cache_arrays%atomidcs2 = 0
+
+   ! Convert part tree
+   item1_idx = 0
+   item2_idx = 0
+   call convert_parts_recurse(partition_tree, cache_arrays, item1_idx, item2_idx)
+end subroutine
+
+subroutine cache_assignment_tree(assignment_tree, cache_arrays)
+   type(chaintree_node_t), pointer, intent(in) :: assignment_tree
+   type(array_trees_t), intent(inout) :: cache_arrays
+   integer :: partref_idx, link_idx
+
+   ! Set assignment tree metadata
+   cache_arrays%atoms1_size = assignment_tree%atoms1_size
+   cache_arrays%atoms2_size = assignment_tree%atoms2_size
+   cache_arrays%total_chains = assignment_tree%total_chains
+   cache_arrays%total_links = assignment_tree%total_links
+   cache_arrays%total_partref_entries = assignment_tree%total_partrefs
+
+   ! Allocate assignment tree arrays
+   allocate(cache_arrays%chain(cache_arrays%total_links))
+   allocate(cache_arrays%assigntree(cache_arrays%total_chains))
+   allocate(cache_arrays%partref_entries(cache_arrays%total_partref_entries))
+   allocate(cache_arrays%itemdir1_entries(cache_arrays%total_links, cache_arrays%atoms1_size))
+   allocate(cache_arrays%itemdir2_entries(cache_arrays%total_links, cache_arrays%atoms2_size))
+
+   ! Initialize arrays
+   cache_arrays%partref_entries = 0
+   cache_arrays%itemdir1_entries = 0
+   cache_arrays%itemdir2_entries = 0
+
+   ! Convert assignment tree
+   partref_idx = 0
+   link_idx = 0
+   call convert_chains_recurse(assignment_tree, cache_arrays, partref_idx, link_idx, &
+         cache_arrays%local_combinations, cache_arrays%global_combinations)
+end subroutine
+
+subroutine convert_signature(part, cache_arrays, part_idx)
+   type(partition_node_t), pointer, intent(in) :: part
+   type(array_trees_t), intent(inout) :: cache_arrays
    integer, intent(in) :: part_idx
    integer :: temp_values(MAX_COORD)
    integer :: temp_count, i, j, value
@@ -165,19 +209,19 @@ subroutine convert_signature(part, assign_arrays, part_idx)
    end do
 
    ! Store total signature length
-   assign_arrays%partree(part_idx)%signature_length = temp_count
+   cache_arrays%partree(part_idx)%signature_length = temp_count
 
    ! Second pass: compute unique values and their frequencies
-   assign_arrays%partree(part_idx)%signature_unique_count = 0
+   cache_arrays%partree(part_idx)%signature_unique_count = 0
    do i = 1, temp_count
       value = temp_values(i)
       found = .false.
 
       ! Check if this value is already in unique list
-      do j = 1, assign_arrays%partree(part_idx)%signature_unique_count
-         if (assign_arrays%partree(part_idx)%signature_values(j) == value) then
-            assign_arrays%partree(part_idx)%signature_frequencies(j) = &
-               assign_arrays%partree(part_idx)%signature_frequencies(j) + 1
+      do j = 1, cache_arrays%partree(part_idx)%signature_unique_count
+         if (cache_arrays%partree(part_idx)%signature_values(j) == value) then
+            cache_arrays%partree(part_idx)%signature_frequencies(j) = &
+               cache_arrays%partree(part_idx)%signature_frequencies(j) + 1
             found = .true.
             exit
          end if
@@ -185,23 +229,23 @@ subroutine convert_signature(part, assign_arrays, part_idx)
 
       ! If not found, add as new unique value
       if (.not. found) then
-         assign_arrays%partree(part_idx)%signature_unique_count = &
-            assign_arrays%partree(part_idx)%signature_unique_count + 1
-         assign_arrays%partree(part_idx)%signature_values(assign_arrays%partree(part_idx)%signature_unique_count) = value
-         assign_arrays%partree(part_idx)%signature_frequencies(assign_arrays%partree(part_idx)%signature_unique_count) = 1
+         cache_arrays%partree(part_idx)%signature_unique_count = &
+            cache_arrays%partree(part_idx)%signature_unique_count + 1
+         cache_arrays%partree(part_idx)%signature_values(cache_arrays%partree(part_idx)%signature_unique_count) = value
+         cache_arrays%partree(part_idx)%signature_frequencies(cache_arrays%partree(part_idx)%signature_unique_count) = 1
       end if
    end do
 
    ! Zero out unused entries using intrinsic operation
-   assign_arrays%partree(part_idx)%signature_values(assign_arrays%partree(part_idx)%signature_unique_count + 1:MAX_COORD) = 0
-   assign_arrays%partree(part_idx)%signature_frequencies(assign_arrays%partree(part_idx)%signature_unique_count + 1:MAX_COORD) = 0
+   cache_arrays%partree(part_idx)%signature_values(cache_arrays%partree(part_idx)%signature_unique_count + 1:MAX_COORD) = 0
+   cache_arrays%partree(part_idx)%signature_frequencies(cache_arrays%partree(part_idx)%signature_unique_count + 1:MAX_COORD) = 0
 end subroutine
 
-recursive subroutine convert_parts_recurse(part, assign_arrays, item1_idx, item2_idx)
-   type(partree_node_t), pointer, intent(in) :: part
-   type(array_trees_t), intent(inout) :: assign_arrays
+recursive subroutine convert_parts_recurse(part, cache_arrays, item1_idx, item2_idx)
+   type(partition_node_t), pointer, intent(in) :: part
+   type(array_trees_t), intent(inout) :: cache_arrays
    integer, intent(inout) :: item1_idx, item2_idx
-   type(partree_node_t), pointer :: child_part
+   type(partition_node_t), pointer :: child_part
    type(item_node_t), pointer :: item
    integer :: part_idx, i, child_count
 
@@ -210,43 +254,43 @@ recursive subroutine convert_parts_recurse(part, assign_arrays, item1_idx, item2
    ! Convert this part (global indices always start at 1)
    part_idx = part%global_idx
 
-   assign_arrays%partree(part_idx)%depth = part%depth
-   assign_arrays%partree(part_idx)%num_children = part%num_children
+   cache_arrays%partree(part_idx)%depth = part%depth
+   cache_arrays%partree(part_idx)%num_children = part%num_children
 
    ! Relationships using global indices
    if (associated(part%parent_part)) then
-      assign_arrays%partree(part_idx)%parent_part_idx = part%parent_part%global_idx
+      cache_arrays%partree(part_idx)%parent_part_idx = part%parent_part%global_idx
    else
-      assign_arrays%partree(part_idx)%parent_part_idx = 0
+      cache_arrays%partree(part_idx)%parent_part_idx = 0
    end if
 
    if (associated(part%first_child_part)) then
-      assign_arrays%partree(part_idx)%first_child_idx = part%first_child_part%global_idx
+      cache_arrays%partree(part_idx)%first_child_idx = part%first_child_part%global_idx
    else
-      assign_arrays%partree(part_idx)%first_child_idx = 0
+      cache_arrays%partree(part_idx)%first_child_idx = 0
    end if
 
    if (associated(part%last_child_part)) then
-      assign_arrays%partree(part_idx)%last_child_idx = part%last_child_part%global_idx
+      cache_arrays%partree(part_idx)%last_child_idx = part%last_child_part%global_idx
    else
-      assign_arrays%partree(part_idx)%last_child_idx = 0
+      cache_arrays%partree(part_idx)%last_child_idx = 0
    end if
 
    if (associated(part%next_sibling_part)) then
-      assign_arrays%partree(part_idx)%next_sibling_idx = part%next_sibling_part%global_idx
+      cache_arrays%partree(part_idx)%next_sibling_idx = part%next_sibling_part%global_idx
    else
-      assign_arrays%partree(part_idx)%next_sibling_idx = 0
+      cache_arrays%partree(part_idx)%next_sibling_idx = 0
    end if
 
    ! Set up item segments using offset approach (offset = start_idx - 1)
-   assign_arrays%partree(part_idx)%items1_offset = item1_idx  ! item1_idx tracks the last used index
-   assign_arrays%partree(part_idx)%items1_count = part%num_items1
+   cache_arrays%partree(part_idx)%items1_offset = item1_idx  ! item1_idx tracks the last used index
+   cache_arrays%partree(part_idx)%items1_count = part%num_items1
 
-   assign_arrays%partree(part_idx)%items2_offset = item2_idx  ! item2_idx tracks the last used index
-   assign_arrays%partree(part_idx)%items2_count = part%num_items2
+   cache_arrays%partree(part_idx)%items2_offset = item2_idx  ! item2_idx tracks the last used index
+   cache_arrays%partree(part_idx)%items2_count = part%num_items2
 
    ! OPTIMIZED: Convert signature to unique values, frequencies, and total length
-   call convert_signature(part, assign_arrays, part_idx)
+   call convert_signature(part, cache_arrays, part_idx)
 
    ! Convert items1 to pure array format
    item => part%first_item1
@@ -254,7 +298,7 @@ recursive subroutine convert_parts_recurse(part, assign_arrays, item1_idx, item2
    do while (associated(item))
       i = i + 1
       item1_idx = item1_idx + 1
-      assign_arrays%atomidcs1(item1_idx) = item%idx
+      cache_arrays%atomidcs1(item1_idx) = item%idx
       item => item%next_item
    end do
 
@@ -264,18 +308,18 @@ recursive subroutine convert_parts_recurse(part, assign_arrays, item1_idx, item2
    do while (associated(item))
       i = i + 1
       item2_idx = item2_idx + 1
-      assign_arrays%atomidcs2(item2_idx) = item%idx
+      cache_arrays%atomidcs2(item2_idx) = item%idx
       item => item%next_item
    end do
 
    ! OPTIMIZATION: Populate direct child access array for faster traversal
    if (part%num_children > 0) then
-      allocate(assign_arrays%partree(part_idx)%child_indices(part%num_children))
+      allocate(cache_arrays%partree(part_idx)%child_indices(part%num_children))
       child_part => part%first_child_part
       child_count = 0
       do while (associated(child_part))
          child_count = child_count + 1
-         assign_arrays%partree(part_idx)%child_indices(child_count) = child_part%global_idx
+         cache_arrays%partree(part_idx)%child_indices(child_count) = child_part%global_idx
          child_part => child_part%next_sibling_part
       end do
    end if
@@ -283,18 +327,18 @@ recursive subroutine convert_parts_recurse(part, assign_arrays, item1_idx, item2
    ! Recursively convert all children
    child_part => part%first_child_part
    do while (associated(child_part))
-      call convert_parts_recurse(child_part, assign_arrays, item1_idx, item2_idx)
+      call convert_parts_recurse(child_part, cache_arrays, item1_idx, item2_idx)
       child_part => child_part%next_sibling_part
    end do
 end subroutine
 
-recursive subroutine convert_chains_recurse(chain, assign_arrays, partref_idx, link_idx, &
+recursive subroutine convert_chains_recurse(chain, cache_arrays, partref_idx, link_idx, &
                                             local_combinations, global_combinations)
-   type(assigntree_node_t), pointer, intent(in) :: chain
-   type(array_trees_t), intent(inout) :: assign_arrays
+   type(chaintree_node_t), pointer, intent(in) :: chain
+   type(array_trees_t), intent(inout) :: cache_arrays
    integer, intent(inout) :: partref_idx, link_idx
    real(rk), intent(out) :: local_combinations, global_combinations
-   type(assigntree_node_t), pointer :: child_chain
+   type(chaintree_node_t), pointer :: child_chain
    type(chain_node_t), pointer :: link
    type(partref_node_t), pointer :: partref
    integer :: chain_idx, current_link_idx, child_count
@@ -316,57 +360,57 @@ recursive subroutine convert_chains_recurse(chain, assign_arrays, partref_idx, l
    ! Convert this chain (existing conversion logic)
    chain_idx = chain%global_idx
 
-   assign_arrays%assigntree(chain_idx)%atoms1_size = chain%atoms1_size
-   assign_arrays%assigntree(chain_idx)%atoms2_size = chain%atoms2_size
-   assign_arrays%assigntree(chain_idx)%num_links = chain%num_links
-   assign_arrays%assigntree(chain_idx)%num_children = chain%num_children
+   cache_arrays%assigntree(chain_idx)%atoms1_size = chain%atoms1_size
+   cache_arrays%assigntree(chain_idx)%atoms2_size = chain%atoms2_size
+   cache_arrays%assigntree(chain_idx)%num_links = chain%num_links
+   cache_arrays%assigntree(chain_idx)%num_children = chain%num_children
 
    ! Cross-tree reference
    if (associated(chain%split_part)) then
-      assign_arrays%assigntree(chain_idx)%split_part_idx = chain%split_part%global_idx
+      cache_arrays%assigntree(chain_idx)%split_part_idx = chain%split_part%global_idx
    else
-      assign_arrays%assigntree(chain_idx)%split_part_idx = 0
+      cache_arrays%assigntree(chain_idx)%split_part_idx = 0
    end if
 
    ! Chain relationships
    if (associated(chain%parent_chain)) then
-      assign_arrays%assigntree(chain_idx)%parent_chain_idx = chain%parent_chain%global_idx
+      cache_arrays%assigntree(chain_idx)%parent_chain_idx = chain%parent_chain%global_idx
    else
-      assign_arrays%assigntree(chain_idx)%parent_chain_idx = 0
+      cache_arrays%assigntree(chain_idx)%parent_chain_idx = 0
    end if
 
    if (associated(chain%first_child_chain)) then
-      assign_arrays%assigntree(chain_idx)%first_child_idx = chain%first_child_chain%global_idx
+      cache_arrays%assigntree(chain_idx)%first_child_idx = chain%first_child_chain%global_idx
    else
-      assign_arrays%assigntree(chain_idx)%first_child_idx = 0
+      cache_arrays%assigntree(chain_idx)%first_child_idx = 0
    end if
 
    if (associated(chain%last_child_chain)) then
-      assign_arrays%assigntree(chain_idx)%last_child_idx = chain%last_child_chain%global_idx
+      cache_arrays%assigntree(chain_idx)%last_child_idx = chain%last_child_chain%global_idx
    else
-      assign_arrays%assigntree(chain_idx)%last_child_idx = 0
+      cache_arrays%assigntree(chain_idx)%last_child_idx = 0
    end if
 
    if (associated(chain%next_sibling_chain)) then
-      assign_arrays%assigntree(chain_idx)%next_sibling_idx = chain%next_sibling_chain%global_idx
+      cache_arrays%assigntree(chain_idx)%next_sibling_idx = chain%next_sibling_chain%global_idx
    else
-      assign_arrays%assigntree(chain_idx)%next_sibling_idx = 0
+      cache_arrays%assigntree(chain_idx)%next_sibling_idx = 0
    end if
 
    ! OPTIMIZATION: Populate direct child access array for faster traversal
    if (chain%num_children > 0) then
-      allocate(assign_arrays%assigntree(chain_idx)%child_indices(chain%num_children))
+      allocate(cache_arrays%assigntree(chain_idx)%child_indices(chain%num_children))
       child_chain => chain%first_child_chain
       child_count = 0
       do while (associated(child_chain))
          child_count = child_count + 1
-         assign_arrays%assigntree(chain_idx)%child_indices(child_count) = child_chain%global_idx
+         cache_arrays%assigntree(chain_idx)%child_indices(child_count) = child_chain%global_idx
          child_chain => child_chain%next_sibling_chain
       end do
    end if
 
    ! Set link offset (offset = start_idx - 1)
-   assign_arrays%assigntree(chain_idx)%link_offset = link_idx
+   cache_arrays%assigntree(chain_idx)%link_offset = link_idx
 
    ! Convert links in this chain using offset approach
    link => chain%first_link
@@ -374,17 +418,17 @@ recursive subroutine convert_chains_recurse(chain, assign_arrays, partref_idx, l
       link_idx = link_idx + 1
       current_link_idx = link_idx
 
-      assign_arrays%chain(current_link_idx)%num_parts = link%num_parts
-      assign_arrays%chain(current_link_idx)%parent_chain_idx = chain%global_idx
+      cache_arrays%chain(current_link_idx)%num_parts = link%num_parts
+      cache_arrays%chain(current_link_idx)%parent_chain_idx = chain%global_idx
 
       ! Set partref offset (offset = start_idx - 1)
-      assign_arrays%chain(current_link_idx)%partref_offset = partref_idx
+      cache_arrays%chain(current_link_idx)%partref_offset = partref_idx
 
       ! Convert partrefs to pure array format
       partref => link%first_partref
       do while (associated(partref))
          partref_idx = partref_idx + 1
-         assign_arrays%partref_entries(partref_idx) = partref%part%global_idx
+         cache_arrays%partref_entries(partref_idx) = partref%part%global_idx
          partref => partref%nextref
       end do
 
@@ -394,7 +438,7 @@ recursive subroutine convert_chains_recurse(chain, assign_arrays, partref_idx, l
    ! Recursively convert child chains and accumulate statistics
    child_chain => chain%first_child_chain
    do while (associated(child_chain))
-      call convert_chains_recurse(child_chain, assign_arrays, partref_idx, link_idx, &
+      call convert_chains_recurse(child_chain, cache_arrays, partref_idx, link_idx, &
                                   child_combinations, child_product)
 
       ! Count statistics if this is not a leaf
@@ -412,10 +456,10 @@ recursive subroutine convert_chains_recurse(chain, assign_arrays, partref_idx, l
    end do
 end subroutine
 
-subroutine print_tree_items_array(assign_arrays)
-   type(array_trees_t), intent(in) :: assign_arrays
+subroutine print_tree_items_array(cache_arrays)
+   type(array_trees_t), intent(in) :: cache_arrays
 
-   if (assign_arrays%total_parts == 0) then
+   if (cache_arrays%total_parts == 0) then
       write(stderr, '(A)') "Part tree is empty"
       return
    end if
@@ -426,43 +470,43 @@ subroutine print_tree_items_array(assign_arrays)
    write(stderr, *)
 
    ! Root part is always at index 1, print its children recursively
-   call print_items_recursive_array(assign_arrays, 1)
+   call print_items_recursive_array(cache_arrays, 1)
    write(stderr, *)
 end subroutine
 
-recursive subroutine print_items_recursive_array(assign_arrays, part_idx)
-   type(array_trees_t), intent(in) :: assign_arrays
+recursive subroutine print_items_recursive_array(cache_arrays, part_idx)
+   type(array_trees_t), intent(in) :: cache_arrays
    integer, intent(in) :: part_idx
    integer :: child_idx, i
 
    ! Use direct array access instead of linked traversal for better performance
-   do i = 1, assign_arrays%partree(part_idx)%num_children
-      child_idx = assign_arrays%partree(part_idx)%child_indices(i)
+   do i = 1, cache_arrays%partree(part_idx)%num_children
+      child_idx = cache_arrays%partree(part_idx)%child_indices(i)
 
       ! Print the child items with part index prefix
       write(stderr, '(A,I0,A)', advance='no') "Part ", child_idx, ':'
-      call print_part_items_array(assign_arrays, child_idx)
+      call print_part_items_array(cache_arrays, child_idx)
 
       ! Recursively print this child's children
-      call print_items_recursive_array(assign_arrays, child_idx)
+      call print_items_recursive_array(cache_arrays, child_idx)
    end do
 end subroutine
 
-subroutine print_part_items_array(assign_arrays, part_idx)
-   type(array_trees_t), intent(in) :: assign_arrays
+subroutine print_part_items_array(cache_arrays, part_idx)
+   type(array_trees_t), intent(in) :: cache_arrays
    integer, intent(in) :: part_idx
    integer :: i
 
    ! Print items1 using offset-based access
-   do i = 1, assign_arrays%partree(part_idx)%items1_count
-      write(stderr, '(1X,I0)', advance='no') assign_arrays%atomidcs1(assign_arrays%partree(part_idx)%items1_offset + i)
+   do i = 1, cache_arrays%partree(part_idx)%items1_count
+      write(stderr, '(1X,I0)', advance='no') cache_arrays%atomidcs1(cache_arrays%partree(part_idx)%items1_offset + i)
    end do
 
    write(stderr, '(A)', advance='no') ' /'
 
    ! Print items2 using offset-based access
-   do i = 1, assign_arrays%partree(part_idx)%items2_count
-      write(stderr, '(1X,I0)', advance='no') assign_arrays%atomidcs2(assign_arrays%partree(part_idx)%items2_offset + i)
+   do i = 1, cache_arrays%partree(part_idx)%items2_count
+      write(stderr, '(1X,I0)', advance='no') cache_arrays%atomidcs2(cache_arrays%partree(part_idx)%items2_offset + i)
    end do
 
    write(stderr, *)
@@ -470,11 +514,11 @@ end subroutine
 
 ! Array-based tree printing procedures
 
-subroutine print_part_tree_array(assign_arrays)
-   type(array_trees_t), intent(in) :: assign_arrays
+subroutine print_part_tree_array(cache_arrays)
+   type(array_trees_t), intent(in) :: cache_arrays
    logical, dimension(:), allocatable :: is_last_child
 
-   if (assign_arrays%total_parts == 0) then
+   if (cache_arrays%total_parts == 0) then
       write(stderr, '(A)') "Part tree is empty"
       return
    end if
@@ -492,17 +536,17 @@ subroutine print_part_tree_array(assign_arrays)
    write(stderr, '(A)') 'ROOT'
 
    ! Print children recursively (root is always at index 1)
-   call print_part_recursive_array(assign_arrays, 1, 0, is_last_child)
+   call print_part_recursive_array(cache_arrays, 1, 0, is_last_child)
    write(stderr, *)
 
    deallocate(is_last_child)
 end subroutine
 
-subroutine print_chain_tree_array(assign_arrays)
-   type(array_trees_t), intent(in) :: assign_arrays
+subroutine print_chain_tree_array(cache_arrays)
+   type(array_trees_t), intent(in) :: cache_arrays
    logical, dimension(:), allocatable :: is_last_child
 
-   if (assign_arrays%total_chains == 0) then
+   if (cache_arrays%total_chains == 0) then
       write(stderr, '(A)') "Assignment tree is empty"
       return
    end if
@@ -513,29 +557,29 @@ subroutine print_chain_tree_array(assign_arrays)
 
    ! Print children recursively (root is always at index 1)
    write(stderr, '(A)') '*'
-   call print_chain_recursive_array(assign_arrays, 1, 0, is_last_child)
+   call print_chain_recursive_array(cache_arrays, 1, 0, is_last_child)
    write(stderr, *)
 
    ! Print assignment statistics
-   if (assign_arrays%global_combinations > 2**24) then
-      write(stderr, '(A,ES8.2)') "Total combinations: ", assign_arrays%global_combinations
+   if (cache_arrays%global_combinations > 2**24) then
+      write(stderr, '(A,ES8.2)') "Total combinations: ", cache_arrays%global_combinations
    else
-      write(stderr, '(A,I0)') "Total combinations: ", int(assign_arrays%global_combinations)
+      write(stderr, '(A,I0)') "Total combinations: ", int(cache_arrays%global_combinations)
    end if
-   if (assign_arrays%local_combinations > 2**24) then
-      write(stderr, '(A,ES8.2)') "Reduced combinations: ", assign_arrays%local_combinations
+   if (cache_arrays%local_combinations > 2**24) then
+      write(stderr, '(A,ES8.2)') "Reduced combinations: ", cache_arrays%local_combinations
    else
-      write(stderr, '(A,I0)') "Reduced combinations: ", int(assign_arrays%local_combinations)
+      write(stderr, '(A,I0)') "Reduced combinations: ", int(cache_arrays%local_combinations)
    end if
    write(stderr, *)
 
    deallocate(is_last_child)
 end subroutine
 
-subroutine print_part_signatures_array(assign_arrays)
-   type(array_trees_t), intent(in) :: assign_arrays
+subroutine print_part_signatures_array(cache_arrays)
+   type(array_trees_t), intent(in) :: cache_arrays
 
-   if (assign_arrays%total_parts == 0) then
+   if (cache_arrays%total_parts == 0) then
       write(stderr, '(A)') "Part tree is empty"
       return
    end if
@@ -546,33 +590,33 @@ subroutine print_part_signatures_array(assign_arrays)
    write(stderr, *)
 
    ! Print signatures for all parts (root is always at index 1)
-   call print_signatures_recursive_array(assign_arrays, 1)
+   call print_signatures_recursive_array(cache_arrays, 1)
    write(stderr, *)
 end subroutine
 
-recursive subroutine print_signatures_recursive_array(assign_arrays, part_idx)
-   type(array_trees_t), intent(in) :: assign_arrays
+recursive subroutine print_signatures_recursive_array(cache_arrays, part_idx)
+   type(array_trees_t), intent(in) :: cache_arrays
    integer, intent(in) :: part_idx
    integer :: child_idx, i, j
 
    if (part_idx == 0) return
 
    ! Process all children using direct array access
-   do i = 1, assign_arrays%partree(part_idx)%num_children
-      child_idx = assign_arrays%partree(part_idx)%child_indices(i)
+   do i = 1, cache_arrays%partree(part_idx)%num_children
+      child_idx = cache_arrays%partree(part_idx)%child_indices(i)
 
       ! Print the child signature with frequencies and total length
       write(stderr,'(A,I0,A,I0,A)',advance='no') 'Part ', child_idx, ' (len=', &
-         assign_arrays%partree(child_idx)%signature_length, '):'
+         cache_arrays%partree(child_idx)%signature_length, '):'
 
       ! Print unique signature values with frequencies
-      if (assign_arrays%partree(child_idx)%signature_unique_count > 0) then
+      if (cache_arrays%partree(child_idx)%signature_unique_count > 0) then
          write(stderr, '(A)', advance='no') ' ['
-         do j = 1, assign_arrays%partree(child_idx)%signature_unique_count
+         do j = 1, cache_arrays%partree(child_idx)%signature_unique_count
             if (j > 1) write(stderr, '(A)', advance='no') ', '
             write(stderr, '(I0,A,I0)', advance='no') &
-               assign_arrays%partree(child_idx)%signature_values(j), '×', &
-               assign_arrays%partree(child_idx)%signature_frequencies(j)
+               cache_arrays%partree(child_idx)%signature_values(j), '×', &
+               cache_arrays%partree(child_idx)%signature_frequencies(j)
          end do
          write(stderr, '(A)') ']'
       else
@@ -580,14 +624,14 @@ recursive subroutine print_signatures_recursive_array(assign_arrays, part_idx)
       end if
 
       ! Recursively print this child's children
-      call print_signatures_recursive_array(assign_arrays, child_idx)
+      call print_signatures_recursive_array(cache_arrays, child_idx)
    end do
 end subroutine
 
-subroutine print_leaf_items_array(assign_arrays)
-   type(array_trees_t), intent(in) :: assign_arrays
+subroutine print_leaf_items_array(cache_arrays)
+   type(array_trees_t), intent(in) :: cache_arrays
 
-   if (assign_arrays%total_parts == 0) then
+   if (cache_arrays%total_parts == 0) then
       write(stderr, '(A)') "Part tree is empty"
       return
    end if
@@ -598,34 +642,34 @@ subroutine print_leaf_items_array(assign_arrays)
    write(stderr, *)
 
    ! Print leaf items recursively (root is always at index 1)
-   call print_leaf_items_recursive_array(assign_arrays, 1)
+   call print_leaf_items_recursive_array(cache_arrays, 1)
    write(stderr, *)
 end subroutine
 
-recursive subroutine print_leaf_items_recursive_array(assign_arrays, part_idx)
-   type(array_trees_t), intent(in) :: assign_arrays
+recursive subroutine print_leaf_items_recursive_array(cache_arrays, part_idx)
+   type(array_trees_t), intent(in) :: cache_arrays
    integer, intent(in) :: part_idx
    integer :: child_idx, i
 
    if (part_idx == 0) return
 
    ! Process all children using direct array access
-   do i = 1, assign_arrays%partree(part_idx)%num_children
-      child_idx = assign_arrays%partree(part_idx)%child_indices(i)
+   do i = 1, cache_arrays%partree(part_idx)%num_children
+      child_idx = cache_arrays%partree(part_idx)%child_indices(i)
 
       ! Only print items if this is a leaf part (no children)
-      if (assign_arrays%partree(child_idx)%num_children == 0) then
+      if (cache_arrays%partree(child_idx)%num_children == 0) then
          write(stderr, '(A,I0,A)', advance='no') 'Part ', child_idx, ':'
-         call print_part_items_array(assign_arrays, child_idx)
+         call print_part_items_array(cache_arrays, child_idx)
       end if
 
       ! Recursively traverse this child's children to find more leaves
-      call print_leaf_items_recursive_array(assign_arrays, child_idx)
+      call print_leaf_items_recursive_array(cache_arrays, child_idx)
    end do
 end subroutine
 
-subroutine print_chain_details_array(assign_arrays)
-   type(array_trees_t), intent(in) :: assign_arrays
+subroutine print_chain_details_array(cache_arrays)
+   type(array_trees_t), intent(in) :: cache_arrays
    integer :: i, link_idx, j, k, part_idx
 
    write(stderr, '(A)') repeat("=", 40)
@@ -633,41 +677,41 @@ subroutine print_chain_details_array(assign_arrays)
    write(stderr, '(A)') repeat("=", 40)
    write(stderr, *)
 
-   do i = 1, assign_arrays%total_chains
+   do i = 1, cache_arrays%total_chains
       write(stderr, '(A,I0,A,I0,A,I0,A)') 'Chain ', i, ': ', &
-         assign_arrays%assigntree(i)%num_links, ' links, ', &
-         assign_arrays%assigntree(i)%num_children, ' children'
+         cache_arrays%assigntree(i)%num_links, ' links, ', &
+         cache_arrays%assigntree(i)%num_children, ' children'
 
-      if (assign_arrays%assigntree(i)%split_part_idx > 0) then
-         write(stderr, '(A,I0)') '  Split part: ', assign_arrays%assigntree(i)%split_part_idx
+      if (cache_arrays%assigntree(i)%split_part_idx > 0) then
+         write(stderr, '(A,I0)') '  Split part: ', cache_arrays%assigntree(i)%split_part_idx
       end if
 
       ! Show links in this chain using offset-based access
-      do j = 1, assign_arrays%assigntree(i)%num_links
-         link_idx = assign_arrays%assigntree(i)%link_offset + j
+      do j = 1, cache_arrays%assigntree(i)%num_links
+         link_idx = cache_arrays%assigntree(i)%link_offset + j
          write(stderr, '(A,I0,A,I0,A)', advance='no') '  Link ', link_idx, &
-            ' (', assign_arrays%chain(link_idx)%num_parts, ' parts): '
+            ' (', cache_arrays%chain(link_idx)%num_parts, ' parts): '
 
          ! Show parts in this link using offset-based access
-         do k = 1, assign_arrays%chain(link_idx)%num_parts
-            part_idx = assign_arrays%partref_entries(assign_arrays%chain(link_idx)%partref_offset + k)
+         do k = 1, cache_arrays%chain(link_idx)%num_parts
+            part_idx = cache_arrays%partref_entries(cache_arrays%chain(link_idx)%partref_offset + k)
             write(stderr, '(I0)', advance='no') part_idx
-            if (k < assign_arrays%chain(link_idx)%num_parts) write(stderr, '(A)', advance='no') ', '
+            if (k < cache_arrays%chain(link_idx)%num_parts) write(stderr, '(A)', advance='no') ', '
          end do
          write(stderr, *)
       end do
 
-      if (i < assign_arrays%total_chains) write(stderr, *)
+      if (i < cache_arrays%total_chains) write(stderr, *)
    end do
 
    write(stderr, *)
 end subroutine
 
-subroutine print_first_level_items_array(assign_arrays)
-   type(array_trees_t), intent(in) :: assign_arrays
+subroutine print_first_level_items_array(cache_arrays)
+   type(array_trees_t), intent(in) :: cache_arrays
    integer :: child_idx, i
 
-   if (assign_arrays%total_parts == 0) then
+   if (cache_arrays%total_parts == 0) then
       write(stderr, '(A)') "Part tree is empty"
       return
    end if
@@ -678,17 +722,17 @@ subroutine print_first_level_items_array(assign_arrays)
    write(stderr, *)
 
    ! Print items for all parts at first level using direct array access
-   do i = 1, assign_arrays%partree(1)%num_children
-      child_idx = assign_arrays%partree(1)%child_indices(i)
+   do i = 1, cache_arrays%partree(1)%num_children
+      child_idx = cache_arrays%partree(1)%child_indices(i)
       write(stderr, '(A,I0,A)', advance='no') 'Part ', child_idx, ':'
-      call print_part_items_array(assign_arrays, child_idx)
+      call print_part_items_array(cache_arrays, child_idx)
    end do
 
    write(stderr, *)
 end subroutine
 
-recursive subroutine print_part_recursive_array(assign_arrays, part_idx, depth, is_last_child)
-   type(array_trees_t), intent(in) :: assign_arrays
+recursive subroutine print_part_recursive_array(cache_arrays, part_idx, depth, is_last_child)
+   type(array_trees_t), intent(in) :: cache_arrays
    integer, intent(in) :: part_idx, depth
    logical, dimension(:), intent(inout) :: is_last_child
    integer :: child_idx, i, j
@@ -696,11 +740,11 @@ recursive subroutine print_part_recursive_array(assign_arrays, part_idx, depth, 
    if (part_idx == 0) return
 
    ! Process all children using direct array access
-   do i = 1, assign_arrays%partree(part_idx)%num_children
-      child_idx = assign_arrays%partree(part_idx)%child_indices(i)
+   do i = 1, cache_arrays%partree(part_idx)%num_children
+      child_idx = cache_arrays%partree(part_idx)%child_indices(i)
 
       ! Check if this is the last child
-      is_last_child(depth + 1) = (i == assign_arrays%partree(part_idx)%num_children)
+      is_last_child(depth + 1) = (i == cache_arrays%partree(part_idx)%num_children)
 
       ! Print prefix components directly
       do j = 1, depth
@@ -720,16 +764,16 @@ recursive subroutine print_part_recursive_array(assign_arrays, part_idx, depth, 
 
       ! Print part index with item counts
       write(stderr, '(A,I0,A,I0,A)') '* (', &
-         assign_arrays%partree(child_idx)%items1_count, '/', &
-         assign_arrays%partree(child_idx)%items2_count, ')'
+         cache_arrays%partree(child_idx)%items1_count, '/', &
+         cache_arrays%partree(child_idx)%items2_count, ')'
 
       ! Recursively print this child's children
-      call print_part_recursive_array(assign_arrays, child_idx, depth + 1, is_last_child)
+      call print_part_recursive_array(cache_arrays, child_idx, depth + 1, is_last_child)
    end do
 end subroutine
 
-recursive subroutine print_chain_recursive_array(assign_arrays, chain_idx, depth, is_last_child)
-   type(array_trees_t), intent(in) :: assign_arrays
+recursive subroutine print_chain_recursive_array(cache_arrays, chain_idx, depth, is_last_child)
+   type(array_trees_t), intent(in) :: cache_arrays
    integer, intent(in) :: chain_idx, depth
    logical, dimension(:), intent(inout) :: is_last_child
    integer :: child_idx, split_part_idx, i, j
@@ -737,11 +781,11 @@ recursive subroutine print_chain_recursive_array(assign_arrays, chain_idx, depth
    if (chain_idx == 0) return
 
    ! Process all children using direct array access instead of linked traversal
-   do i = 1, assign_arrays%assigntree(chain_idx)%num_children
-      child_idx = assign_arrays%assigntree(chain_idx)%child_indices(i)
+   do i = 1, cache_arrays%assigntree(chain_idx)%num_children
+      child_idx = cache_arrays%assigntree(chain_idx)%child_indices(i)
 
       ! Check if this is the last child
-      is_last_child(depth + 1) = (i == assign_arrays%assigntree(chain_idx)%num_children)
+      is_last_child(depth + 1) = (i == cache_arrays%assigntree(chain_idx)%num_children)
 
       ! Print prefix components directly
       do j = 1, depth
@@ -760,17 +804,17 @@ recursive subroutine print_chain_recursive_array(assign_arrays, chain_idx, depth
       end if
 
       ! Print the split part index with item counts
-      split_part_idx = assign_arrays%assigntree(child_idx)%split_part_idx
+      split_part_idx = cache_arrays%assigntree(child_idx)%split_part_idx
       if (split_part_idx > 0) then
          write(stderr, '(A,I0,A,I0,A)') '* (', &
-            assign_arrays%partree(split_part_idx)%items1_count, '/', &
-            assign_arrays%partree(split_part_idx)%items2_count, ')'
+            cache_arrays%partree(split_part_idx)%items1_count, '/', &
+            cache_arrays%partree(split_part_idx)%items2_count, ')'
       else
          write(stderr, '(A)') '(no split part)'
       end if
 
       ! Recursively print this child's children
-      call print_chain_recursive_array(assign_arrays, child_idx, depth + 1, is_last_child)
+      call print_chain_recursive_array(cache_arrays, child_idx, depth + 1, is_last_child)
    end do
 end subroutine
 

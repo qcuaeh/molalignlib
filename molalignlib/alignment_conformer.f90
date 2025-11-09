@@ -38,7 +38,7 @@ contains
 subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atomtypes, &
       coords1, coords2, registry)
    integer, dimension(:), intent(in) :: atomset1, atomset2
-   type(adjcs_t), intent(in) :: adjcs1, adjcs2
+   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(partition_t), intent(in) :: atomtypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    type(registry_t), target, intent(inout) :: registry
@@ -48,22 +48,22 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
    real(rk), dimension(:,:), allocatable :: coords2r
    real(rk), dimension(4) :: rotation, total_rotation
    real(rk) :: steps, permdist, new_permdist
-   type(assigntree_node_t), pointer :: hnachain
-   type(array_trees_t) :: assign_arrays
+   type(chaintree_node_t), pointer :: hna_chain
+   type(array_trees_t) :: cache_arrays
 
    ! Pre-compute assignment tree for decision making
-   call compute_scna_partition( adjcs1, adjcs2, atomtypes, hnachain)
-   call build_assignment_tree( adjcs1, adjcs2, hnachain%last_link, assign_arrays)
+   call compute_scna_partition( adjcs1, adjcs2, atomtypes, hna_chain)
+   call build_assignment_tree( adjcs1, adjcs2, hna_chain%last_link, cache_arrays)
 
    if (tree_flag) then
-      call print_chain_tree_array( assign_arrays)
+      call print_chain_tree_array( cache_arrays)
    end if
 
    ! Reset registry for new conformer
    call reset_registry( registry)
 
    if ((stoch_flag .and. .not. adaptive_flag) .or. (stoch_flag .and. adaptive_flag .and. &
-         assign_arrays%global_combinations > confo_thres*assign_arrays%local_combinations)) then
+         cache_arrays%global_combinations > confo_thres*cache_arrays%local_combinations)) then
 
       ! Initialize random number generator
       call random_initialize()
@@ -77,13 +77,10 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
 
          ! Assign atoms with current orientation
          if (full_flag) then
-            call assign_atoms_local_full( adjcs1, adjcs2, coords1, coords2r, assign_arrays, &
-                  atomperm1, permdist)
+            call assign_atoms_local_full( coords1, coords2r, cache_arrays, atomperm1, permdist)
          else
-            call assign_atoms_greedy( adjcs1, adjcs2, coords1, coords2r, assign_arrays, &
-                  atomperm1, permdist)
-            call assign_atoms_local_pruned( adjcs1, adjcs2, coords1, coords2r, assign_arrays, &
-                  atomperm1, permdist)
+            call assign_atoms_greedy( coords1, coords2r, cache_arrays, atomperm1, permdist)
+            call assign_atoms_local_pruned( coords1, coords2r, cache_arrays, atomperm1, permdist)
          end if
          rotation = least_rotquat( atomset1, atomperm1, coords1, coords2r)
          total_rotation = quatmul( total_rotation, rotation)
@@ -93,12 +90,12 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
 
          do
             if (full_flag) then
-               call assign_atoms_local_full( adjcs1, adjcs2, coords1, coords2r, assign_arrays, &
-                     new_atomperm, new_permdist)
+               call assign_atoms_local_full( coords1, coords2r, cache_arrays, new_atomperm, &
+                     new_permdist)
             else
                new_permdist = permdist
-               call assign_atoms_local_pruned( adjcs1, adjcs2, coords1, coords2r, assign_arrays, &
-                     new_atomperm, new_permdist)
+               call assign_atoms_local_pruned( coords1, coords2r, cache_arrays, new_atomperm, &
+                     new_permdist)
             end if
 !            write (stdout,*) permdist, new_permdist
             if (all(atomperm1 == new_atomperm)) exit
@@ -118,7 +115,7 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
    else
 
       ! Assign atoms using global assignment
-      call assign_atoms_global( adjcs1, adjcs2, coords1, coords2, assign_arrays, atomperm1)
+      call assign_atoms_global( coords1, coords2, cache_arrays, atomperm1)
       
       ! Calculate optimal rotation
       rotation = least_rotquat( atomset1, atomperm1, coords1, coords2)
@@ -140,33 +137,30 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
 end subroutine
 
 subroutine assign_atomperm_conformer( adjcs1, adjcs2, atomtypes, coords1, coords2, atomperm1)
-   type(adjcs_t), intent(in) :: adjcs1, adjcs2
+   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(partition_t), intent(in) :: atomtypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    integer, dimension(:), allocatable, intent(out) :: atomperm1
 
    ! Local variables
-   type(assigntree_node_t), pointer :: hnachain
-   type(array_trees_t) :: assign_arrays
+   type(chaintree_node_t), pointer :: hna_chain
+   type(array_trees_t) :: cache_arrays
    real(rk) :: permdist
 
    ! Pre-compute assignment tree
-   call compute_scna_partition( adjcs1, adjcs2, atomtypes, hnachain)
-   call build_assignment_tree( adjcs1, adjcs2, hnachain%last_link, assign_arrays)
+   call compute_scna_partition( adjcs1, adjcs2, atomtypes, hna_chain)
+   call build_assignment_tree( adjcs1, adjcs2, hna_chain%last_link, cache_arrays)
 
    if (tree_flag) then
-      call print_chain_tree_array( assign_arrays)
+      call print_chain_tree_array( cache_arrays)
    end if
 
    ! Assign atoms using greedy and local pruned methods
    if (full_flag) then
-      call assign_atoms_local_full( adjcs1, adjcs2, coords1, coords2, assign_arrays, &
-            atomperm1, permdist)
+      call assign_atoms_local_full( coords1, coords2, cache_arrays, atomperm1, permdist)
    else
-      call assign_atoms_greedy( adjcs1, adjcs2, coords1, coords2, assign_arrays, &
-            atomperm1, permdist)
-      call assign_atoms_local_pruned( adjcs1, adjcs2, coords1, coords2, assign_arrays, &
-            atomperm1, permdist)
+      call assign_atoms_greedy( coords1, coords2, cache_arrays, atomperm1, permdist)
+      call assign_atoms_local_pruned( coords1, coords2, cache_arrays, atomperm1, permdist)
    end if
 end subroutine
 

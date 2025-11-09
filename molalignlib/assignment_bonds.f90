@@ -50,7 +50,7 @@ subroutine minimize_adjdiff(atomset1, atomtypes, scnatypes, adjcs1, adjcs2, adjm
 
    integer, dimension(:), intent(in) :: atomset1
    type(partition_t), intent(in) :: atomtypes, scnatypes
-   type(adjcs_t), intent(in) :: adjcs1, adjcs2
+   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    logical, dimension(:,:), intent(in) :: adjmat2
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    integer, dimension(:), intent(inout) :: atomperm1
@@ -153,7 +153,7 @@ subroutine match_neighbors(node, adjcs1, adjcs2, atomperm1, tracked, nmatch, mat
                 nmismatch1, mismatches1, nmismatch2, mismatches2)
 ! Classify the atoms connected to node as matches or unmatched
    integer, intent(in) :: node
-   type(adjcs_t), intent(in) :: adjcs1, adjcs2
+   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    integer, dimension(:), intent(in) :: atomperm1
    logical, dimension(:), intent(in) :: tracked
    integer, intent(out) :: nmatch, nmismatch1, nmismatch2
@@ -167,21 +167,21 @@ subroutine match_neighbors(node, adjcs1, adjcs2, atomperm1, tracked, nmatch, mat
    nmismatch2 = 0
 
    ! Classify neighbors of node in structure 1
-   do i = 1, adjcs1%cns(node)
-      if (any(adjcs2%lists(1:adjcs2%cns(mapped_node), mapped_node) == atomperm1(adjcs1%lists(i, node)))) then
+   do i = 1, adjcs1(node)%cn
+      if (any(adjcs2(mapped_node)%list(:adjcs2(mapped_node)%cn) == atomperm1(adjcs1(node)%list(i)))) then
          nmatch = nmatch + 1
-         matches(nmatch) = adjcs1%lists(i, node)
+         matches(nmatch) = adjcs1(node)%list(i)
       else
          nmismatch1 = nmismatch1 + 1
-         mismatches1(nmismatch1) = adjcs1%lists(i, node)
+         mismatches1(nmismatch1) = adjcs1(node)%list(i)
       end if
    end do
 
    ! Find neighbors in structure 2 that don't match
-   do i = 1, adjcs2%cns(mapped_node)
-      if (.not. any(atomperm1(matches(:nmatch)) == adjcs2%lists(i, mapped_node))) then
+   do i = 1, adjcs2(mapped_node)%cn
+      if (.not. any(atomperm1(matches(:nmatch)) == adjcs2(mapped_node)%list(i))) then
          nmismatch2 = nmismatch2 + 1
-         mismatches2(nmismatch2) = adjcs2%lists(i, mapped_node)
+         mismatches2(nmismatch2) = adjcs2(mapped_node)%list(i)
       end if
    end do
 end subroutine
@@ -192,7 +192,7 @@ recursive subroutine recurse_minimize_adjdiff(node, adjcs1, adjcs2, adjmat2, ato
 ! Backtracks structure to find assignments that minimize permdiff
 ! OPTIMIZED: Uses memory pool slices based on recursion depth to avoid allocations
    integer, intent(in) :: node
-   type(adjcs_t), intent(in) :: adjcs1, adjcs2
+   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    logical, dimension(:,:), intent(in) :: adjmat2
    integer, dimension(:), intent(inout) :: atomperm1, atomperm2
    logical, dimension(:), intent(inout) :: tracked
@@ -211,7 +211,6 @@ recursive subroutine recurse_minimize_adjdiff(node, adjcs1, adjcs2, adjmat2, ato
 
    ! Pointers to memory pool slices for this recursion level
    integer, dimension(:), pointer :: matches, mismatches1, mismatches2
-   integer, dimension(:), pointer :: matched1_int, matched2_int
    logical, dimension(:), pointer :: matched1, matched2
 
    ! For branching, we need the next depth level

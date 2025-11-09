@@ -33,14 +33,14 @@ public add_bonds
 public delete_bonds
 public bond_modifier_interface
 
-type, public :: adjcs_t
-   integer, allocatable :: cns(:)
-   integer, allocatable :: lists(:,:)
+type, public :: adjc_t
+   integer :: cn
+   integer :: list(MAX_COORD)
 end type
 
 interface adjmat_to_adjcs
    module procedure adjmat_to_adjcs_all
-   module procedure adjmat_to_adjcs_atomset
+   module procedure adjmat_to_adjcs_subset
 end interface
 
 interface adjacencydiff
@@ -50,10 +50,10 @@ end interface
 abstract interface
    subroutine bond_modifier_interface(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, adjcs2_mod)
       import
-      type(adjcs_t), intent(in) :: adjcs1, adjcs2
+      type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
       integer, dimension(:), intent(in) :: atomperm1
       integer, dimension(:,:), intent(in) :: moldiffs
-      type(adjcs_t), intent(out) :: adjcs1_mod, adjcs2_mod
+      type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs1_mod, adjcs2_mod
    end subroutine
 end interface
 
@@ -61,17 +61,17 @@ contains
 
 function adjcs_to_adjmat(adjcs) result(adjmat)
 ! Convert adjacency lists to adjacency matrix
-   type(adjcs_t), intent(in) :: adjcs
+   type(adjc_t), dimension(:), intent(in) :: adjcs
    logical, dimension(:,:), allocatable :: adjmat
    integer :: i, j, k, atoms_size
 
-   atoms_size = size(adjcs%cns)
+   atoms_size = size(adjcs)
    allocate(adjmat(atoms_size, atoms_size))
    adjmat = .false.
 
    do i = 1, atoms_size
-      do j = 1, adjcs%cns(i)
-         k = adjcs%lists(j, i)
+      do j = 1, adjcs(i)%cn
+         k = adjcs(i)%list(j)
          adjmat(i, k) = .true.
       end do
    end do
@@ -79,13 +79,11 @@ end function
 
 subroutine adjmat_to_adjcs_all(adjmat, adjcs)
    logical, dimension(:,:), intent(in) :: adjmat
-   type(adjcs_t), intent(out) :: adjcs
+   type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs
    integer :: i, j, atoms_size, nadj
 
    atoms_size = size(adjmat, 1)
-   allocate(adjcs%cns(atoms_size))
-   allocate(adjcs%lists(MAX_COORD, atoms_size))
-   adjcs%lists = 0
+   allocate(adjcs(atoms_size))
 
    do i = 1, atoms_size
       nadj = 0
@@ -98,23 +96,21 @@ subroutine adjmat_to_adjcs_all(adjmat, adjcs)
                      'exceeds', MAX_COORD
                stop 1
             end if
-            adjcs%lists(nadj, i) = j
+            adjcs(i)%list(nadj) = j
          end if
       end do
-      adjcs%cns(i) = nadj
+      adjcs(i)%cn = nadj
    end do
 end subroutine
 
-subroutine adjmat_to_adjcs_atomset(atomset, adjmat, adjcs)
+subroutine adjmat_to_adjcs_subset(atomset, adjmat, adjcs)
    integer, dimension(:), intent(in) :: atomset
    logical, dimension(:,:), intent(in) :: adjmat
-   type(adjcs_t), intent(out) :: adjcs
+   type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs
    integer :: i, nadj, atomidx, atoms_size
 
    atoms_size = size(adjmat, 1)
-   allocate(adjcs%cns(atoms_size))
-   allocate(adjcs%lists(MAX_COORD, atoms_size))
-   adjcs%lists = 0
+   allocate(adjcs(atoms_size))
 
    ! Populate adjacency lists for all atoms
    do atomidx = 1, atoms_size
@@ -129,10 +125,10 @@ subroutine adjmat_to_adjcs_atomset(atomset, adjmat, adjcs)
                      'exceeds', MAX_COORD
                stop 1
             end if
-            adjcs%lists(nadj, atomidx) = atomset(i)
+            adjcs(atomidx)%list(nadj) = atomset(i)
          end if
       end do
-      adjcs%cns(atomidx) = nadj
+      adjcs(atomidx)%cn = nadj
    end do
 end subroutine
 
@@ -143,7 +139,7 @@ function adjacencydiff_perm(atomset1, atomperm1, adjcs1, adjcs2) result(diff)
 !------------------------------------------------------------------------------
    integer, dimension(:), intent(in) :: atomset1
    integer, dimension(:), intent(in) :: atomperm1
-   type(adjcs_t), intent(in) :: adjcs1, adjcs2
+   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    integer :: diff
    integer :: i, j, idx1, idx2, mapped_idx1, neighbor_idx1, mapped_neighbor_idx1
    integer :: common_edges, nadjs, total_edges1, total_edges2
@@ -156,10 +152,10 @@ function adjacencydiff_perm(atomset1, atomperm1, adjcs1, adjcs2) result(diff)
    do i = 1, size(atomset1)
       idx1 = atomset1(i)
       mapped_idx1 = atomperm1(idx1)
-      nadjs = adjcs1%cns(idx1)
+      nadjs = adjcs1(idx1)%cn
 
       do j = 1, nadjs
-         neighbor_idx1 = adjcs1%lists(j, idx1)
+         neighbor_idx1 = adjcs1(idx1)%list(j)
 
          ! Only count edge if idx1 < neighbor_idx1 to avoid double-counting
          if (idx1 < neighbor_idx1) then
@@ -168,7 +164,7 @@ function adjacencydiff_perm(atomset1, atomperm1, adjcs1, adjcs2) result(diff)
             mapped_neighbor_idx1 = atomperm1(neighbor_idx1)
 
             ! Check if edge (mapped_idx1, mapped_neighbor_idx1) exists in structure 2
-            if (any(adjcs2%lists(1:adjcs2%cns(mapped_idx1), mapped_idx1) == mapped_neighbor_idx1)) then
+            if (any(adjcs2(mapped_idx1)%list(1:adjcs2(mapped_idx1)%cn) == mapped_neighbor_idx1)) then
                common_edges = common_edges + 1
             end if
          end if
@@ -180,10 +176,10 @@ function adjacencydiff_perm(atomset1, atomperm1, adjcs1, adjcs2) result(diff)
    total_edges2 = 0
    do i = 1, size(atomset1)
       idx2 = atomperm1(atomset1(i))
-      nadjs = adjcs2%cns(idx2)
+      nadjs = adjcs2(idx2)%cn
 
       do j = 1, nadjs
-         neighbor_idx1 = adjcs2%lists(j, idx2)
+         neighbor_idx1 = adjcs2(idx2)%list(j)
 
          ! Only count edge if idx2 < neighbor to avoid double-counting
          if (idx2 < neighbor_idx1) then
@@ -202,22 +198,22 @@ function adjacencydelta(adjcs1, adjmat2, atomperm1, k, l) result(delta)
 ! atoms k and l in the permutation. Uses adjacency lists for structure 1 and
 ! adjacency matrix for structure 2.
 !------------------------------------------------------------------------------
-   type(adjcs_t), intent(in) :: adjcs1
+   type(adjc_t), dimension(:), intent(in) :: adjcs1
    logical, dimension(:,:), intent(in) :: adjmat2
    integer, dimension(:), intent(in) :: atomperm1
    integer, intent(in) :: k, l
    integer :: i, nkk, nkl, nll, nlk, delta, nadjs_k, nadjs_l
 
-   nadjs_k = adjcs1%cns(k)
-   nadjs_l = adjcs1%cns(l)
+   nadjs_k = adjcs1(k)%cn
+   nadjs_l = adjcs1(l)%cn
 
    nkk = 0
    nkl = 0
 
    do i = 1, nadjs_k
-      if (adjcs1%lists(i, k) /= l) then
-         if (adjmat2(atomperm1(k), atomperm1(adjcs1%lists(i, k)))) nkk = nkk + 1
-         if (adjmat2(atomperm1(l), atomperm1(adjcs1%lists(i, k)))) nkl = nkl + 1
+      if (adjcs1(k)%list(i) /= l) then
+         if (adjmat2(atomperm1(k), atomperm1(adjcs1(k)%list(i)))) nkk = nkk + 1
+         if (adjmat2(atomperm1(l), atomperm1(adjcs1(k)%list(i)))) nkl = nkl + 1
       end if
    end do
 
@@ -225,9 +221,9 @@ function adjacencydelta(adjcs1, adjmat2, atomperm1, k, l) result(delta)
    nlk = 0
 
    do i = 1, nadjs_l
-      if (adjcs1%lists(i, l) /= k) then
-         if (adjmat2(atomperm1(l), atomperm1(adjcs1%lists(i, l)))) nll = nll + 1
-         if (adjmat2(atomperm1(k), atomperm1(adjcs1%lists(i, l)))) nlk = nlk + 1
+      if (adjcs1(l)%list(i) /= k) then
+         if (adjmat2(atomperm1(l), atomperm1(adjcs1(l)%list(i)))) nll = nll + 1
+         if (adjmat2(atomperm1(k), atomperm1(adjcs1(l)%list(i)))) nlk = nlk + 1
       end if
    end do
 
@@ -301,14 +297,14 @@ subroutine match_bonds2(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, adjcs2_
    ! If bond exists in mol2: remove it (exists in mol2 but not mol1)
    ! If bond doesn't exist in mol2: add it (exists in mol1 but not mol2)
    ! Note: adjcs1 and atomperm1 are not used but present for interface compatibility
-   type(adjcs_t), intent(in) :: adjcs1, adjcs2
+   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    integer, dimension(:), intent(in) :: atomperm1
    integer, dimension(:,:), intent(in) :: moldiffs
-   type(adjcs_t), intent(out) :: adjcs1_mod, adjcs2_mod
+   type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs1_mod, adjcs2_mod
    logical, dimension(:,:), allocatable :: adjmat2
    integer :: i, atom1, atom2, atoms_size
 
-   atoms_size = size(adjcs2%cns)
+   atoms_size = size(adjcs2)
 
    ! Convert adjcs2 to matrix, modify it, and convert back
    adjmat2 = adjcs_to_adjmat(adjcs2)
@@ -323,20 +319,21 @@ subroutine match_bonds2(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, adjcs2_
    end do
 
    ! adjcs1 remains unchanged - copy structure
-   allocate(adjcs1_mod%cns(size(adjcs1%cns)))
-   allocate(adjcs1_mod%lists(MAX_COORD, size(adjcs1%cns)))
-   adjcs1_mod%cns = adjcs1%cns
-   adjcs1_mod%lists = adjcs1%lists
+   allocate(adjcs1_mod(size(adjcs1)))
+   do i = 1, size(adjcs1)
+      adjcs1_mod(i)%cn = adjcs1(i)%cn
+      adjcs1_mod(i)%list = adjcs1(i)%list
+   end do
 
    ! Convert modified adjmat2 back to adjcs
    call adjmat_to_adjcs(adjmat2, adjcs2_mod)
 end subroutine
 
 subroutine add_bonds(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, adjcs2_mod)
-   type(adjcs_t), intent(in) :: adjcs1, adjcs2
+   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    integer, dimension(:), intent(in) :: atomperm1
    integer, dimension(:,:), intent(in) :: moldiffs
-   type(adjcs_t), intent(out) :: adjcs1_mod, adjcs2_mod
+   type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs1_mod, adjcs2_mod
    logical, dimension(:,:), allocatable :: adjmat1, adjmat2
    integer :: i, atom1_mol2, atom2_mol2, atom1_mol1, atom2_mol1
    integer, dimension(:), allocatable :: inv_perm
@@ -369,10 +366,10 @@ subroutine add_bonds(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, adjcs2_mod
 end subroutine
 
 subroutine delete_bonds(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, adjcs2_mod)
-   type(adjcs_t), intent(in) :: adjcs1, adjcs2
+   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    integer, dimension(:), intent(in) :: atomperm1
    integer, dimension(:,:), intent(in) :: moldiffs
-   type(adjcs_t), intent(out) :: adjcs1_mod, adjcs2_mod
+   type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs1_mod, adjcs2_mod
    logical, dimension(:,:), allocatable :: adjmat1, adjmat2
    integer :: i, atom1_mol2, atom2_mol2, atom1_mol1, atom2_mol1
    integer, dimension(:), allocatable :: inv_perm

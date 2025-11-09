@@ -114,17 +114,17 @@ end subroutine
 subroutine add_hna_costs(atomtypes, adjcs1, adjcs2, scnatypes, costs)
 ! Iteratively compute HNAs
    type(partition_t), target, intent(in) :: atomtypes
-   type(adjcs_t), intent(in) :: adjcs1, adjcs2
+   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(partition_t), intent(out) :: scnatypes
    type(real_matrix), dimension(:), allocatable, intent(inout) :: costs
    ! Local variables
    type(partition_part_t), pointer :: part
-   type(assigntree_node_t), pointer :: hnachain
+   type(chaintree_node_t), pointer :: hna_chain
    integer :: h, i, j, iatom, jatom, num_splits
 !   integer :: link_idx
 
    ! Initialize HNA chain with element types
-   hnachain => chain_from_partition(atomtypes)
+   hna_chain => chain_from_partition(atomtypes)
 
 !   link_idx = 0
    do
@@ -133,7 +133,7 @@ subroutine add_hna_costs(atomtypes, adjcs1, adjcs2, scnatypes, costs)
 !      write(stderr, '(a)') repeat('-- link_idx '//str(link_idx)//' --', 6)
 
       ! Call refine_hna_partition and get the number of splits
-      call refine_hna_partition(adjcs1, adjcs2, hnachain, num_splits)
+      call refine_hna_partition(adjcs1, adjcs2, hna_chain, num_splits)
 
       ! Exit loop if no splits occurred in the last iteration
       if (num_splits == 0) exit
@@ -146,8 +146,8 @@ subroutine add_hna_costs(atomtypes, adjcs1, adjcs2, scnatypes, costs)
             do i = 1, part%num_items1
                iatom = part%items1(i)
                if (.not. associated( &
-                  hnachain%last_link%itemdir1(iatom)%ptr, &
-                  hnachain%last_link%itemdir2(jatom)%ptr) &
+                  hna_chain%last_link%itemdir1(iatom)%ptr, &
+                  hna_chain%last_link%itemdir2(jatom)%ptr) &
                ) then
                   costs(h)%a(i, j) = costs(h)%a(i, j) + 1
                end if
@@ -166,9 +166,9 @@ subroutine add_hna_costs(atomtypes, adjcs1, adjcs2, scnatypes, costs)
 !   end do
 
    ! Extract scnatypes from the final HNA partition
-   call link_to_partition(hnachain%last_link, scnatypes)
+   call link_to_partition(hna_chain%last_link, scnatypes)
 
-   call delete_chain(hnachain)  ! Cleanup
+   call delete_chain(hna_chain)  ! Cleanup
 end subroutine
 
 end module

@@ -99,7 +99,7 @@ subroutine adjacency_from_bonds(atomset, bonds, atoms_size, adjcs)
    integer, dimension(:), intent(in) :: atomset
    type(bond_t), dimension(:), intent(in) :: bonds
    integer, intent(in) :: atoms_size
-   type(adjcs_t), intent(out) :: adjcs
+   type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs
    ! Local variables
    logical, dimension(:,:), allocatable :: adjmat
    integer :: i, atomidx1, atomidx2
@@ -116,7 +116,6 @@ subroutine adjacency_from_bonds(atomset, bonds, atoms_size, adjcs)
    end do
 
    ! Convert to adjacency lists
-!   call adjmat_to_adjcs(adjmat, adjcs)
    call adjmat_to_adjcs(atomset, adjmat, adjcs)
 
    deallocate (adjmat)
@@ -125,7 +124,7 @@ end subroutine
 subroutine adjacency_from_atoms(atomset, atoms, adjcs)
    integer, dimension(:), intent(in) :: atomset
    type(atom_t), dimension(:), intent(in) :: atoms
-   type(adjcs_t), intent(out) :: adjcs
+   type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs
    ! Local variables
    logical, dimension(:,:), allocatable :: adjmat
    integer :: i, j
@@ -151,7 +150,6 @@ subroutine adjacency_from_atoms(atomset, atoms, adjcs)
    end do
 
    ! Convert to adjacency lists
-!   call adjmat_to_adjcs(adjmat, adjcs)
    call adjmat_to_adjcs(atomset, adjmat, adjcs)
 
    deallocate (adjmat)
