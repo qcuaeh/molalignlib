@@ -19,7 +19,7 @@ use parameters
 use types_basic
 implicit none
 private
-! Public procedures 
+! Public procedures
 public address
 public isdescendant
 public new_root_part
@@ -37,7 +37,14 @@ public move_first_item1
 public move_first_item2
 public copy_part_items
 public move_part_items
+public link_to_partition
+public find_child_part
+public first_partition
+public second_partition
+public add_branch_part
 public delete_chain
+public delete_part
+public delete_part_tree
 public print_part_tree
 public print_part_items
 public print_tree_items
@@ -47,14 +54,9 @@ public print_part_signature
 public print_tree_signatures
 public print_part_indices
 public print_chain_indices
-public link_to_partition
-public find_child_part
-public first_partition
-public second_partition
-public add_branch_part
 public print_chain_tree
-public delete_part_tree
-public delete_part
+public is_partition_uneven
+public print_partition_chain
 public operator(==)
 public operator(.equiv.)
 
@@ -1309,6 +1311,131 @@ recursive subroutine print_chain_recurse(chain, depth, is_last_child)
       call print_chain_recurse(child_chain, depth + 1, is_last_child)
 
       child_chain => next_child
+   end do
+end subroutine
+
+function is_partition_uneven(link) result(uneven)
+! Check if all parts in a partition have equal numbers of items from both molecules
+   type(chain_node_t), pointer, intent(in) :: link
+   logical :: uneven
+   type(partref_node_t), pointer :: partref
+
+   uneven = .false.
+   partref => link%first_partref
+   do while (associated(partref))
+      if (partref%part%num_items1 /= partref%part%num_items2) then
+         uneven = .true.
+         return
+      end if
+      partref => partref%nextref
+   end do
+end function
+
+subroutine print_partition_details(link, link_number)
+! Print detailed information about a partition link in compact form
+! Separates even and uneven parts
+   type(chain_node_t), pointer, intent(in) :: link
+   integer, intent(in) :: link_number
+   type(partref_node_t), pointer :: partref
+   integer :: even_count, uneven_count
+
+   write(stderr, '(A)') repeat("=", 70)
+   write(stderr, '(A,I0,A,I0,A)') "PARTITION LINK ", link_number, " (", link%num_parts, " parts)"
+   write(stderr, '(A)') repeat("=", 70)
+
+   ! First pass: count even and uneven parts
+   even_count = 0
+   uneven_count = 0
+   partref => link%first_partref
+   do while (associated(partref))
+      if (partref%part%num_items1 == partref%part%num_items2) then
+         even_count = even_count + 1
+      else
+         uneven_count = uneven_count + 1
+      end if
+      partref => partref%nextref
+   end do
+
+   ! Print even parts
+   write(stderr, '(A)') "Even parts:"
+   if (even_count == 0) then
+      write(stderr, '(A)') "  (none)"
+   else
+      partref => link%first_partref
+      do while (associated(partref))
+         if (partref%part%num_items1 == partref%part%num_items2) then
+            call print_part_line(partref%part)
+         end if
+         partref => partref%nextref
+      end do
+   end if
+
+   ! Print uneven parts only if they exist
+   if (uneven_count > 0) then
+      write(stderr, *)
+      write(stderr, '(A)') "Uneven parts:"
+      partref => link%first_partref
+      do while (associated(partref))
+         if (partref%part%num_items1 /= partref%part%num_items2) then
+            call print_part_line(partref%part)
+         end if
+         partref => partref%nextref
+      end do
+   end if
+
+   write(stderr, '(A)') repeat("=", 70)
+   write(stderr, *)
+end subroutine
+
+subroutine print_part_line(part)
+! Print a single part in compact form
+   type(partition_node_t), pointer, intent(in) :: part
+   type(item_node_t), pointer :: item
+
+   ! Print part address and counts
+   write(stderr, '(A,A,I0,A,I0,A)', advance='no') &
+      address(part), " (", part%num_items1, "/", part%num_items2, "): ["
+
+   ! Print molecule 1 atoms
+   item => part%first_item1
+   do while (associated(item))
+      write(stderr, '(I0)', advance='no') item%idx
+      item => item%next_item
+      if (associated(item)) write(stderr, '(A)', advance='no') ","
+   end do
+
+   write(stderr, '(A)', advance='no') "] / ["
+
+   ! Print molecule 2 atoms
+   item => part%first_item2
+   do while (associated(item))
+      write(stderr, '(I0)', advance='no') item%idx
+      item => item%next_item
+      if (associated(item)) write(stderr, '(A)', advance='no') ","
+   end do
+
+   write(stderr, '(A)') "]"
+end subroutine
+
+subroutine print_partition_chain(hna_chain)
+! Print all links in the chain history
+   type(chaintree_node_t), pointer, intent(in) :: hna_chain
+   type(chain_node_t), pointer :: link
+   integer :: link_number
+
+   write(stderr, *)
+   write(stderr, '(A)') repeat("#", 70)
+   write(stderr, '(A)') "                    PARTITION CHAIN HISTORY"
+   write(stderr, '(A)') repeat("#", 70)
+   write(stderr, *)
+
+   link => hna_chain%first_link
+   link_number = 1
+
+   do while (associated(link))
+      call print_partition_details(link, link_number)
+      link => link%next_link
+      link_number = link_number + 1
    end do
 end subroutine
 

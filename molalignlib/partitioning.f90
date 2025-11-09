@@ -233,6 +233,13 @@ subroutine compute_scna_partition(adjcs1, adjcs2, atomtypes, hna_chain)
       ! Exit loop if no splits occurred
       if (num_splits == 0) exit
    end do
+
+   ! Verify that molecules are conformers
+   if (is_partition_uneven(hna_chain%last_link)) then
+      write(stderr, '(A)') "Error: Molecules are not conformers!"
+!      call print_partition_chain(hna_chain)
+      stop 1
+   end if
 end subroutine
 
 subroutine update_hna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
@@ -492,7 +499,7 @@ function would_part_split(adjcs1, adjcs2, itemdir1, itemdir2, part) result(would
    end do
 end function
 
-subroutine recompute_scna_partition(adjcs1, adjcs2, hna_chain, branch, branch_parts, num_splits)
+subroutine refine_branched_hna_partition(adjcs1, adjcs2, hna_chain, branch, branch_parts, num_splits)
 ! Compute next level HNAs - only keeps children if real split occurred
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(chaintree_node_t), pointer, intent(inout) :: hna_chain
@@ -567,25 +574,6 @@ subroutine split_part_first(part, link)
    type(partition_node_t), pointer :: child_part
    type(item_node_t), pointer :: item1, item2
 
-   ! Verify that both molecules are conformers
-   if (part%num_items1 /= part%num_items2) then
-      write(stderr, '(A)') "Error: Molecules are not conformers!"
-      stop
-   end if
-
-   if (DEBUG_TESTS) then
-      ! Verify that the item chains are properly linked
-      item1 => part%first_item1%next_item
-      item2 => part%first_item2%next_item
-      do while (associated(item1) .and. associated(item2))
-         item1 => item1%next_item
-         item2 => item2%next_item
-      end do
-      if (associated(item1) .neqv. associated(item2)) then
-         error stop 'Item chains have different lengths.'
-      end if
-   end if
-
    ! Create first child and add first item from each molecule
    child_part => new_child_part(part)
    call link_part(link, child_part)
@@ -656,11 +644,18 @@ recursive subroutine split_dependent_parts(adjcs1, adjcs2, hna_chain, branch, br
 
    ! Compute self-consistent HNAs
    do
-      ! Call recompute_scna_partition and get the number of splits
-      call recompute_scna_partition(adjcs1, adjcs2, hna_chain, branch, branch_parts, num_splits)
+      ! Refine HNA partition and get the number of splits
+      call refine_branched_hna_partition(adjcs1, adjcs2, hna_chain, branch, branch_parts, num_splits)
       ! Exit loop if no splits occurred
       if (num_splits == 0) exit
    end do
+
+   ! Verify that molecules are conformers
+   if (is_partition_uneven(hna_chain%last_link)) then
+      write(stderr, '(A)') "Error: Molecules are not conformers!"
+!      call print_partition_chain(hna_chain)
+      stop 1
+   end if
 
    ! Find a degenerate descendant part to split
    next_part_to_split => null()
