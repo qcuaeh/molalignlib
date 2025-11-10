@@ -3,7 +3,7 @@ shopt -s nullglob
 unalias -a
 
 build_library() {
-   srcdir=$PWD/molalignlib
+   srcdir=$PWD/modules
    if $full_build; then
       full_build=false
       if test -d "$blddir"; then
@@ -31,7 +31,7 @@ build_library() {
          "$env_FC" "${comp_flags[@]}" -J "$blddir" -c "$srcfile" -o "$objfile"
       fi
       ar rcs "$blddir/molalignlib.a" "$objfile"
-   done < <(grep -v '^#' "$srcdir/source_files")
+   done < <(grep -v '^#' "$srcdir/module_files")
 }
 
 build_programs() {
