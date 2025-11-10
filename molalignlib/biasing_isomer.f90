@@ -111,11 +111,10 @@ subroutine add_random_costs(atomtypes, coords1, coords2, costs)
    end do
 end subroutine
 
-subroutine add_hna_costs(atomtypes, adjcs1, adjcs2, scnatypes, costs)
+subroutine add_hna_costs(atomtypes, adjcs1, adjcs2, costs)
 ! Iteratively compute HNAs
    type(partition_t), target, intent(in) :: atomtypes
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
-   type(partition_t), intent(out) :: scnatypes
    type(real_matrix), dimension(:), allocatable, intent(inout) :: costs
    ! Local variables
    type(partition_part_t), pointer :: part
@@ -164,9 +163,6 @@ subroutine add_hna_costs(atomtypes, adjcs1, adjcs2, scnatypes, costs)
 !         write(stderr, '(*(i2))') costs(h)%a(:atomtypes%parts(h)%num_items1, j)
 !      end do
 !   end do
-
-   ! Extract scnatypes from the final HNA partition
-   call link_to_partition(hna_chain%last_link, scnatypes)
 
    call delete_chain(hna_chain)  ! Cleanup
 end subroutine

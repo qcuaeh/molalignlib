@@ -47,7 +47,6 @@ subroutine optimize_atomperm_isomer( atomset1, atomset2, atomtypes, adjcs1, adjc
    type(real_matrix), dimension(:), allocatable :: costs, fixed_costs
    logical, dimension(:,:), allocatable :: adjmat1, adjmat2
    integer, dimension(:,:), allocatable :: moldiffs
-   type(partition_t) :: scnatypes
 
    ! Convert adjacency lists to adjacency matrix
    adjmat1 = adjcs_to_adjmat( adjcs1)
@@ -60,7 +59,7 @@ subroutine optimize_atomperm_isomer( atomset1, atomset2, atomtypes, adjcs1, adjc
 
    ! Compute constant costs
    call init_costs( atomtypes, fixed_costs)
-   call add_hna_costs( atomtypes, adjcs1, adjcs2, scnatypes, fixed_costs)
+   call add_hna_costs( atomtypes, adjcs1, adjcs2, fixed_costs)
    euclidean_scale = 0.99_rk/longest_distance( atomtypes, coords1, coords2)**2
 
    ! Initialize local minima registry
@@ -81,7 +80,7 @@ subroutine optimize_atomperm_isomer( atomset1, atomset2, atomtypes, adjcs1, adjc
       call add_euclidean_costs( atomtypes, coords1, coords2r, euclidean_scale, costs)
 !      call add_random_costs( atomtypes, coords1, coords2r, costs)
       call assign_atoms( atomtypes, costs, atomperm1)
-      call minimize_adjdiff( atomset1, atomtypes, scnatypes, adjcs1, adjcs2, adjmat2, &
+      call remap_mismatched_bonds( atomset1, atomtypes, adjcs1, adjcs2, adjmat2, &
             coords1, coords2, atomperm1)
       rotation = least_rotquat( atomset1, atomperm1, coords1, coords2r)
       total_rotation = quatmul( total_rotation, rotation)
