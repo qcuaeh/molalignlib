@@ -28,9 +28,10 @@ public adjmat_to_adjcs
 public adjacencydiff
 public adjacencydelta
 public compute_differing_bonds
-public match_bonds2
-public add_bonds
-public delete_bonds
+public toggle_bonds1
+public toggle_bonds2
+public add_missing_bonds
+public delete_extra_bonds
 public bond_modifier_interface
 
 type, public :: adjc_t
@@ -292,7 +293,50 @@ subroutine compute_differing_bonds(atomset1, atomperm1, adjmat1, adjmat2, moldif
    deallocate(temp_bonds)
 end subroutine
 
-subroutine match_bonds2(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, adjcs2_mod)
+subroutine toggle_bonds1(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, adjcs2_mod)
+   ! Modify mol1's bonds to match mol2's connectivity
+   ! If bond exists in mol1: remove it (exists in mol1 but not mol2)
+   ! If bond doesn't exist in mol1: add it (exists in mol2 but not mol1)
+   type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
+   integer, dimension(:), intent(in) :: atomperm1
+   integer, dimension(:,:), intent(in) :: moldiffs
+   type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs1_mod, adjcs2_mod
+   logical, dimension(:,:), allocatable :: adjmat1
+   integer :: i, atom1_mol2, atom2_mol2, atom1_mol1, atom2_mol1
+   integer, dimension(:), allocatable :: inv_perm
+
+   ! Convert adjcs1 to matrix for modification
+   adjmat1 = adjcs_to_adjmat(adjcs1)
+   
+   ! Get inverse permutation to map molecule 2 indices back to molecule 1
+   inv_perm = inverse_permutation(atomperm1)
+
+   ! For each differing bond
+   do i = 1, size(moldiffs, 2)
+      atom1_mol2 = moldiffs(1, i)
+      atom2_mol2 = moldiffs(2, i)
+      
+      ! Map to molecule 1 coordinate system
+      atom1_mol1 = inv_perm(atom1_mol2)
+      atom2_mol1 = inv_perm(atom2_mol2)
+      
+      ! Toggle the bond in mol1: if it exists, remove it; if it doesn't exist, add it
+      adjmat1(atom1_mol1, atom2_mol1) = .not. adjmat1(atom1_mol1, atom2_mol1)
+      adjmat1(atom2_mol1, atom1_mol1) = .not. adjmat1(atom2_mol1, atom1_mol1)
+   end do
+
+   ! Convert modified adjmat1 back to adjcs
+   call adjmat_to_adjcs(adjmat1, adjcs1_mod)
+   
+   ! adjcs2 remains unchanged - copy structure
+   allocate(adjcs2_mod(size(adjcs2)))
+   do i = 1, size(adjcs2)
+      adjcs2_mod(i)%cn = adjcs2(i)%cn
+      adjcs2_mod(i)%list = adjcs2(i)%list
+   end do
+end subroutine
+
+subroutine toggle_bonds2(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, adjcs2_mod)
    ! Modify mol2's bonds to match mol1's connectivity
    ! If bond exists in mol2: remove it (exists in mol2 but not mol1)
    ! If bond doesn't exist in mol2: add it (exists in mol1 but not mol2)
@@ -329,7 +373,7 @@ subroutine match_bonds2(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, adjcs2_
    call adjmat_to_adjcs(adjmat2, adjcs2_mod)
 end subroutine
 
-subroutine add_bonds(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, adjcs2_mod)
+subroutine add_missing_bonds(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, adjcs2_mod)
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    integer, dimension(:), intent(in) :: atomperm1
    integer, dimension(:,:), intent(in) :: moldiffs
@@ -365,7 +409,7 @@ subroutine add_bonds(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, adjcs2_mod
    call adjmat_to_adjcs(adjmat2, adjcs2_mod)
 end subroutine
 
-subroutine delete_bonds(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, adjcs2_mod)
+subroutine delete_extra_bonds(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, adjcs2_mod)
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    integer, dimension(:), intent(in) :: atomperm1
    integer, dimension(:,:), intent(in) :: moldiffs

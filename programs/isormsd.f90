@@ -59,7 +59,7 @@ integer :: adjd
 real(rk) :: rmsd
 integer :: i
 
-procedure(bond_modifier_interface), pointer :: modify_bonds => null()
+procedure(bond_modifier_interface), pointer :: match_diff_bonds => null()
 
 ! Set default options
 
@@ -118,12 +118,14 @@ do while (get_arg(arg))
       random_flag = .true.
    case ('-rebond')
       rebond_flag = .true.
-   case ('-confo')
-      modify_bonds => match_bonds2
+   case ('-confo1')
+      match_diff_bonds => toggle_bonds1
+   case ('-confo2')
+      match_diff_bonds => toggle_bonds2
    case ('-confoadd')
-      modify_bonds => add_bonds
+      match_diff_bonds => add_missing_bonds
    case ('-confodel')
-      modify_bonds => delete_bonds
+      match_diff_bonds => delete_extra_bonds
    case default
       call read_posarg( arg, posargs)
    end select
@@ -239,7 +241,7 @@ if (align_flag) then
       end if
 
       ! Check if conformer optimization is needed
-      if (associated(modify_bonds)) then
+      if (associated(match_diff_bonds)) then
 
          call allocate_registry( confo_registry, num_records)
          call allocate_registry( temp_registry, 1)
@@ -249,7 +251,7 @@ if (align_flag) then
             atomperm1 = iso_registry%records(i)%atomperm1
 
             ! Apply bond modification strategy
-            call modify_bonds( adjcs1, adjcs2, atomperm1, &
+            call match_diff_bonds( adjcs1, adjcs2, atomperm1, &
                   iso_registry%records(i)%moldiffs, adjcs1_mod, adjcs2_mod)
             call optimize_atomperm_conformer( atomset1, atomset2, adjcs1_mod, &
                   adjcs2_mod, atomtypes, coords1w, coords2w, temp_registry)
