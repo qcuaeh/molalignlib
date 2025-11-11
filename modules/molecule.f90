@@ -136,7 +136,7 @@ subroutine adjacency_from_atoms(atomset, atoms, adjcs)
    adjmat = .false.
 
    ! Set atom radii
-   atom_radii = 0.75*covalent_radii(atoms%elnum) + 0.25*vdw_radii(atoms%elnum)
+   atom_radii = 1.2*covalent_radii(atoms%elnum)
 
    ! Calculate adjacency based on distance for all atom pairs
    do i = 1, size(atoms)
