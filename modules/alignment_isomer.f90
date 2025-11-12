@@ -62,6 +62,9 @@ subroutine optimize_atomperm_isomer( atomset1, atomset2, atomtypes, adjcs1, adjc
    call add_hna_costs( atomtypes, adjcs1, adjcs2, fixed_costs)
    euclidean_scale = 0.99_rk/longest_distance( atomtypes, coords1, coords2)**2
 
+   ! Allocate memory pool for remap mismatched bonds
+   call allocate_memory_pool( size(coords1, 2))
+
    ! Initialize local minima registry
    call reset_registry( registry)
 
@@ -93,6 +96,8 @@ subroutine optimize_atomperm_isomer( atomset1, atomset2, atomtypes, adjcs1, adjc
       call insert_record_moldiff( registry, moldiffs, atomperm1, 1, total_rotation, permdist)
 
    end do
+
+   call deallocate_memory_pool()
 end subroutine
 
 end module

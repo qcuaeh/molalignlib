@@ -24,22 +24,61 @@ use adjacency
 use random
 implicit none
 private
+public allocate_memory_pool
+public deallocate_memory_pool
 public remap_mismatched_bonds
+
+! Global pool depth
+integer :: pool_depth
 
 ! Memory pool for recursive work arrays
 ! Organized as (size, depth_level) to eliminate allocations in recursion
-integer, dimension(:,:), allocatable, target :: pool_matches, pool_mismatches1, pool_mismatches2
-integer, dimension(:,:), allocatable, target :: pool_mapping, pool_unmapping, pool_track
+integer, dimension(:,:), allocatable, target :: pool_perm1, pool_perm2, pool_track
 logical, dimension(:,:), allocatable, target :: pool_tracked, pool_matched1, pool_matched2
+integer, dimension(:,:), allocatable, target :: pool_matches, pool_mismatches1, pool_mismatches2
 
 contains
 
+subroutine allocate_memory_pool(num_atoms)
+!------------------------------------------------------------------------------
+! Initialize memory pools for bond assignment
+! Call once before using remap_mismatched_bonds
+! MUST be called before any calls to remap_mismatched_bonds
+!------------------------------------------------------------------------------
+   integer, intent(in) :: num_atoms
+   
+   ! Set pool depth equal to maximum possible recursion depth
+   pool_depth = num_atoms
+   
+   ! Allocate memory pools once for all recursive calls
+   allocate(pool_perm1(num_atoms, pool_depth))
+   allocate(pool_perm2(num_atoms, pool_depth))
+   allocate(pool_matches(num_atoms, pool_depth))
+   allocate(pool_mismatches1(num_atoms, pool_depth))
+   allocate(pool_mismatches2(num_atoms, pool_depth))
+   allocate(pool_track(num_atoms, pool_depth))
+   allocate(pool_tracked(num_atoms, pool_depth))
+   allocate(pool_matched1(num_atoms, pool_depth))
+   allocate(pool_matched2(num_atoms, pool_depth))
+end subroutine
+
+subroutine deallocate_memory_pool()
+!------------------------------------------------------------------------------
+! Deallocate memory pools
+! Call once after all remap operations are complete
+!------------------------------------------------------------------------------
+   deallocate(pool_perm1, pool_perm2, pool_track)
+   deallocate(pool_tracked, pool_matched1, pool_matched2)
+   deallocate(pool_matches, pool_mismatches1, pool_mismatches2)
+end subroutine
+
 subroutine remap_mismatched_bonds(atomset1, atomtypes, adjcs1, adjcs2, adjmat2, &
-                  coords1, coords2, atomperm1)
+                  coords1, coords2, perm1)
 !------------------------------------------------------------------------------
 ! Find best correspondence between points of graphs
 ! Randomly selects starting atoms - fragment identification is implicit
-! OPTIMIZED: Uses pre-allocated memory pools to eliminate recursive allocations
+! OPTIMIZED: Uses pre-allocated memory pools with branch memory reuse
+! NOTE: allocate_memory_pool must be called before using this subroutine
 !------------------------------------------------------------------------------
 
    integer, dimension(:), intent(in) :: atomset1
@@ -47,106 +86,84 @@ subroutine remap_mismatched_bonds(atomset1, atomtypes, adjcs1, adjcs2, adjmat2, 
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    logical, dimension(:,:), intent(in) :: adjmat2
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
-   integer, dimension(:), intent(inout) :: atomperm1
+   integer, dimension(:), intent(inout) :: perm1
 
    ! Local variables
    integer :: ntrack, permdiff
    integer, dimension(:), allocatable :: track
    logical, dimension(:), allocatable :: tracked
-   integer, dimension(:), allocatable :: atomperm2
+   integer, dimension(:), allocatable :: perm2
    real(rk) :: permdist
    integer :: i
 
    ! Variables for random selection
-   integer, dimension(:), allocatable :: untracked_atoms
-   integer :: num_untracked, random_idx, start_atom
+   integer, dimension(:), allocatable :: untracked
+   integer :: nuntrack, random_idx, start_atom
 
-   ! Memory pool configuration
-   integer :: natoms, max_depth
+   ! Variables
+   integer :: num_atoms
 
-   natoms = size(atomperm1)
+   num_atoms = size(adjcs1)
 
-   ! Estimate maximum recursion depth
-   ! Conservative estimate: assume worst case is full depth tree
-   ! In practice, depth is typically much smaller (connected components, branching)
-   ! A reasonable heuristic: natoms (worst case) but could be tuned lower
-   max_depth = natoms
-
-   ! Allocate memory pools once for all recursive calls
-   ! Each "column" is used by one recursion level
-   allocate(pool_matches(natoms, max_depth))
-   allocate(pool_mismatches1(natoms, max_depth))
-   allocate(pool_mismatches2(natoms, max_depth))
-   allocate(pool_mapping(natoms, max_depth))
-   allocate(pool_unmapping(natoms, max_depth))
-   allocate(pool_track(natoms, max_depth))
-   allocate(pool_tracked(natoms, max_depth))
-   allocate(pool_matched1(natoms, max_depth))
-   allocate(pool_matched2(natoms, max_depth))
-
-   allocate(track(natoms))
-   allocate(tracked(natoms))
-   allocate(atomperm2(natoms))
-   allocate(untracked_atoms(natoms))
+   allocate(perm2(num_atoms))
+   allocate(track(num_atoms))
+   allocate(tracked(num_atoms))
+   allocate(untracked(num_atoms))
 
    ! Initialization
    ntrack = 0
    tracked(:) = .false.
-   atomperm2 = inverse_permutation(atomperm1)
-   permdiff = adjacencydiff(atomset1, atomperm1, adjcs1, adjcs2)
-!   permdist = sqdistsum(atomset1, atomperm1, coords1, coords2)
+   perm2 = inverse_permutation(perm1)
+   permdiff = adjacencydiff(atomset1, perm1, adjcs1, adjcs2)
+!   permdist = sqdistsum(atomset1, perm1, coords1, coords2)
 
    ! Process all atoms by randomly selecting untracked ones
    ! Each random selection implicitly starts a new fragment
-   do while (ntrack < natoms)
+   do while (ntrack < num_atoms)
       ! Build list of untracked atoms
-      num_untracked = 0
-      do i = 1, natoms
+      nuntrack = 0
+      do i = 1, num_atoms
          if (.not. tracked(i)) then
-            num_untracked = num_untracked + 1
-            untracked_atoms(num_untracked) = i
+            nuntrack = nuntrack + 1
+            untracked(nuntrack) = i
          end if
       end do
 
       ! Pick a random untracked atom
-      random_idx = random_uniform_integer(1, num_untracked)
-      start_atom = untracked_atoms(random_idx)
+      random_idx = random_uniform_integer(1, nuntrack)
+      start_atom = untracked(random_idx)
 
       ! Process fragment starting from this random atom
       ! Start at depth 1 of the memory pool
-      call recurse_remap_mismatched_bonds(start_atom, atomtypes, adjcs1, adjcs2, adjmat2, &
-            atomperm1, atomperm2, tracked, permdiff, permdist, ntrack, track, coords1, &
-            coords2, 1, max_depth)
+      call recurse_remap_mismatched_bonds(atomtypes, adjcs1, adjcs2, adjmat2, &
+            coords1, coords2, start_atom, perm1, perm2, permdiff, permdist, &
+            ntrack, track, tracked, 1)
    end do
 
    if (DEBUG_TESTS) then
-      if (adjacencydiff(atomset1, atomperm1, adjcs1, adjcs2) /= permdiff) then
+      if (adjacencydiff(atomset1, perm1, adjcs1, adjcs2) /= permdiff) then
          error stop 'permdiff is not equal to the final adjacency difference'
       end if
    end if
 
-   ! Deallocate memory pools
-   deallocate(pool_matches, pool_mismatches1, pool_mismatches2)
-   deallocate(pool_mapping, pool_unmapping, pool_track)
-   deallocate(pool_tracked, pool_matched1, pool_matched2)
-
-   ! Deallocate other arrays
-   deallocate(untracked_atoms)
+   ! Deallocate local arrays
+   deallocate(untracked)
+   deallocate(track, tracked, perm2)
 end subroutine
 
-subroutine match_neighbors(node, adjcs1, adjcs2, atomperm1, tracked, nmatch, matches, &
+subroutine match_neighbors(node, adjcs1, adjcs2, perm1, tracked, nmatch, matches, &
                 nmismatch1, mismatches1, nmismatch2, mismatches2)
 ! Classify the atoms connected to node as matches or unmatched
    integer, intent(in) :: node
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
-   integer, dimension(:), intent(in) :: atomperm1
+   integer, dimension(:), intent(in) :: perm1
    logical, dimension(:), intent(in) :: tracked
    integer, intent(out) :: nmatch, nmismatch1, nmismatch2
    integer, dimension(:), intent(out) :: matches, mismatches1, mismatches2
    ! Local variables
    integer :: i, mapped_node
 
-   mapped_node = atomperm1(node)
+   mapped_node = perm1(node)
    nmatch = 0
    nmismatch1 = 0
    nmismatch2 = 0
@@ -154,7 +171,7 @@ subroutine match_neighbors(node, adjcs1, adjcs2, atomperm1, tracked, nmatch, mat
    ! Classify neighbors of node in structure 1
    do i = 1, adjcs1(node)%cn
       if (any(adjcs2(mapped_node)%list(:adjcs2(mapped_node)%cn) &
-            == atomperm1(adjcs1(node)%list(i)))) then
+            == perm1(adjcs1(node)%list(i)))) then
          nmatch = nmatch + 1
          matches(nmatch) = adjcs1(node)%list(i)
       else
@@ -165,51 +182,47 @@ subroutine match_neighbors(node, adjcs1, adjcs2, atomperm1, tracked, nmatch, mat
 
    ! Find neighbors in structure 2 that don't match
    do i = 1, adjcs2(mapped_node)%cn
-      if (.not. any(atomperm1(matches(:nmatch)) == adjcs2(mapped_node)%list(i))) then
+      if (.not. any(perm1(matches(:nmatch)) == adjcs2(mapped_node)%list(i))) then
          nmismatch2 = nmismatch2 + 1
          mismatches2(nmismatch2) = adjcs2(mapped_node)%list(i)
       end if
    end do
 end subroutine
 
-recursive subroutine recurse_remap_mismatched_bonds(node, atomtypes, adjcs1, adjcs2, &
-      adjmat2, atomperm1, atomperm2, tracked, permdiff, permdist, ntrack, track, &
-      coords1, coords2, depth, max_depth)
+recursive subroutine recurse_remap_mismatched_bonds(atomtypes, adjcs1, adjcs2, &
+               adjmat2, coords1, coords2, node, perm1, perm2, permdiff, permdist, &
+               ntrack, track, tracked, depth)
 ! Backtracks structure to find assignments that minimize permdiff
-! OPTIMIZED: Uses memory pool slices based on recursion depth to avoid allocations
+! OPTIMIZED: Reuses branch memory at same recursion level to minimize depth usage
    integer, intent(in) :: node
    type(partition_t), intent(in) :: atomtypes
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    logical, dimension(:,:), intent(in) :: adjmat2
-   integer, dimension(:), intent(inout) :: atomperm1, atomperm2
+   integer, dimension(:), intent(inout) :: perm1, perm2
    logical, dimension(:), intent(inout) :: tracked
    integer, intent(inout) :: permdiff, ntrack
    integer, dimension(:), intent(inout) :: track
    real(rk), intent(inout) :: permdist
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
-   integer, intent(in) :: depth, max_depth
+   integer, intent(in) :: depth
 
    ! Local variables
    integer :: nmatch, nmismatch1, nmismatch2
-   integer :: moldiff_branch, ntrack_branch
-   real(rk) :: moldist_branch
+   integer :: branch_permdiff, branch_ntrack
+   real(rk) :: branch_permdist
    integer :: i, j
-   integer :: natoms
 
    ! Pointers to memory pool slices for this recursion level
    integer, dimension(:), pointer :: matches, mismatches1, mismatches2
    logical, dimension(:), pointer :: matched1, matched2
 
-   ! For branching, we need the next depth level
-   integer, dimension(:), pointer :: mapping_branch, unmapping_branch, track_branch
-   logical, dimension(:), pointer :: tracked_branch
-   integer :: next_depth
-
-   natoms = size(atomperm1)
+   ! Pointers for branch workspace (shared by all branches at this level)
+   integer, dimension(:), pointer :: branch_perm1, branch_perm2, branch_track
+   logical, dimension(:), pointer :: branch_tracked
 
    ! Check recursion depth limit
-   if (depth > max_depth) then
-      error stop 'Maximum recursion depth exceeded in remap_mismatched_bonds'
+   if (depth > pool_depth) then
+      error stop 'Maximum recursion depth exceeded'
    end if
 
    ! Point to this level's slices in the memory pool
@@ -225,7 +238,7 @@ recursive subroutine recurse_remap_mismatched_bonds(node, atomtypes, adjcs1, adj
    tracked(node) = .true.
 
    ! Classify neighbor atoms as matches or mismatched for coords1/coords2
-   call match_neighbors(node, adjcs1, adjcs2, atomperm1, tracked, nmatch, matches, &
+   call match_neighbors(node, adjcs1, adjcs2, perm1, tracked, nmatch, matches, &
                nmismatch1, mismatches1, nmismatch2, mismatches2)
 
 !   print *, "node:", node, "depth:", depth
@@ -241,14 +254,20 @@ recursive subroutine recurse_remap_mismatched_bonds(node, atomtypes, adjcs1, adj
    ! Run over matched neighbors
    do i = 1, nmatch
       if (.not. tracked(matches(i))) then
-         call recurse_remap_mismatched_bonds(matches(i), atomtypes, adjcs1, adjcs2, adjmat2, &
-               atomperm1, atomperm2, tracked, permdiff, permdist, ntrack, track, coords1, &
-               coords2, depth + 1, max_depth)
+         call recurse_remap_mismatched_bonds(atomtypes, adjcs1, adjcs2, adjmat2, &
+               coords1, coords2, matches(i), perm1, perm2, permdiff, permdist, &
+               ntrack, track, tracked, depth+1)
       end if
    end do
 
    matched1(:nmismatch1) = .false.
    matched2(:nmismatch2) = .false.
+
+   ! Point to shared branch workspace
+   branch_perm1 => pool_perm1(:, depth)
+   branch_perm2 => pool_perm2(:, depth)
+   branch_track => pool_track(:, depth)
+   branch_tracked => pool_tracked(:, depth)
 
    ! Run over mismatched neighbors - these create branches
    do i = 1, nmismatch1
@@ -258,56 +277,45 @@ recursive subroutine recurse_remap_mismatched_bonds(node, atomtypes, adjcs1, adj
                if (atomtypes%itemdir1(mismatches1(i)) &
                      == atomtypes%itemdir2(mismatches2(j))) then
 
-                  ! Use next depth level for branch arrays
-                  next_depth = depth + 1
-                  if (next_depth > max_depth) then
-                     error stop 'Maximum recursion depth exceeded in branching'
-                  end if
+                  ! Setup branch state
+                  branch_ntrack = ntrack
+                  branch_track(:) = track(:)
+                  branch_tracked(:) = tracked(:)
+                  branch_perm1(:) = perm1(:)
+                  branch_perm2(:) = perm2(:)
 
-                  mapping_branch => pool_mapping(:, next_depth)
-                  unmapping_branch => pool_unmapping(:, next_depth)
-                  track_branch => pool_track(:, next_depth)
-                  tracked_branch => pool_tracked(:, next_depth)
+                  ! Apply swap to perm1 branch
+                  branch_perm1(mismatches1(i)) = mismatches2(j)
+                  branch_perm1(perm2(mismatches2(j))) = perm1(mismatches1(i))
 
-                  ntrack_branch = ntrack
-                  track_branch(:) = track(:)
-                  tracked_branch(:) = tracked(:)
-                  mapping_branch(:) = atomperm1(:)
-                  unmapping_branch(:) = atomperm2(:)
-
-                  ! Apply swap to atomperm1 branch
-                  mapping_branch(mismatches1(i)) = mismatches2(j)
-                  mapping_branch(atomperm2(mismatches2(j))) = atomperm1(mismatches1(i))
-
-                  ! Apply swap to atomperm2 branch
-                  unmapping_branch(mismatches2(j)) = mismatches1(i)
-                  unmapping_branch(atomperm1(mismatches1(i))) = atomperm2(mismatches2(j))
+                  ! Apply swap to perm2 branch
+                  branch_perm2(mismatches2(j)) = mismatches1(i)
+                  branch_perm2(perm1(mismatches1(i))) = perm2(mismatches2(j))
 
                   ! Update adjd with swap
-                  moldiff_branch = permdiff + adjacencydelta(adjcs1, adjmat2, &
-                                atomperm1, mismatches1(i), atomperm2(mismatches2(j)))
+                  branch_permdiff = permdiff + adjacencydelta(adjcs1, adjmat2, &
+                                perm1, mismatches1(i), perm2(mismatches2(j)))
 
-                  ! Update ssd with swap
-!                  moldist_branch = permdist + ( &
-!                     - sum((coords2(:,atomperm1(mismatches1(i))) - coords1(:,mismatches1(i)))**2) &
-!                     - sum((coords2(:,mismatches2(j)) - coords1(:,atomperm2(mismatches2(j))))**2) &
+                  ! Update permdist with swap
+!                  branch_permdist = permdist + ( &
+!                     - sum((coords2(:,perm1(mismatches1(i))) - coords1(:,mismatches1(i)))**2) &
+!                     - sum((coords2(:,mismatches2(j)) - coords1(:,perm2(mismatches2(j))))**2) &
 !                     + sum((coords2(:,mismatches2(j)) - coords1(:,mismatches1(i)))**2) &
-!                     + sum((coords2(:,atomperm1(mismatches1(i))) - coords1(:,atomperm2(mismatches2(j))))**2))
+!                     + sum((coords2(:,perm1(mismatches1(i))) - coords1(:,perm2(mismatches2(j))))**2))
 
                   ! Backtrack swapped index
-                  ! Branch recursion uses next_depth + 1 since we've already used next_depth for branch state
-                  call recurse_remap_mismatched_bonds(mismatches1(i), atomtypes, adjcs1, adjcs2, adjmat2, &
-                        mapping_branch, unmapping_branch, tracked_branch, moldiff_branch, moldist_branch, &
-                        ntrack_branch, track_branch, coords1, coords2, next_depth + 1, max_depth)
+                  call recurse_remap_mismatched_bonds(atomtypes, adjcs1, adjcs2, adjmat2, coords1, &
+                        coords2, mismatches1(i), branch_perm1, branch_perm2, branch_permdiff, &
+                        branch_permdist, branch_ntrack, branch_track, branch_tracked, depth+1)
 
-                  if (moldiff_branch < permdiff) then
-                     ntrack = ntrack_branch
-                     track(:) = track_branch(:)
-                     tracked(:) = tracked_branch(:)
-                     atomperm1(:) = mapping_branch(:)
-                     atomperm2(:) = unmapping_branch(:)
-                     permdiff = moldiff_branch
-!                     permdist = moldist_branch
+                  if (branch_permdiff < permdiff) then
+                     ntrack = branch_ntrack
+                     track(:) = branch_track(:)
+                     tracked(:) = branch_tracked(:)
+                     perm1(:) = branch_perm1(:)
+                     perm2(:) = branch_perm2(:)
+                     permdiff = branch_permdiff
+!                     permdist = branch_permdist
                      matched1(i) = .true.
                      matched2(j) = .true.
                      exit   ! exits inner do loop
@@ -322,15 +330,12 @@ recursive subroutine recurse_remap_mismatched_bonds(node, atomtypes, adjcs1, adj
    do i = 1, nmismatch1
       if (.not. matched1(i)) then
          if (.not. tracked(mismatches1(i))) then
-            call recurse_remap_mismatched_bonds(mismatches1(i), atomtypes, adjcs1, adjcs2, &
-                  adjmat2, atomperm1, atomperm2, tracked, permdiff, permdist, ntrack, track, &
-                  coords1, coords2, depth + 1, max_depth)
+            call recurse_remap_mismatched_bonds(atomtypes, adjcs1, adjcs2, adjmat2, &
+                  coords1, coords2, mismatches1(i), perm1, perm2, permdiff, permdist, &
+                  ntrack, track, tracked, depth+1)
          end if
       end if
    end do
-
-   ! No deallocation needed - memory pool is managed by caller
-
 end subroutine
 
 end module
