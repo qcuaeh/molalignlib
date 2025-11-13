@@ -250,26 +250,26 @@ subroutine print_records(registry)
    integer :: i
 
    line = repeat('-', 39)
-   write (stderr, '(2x,a,4x,a,5x,a,4x,a,5x,a,6x,a)') '#', 'Freq', 'Steps', 'Δadj', 'Δxyz'
-   write (stderr, '(a)') line
+   write (stdout, '(2x,a,4x,a,5x,a,4x,a,5x,a,6x,a)') '#', 'Freq', 'Steps', 'Δadj', 'Δxyz'
+   write (stdout, '(a)') line
    do i = 1, registry%occ_records
       record = registry%records(i)
-      write (stderr, '(i3,4x,i4,4x,f5.1,3x,i4,4x,f8.4)') &
+      write (stdout, '(i3,4x,i4,4x,f5.1,3x,i4,4x,f8.4)') &
          i, record%freq, record%steps, record%permdiff, record%permdist
    end do
-   write (stderr, '(a)') line
+   write (stdout, '(a)') line
 
-   write (stderr, *)
-   write (stderr, '(a,1x,i0)') 'Random trials:', registry%num_trials
-   write (stderr, '(a,1x,i0)') 'Minimization steps:', registry%total_steps
+   write (stdout, *)
+   write (stdout, '(a,1x,i0)') 'Random trials:', registry%num_trials
+   write (stdout, '(a,1x,i0)') 'Minimization steps:', registry%total_steps
 
    if (registry%overflow) then
-      write (stderr, '(a,1x,i0)') 'Visited local minima: >', registry%occ_records
+      write (stdout, '(a,1x,i0)') 'Visited local minima: >', registry%occ_records
    else
-      write (stderr, '(a,1x,i0)') 'Visited local minima:', registry%occ_records
+      write (stdout, '(a,1x,i0)') 'Visited local minima:', registry%occ_records
    end if
 
-   write (stderr, *)
+   write (stdout, *)
 end subroutine
 
 end module

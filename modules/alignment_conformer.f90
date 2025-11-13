@@ -63,7 +63,7 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
    call reset_registry( registry)
 
    if ((stoch_flag .and. .not. adaptive_flag) .or. (stoch_flag .and. adaptive_flag .and. &
-         cache_arrays%global_combinations > confo_thres*cache_arrays%local_combinations)) then
+         cache_arrays%total_combinations > confo_thres*cache_arrays%partial_combinations)) then
 
       ! Initialize random number generator
       call random_initialize()

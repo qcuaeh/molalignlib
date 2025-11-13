@@ -98,8 +98,8 @@ type, public :: array_trees_t
    integer :: total_links, total_chains
    integer :: total_partref_entries
    ! Assignment statistics
-   real(rk) :: local_combinations
-   real(rk) :: global_combinations
+   real(rk) :: partial_combinations
+   real(rk) :: total_combinations
 end type
 
 contains
@@ -188,7 +188,7 @@ subroutine cache_assignment_tree(assignment_tree, cache_arrays)
    partref_idx = 0
    link_idx = 0
    call convert_chains_recurse(assignment_tree, cache_arrays, partref_idx, link_idx, &
-         cache_arrays%local_combinations, cache_arrays%global_combinations)
+         cache_arrays%partial_combinations, cache_arrays%total_combinations)
 end subroutine
 
 subroutine convert_signature(part, cache_arrays, part_idx)
@@ -333,11 +333,11 @@ recursive subroutine convert_parts_recurse(part, cache_arrays, item1_idx, item2_
 end subroutine
 
 recursive subroutine convert_chains_recurse(chain, cache_arrays, partref_idx, link_idx, &
-                                            local_combinations, global_combinations)
+                                            partial_combinations, total_combinations)
    type(chaintree_node_t), pointer, intent(in) :: chain
    type(array_trees_t), intent(inout) :: cache_arrays
    integer, intent(inout) :: partref_idx, link_idx
-   real(rk), intent(out) :: local_combinations, global_combinations
+   real(rk), intent(out) :: partial_combinations, total_combinations
    type(chaintree_node_t), pointer :: child_chain
    type(chain_node_t), pointer :: link
    type(partref_node_t), pointer :: partref
@@ -349,12 +349,12 @@ recursive subroutine convert_chains_recurse(chain, cache_arrays, partref_idx, li
 
    ! If this is a leaf level (no children), both values are 1
    if (chain%num_children == 0) then
-      local_combinations = 1
-      global_combinations = 1
+      partial_combinations = 1
+      total_combinations = 1
    else
       ! Initialize accumulators for non-leaf nodes
-      local_combinations = 0
-      global_combinations = 1
+      partial_combinations = 0
+      total_combinations = 1
    end if
 
    ! Convert this chain (existing conversion logic)
@@ -446,10 +446,10 @@ recursive subroutine convert_chains_recurse(chain, cache_arrays, partref_idx, li
          items2_count = child_chain%split_part%num_items2
 
          ! Update combinations (sum): first item1 with each item2
-         local_combinations = local_combinations + (items2_count * child_combinations)
+         partial_combinations = partial_combinations + (items2_count * child_combinations)
 
          ! Update product (multiply): split sizes only
-         global_combinations = global_combinations * (items2_count * child_product)
+         total_combinations = total_combinations * (items2_count * child_product)
       end if
 
       child_chain => child_chain%next_sibling_chain
@@ -547,7 +547,7 @@ subroutine print_chain_tree_array(cache_arrays)
    logical, dimension(:), allocatable :: is_last_child
 
    if (cache_arrays%total_chains == 0) then
-      write(stderr, '(A)') "Assignment tree is empty"
+      write(stdout, '(A)') "Assignment tree is empty"
       return
    end if
 
@@ -556,22 +556,22 @@ subroutine print_chain_tree_array(cache_arrays)
    is_last_child = .false.
 
    ! Print children recursively (root is always at index 1)
-   write(stderr, '(A)') '*'
+   write(stdout, '(A)') '(*)'
    call print_chain_recursive_array(cache_arrays, 1, 0, is_last_child)
-   write(stderr, *)
+   write(stdout, *)
 
    ! Print assignment statistics
-   if (cache_arrays%global_combinations > 2**24) then
-      write(stderr, '(A,ES8.2)') "Total combinations: ", cache_arrays%global_combinations
+   if (cache_arrays%total_combinations > 2**24) then
+      write(stdout, '(A,ES8.2)') "Total combinations: ", cache_arrays%total_combinations
    else
-      write(stderr, '(A,I0)') "Total combinations: ", int(cache_arrays%global_combinations)
+      write(stdout, '(A,I0)') "Total combinations: ", int(cache_arrays%total_combinations)
    end if
-   if (cache_arrays%local_combinations > 2**24) then
-      write(stderr, '(A,ES8.2)') "Reduced combinations: ", cache_arrays%local_combinations
+   if (cache_arrays%partial_combinations > 2**24) then
+      write(stdout, '(A,ES8.2)') "Sum of partial combinations: ", cache_arrays%partial_combinations
    else
-      write(stderr, '(A,I0)') "Reduced combinations: ", int(cache_arrays%local_combinations)
+      write(stdout, '(A,I0)') "Sum of partial combinations: ", int(cache_arrays%partial_combinations)
    end if
-   write(stderr, *)
+   write(stdout, *)
 
    deallocate(is_last_child)
 end subroutine
@@ -790,28 +790,23 @@ recursive subroutine print_chain_recursive_array(cache_arrays, chain_idx, depth,
       ! Print prefix components directly
       do j = 1, depth
          if (is_last_child(j)) then
-            write(stderr, '(A)', advance='no') "   "
+            write(stdout, '(A)', advance='no') "   "
          else
-            write(stderr, '(A)', advance='no') "|  "
+            write(stdout, '(A)', advance='no') "|  "
          end if
       end do
 
       ! Add branch characters
       if (is_last_child(depth + 1)) then
-         write(stderr, '(A)', advance='no') "`--"
+         write(stdout, '(A)', advance='no') "'--"
       else
-         write(stderr, '(A)', advance='no') "|--"
+         write(stdout, '(A)', advance='no') "|--"
       end if
 
       ! Print the split part index with item counts
       split_part_idx = cache_arrays%assigntree(child_idx)%split_part_idx
-      if (split_part_idx > 0) then
-         write(stderr, '(A,I0,A,I0,A)') '* (', &
-            cache_arrays%partree(split_part_idx)%items1_count, '/', &
-            cache_arrays%partree(split_part_idx)%items2_count, ')'
-      else
-         write(stderr, '(A)') '(no split part)'
-      end if
+      write(stdout, '(A,I0,A)') '(', &
+         cache_arrays%partree(split_part_idx)%items2_count, ')'
 
       ! Recursively print this child's children
       call print_chain_recursive_array(cache_arrays, child_idx, depth + 1, is_last_child)
