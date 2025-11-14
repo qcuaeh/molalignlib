@@ -36,15 +36,15 @@ subroutine open2write(filepath, unit)
    end if
 end subroutine
 
-subroutine writefile(unit, extout, title, atoms, bonds, atomperm1)
+subroutine writefile(unit, typeout, title, atoms, bonds, atomperm1)
    integer, intent(in) :: unit
-   character(*), intent(in) :: extout
+   character(*), intent(in) :: typeout
    character(*), intent(in) :: title
    type(atom_t), dimension(:), intent(in) :: atoms
    type(bond_t), dimension(:), intent(in) :: bonds
    integer, dimension(:), intent(in) :: atomperm1
 
-   select case (extout)
+   select case (typeout)
    case ('xyz')
       call writefile_xyz(unit, title, atoms, bonds, atomperm1)
    case ('mol2')
@@ -52,7 +52,7 @@ subroutine writefile(unit, extout, title, atoms, bonds, atomperm1)
    case ('sdf')
       call writefile_sdf(unit, title, atoms, bonds, atomperm1)
    case default
-      write (stderr, '(A,A,A)') 'Error: File format "', extout, '" is not supported'
+      write (stderr, '(A,A,A)') 'Error: File format "', typeout, '" is not supported'
       stop 1
    end select
 end subroutine

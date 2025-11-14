@@ -24,26 +24,28 @@ implicit none
 
 contains
 
-subroutine open2read(filepath, unit)
+subroutine open2read(filepath, filetype, fileunit)
    character(*), intent(in) :: filepath
-   integer, intent(out) :: unit
+   character(:), allocatable, intent(out) :: filetype
+   integer, intent(out) :: fileunit
    integer :: stat
 
-   open(newunit=unit, file=filepath, action='read', status='old', iostat=stat)
+   call parse_path(filepath, filetype)
+   open(newunit=fileunit, file=filepath, action='read', status='old', iostat=stat)
    if (stat /= 0) then
       write (stderr, '(A,1X,A,1X,A)') 'Error: opening', filepath, 'for reading'
       stop 1
    end if
 end subroutine
 
-subroutine readfile(unit, extin, title, atoms, bonds)
+subroutine read_file(unit, typein, title, atoms, bonds)
    integer, intent(in) :: unit
-   character(*), intent(in) :: extin
+   character(*), intent(in) :: typein
    character(:), allocatable, intent(out) :: title
    type(atom_t), dimension(:), allocatable, intent(out) :: atoms
    type(bond_t), dimension(:), allocatable, intent(out) :: bonds
 
-   select case (extin)
+   select case (typein)
    case ('xyz')
       call readfile_xyz(unit, title, atoms, bonds)
    case ('mol')
@@ -53,7 +55,7 @@ subroutine readfile(unit, extin, title, atoms, bonds)
    case ('mol2')
       call readfile_mol2(unit, title, atoms, bonds)
    case default
-      write (stderr, '(A,A,A)') 'Error: File format "', extin, '" is not supported'
+      write (stderr, '(A,A,A)') 'Error: File format "', typein, '" is not supported'
       stop 1
    end select
 end subroutine

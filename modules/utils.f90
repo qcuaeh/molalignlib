@@ -21,7 +21,7 @@ private
 public str
 public lowercase
 public uppercase
-public split_path
+public parse_path
 public uniform_weights
 
 interface str
@@ -80,11 +80,12 @@ function uppercase(x) result(u)
    end do
 end function
 
-subroutine split_path(filepath, dirname, filename, extension)
+subroutine parse_path(filepath, filetype)
    character(*), intent(in) :: filepath
-   character(:), allocatable, intent(out) :: dirname, filename, extension
+   character(:), allocatable, intent(out) :: filetype
    ! Local variables
    character(:), allocatable :: basename
+   character(:), allocatable :: dirname, filename
    integer :: pos
    pos = index(filepath, '/', back=.true.)
    if (pos /= 0) then
@@ -101,8 +102,8 @@ subroutine split_path(filepath, dirname, filename, extension)
    pos = index(basename, '.', back=.true.)
    if (pos /= 0) then
       filename = basename(:pos-1)
-      extension = basename(pos+1:)
-      if (len(filename) == 0 .or. len(extension) == 0) then
+      filetype = basename(pos+1:)
+      if (len(filename) == 0 .or. len(filetype) == 0) then
          write (stderr, '(A,1X,A)') 'Error: Invalid file name', basename
          stop 1
       end if

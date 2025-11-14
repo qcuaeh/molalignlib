@@ -36,8 +36,8 @@ use options
 implicit none
 
 character(:), allocatable :: title1, title2
-character(:), allocatable :: arg, coords_path, dummy
-character(:), allocatable :: extin1, extin2, extout
+character(:), allocatable :: arg, coords_path
+character(:), allocatable :: typein, typeout
 type(strlist_type) :: posargs(2)
 type(atom_t), dimension(:), allocatable :: atoms1, atoms2
 type(bond_t), dimension(:), allocatable :: bonds1, bonds2
@@ -50,7 +50,7 @@ real(rk), dimension(:), allocatable :: weights1, weights2
 real(rk), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, coords2r
 integer, dimension(:), allocatable :: atomset1, atomset2
 integer, dimension(:), allocatable :: atomperm1
-integer :: unitin1, unitin2, unitout
+integer :: unitin, unitout
 integer :: i
 
 ! Set default options
@@ -122,23 +122,21 @@ case (1)
    write (stderr, '(A)') 'Error: Too few file paths'
    stop 1
 case (2)
-   call split_path( posargs(1)%arg, dummy, dummy, extin1)
-   call split_path( posargs(2)%arg, dummy, dummy, extin2)
-   call open2read( posargs(1)%arg, unitin1)
-   call open2read( posargs(2)%arg, unitin2)
+   call open2read( posargs(1)%arg, typein, unitin)
+   call read_file( unitin, typein, title1, atoms1, bonds1)
+   close (unitin)
+   call open2read( posargs(2)%arg, typein, unitin)
+   call read_file( unitin, typein, title2, atoms2, bonds2)
+   close (unitin)
 case default
    write (stderr, '(A)') 'Error: Too many file paths'
    stop 1
 end select
 
 if (coords_flag) then
-   call split_path( coords_path, dummy, dummy, extout)
+   call parse_path( coords_path, typeout)
    call open2write( coords_path, unitout)
 end if
-
-! Read coordinates
-call readfile( unitin1, extin1, title1, atoms1, bonds1)
-call readfile( unitin2, extin2, title2, atoms2, bonds2)
 
 if (heavy_flag) then
    ! Include only heavy atoms
@@ -210,7 +208,7 @@ if (align_flag) then
             title2 = 'RMSD=' // str( rmsd)
             coords2r = rotated_coords( coords2, rotquat, center1)
             call set_coords( atoms2, coords2r)
-            call writefile( unitout, extout, title2, atoms2, bonds2, atomperm1)
+            call writefile( unitout, typeout, title2, atoms2, bonds2, atomperm1)
          else
             write (stdout,'(A)',advance='no') str( rmsd)
             if (atomorder_flag) then
@@ -233,7 +231,7 @@ if (align_flag) then
          title2 = 'RMSD=' // str( rmsd)
          coords2r = rotated_coords( coords2, rotquat, center1)
          call set_coords( atoms2, coords2r)
-         call writefile( unitout, extout, title2, atoms2, bonds2, atomperm1)
+         call writefile( unitout, typeout, title2, atoms2, bonds2, atomperm1)
       else
          write (unitout,'(A)') str( rmsd)
       end if
@@ -260,7 +258,7 @@ else
       title2 = 'RMSD=' // str( rmsd)
       coords2r = rotated_coords( coords2, rotquat, center1)
       call set_coords( atoms2, coords2r)
-      call writefile( unitout, extout, title2, atoms2, bonds2, atomperm1)
+      call writefile( unitout, typeout, title2, atoms2, bonds2, atomperm1)
    else
       write (stdout,'(A)',advance='no') str( rmsd)
       if (remap_flag .and. atomorder_flag) then
