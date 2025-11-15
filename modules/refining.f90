@@ -14,7 +14,7 @@
 ! You should have received a copy of the GNU General Public License
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-module partitioning
+module refining
 use parameters
 use types_basic
 use random
@@ -26,126 +26,12 @@ use types_indexed
 use options
 implicit none
 private
-public collect_atomtypes
 public refine_hna_part
 public refine_hna_partition
 public compute_scna_partition
 public build_assignment_tree
 
-type :: atomtype_item_t
-   integer :: elnum
-   integer :: typeid
-   type(partition_node_t), pointer :: part
-end type
-
-type :: atomtype_table_t
-   integer :: num_items
-   type(atomtype_item_t), dimension(:), allocatable :: items
-end type
-
 contains
-
-subroutine add_atomtype(atomtypetable, atom, part)
-   type(atomtype_table_t), intent(inout) :: atomtypetable
-   type(atom_t), intent(in) :: atom
-   type(partition_node_t), pointer, intent(in) :: part
-
-   atomtypetable%num_items = atomtypetable%num_items + 1
-   atomtypetable%items(atomtypetable%num_items)%elnum = atom%elnum
-   atomtypetable%items(atomtypetable%num_items)%typeid = atom%typeid
-   atomtypetable%items(atomtypetable%num_items)%part => part
-end subroutine
-
-function find_atomtype(atomtypetable, atom) result(part)
-   type(atomtype_table_t), intent(in) :: atomtypetable
-   type(atom_t), intent(in) :: atom
-   type(partition_node_t), pointer :: part
-   integer :: i
-
-   do i = 1, atomtypetable%num_items
-      if (atomtypetable%items(i)%elnum == atom%elnum) then
-         if (.not. label_flag .or. atomtypetable%items(i)%typeid == atom%typeid) then
-            part => atomtypetable%items(i)%part
-            return
-         end if
-      end if
-   end do
-
-   part => null()
-end function
-
-subroutine build_atomtypes_tree(atomset1, atomset2, atoms1, atoms2, root_chain, root_part)
-! Partition atoms by atomic number and label using linked list structures
-   integer, dimension(:), intent(in) :: atomset1, atomset2
-   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
-   type(chaintree_node_t), pointer, intent(out) :: root_chain
-   type(partition_node_t), pointer, intent(out) :: root_part
-   ! Local variables
-   type(partition_node_t), pointer :: child_part
-   type(chain_node_t), pointer :: new_link
-   type(atomtype_table_t) :: atomtypetable
-   integer :: atoms1_size, atoms2_size, i, atomidx
-
-   atoms1_size = size(atoms1)
-   atoms2_size = size(atoms2)
-
-   root_part => new_root_part()
-   root_chain => new_root_chain(atoms1_size, atoms2_size)
-   new_link => new_chain_link(root_chain)
-
-   allocate(atomtypetable%items(atoms1_size + atoms2_size))
-   atomtypetable%num_items = 0
-
-   ! First molecule
-   do i = 1, size(atomset1)
-      atomidx = atomset1(i)
-      child_part => find_atomtype(atomtypetable, atoms1(atomidx))
-      if (.not. associated(child_part)) then
-         child_part => new_child_part(root_part)
-         call link_part(new_link, child_part)
-         call add_atomtype(atomtypetable, atoms1(atomidx), child_part)
-      end if
-      call add_new_item1(child_part, atomidx)
-      new_link%itemdir1(atomidx)%ptr => child_part
-   end do
-
-   ! Second molecule
-   do i = 1, size(atomset2)
-      atomidx = atomset2(i)
-      child_part => find_atomtype(atomtypetable, atoms2(atomidx))
-      if (.not. associated(child_part)) then
-         child_part => new_child_part(root_part)
-         call link_part(new_link, child_part)
-         call add_atomtype(atomtypetable, atoms2(atomidx), child_part)
-      end if
-      call add_new_item2(child_part, atomidx)
-      new_link%itemdir2(atomidx)%ptr => child_part
-   end do
-
-   deallocate(atomtypetable%items)
-end subroutine
-
-subroutine collect_atomtypes(atomset1, atomset2, atoms1, atoms2, atomtypes)
-! Partition atoms by atomic number and label
-! Uses linked list structures internally, then converts to partition array
-   integer, dimension(:), intent(in) :: atomset1, atomset2
-   type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
-   type(partition_t), intent(out) :: atomtypes
-   ! Local variables
-   type(chaintree_node_t), pointer :: root_chain
-   type(partition_node_t), pointer :: root_part
-   type(chain_node_t), pointer :: first_link
-
-   ! Create linked list structures
-   call build_atomtypes_tree(atomset1, atomset2, atoms1, atoms2, root_chain, root_part)
-   ! Get the first (and only) link from the chain
-   first_link => root_chain%first_link
-   ! Convert link to partition array structure
-   call link_to_partition(first_link, atomtypes)
-   ! Clean up tree structures
-   call delete_chain(root_chain)
-   call delete_part_tree(root_part)
-end subroutine
 
 subroutine refine_hna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
 ! Create children for different signatures - caller decides what to do with them

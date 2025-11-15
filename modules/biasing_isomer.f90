@@ -22,7 +22,7 @@ use utils
 use permutation
 use adjacency
 use types_linked
-use partitioning
+use refining
 use euclidean
 use options
 use randlib

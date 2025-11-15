@@ -21,7 +21,7 @@ use random
 use euclidean
 use adjacency
 use biasing_isomer
-use partitioning
+use refining
 use recording
 use assignment_atoms
 use assignment_bonds

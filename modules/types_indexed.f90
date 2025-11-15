@@ -16,7 +16,9 @@
 
 module types_indexed
 use parameters
+use types_basic
 use types_linked
+use chemistry
 use adjacency
 implicit none
 private
@@ -542,40 +544,6 @@ subroutine print_part_tree_array(cache_arrays)
    deallocate(is_last_child)
 end subroutine
 
-subroutine print_chain_tree_array(cache_arrays)
-   type(array_trees_t), intent(in) :: cache_arrays
-   logical, dimension(:), allocatable :: is_last_child
-
-   if (cache_arrays%total_chains == 0) then
-      write(stdout, '(A)') "Assignment tree is empty"
-      return
-   end if
-
-   ! Allocate tracking array for tree lines (max depth 100)
-   allocate(is_last_child(100))
-   is_last_child = .false.
-
-   ! Print children recursively (root is always at index 1)
-   write(stdout, '(A)') '(*)'
-   call print_chain_recursive_array(cache_arrays, 1, 0, is_last_child)
-   write(stdout, *)
-
-   ! Print assignment statistics
-   if (cache_arrays%total_combinations > 2**24) then
-      write(stdout, '(A,ES8.2)') "Total combinations: ", cache_arrays%total_combinations
-   else
-      write(stdout, '(A,I0)') "Total combinations: ", int(cache_arrays%total_combinations)
-   end if
-   if (cache_arrays%partial_combinations > 2**24) then
-      write(stdout, '(A,ES8.2)') "Sum of partial combinations: ", cache_arrays%partial_combinations
-   else
-      write(stdout, '(A,I0)') "Sum of partial combinations: ", int(cache_arrays%partial_combinations)
-   end if
-   write(stdout, *)
-
-   deallocate(is_last_child)
-end subroutine
-
 subroutine print_part_signatures_array(cache_arrays)
    type(array_trees_t), intent(in) :: cache_arrays
 
@@ -772,11 +740,48 @@ recursive subroutine print_part_recursive_array(cache_arrays, part_idx, depth, i
    end do
 end subroutine
 
-recursive subroutine print_chain_recursive_array(cache_arrays, chain_idx, depth, is_last_child)
+subroutine print_chain_tree_array(atomtypes, cache_arrays)
+   type(partition_t), intent(in) :: atomtypes
+   type(array_trees_t), intent(in) :: cache_arrays
+   logical, dimension(:), allocatable :: is_last_child
+
+   if (cache_arrays%total_chains == 0) then
+      write(stdout, '(A)') "Assignment tree is empty"
+      return
+   end if
+
+   ! Allocate tracking array for tree lines (max depth 100)
+   allocate(is_last_child(100))
+   is_last_child = .false.
+
+   ! Print children recursively (root is always at index 1)
+   write(stdout, '(A)') '*'
+   call print_chain_recursive_array(atomtypes, cache_arrays, 1, 0, is_last_child)
+   write(stdout, *)
+
+   ! Print assignment statistics
+   if (cache_arrays%total_combinations > 2**24) then
+      write(stdout, '(A,ES8.2)') "Total combinations: ", cache_arrays%total_combinations
+   else
+      write(stdout, '(A,I0)') "Total combinations: ", int(cache_arrays%total_combinations)
+   end if
+   if (cache_arrays%partial_combinations > 2**24) then
+      write(stdout, '(A,ES8.2)') "Sum of partial combinations: ", cache_arrays%partial_combinations
+   else
+      write(stdout, '(A,I0)') "Sum of partial combinations: ", int(cache_arrays%partial_combinations)
+   end if
+   write(stdout, *)
+
+   deallocate(is_last_child)
+end subroutine
+
+recursive subroutine print_chain_recursive_array(atomtypes, cache_arrays, chain_idx, depth, is_last_child)
+   type(partition_t), intent(in) :: atomtypes
    type(array_trees_t), intent(in) :: cache_arrays
    integer, intent(in) :: chain_idx, depth
    logical, dimension(:), intent(inout) :: is_last_child
-   integer :: child_idx, split_part_idx, i, j
+   integer :: child_idx, split_part_idx, first_atom_idx
+   integer :: i, j
 
    if (chain_idx == 0) return
 
@@ -805,11 +810,13 @@ recursive subroutine print_chain_recursive_array(cache_arrays, chain_idx, depth,
 
       ! Print the split part index with item counts
       split_part_idx = cache_arrays%assigntree(child_idx)%split_part_idx
-      write(stdout, '(A,I0,A)') '(', &
-         cache_arrays%partree(split_part_idx)%items2_count, ')'
+      first_atom_idx = cache_arrays%atomidcs1(cache_arrays%partree(split_part_idx)%items1_offset+1)
+      write(stdout, '(A,"*",I0)') &
+         trim(element_symbols(atomtypes%parts(atomtypes%itemdir1(first_atom_idx))%elnum)), &
+         cache_arrays%partree(split_part_idx)%items1_count
 
       ! Recursively print this child's children
-      call print_chain_recursive_array(cache_arrays, child_idx, depth + 1, is_last_child)
+      call print_chain_recursive_array(atomtypes, cache_arrays, child_idx, depth + 1, is_last_child)
    end do
 end subroutine
 

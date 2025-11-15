@@ -50,21 +50,9 @@ type, public :: int_listmatrix
    type(int_list), dimension(:,:), allocatable :: a
 end type
 
-! Semipart array
-type, public :: semipartition_part_t
-   integer :: num_items
-   integer, dimension(:), allocatable :: items
-end type
-
-! Semipartition array
-type, public :: semipartition_t
-   integer :: num_parts
-   type(semipartition_part_t), dimension(:), allocatable :: parts
-   integer, dimension(:), allocatable :: itemdir
-end type
-
 ! Part array
 type, public :: partition_part_t
+   integer :: elnum
    integer :: num_items1
    integer :: num_items2
    integer :: num_children

@@ -22,12 +22,12 @@ use random
 use chemistry
 use permutation
 use euclidean
-use assignment_atoms
 use adjacency
 use pruning_atoms
 use types_linked
 use types_indexed
-use partitioning
+use refining
+use assignment_atoms
 use assignment_conformer
 use recording
 use options
@@ -56,7 +56,7 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
    call build_assignment_tree( adjcs1, adjcs2, hna_chain%last_link, cache_arrays)
 
    if (tree_flag) then
-      call print_chain_tree_array( cache_arrays)
+      call print_chain_tree_array( atomtypes, cache_arrays)
    end if
 
    ! Reset registry for new conformer
@@ -152,7 +152,7 @@ subroutine assign_atomperm_conformer( adjcs1, adjcs2, atomtypes, coords1, coords
    call build_assignment_tree( adjcs1, adjcs2, hna_chain%last_link, cache_arrays)
 
    if (tree_flag) then
-      call print_chain_tree_array( cache_arrays)
+      call print_chain_tree_array( atomtypes, cache_arrays)
    end if
 
    ! Assign atoms using greedy and local pruned methods

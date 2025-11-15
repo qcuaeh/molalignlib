@@ -39,8 +39,6 @@ public copy_part_items
 public move_part_items
 public link_to_partition
 public find_child_part
-public first_partition
-public second_partition
 public add_branch_part
 public delete_chain
 public delete_part
@@ -806,40 +804,6 @@ function chain_from_partition(partition) result(chain)
       ! Link child part to first link
       call link_part(first_link, new_part)
       call update_itemdir(first_link, new_part)
-   end do
-end function
-
-function first_partition(partition) result(semipartition)
-   type(partition_t), intent(in) :: partition
-   type(semipartition_t) :: semipartition
-   integer :: i
-
-   semipartition%num_parts = partition%num_parts
-   allocate(semipartition%parts(semipartition%num_parts))
-   allocate(semipartition%itemdir(size(partition%itemdir1)))
-   semipartition%itemdir = partition%itemdir1
-
-   do i = 1, semipartition%num_parts
-      semipartition%parts(i)%num_items = partition%parts(i)%num_items1
-      allocate(semipartition%parts(i)%items(semipartition%parts(i)%num_items))
-      semipartition%parts(i)%items = partition%parts(i)%items1
-   end do
-end function
-
-function second_partition(partition) result(semipartition)
-   type(partition_t), intent(in) :: partition
-   type(semipartition_t) :: semipartition
-   integer :: i
-
-   semipartition%num_parts = partition%num_parts
-   allocate(semipartition%parts(semipartition%num_parts))
-   allocate(semipartition%itemdir(size(partition%itemdir2)))
-   semipartition%itemdir = partition%itemdir2
-
-   do i = 1, semipartition%num_parts
-      semipartition%parts(i)%num_items = partition%parts(i)%num_items2
-      allocate(semipartition%parts(i)%items(semipartition%parts(i)%num_items))
-      semipartition%parts(i)%items = partition%parts(i)%items2
    end do
 end function
 

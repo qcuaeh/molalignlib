@@ -20,7 +20,8 @@ file_writing.f90
 argparse.f90
 types_linked.f90
 types_indexed.f90
-partitioning.f90
+assorting.f90
+refining.f90
 biasing_isomer.f90
 pruning_atoms.f90
 assignment_atoms.f90

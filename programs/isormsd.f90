@@ -28,6 +28,7 @@ use adjacency
 use file_reading
 use file_writing
 use argparse
+use assorting
 use biasing_isomer
 use recording
 use alignment_isomer
