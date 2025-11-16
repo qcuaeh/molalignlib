@@ -22,7 +22,7 @@ implicit none
 integer, parameter :: num_elems = 103
 
 ! Element symbols
-character(3), parameter :: element_symbols(num_elems) = [ &
+character(3), parameter :: atomic_symbols(num_elems) = [ &
 'H ', &
 'He', &
 'Li', &
@@ -126,6 +126,114 @@ character(3), parameter :: element_symbols(num_elems) = [ &
 'Md', &
 'No', &
 'Lr'  &
+]
+
+! Standard atomic masses
+! Source: mendeleev Python library
+real(rk), target :: atomic_masses(num_elems) = [ &
+1.0, &  ! H
+4.0, &  ! He
+6.9, &  ! Li
+9.0, &  ! Be
+10.8, &  ! B
+12.0, &  ! C
+14.0, &  ! N
+16.0, &  ! O
+19.0, &  ! F
+20.2, &  ! Ne
+23.0, &  ! Na
+24.3, &  ! Mg
+27.0, &  ! Al
+28.1, &  ! Si
+31.0, &  ! P
+32.1, &  ! S
+35.5, &  ! Cl
+39.9, &  ! Ar
+39.1, &  ! K
+40.1, &  ! Ca
+45.0, &  ! Sc
+47.9, &  ! Ti
+50.9, &  ! V
+52.0, &  ! Cr
+54.9, &  ! Mn
+55.8, &  ! Fe
+58.9, &  ! Co
+58.7, &  ! Ni
+63.5, &  ! Cu
+65.4, &  ! Zn
+69.7, &  ! Ga
+72.6, &  ! Ge
+74.9, &  ! As
+79.0, &  ! Se
+79.9, &  ! Br
+83.8, &  ! Kr
+85.5, &  ! Rb
+87.6, &  ! Sr
+88.9, &  ! Y
+91.2, &  ! Zr
+92.9, &  ! Nb
+96.0, &  ! Mo
+97.9, &  ! Tc
+101.1, &  ! Ru
+102.9, &  ! Rh
+106.4, &  ! Pd
+107.9, &  ! Ag
+112.4, &  ! Cd
+114.8, &  ! In
+118.7, &  ! Sn
+121.8, &  ! Sb
+127.6, &  ! Te
+126.9, &  ! I
+131.3, &  ! Xe
+132.9, &  ! Cs
+137.3, &  ! Ba
+138.9, &  ! La
+140.1, &  ! Ce
+140.9, &  ! Pr
+144.2, &  ! Nd
+144.9, &  ! Pm
+150.4, &  ! Sm
+152.0, &  ! Eu
+157.2, &  ! Gd
+158.9, &  ! Tb
+162.5, &  ! Dy
+164.9, &  ! Ho
+167.3, &  ! Er
+168.9, &  ! Tm
+173.0, &  ! Yb
+175.0, &  ! Lu
+178.5, &  ! Hf
+180.9, &  ! Ta
+183.8, &  ! W
+186.2, &  ! Re
+190.2, &  ! Os
+192.2, &  ! Ir
+195.1, &  ! Pt
+197.0, &  ! Au
+200.6, &  ! Hg
+204.4, &  ! Tl
+207.2, &  ! Pb
+209.0, &  ! Bi
+209.0, &  ! Po
+210.0, &  ! At
+222.0, &  ! Rn
+223.0, &  ! Fr
+226.0, &  ! Ra
+227.0, &  ! Ac
+232.0, &  ! Th
+231.0, &  ! Pa
+238.0, &  ! U
+237.0, &  ! Np
+244.0, &  ! Pu
+243.0, &  ! Am
+247.0, &  ! Cm
+247.0, &  ! Bk
+251.0, &  ! Cf
+252.0, &  ! Es
+257.0, &  ! Fm
+258.0, &  ! Md
+259.0, &  ! No
+262.0  &  ! Lr
 ]
 
 ! Atomic covalent radii (Angstrom)
@@ -344,114 +452,6 @@ real(rk), parameter :: vdw_radii(num_elems) = [ &
 2.46  &  ! Lr
 ]
 
-! Standard atomic masses
-! Source: mendeleev Python library
-real(rk), target :: atomic_masses(num_elems) = [ &
-1.0, &  ! H
-4.0, &  ! He
-6.9, &  ! Li
-9.0, &  ! Be
-10.8, &  ! B
-12.0, &  ! C
-14.0, &  ! N
-16.0, &  ! O
-19.0, &  ! F
-20.2, &  ! Ne
-23.0, &  ! Na
-24.3, &  ! Mg
-27.0, &  ! Al
-28.1, &  ! Si
-31.0, &  ! P
-32.1, &  ! S
-35.5, &  ! Cl
-39.9, &  ! Ar
-39.1, &  ! K
-40.1, &  ! Ca
-45.0, &  ! Sc
-47.9, &  ! Ti
-50.9, &  ! V
-52.0, &  ! Cr
-54.9, &  ! Mn
-55.8, &  ! Fe
-58.9, &  ! Co
-58.7, &  ! Ni
-63.5, &  ! Cu
-65.4, &  ! Zn
-69.7, &  ! Ga
-72.6, &  ! Ge
-74.9, &  ! As
-79.0, &  ! Se
-79.9, &  ! Br
-83.8, &  ! Kr
-85.5, &  ! Rb
-87.6, &  ! Sr
-88.9, &  ! Y
-91.2, &  ! Zr
-92.9, &  ! Nb
-96.0, &  ! Mo
-97.9, &  ! Tc
-101.1, &  ! Ru
-102.9, &  ! Rh
-106.4, &  ! Pd
-107.9, &  ! Ag
-112.4, &  ! Cd
-114.8, &  ! In
-118.7, &  ! Sn
-121.8, &  ! Sb
-127.6, &  ! Te
-126.9, &  ! I
-131.3, &  ! Xe
-132.9, &  ! Cs
-137.3, &  ! Ba
-138.9, &  ! La
-140.1, &  ! Ce
-140.9, &  ! Pr
-144.2, &  ! Nd
-144.9, &  ! Pm
-150.4, &  ! Sm
-152.0, &  ! Eu
-157.2, &  ! Gd
-158.9, &  ! Tb
-162.5, &  ! Dy
-164.9, &  ! Ho
-167.3, &  ! Er
-168.9, &  ! Tm
-173.0, &  ! Yb
-175.0, &  ! Lu
-178.5, &  ! Hf
-180.9, &  ! Ta
-183.8, &  ! W
-186.2, &  ! Re
-190.2, &  ! Os
-192.2, &  ! Ir
-195.1, &  ! Pt
-197.0, &  ! Au
-200.6, &  ! Hg
-204.4, &  ! Tl
-207.2, &  ! Pb
-209.0, &  ! Bi
-209.0, &  ! Po
-210.0, &  ! At
-222.0, &  ! Rn
-223.0, &  ! Fr
-226.0, &  ! Ra
-227.0, &  ! Ac
-232.0, &  ! Th
-231.0, &  ! Pa
-238.0, &  ! U
-237.0, &  ! Np
-244.0, &  ! Pu
-243.0, &  ! Am
-247.0, &  ! Cm
-247.0, &  ! Bk
-251.0, &  ! Cf
-252.0, &  ! Es
-257.0, &  ! Fm
-258.0, &  ! Md
-259.0, &  ! No
-262.0  &  ! Lr
-]
-
 contains
 
 function atomic_number(elsym) result(z)
@@ -459,7 +459,7 @@ function atomic_number(elsym) result(z)
    integer :: z
 
    do z = 1, num_elems
-      if (uppercase(elsym) == uppercase(element_symbols(z))) then
+      if (uppercase(elsym) == uppercase(atomic_symbols(z))) then
          return
       end if
    end do

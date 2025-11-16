@@ -812,7 +812,7 @@ recursive subroutine print_chain_recursive_array(atomtypes, cache_arrays, chain_
       split_part_idx = cache_arrays%assigntree(child_idx)%split_part_idx
       first_atom_idx = cache_arrays%atomidcs1(cache_arrays%partree(split_part_idx)%items1_offset+1)
       write(stdout, '(A,"*",I0)') &
-         trim(element_symbols(atomtypes%parts(atomtypes%itemdir1(first_atom_idx))%elnum)), &
+         trim(atomic_symbols(atomtypes%parts(atomtypes%itemdir1(first_atom_idx))%elnum)), &
          cache_arrays%partree(split_part_idx)%items1_count
 
       ! Recursively print this child's children

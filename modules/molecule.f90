@@ -247,7 +247,7 @@ subroutine print_atoms(atoms)
    do i = 1, size(atoms)
       atom = atoms(i)
       fmtstr = '(I3,3X,A2,1X,I3,3(1X,f8.4),2X)'
-      write (stderr, fmtstr) i, element_symbols(atom%elnum), atom%typeid, atom%coords
+      write (stderr, fmtstr) i, atomic_symbols(atom%elnum), atom%typeid, atom%coords
    end do
 end subroutine
 

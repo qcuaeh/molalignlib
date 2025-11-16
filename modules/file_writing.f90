@@ -74,7 +74,7 @@ subroutine writefile_xyz(unit, title, atoms, bonds, atomperm1)
 
    do i = 1, atoms_size
       iatom = atoms(atomperm1(i))
-      write (unit, '(A,3(2X,F12.6))') element_symbols(iatom%elnum), iatom%coords
+      write (unit, '(A,3(2X,F12.6))') atomic_symbols(iatom%elnum), iatom%coords
    end do
 end subroutine
 
@@ -115,7 +115,7 @@ subroutine writefile_mol2(unit, title, atoms, bonds, atomperm1)
          atom_type = 'H'
       end if
       write (unit, '(I4,2X,A2,3(1X,F12.6),2X,A4,1X,I2,1X,A4,1X,F7.3)') &
-         i, element_symbols(iatom%elnum), iatom%coords, atom_type, 1, 'MOL1', 0.
+         i, atomic_symbols(iatom%elnum), iatom%coords, atom_type, 1, 'MOL1', 0.
    end do
 
    write (unit, '(A)') '@<TRIPOS>BOND'
@@ -162,7 +162,7 @@ subroutine writefile_sdf(unit, title, atoms, bonds, atomperm1)
    do i = 1, atoms_size
       iatom = atoms(atomperm1(i))
       write (unit, '(3F10.4,1X,A3,I2,11I3)') &
-         iatom%coords, element_symbols(iatom%elnum), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+         iatom%coords, atomic_symbols(iatom%elnum), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
    end do
 
    ! Bond block
