@@ -50,7 +50,7 @@ type, public :: partree_item_t
    integer :: signature_values(MAX_COORD)       ! unique values in signature
    integer :: signature_frequencies(MAX_COORD)  ! frequency of each unique value
    integer :: signature_unique_count            ! number of unique values
-   integer :: signature_length            ! total signature length (sum of frequencies)
+   integer :: signature_size            ! total signature length (sum of frequencies)
 end type
 
 type, public :: chain_item_t
@@ -211,7 +211,7 @@ subroutine convert_signature(part, cache_arrays, part_idx)
    end do
 
    ! Store total signature length
-   cache_arrays%partree(part_idx)%signature_length = temp_count
+   cache_arrays%partree(part_idx)%signature_size = temp_count
 
    ! Second pass: compute unique values and their frequencies
    cache_arrays%partree(part_idx)%signature_unique_count = 0
@@ -575,7 +575,7 @@ recursive subroutine print_signatures_recursive_array(cache_arrays, part_idx)
 
       ! Print the child signature with frequencies and total length
       write(stderr,'(A,I0,A,I0,A)',advance='no') 'Part ', child_idx, ' (len=', &
-         cache_arrays%partree(child_idx)%signature_length, '):'
+         cache_arrays%partree(child_idx)%signature_size, '):'
 
       ! Print unique signature values with frequencies
       if (cache_arrays%partree(child_idx)%signature_unique_count > 0) then

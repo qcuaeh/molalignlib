@@ -28,33 +28,30 @@ public assign_atoms_global
 public assign_atoms_local_full
 public assign_atoms_local_pruned
 
-! Maximum number of children for a part
-integer, parameter :: MAX_CHILDREN = 10
-
-! Module-level signature workspace to eliminate allocations
-integer :: signature_array(MAX_COORD)
-integer :: signature_length
+! Maximum number of part children
+integer, parameter :: MAX_CHILD = 10
 
 ! DFS exploration variables
 integer :: combination_count
 
 contains
 
-function signature_equivalence_array(cache_arrays, part_idx) result(equiv)
+function signature_equivalence_array(cache_arrays, part_idx, signature_size, signature) result(equiv)
    ! OPTIMIZED: Fast path for length-1 signatures (most common case)
    type(array_trees_t), intent(in) :: cache_arrays
    integer, intent(in) :: part_idx
+   integer, intent(in) :: signature_size, signature(:)
    logical :: equiv
    integer :: signature_frequencies, i, j
 
-   if (signature_length /= cache_arrays%partree(part_idx)%signature_length) then
+   if (signature_size /= cache_arrays%partree(part_idx)%signature_size) then
       equiv = .false.
       return
    end if
 
    ! FAST PATH: Direct comparison for length-1 signatures (most common)
-   if (cache_arrays%partree(part_idx)%signature_length == 1) then
-      equiv = (signature_array(1) == cache_arrays%partree(part_idx)%signature_values(1))
+   if (cache_arrays%partree(part_idx)%signature_size == 1) then
+      equiv = (signature(1) == cache_arrays%partree(part_idx)%signature_values(1))
       return
    end if
 
@@ -63,8 +60,8 @@ function signature_equivalence_array(cache_arrays, part_idx) result(equiv)
       signature_frequencies = 0
 
       ! Count matches in target signature
-      do j = 1, signature_length
-         if (signature_array(j) == cache_arrays%partree(part_idx)%signature_values(i)) then
+      do j = 1, signature_size
+         if (signature(j) == cache_arrays%partree(part_idx)%signature_values(i)) then
             signature_frequencies = signature_frequencies + 1
          end if
       end do
@@ -78,9 +75,10 @@ function signature_equivalence_array(cache_arrays, part_idx) result(equiv)
    equiv = .true.
 end function
 
-function find_child_part_array(cache_arrays, parent_idx) result(child_relative_idx)
+function find_child_part_array(cache_arrays, parent_idx, signature_size, signature) result(child_relative_idx)
    type(array_trees_t), intent(in) :: cache_arrays
    integer, intent(in) :: parent_idx
+   integer, intent(in) :: signature_size, signature(:)
    integer :: child_relative_idx
    integer :: num_children, child_idx, i
 
@@ -90,7 +88,7 @@ function find_child_part_array(cache_arrays, parent_idx) result(child_relative_i
    ! Find the child that matches the signature
    do i = 1, num_children
       child_idx = cache_arrays%partree(parent_idx)%child_indices(i)
-      if (signature_equivalence_array(cache_arrays, child_idx)) then
+      if (signature_equivalence_array(cache_arrays, child_idx, signature_size, signature)) then
          child_relative_idx = i
          return
       end if
@@ -134,7 +132,8 @@ subroutine update_hna_part(cache_arrays, part_idx, read_link_idx, write_link_idx
    type(array_trees_t), intent(inout) :: cache_arrays
    integer, intent(in) :: part_idx, read_link_idx, write_link_idx
    type(subperm_t), intent(inout) :: subperm
-   integer, dimension(MAX_CHILDREN) :: items1_trackers, items2_trackers
+   integer, save :: signature_size, signature(MAX_COORD)
+   integer, dimension(MAX_CHILD), save :: items1_trackers, items2_trackers
    integer :: target_relative_idx, target_part_idx, item_idx, target_idx, part_ref_idx
    integer :: items1_offset, items1_count, items2_offset, items2_count, num_children
    integer :: adj_atom
@@ -158,18 +157,18 @@ subroutine update_hna_part(cache_arrays, part_idx, read_link_idx, write_link_idx
       item_idx = cache_arrays%atomidcs1(items1_offset + i)
 
       ! ULTRA-OPTIMIZED: Generate compact signature using direct 2D adjacency access
-      signature_length = 0
+      signature_size = 0
       do j = 1, cache_arrays%adjcs1_cn(item_idx)
          adj_atom = cache_arrays%adjcs1_list(item_idx, j)
          part_ref_idx = cache_arrays%itemdir1_entries(read_link_idx, adj_atom)
          if (part_ref_idx /= 0) then
-            signature_length = signature_length + 1
-            signature_array(signature_length) = part_ref_idx
+            signature_size = signature_size + 1
+            signature(signature_size) = part_ref_idx
          end if
       end do
 
       ! Get relative index directly - no search needed
-      target_relative_idx = find_child_part_array(cache_arrays, part_idx)
+      target_relative_idx = find_child_part_array(cache_arrays, part_idx, signature_size, signature)
 
       ! Get absolute part index from relative index
       target_part_idx = cache_arrays%partree(part_idx)%child_indices(target_relative_idx)
@@ -189,18 +188,18 @@ subroutine update_hna_part(cache_arrays, part_idx, read_link_idx, write_link_idx
       item_idx = cache_arrays%atomidcs2(items2_offset + i)
 
       ! ULTRA-OPTIMIZED: Generate compact signature using direct 2D adjacency access
-      signature_length = 0
+      signature_size = 0
       do j = 1, cache_arrays%adjcs2_cn(item_idx)
          adj_atom = cache_arrays%adjcs2_list(item_idx, j)
          part_ref_idx = cache_arrays%itemdir2_entries(read_link_idx, adj_atom)
          if (part_ref_idx /= 0) then
-            signature_length = signature_length + 1
-            signature_array(signature_length) = part_ref_idx
+            signature_size = signature_size + 1
+            signature(signature_size) = part_ref_idx
          end if
       end do
 
       ! Get relative index directly - no search needed
-      target_relative_idx = find_child_part_array(cache_arrays, part_idx)
+      target_relative_idx = find_child_part_array(cache_arrays, part_idx, signature_size, signature)
 
       ! Get absolute part index from relative index
       target_part_idx = cache_arrays%partree(part_idx)%child_indices(target_relative_idx)
@@ -418,7 +417,8 @@ recursive subroutine recurse_assign_atoms_greedy(coords1, coords2, cache_arrays,
 end subroutine
 
 subroutine assign_atoms_greedy(coords1, coords2, cache_arrays, atomperm1, permdist)
-   ! Greedy exploration wrapper - generates assignment by always choosing closest pairs
+   ! Greedy exploration wrapper with recursive JVC optimization
+   ! At each split level, applies JVC to find optimal pairing for that subset
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: cache_arrays
    integer, dimension(:), allocatable, intent(out) :: atomperm1
@@ -432,7 +432,7 @@ subroutine assign_atoms_greedy(coords1, coords2, cache_arrays, atomperm1, permdi
    ! Initialize assignment with preassigned pairs
    call collect_leaf_assignments(cache_arrays, 1, greedy_perm)
 
-   ! Perform greedy exploration to generate one assignment (starting from root chain at index 1)
+   ! Perform greedy exploration with JVC optimization (starting from root chain at index 1)
    call recurse_assign_atoms_greedy(coords1, coords2, cache_arrays, 1, greedy_perm)
 
    ! Convert subperm type to permutation array
@@ -671,10 +671,53 @@ subroutine assign_atoms_local_full(coords1, coords2, cache_arrays, atomperm1, to
    atomperm1 = best_perm%atomperm
 end subroutine
 
+function estimate_unassigned_lower_bound(coords1, coords2, cache_arrays, branch_idx) result(lower_bound)
+   ! Estimate lower bound distance for all unassigned atoms using nearest-neighbor approach
+   ! For each unassigned atom in molecule 1, finds closest unassigned atom in molecule 2
+   real(rk), intent(in) :: coords1(:,:), coords2(:,:)
+   type(array_trees_t), intent(in) :: cache_arrays
+   integer, intent(in) :: branch_idx
+   real(rk) :: dist, min_dist, lower_bound
+   integer :: child_idx, split_part_idx, item1_idx, item2_idx
+   integer :: items1_offset, items2_offset, items1_count, items2_count
+   integer :: i, j, k
+   
+   lower_bound = 0.0_rk
+   
+   ! Process all child branches to accumulate unassigned atoms
+   do i = 1, cache_arrays%assigntree(branch_idx)%num_children
+      child_idx = cache_arrays%assigntree(branch_idx)%child_indices(i)
+      split_part_idx = cache_arrays%assigntree(child_idx)%split_part_idx
+      
+      items1_offset = cache_arrays%partree(split_part_idx)%items1_offset
+      items1_count = cache_arrays%partree(split_part_idx)%items1_count
+      items2_offset = cache_arrays%partree(split_part_idx)%items2_offset
+      items2_count = cache_arrays%partree(split_part_idx)%items2_count
+      
+      ! For each atom in molecule 1 at this split, find nearest atom in molecule 2
+      do j = 1, items1_count
+         item1_idx = cache_arrays%atomidcs1(items1_offset + j)
+         min_dist = huge(rk)
+         
+         ! Find minimum distance to any atom in molecule 2 at this split
+         do k = 1, items2_count
+            item2_idx = cache_arrays%atomidcs2(items2_offset + k)
+            dist = sum((coords1(:, item1_idx) - coords2(:, item2_idx))**2)
+            
+            if (dist < min_dist) then
+               min_dist = dist
+            end if
+         end do
+         
+         lower_bound = lower_bound + min_dist
+      end do
+   end do
+end function
+
 recursive subroutine recurse_assign_atoms_local_pruned(coords1, coords2, cache_arrays, &
          branch_idx, total_budget, best_perm, accumulated_dist, success)
    ! DFS exploration with pruning_atoms - finds permutation that minimizes total distance
-   ! OPTIMIZED: Incremental distance calculation to avoid redundant sqdistsum calls
+   ! OPTIMIZED: Incremental distance calculation + nearest-neighbor lower bound pruning
    real(rk), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: cache_arrays
    integer, intent(in) :: branch_idx
@@ -688,7 +731,7 @@ recursive subroutine recurse_assign_atoms_local_pruned(coords1, coords2, cache_a
    type(subperm_t) :: best_branch_perm, branch_perm
    real(rk) :: branch_dist, min_branch_dist
    logical :: branch_success, child_success
-   real(rk) :: remaining_budget
+   real(rk) :: remaining_budget, lower_bound_estimate
    integer :: atoms_size
 
    atoms_size = cache_arrays%atoms1_size
@@ -702,6 +745,15 @@ recursive subroutine recurse_assign_atoms_local_pruned(coords1, coords2, cache_a
 
    ! Calculate remaining budget at this level
    remaining_budget = total_budget - accumulated_dist
+   
+   ! AGGRESSIVE PRUNING: Estimate lower bound for unassigned atoms
+   lower_bound_estimate = estimate_unassigned_lower_bound(coords1, coords2, cache_arrays, branch_idx)
+   
+   ! If even the best-case scenario exceeds budget, prune this branch
+   if (lower_bound_estimate >= remaining_budget) then
+      success = .false.
+      return
+   end if
 
    ! Process each child branch independently
    do i = 1, cache_arrays%assigntree(branch_idx)%num_children
