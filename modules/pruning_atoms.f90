@@ -55,7 +55,7 @@ subroutine prune_none( atomtypes, coords1, coords2, prunes)
       allocate (prunes(h)%a(num_items1, num_items2))
       do i = 1, num_items1
          do j = 1, num_items2
-            prunes(h)%a(j, i) = .false.
+            prunes(h)%a(j, i) = .FALSE.
          end do
       end do
    end do
@@ -108,14 +108,14 @@ subroutine prune_rd( atomtypes, coords1, coords2, prunes)
       num_items1 = atomtypes%parts(h)%num_items1
       num_items2 = atomtypes%parts(h)%num_items2
       allocate (prunes(h)%a(num_items1, num_items2))
-      prunes(h)%a = .false.
+      prunes(h)%a = .FALSE.
       do i = 1, num_items1
          iatom = atomtypes%parts(h)%items1(i)
          do j = 1, num_items2
             jatom = atomtypes%parts(h)%items2(j)
             do k = 1, atomtypes%num_parts
                if (any(abs(dists2(jatom)%u(k)%u - dists1(iatom)%u(k)%u) > 3.4641*prune_tol)) then
-                  prunes(h)%a(j, i) = .true.
+                  prunes(h)%a(j, i) = .TRUE.
                   exit
                end if
             end do

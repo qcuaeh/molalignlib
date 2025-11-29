@@ -68,11 +68,11 @@ subroutine reset_registry(registry)
    registry%occ_records = 0
    registry%num_trials = 0
    registry%total_steps = 0
-   registry%overflow = .false.
+   registry%overflow = .FALSE.
    registry%records%freq = 0
    registry%records%steps = 0
-   registry%records%permdiff = huge(ik)
-   registry%records%permdist = huge(rk)
+   registry%records%permdiff = huge(registry%records(1)%permdiff)
+   registry%records%permdist = huge(registry%records(1)%permdist)
 end subroutine
 
 subroutine insert_record_atomperm(registry, atomperm1, steps, rotation, permdiff, permdist)
@@ -134,7 +134,7 @@ subroutine insert_record_atomperm(registry, atomperm1, steps, rotation, permdiff
       if (registry%occ_records < size(registry%records)) then
          registry%occ_records = registry%occ_records + 1
       else
-         registry%overflow = .true.
+         registry%overflow = .TRUE.
       end if
    end if
 end subroutine
@@ -155,7 +155,7 @@ subroutine insert_record_moldiff(registry, moldiffs, atomperm1, steps, rotation,
    registry%total_steps = registry%total_steps + steps
 
    permdiff = size(moldiffs, 2)
-   found_match = .false.
+   found_match = .FALSE.
    match_pos = 0
 
    do i = 1, registry%occ_records
@@ -166,7 +166,7 @@ subroutine insert_record_moldiff(registry, moldiffs, atomperm1, steps, rotation,
                        all(moldiffs(2, :) == record%moldiffs(2, :))
 
          if (bonds_match) then
-            found_match = .true.
+            found_match = .TRUE.
             match_pos = i
             record%freq = record%freq + 1
             record%steps = record%steps + (steps - record%steps)/record%freq
@@ -202,7 +202,7 @@ subroutine insert_record_moldiff(registry, moldiffs, atomperm1, steps, rotation,
                   if (registry%occ_records < size(registry%records)) then
                      registry%occ_records = registry%occ_records + 1
                   else
-                     registry%overflow = .true.
+                     registry%overflow = .TRUE.
                   end if
                end if
             end if
@@ -238,7 +238,7 @@ subroutine insert_record_moldiff(registry, moldiffs, atomperm1, steps, rotation,
       if (registry%occ_records < size(registry%records)) then
          registry%occ_records = registry%occ_records + 1
       else
-         registry%overflow = .true.
+         registry%overflow = .TRUE.
       end if
    end if
 end subroutine

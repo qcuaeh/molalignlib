@@ -64,25 +64,25 @@ procedure(bond_modifier_interface), pointer :: match_diff_bonds => null()
 
 ! Set default options
 
-stats_flag = .false.
-heavy_flag = .false.
-mirror_flag = .false.
-align_flag = .false.
-remap_flag = .false.
-coords_flag = .false.
-mass_flag = .false.
-stoch_flag = .true.
-adaptive_flag = .true.
-label_flag = .false.
-random_flag = .false.
-rebond_flag = .false.
-atomorder_flag = .false.
+stats_flag = .FALSE.
+heavy_flag = .FALSE.
+mirror_flag = .FALSE.
+align_flag = .FALSE.
+remap_flag = .FALSE.
+coords_flag = .FALSE.
+mass_flag = .FALSE.
+stoch_flag = .TRUE.
+adaptive_flag = .TRUE.
+label_flag = .FALSE.
+random_flag = .FALSE.
+rebond_flag = .FALSE.
+atomorder_flag = .FALSE.
 
 num_records = 1
 iso_thres = 100
 confo_thres = 100
+max_trials = MAX_TRIALS_DEFAULT
 unitout = stdout
-max_trials = huge(ik)
 
 ! Read command options
 
@@ -91,19 +91,19 @@ call init_args()
 do while (get_arg(arg))
    select case (lowercase(arg))
    case ('-align')
-      align_flag = .true.
+      align_flag = .TRUE.
    case ('-remap')
-      remap_flag = .true.
+      remap_flag = .TRUE.
    case ('-atomorder')
-      atomorder_flag = .true.
+      atomorder_flag = .TRUE.
    case ('-label')
-      label_flag = .true.
+      label_flag = .TRUE.
    case ('-heavy')
-      heavy_flag = .true.
+      heavy_flag = .TRUE.
    case ('-mass')
-      mass_flag = .true.
+      mass_flag = .TRUE.
    case ('-mirror')
-      mirror_flag = .true.
+      mirror_flag = .TRUE.
    case ('-thres')
       call read_optarg( arg, iso_thres)
    case ('-trials')
@@ -111,14 +111,14 @@ do while (get_arg(arg))
    case ('-records')
       call read_optarg( arg, num_records)
    case ('-coords')
-      coords_flag = .true.
+      coords_flag = .TRUE.
       call read_optarg( arg, coords_path)
    case ('-stats')
-      stats_flag = .true.
+      stats_flag = .TRUE.
    case ('-random')
-      random_flag = .true.
+      random_flag = .TRUE.
    case ('-rebond')
-      rebond_flag = .true.
+      rebond_flag = .TRUE.
    case ('-confo1')
       match_diff_bonds => toggle_bonds1
    case ('-confo2')

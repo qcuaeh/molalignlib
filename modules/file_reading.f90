@@ -69,23 +69,23 @@ subroutine readfile_xyz(unit, title, atoms, bonds)
    character(ll) :: buffer
    character(wl) :: elsym
    character(:), allocatable :: label
-   integer :: i, atoms_size, elnum, stat
+   integer :: i, n_atoms, elnum, stat
    real(rk) :: coords(3)
 
    ! Read number of atoms
-   read (unit, *, iostat=stat) atoms_size
+   read (unit, *, iostat=stat) n_atoms
    if (stat /= 0) then
       write (stderr, '(A)') 'Error: Invalid XYZ format'
       stop 1
    end if
 
    ! Check for empty file
-   if (atoms_size <= 0) then
+   if (n_atoms <= 0) then
       write (stderr, '(A)') 'Error: File contains no atoms'
       stop 1
    end if
 
-   allocate (atoms(atoms_size))
+   allocate (atoms(n_atoms))
    allocate (bonds(0))
 
    ! Read title line
@@ -96,7 +96,7 @@ subroutine readfile_xyz(unit, title, atoms, bonds)
    end if
    title = trim(buffer)
 
-   do i = 1, atoms_size
+   do i = 1, n_atoms
       read (unit,*,iostat=stat) elsym, coords
       if (stat /= 0) then
          write (stderr, '(A)') 'Error: Invalid XYZ format'
@@ -209,23 +209,23 @@ subroutine read_v2000_format(unit, counts_line, atoms, bonds)
    character(ll) :: buffer
    character(:), allocatable :: label
    integer :: elnum, atomidx1, atomidx2, typeid
-   integer :: atoms_size, bonds_size, stat, i
+   integer :: n_atoms, n_bonds, stat, i
 
    ! Parse counts from V2000 format
-   read (counts_line(1:3), '(I3)', iostat=stat) atoms_size
+   read (counts_line(1:3), '(I3)', iostat=stat) n_atoms
    if (stat /= 0) then
       write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
       stop 1
    end if
-   read (counts_line(4:6), '(I3)', iostat=stat) bonds_size
+   read (counts_line(4:6), '(I3)', iostat=stat) n_bonds
    if (stat /= 0) then
       write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
       stop 1
    end if
 
-   allocate (atoms(atoms_size))
+   allocate (atoms(n_atoms))
    ! Read atom block
-   do i = 1, atoms_size
+   do i = 1, n_atoms
       read (unit,'(A)',iostat=stat) buffer
       if (stat /= 0) then
          write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
@@ -254,8 +254,8 @@ subroutine read_v2000_format(unit, counts_line, atoms, bonds)
    end do
 
    ! Read bond block
-   allocate (bonds(bonds_size))
-   do i = 1, bonds_size
+   allocate (bonds(n_bonds))
+   do i = 1, n_bonds
       read (unit, '(A)', iostat=stat) buffer
       if (stat /= 0) then
          write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
@@ -292,7 +292,7 @@ subroutine read_v3000_format(unit, counts_line, atoms, bonds)
    character(ll) :: buffer
    character(:), allocatable :: label
    real(rk) :: coords(3)
-   integer :: atoms_size, bonds_size, stat, i, pos
+   integer :: n_atoms, n_bonds, stat, i, pos
    integer :: elnum, typeid, atomidx1, atomidx2, dummy_int
    character(3) :: elsym
 
@@ -314,9 +314,9 @@ subroutine read_v3000_format(unit, counts_line, atoms, bonds)
          stop 1
       end if
       if (index(buffer, 'COUNTS') > 0) then
-         ! Parse: M  V30 COUNTS atoms_size bonds_size ...
+         ! Parse: M  V30 COUNTS n_atoms n_bonds ...
          pos = index(buffer, 'COUNTS')
-         read (buffer(pos+6:), *, iostat=stat) atoms_size, bonds_size
+         read (buffer(pos+6:), *, iostat=stat) n_atoms, n_bonds
          if (stat /= 0) then
             write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
             stop 1
@@ -325,7 +325,7 @@ subroutine read_v3000_format(unit, counts_line, atoms, bonds)
       end if
    end do
 
-   allocate (atoms(atoms_size))
+   allocate (atoms(n_atoms))
 
    ! Find BEGIN ATOM
    do
@@ -339,7 +339,7 @@ subroutine read_v3000_format(unit, counts_line, atoms, bonds)
 
    ! Read atoms in V3000 format
    ! Format: M  V30 atom_id element_symbol x y z charge ...
-   do i = 1, atoms_size
+   do i = 1, n_atoms
       read (unit, '(A)', iostat=stat) buffer
       if (stat /= 0) then
          write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
@@ -374,8 +374,8 @@ subroutine read_v3000_format(unit, counts_line, atoms, bonds)
       if (index(buffer, 'END ATOM') > 0) exit
    end do
 
-   allocate (bonds(bonds_size))
-   if (bonds_size > 0) then
+   allocate (bonds(n_bonds))
+   if (n_bonds > 0) then
       ! Find BEGIN BOND
       do
          read (unit, '(A)', iostat=stat) buffer
@@ -388,7 +388,7 @@ subroutine read_v3000_format(unit, counts_line, atoms, bonds)
 
       ! Read bonds in V3000 format
       ! Format: M  V30 bond_id type atom1 atom2 ...
-      do i = 1, bonds_size
+      do i = 1, n_bonds
          read (unit, '(A)', iostat=stat) buffer
          if (stat /= 0) then
             write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
@@ -438,7 +438,7 @@ subroutine readfile_mol2(unit, title, atoms, bonds)
    character(wl) :: elsym, dummy, typestr
    character(ll) :: buffer
    character(:), allocatable :: label
-   integer :: atoms_size, bonds_size, elnum, stat
+   integer :: n_atoms, n_bonds, elnum, stat
    integer :: i, atomidx1, atomidx2
 
    ! Find @<TRIPOS>MOLECULE section
@@ -460,19 +460,19 @@ subroutine readfile_mol2(unit, title, atoms, bonds)
    title = trim(buffer)
 
    ! Read counts line
-   read (unit, *, iostat=stat) atoms_size, bonds_size
+   read (unit, *, iostat=stat) n_atoms, n_bonds
    if (stat /= 0) then
       write (stderr, '(A)') 'Error: Invalid MOL2 format'
       stop 1
    end if
 
    ! Check for empty file
-   if (atoms_size <= 0) then
+   if (n_atoms <= 0) then
       write (stderr, '(A)') 'Error: File contains no atoms'
       stop 1
    end if
 
-   allocate (atoms(atoms_size))
+   allocate (atoms(n_atoms))
 
    ! Find @<TRIPOS>ATOM section
    do
@@ -486,7 +486,7 @@ subroutine readfile_mol2(unit, title, atoms, bonds)
 
    ! Read atom section
    ! Format: atom_id atom_name x y z typestr [subst_id subst_name charge]
-   do i = 1, atoms_size
+   do i = 1, n_atoms
       read (unit,*,iostat=stat) dummy, elsym, coords, typestr
       if (stat /= 0) then
          write (stderr, '(A)') 'Error: Invalid MOL2 format'
@@ -506,8 +506,8 @@ subroutine readfile_mol2(unit, title, atoms, bonds)
    end do
 
    ! Read bonds
-   allocate (bonds(bonds_size))
-   if (bonds_size > 0) then
+   allocate (bonds(n_bonds))
+   if (n_bonds > 0) then
       ! Find @<TRIPOS>BOND section
       do
          read (unit, '(A)', iostat=stat) buffer
@@ -520,7 +520,7 @@ subroutine readfile_mol2(unit, title, atoms, bonds)
 
       ! Read bond section
       ! Format: bond_id origin_atom_id target_atom_id typestr
-      do i = 1, bonds_size
+      do i = 1, n_bonds
          read (unit, *, iostat=stat) dummy, atomidx1, atomidx2, typestr
          if (stat /= 0) then
             write (stderr, '(A)') 'Error: Invalid MOL2 format'

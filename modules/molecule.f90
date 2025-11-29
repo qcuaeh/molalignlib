@@ -95,24 +95,24 @@ subroutine set_coords(atoms, coords)
    end do
 end subroutine
 
-subroutine adjacency_from_bonds(atomset, bonds, atoms_size, adjcs)
+subroutine adjacency_from_bonds(atomset, bonds, n_atoms, adjcs)
    integer, dimension(:), intent(in) :: atomset
    type(bond_t), dimension(:), intent(in) :: bonds
-   integer, intent(in) :: atoms_size
+   integer, intent(in) :: n_atoms
    type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs
    ! Local variables
    logical, dimension(:,:), allocatable :: adjmat
    integer :: i, atomidx1, atomidx2
 
-   allocate (adjmat(atoms_size, atoms_size))
-   adjmat = .false.
+   allocate (adjmat(n_atoms, n_atoms))
+   adjmat = .FALSE.
 
    ! Build adjacency matrix from bonds
    do i = 1, size(bonds)
       atomidx1 = bonds(i)%atomidx1
       atomidx2 = bonds(i)%atomidx2
-      adjmat(atomidx1, atomidx2) = .true.
-      adjmat(atomidx2, atomidx1) = .true.
+      adjmat(atomidx1, atomidx2) = .TRUE.
+      adjmat(atomidx2, atomidx1) = .TRUE.
    end do
 
    ! Convert to adjacency lists
@@ -133,7 +133,7 @@ subroutine adjacency_from_atoms(atomset, atoms, adjcs)
 
    ! Build adjacency matrix for all atoms
    allocate (adjmat(size(atoms), size(atoms)))
-   adjmat = .false.
+   adjmat = .FALSE.
 
    ! Set atom radii
    atom_radii = 1.2*covalent_radii(atoms%elnum)
@@ -143,8 +143,8 @@ subroutine adjacency_from_atoms(atomset, atoms, adjcs)
       do j = i + 1, size(atoms)
          atom_dist = sqrt(sum((atoms(i)%coords - atoms(j)%coords)**2))
          if (atom_dist < atom_radii(i) + atom_radii(j)) then
-            adjmat(i, j) = .true.
-            adjmat(j, i) = .true.
+            adjmat(i, j) = .TRUE.
+            adjmat(j, i) = .TRUE.
          end if
       end do
    end do

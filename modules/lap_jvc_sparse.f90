@@ -250,7 +250,7 @@ subroutine solve_for_one_row(n, sz, cc, kk, first, l, free, &
    integer :: i, i0, j, jp, t, tp, last, td2, hp
    real(rk) :: min_val, h, v2, dj
    
-   fail = .false.
+   fail = .FALSE.
    
    ! Initialize
    d = infValue
@@ -291,7 +291,7 @@ subroutine solve_for_one_row(n, sz, cc, kk, first, l, free, &
    ! Main loop
    do
       if (td1 < 1) then
-         fail = .true.
+         fail = .TRUE.
          return
       end if
       

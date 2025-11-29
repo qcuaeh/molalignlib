@@ -87,7 +87,7 @@ subroutine parse_path(filepath, filetype)
    character(:), allocatable :: basename
    character(:), allocatable :: dirname, filename
    integer :: pos
-   pos = index(filepath, '/', back=.true.)
+   pos = index(filepath, '/', back=.TRUE.)
    if (pos /= 0) then
       dirname = filepath(:pos-1)
       basename = filepath(pos+1:)
@@ -99,7 +99,7 @@ subroutine parse_path(filepath, filetype)
       dirname = '.'
       basename = filepath
    end if
-   pos = index(basename, '.', back=.true.)
+   pos = index(basename, '.', back=.TRUE.)
    if (pos /= 0) then
       filename = basename(:pos-1)
       filetype = basename(pos+1:)

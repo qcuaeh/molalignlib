@@ -319,7 +319,7 @@ recursive subroutine distribute_items(adjcs1, adjcs2, branch)
    type(chaintree_node_t), pointer :: child_branch
    type(partition_node_t), pointer :: child_part
 
-!   call random_init(.true., .true.)
+!   call random_init(.TRUE., .TRUE.)
 
    ! Process all children of this branch
    child_branch => branch%first_child_chain
@@ -349,7 +349,7 @@ function would_part_split(adjcs1, adjcs2, itemdir1, itemdir2, part) result(would
    type(item_node_t), pointer :: item1, item2
    type(part_nodeptr_t), dimension(:), allocatable :: signature, reference
 
-   would_split = .false.
+   would_split = .FALSE.
    item1 => part%first_item1
    item2 => part%first_item2
 
@@ -368,7 +368,7 @@ function would_part_split(adjcs1, adjcs2, itemdir1, itemdir2, part) result(would
    do while (associated(item1))
       signature = itemdir1(adjcs1(item1%idx)%list(:adjcs1(item1%idx)%cn))
       if (.not. (signature .equiv. reference)) then
-         would_split = .true.
+         would_split = .TRUE.
          return
       end if
       item1 => item1%next_item
@@ -378,7 +378,7 @@ function would_part_split(adjcs1, adjcs2, itemdir1, itemdir2, part) result(would
    do while (associated(item2))
       signature = itemdir2(adjcs2(item2%idx)%list(:adjcs2(item2%idx)%cn))
       if (.not. (signature .equiv. reference)) then
-         would_split = .true.
+         would_split = .TRUE.
          return
       end if
       item2 => item2%next_item
@@ -401,7 +401,7 @@ subroutine refine_branched_hna_partition(adjcs1, adjcs2, hna_chain, branch, bran
    integer :: i
 
    num_splits = 0
-   any_splits = .false.
+   any_splits = .FALSE.
 
    ! Get the current level link
    level_link => hna_chain%last_link
@@ -414,7 +414,7 @@ subroutine refine_branched_hna_partition(adjcs1, adjcs2, hna_chain, branch, bran
    do i = 1, level_link%num_parts
       will_split(i) = would_part_split(adjcs1, adjcs2, level_link%itemdir1, level_link%itemdir2, &
             partref%part)
-      if (will_split(i)) any_splits = .true.
+      if (will_split(i)) any_splits = .TRUE.
       partref => partref%nextref
    end do
 

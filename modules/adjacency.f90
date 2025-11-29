@@ -36,7 +36,7 @@ public bond_modifier_interface
 
 type, public :: adjc_t
    integer :: cn
-   integer :: list(MAX_COORD)
+   integer :: list(MAX_COORDNUM)
 end type
 
 interface adjmat_to_adjcs
@@ -64,16 +64,16 @@ function adjcs_to_adjmat(adjcs) result(adjmat)
 ! Convert adjacency lists to adjacency matrix
    type(adjc_t), dimension(:), intent(in) :: adjcs
    logical, dimension(:,:), allocatable :: adjmat
-   integer :: i, j, k, atoms_size
+   integer :: i, j, k, n_atoms
 
-   atoms_size = size(adjcs)
-   allocate(adjmat(atoms_size, atoms_size))
-   adjmat = .false.
+   n_atoms = size(adjcs)
+   allocate(adjmat(n_atoms, n_atoms))
+   adjmat = .FALSE.
 
-   do i = 1, atoms_size
+   do i = 1, n_atoms
       do j = 1, adjcs(i)%cn
          k = adjcs(i)%list(j)
-         adjmat(i, k) = .true.
+         adjmat(i, k) = .TRUE.
       end do
    end do
 end function
@@ -81,20 +81,20 @@ end function
 subroutine adjmat_to_adjcs_all(adjmat, adjcs)
    logical, dimension(:,:), intent(in) :: adjmat
    type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs
-   integer :: i, j, atoms_size, nadj
+   integer :: i, j, n_atoms, nadj
 
-   atoms_size = size(adjmat, 1)
-   allocate(adjcs(atoms_size))
+   n_atoms = size(adjmat, 1)
+   allocate(adjcs(n_atoms))
 
-   do i = 1, atoms_size
+   do i = 1, n_atoms
       nadj = 0
-      do j = 1, atoms_size
+      do j = 1, n_atoms
          if (adjmat(i, j)) then
             nadj = nadj + 1
-            if (nadj > MAX_COORD) then
+            if (nadj > MAX_COORDNUM) then
                write (stderr, '(A,1X,I0,1X,A,1X,A)') &
                      'Error: Coordination number of atom', i, &
-                     'exceeds', MAX_COORD
+                     'exceeds', MAX_COORDNUM
                stop 1
             end if
             adjcs(i)%list(nadj) = j
@@ -108,22 +108,22 @@ subroutine adjmat_to_adjcs_subset(atomset, adjmat, adjcs)
    integer, dimension(:), intent(in) :: atomset
    logical, dimension(:,:), intent(in) :: adjmat
    type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs
-   integer :: i, nadj, atomidx, atoms_size
+   integer :: i, nadj, atomidx, n_atoms
 
-   atoms_size = size(adjmat, 1)
-   allocate(adjcs(atoms_size))
+   n_atoms = size(adjmat, 1)
+   allocate(adjcs(n_atoms))
 
    ! Populate adjacency lists for all atoms
-   do atomidx = 1, atoms_size
+   do atomidx = 1, n_atoms
       nadj = 0
       ! Only include bonds to atoms in atomset
       do i = 1, size(atomset)
          if (adjmat(atomidx, atomset(i))) then
             nadj = nadj + 1
-            if (nadj > MAX_COORD) then
+            if (nadj > MAX_COORDNUM) then
                write (stderr, '(A,1X,I0,1X,A,1X,A)') &
                      'Error: Coordination number of atom', atomidx, &
-                     'exceeds', MAX_COORD
+                     'exceeds', MAX_COORDNUM
                stop 1
             end if
             adjcs(atomidx)%list(nadj) = atomset(i)
@@ -243,14 +243,14 @@ subroutine compute_differing_bonds(atomset1, atomperm1, adjmat1, adjmat2, moldif
 
    ! Local variables
    integer :: i, j, idx1, idx2, mapped_idx1, mapped_idx2
-   integer :: atoms_size, max_edges, bond_count
+   integer :: n_atoms, max_edges, bond_count
    integer, dimension(:,:), allocatable :: temp_bonds
    integer :: atom1, atom2
    logical :: bond_in_mol1, bond_in_mol2
 
-   atoms_size = size(atomset1)
+   n_atoms = size(atomset1)
    ! Maximum possible differing edges
-   max_edges = atoms_size * (atoms_size - 1) / 2
+   max_edges = n_atoms * (n_atoms - 1) / 2
 
    allocate(temp_bonds(2, max_edges))
    bond_count = 0
@@ -346,9 +346,9 @@ subroutine toggle_bonds2(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, adjcs2
    integer, dimension(:,:), intent(in) :: moldiffs
    type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs1_mod, adjcs2_mod
    logical, dimension(:,:), allocatable :: adjmat2
-   integer :: i, atom1, atom2, atoms_size
+   integer :: i, atom1, atom2, n_atoms
 
-   atoms_size = size(adjcs2)
+   n_atoms = size(adjcs2)
 
    ! Convert adjcs2 to matrix, modify it, and convert back
    adjmat2 = adjcs_to_adjmat(adjcs2)
@@ -394,14 +394,14 @@ subroutine add_missing_bonds(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, ad
       atom2_mol2 = moldiffs(2, i)
 
       ! Add bond to molecule 2
-      adjmat2(atom1_mol2, atom2_mol2) = .true.
-      adjmat2(atom2_mol2, atom1_mol2) = .true.
+      adjmat2(atom1_mol2, atom2_mol2) = .TRUE.
+      adjmat2(atom2_mol2, atom1_mol2) = .TRUE.
 
       ! Map to molecule 1 and add bond
       atom1_mol1 = inv_perm(atom1_mol2)
       atom2_mol1 = inv_perm(atom2_mol2)
-      adjmat1(atom1_mol1, atom2_mol1) = .true.
-      adjmat1(atom2_mol1, atom1_mol1) = .true.
+      adjmat1(atom1_mol1, atom2_mol1) = .TRUE.
+      adjmat1(atom2_mol1, atom1_mol1) = .TRUE.
    end do
 
    ! Convert back to adjacency lists
@@ -430,14 +430,14 @@ subroutine delete_extra_bonds(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, a
       atom2_mol2 = moldiffs(2, i)
 
       ! Remove bond from molecule 2
-      adjmat2(atom1_mol2, atom2_mol2) = .false.
-      adjmat2(atom2_mol2, atom1_mol2) = .false.
+      adjmat2(atom1_mol2, atom2_mol2) = .FALSE.
+      adjmat2(atom2_mol2, atom1_mol2) = .FALSE.
 
       ! Map to molecule 1 and remove bond
       atom1_mol1 = inv_perm(atom1_mol2)
       atom2_mol1 = inv_perm(atom2_mol2)
-      adjmat1(atom1_mol1, atom2_mol1) = .false.
-      adjmat1(atom2_mol1, atom1_mol1) = .false.
+      adjmat1(atom1_mol1, atom2_mol1) = .FALSE.
+      adjmat1(atom2_mol1, atom1_mol1) = .FALSE.
    end do
 
    ! Convert back to adjacency lists

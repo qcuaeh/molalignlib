@@ -60,12 +60,12 @@ logical function compare_atoms_labeled(item, elnum, typeid) result(equal)
 
    if (item%elnum == elnum) then
       if (item%typeid == typeid) then
-         equal = .true.
+         equal = .TRUE.
          return
       end if
    end if
 
-   equal = .false.
+   equal = .FALSE.
 end function
 
 subroutine add_atomtype(atomtypetable, elnum, typeid, partidx)
@@ -105,9 +105,9 @@ subroutine collect_atomtypes(atomset1, atomset2, atoms1, atoms2, atomtypes)
    ! Small temporary arrays - only O(max_parts) size
    integer, dimension(:), allocatable :: part_count1, part_count2
    integer, dimension(:), allocatable :: part_fill1, part_fill2
-   ! Item directories - O(num_atoms) size, unavoidable
+   ! Item directories - O(n_atoms) size, unavoidable
    integer, dimension(:), allocatable :: itemdir1_temp, itemdir2_temp
-   integer :: num_atoms1, num_atoms2
+   integer :: n_atoms1, n_atoms2
    integer :: current_part, max_parts
    integer :: atomidx, partidx, i
 
@@ -117,16 +117,16 @@ subroutine collect_atomtypes(atomset1, atomset2, atoms1, atoms2, atomtypes)
       compare_atoms => compare_atoms_simple
    end if
 
-   num_atoms1 = size(atoms1)
-   num_atoms2 = size(atoms2)
-   max_parts = num_atoms1 + num_atoms2  ! Maximum possible partitions
+   n_atoms1 = size(atoms1)
+   n_atoms2 = size(atoms2)
+   max_parts = n_atoms1 + n_atoms2  ! Maximum possible partitions
 
    ! Allocate temporary storage
    allocate(part_count1(max_parts))
    allocate(part_count2(max_parts))
    allocate(atomtypetable%items(max_parts))
-   allocate(itemdir1_temp(num_atoms1))
-   allocate(itemdir2_temp(num_atoms2))
+   allocate(itemdir1_temp(n_atoms1))
+   allocate(itemdir2_temp(n_atoms2))
 
    ! Initialize
    part_count1 = 0
@@ -164,8 +164,8 @@ subroutine collect_atomtypes(atomset1, atomset2, atoms1, atoms2, atomtypes)
    ! Now allocate final structure with exact sizes (no waste!)
    atomtypes%num_parts = current_part
    allocate(atomtypes%parts(atomtypes%num_parts))
-   allocate(atomtypes%itemdir1(num_atoms1))
-   allocate(atomtypes%itemdir2(num_atoms2))
+   allocate(atomtypes%itemdir1(n_atoms1))
+   allocate(atomtypes%itemdir2(n_atoms2))
 
    ! Copy item directories
    atomtypes%itemdir1 = itemdir1_temp
@@ -191,7 +191,7 @@ subroutine collect_atomtypes(atomset1, atomset2, atoms1, atoms2, atomtypes)
    part_fill2 = 0
 
    ! Fill first molecule using reverse mapping
-   do i = 1, num_atoms1
+   do i = 1, n_atoms1
       if (any(atomset1 == i)) then
          partidx = itemdir1_temp(i)
          part_fill1(partidx) = part_fill1(partidx) + 1
@@ -200,7 +200,7 @@ subroutine collect_atomtypes(atomset1, atomset2, atoms1, atoms2, atomtypes)
    end do
 
    ! Fill second molecule using reverse mapping
-   do i = 1, num_atoms2
+   do i = 1, n_atoms2
       if (any(atomset2 == i)) then
          partidx = itemdir2_temp(i)
          part_fill2(partidx) = part_fill2(partidx) + 1

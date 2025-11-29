@@ -108,7 +108,7 @@ subroutine sort_pairs(pairs)
 
    ! Simple bubble sort (can be replaced with quicksort if needed)
    do i = n, 2, -1
-      swapped = .false.
+      swapped = .FALSE.
       do j = 1, i - 1
          if (pairs(1, j) > pairs(1, j + 1) .or. &
              (pairs(1, j) == pairs(1, j + 1) .and. pairs(2, j) > pairs(2, j + 1))) then
@@ -118,7 +118,7 @@ subroutine sort_pairs(pairs)
             pairs(2, j) = pairs(2, j + 1)
             pairs(1, j + 1) = temp1
             pairs(2, j + 1) = temp2
-            swapped = .true.
+            swapped = .TRUE.
          end if
       end do
       if (.not. swapped) exit

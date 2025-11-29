@@ -194,7 +194,7 @@ subroutine jvc_dense(costs, n, rowsol, lapcost)
       
       low = 1
       up = 1
-      unassignedfound = .false.
+      unassignedfound = .FALSE.
       
       do while (.not. unassignedfound)
          if (up == low) then
@@ -222,7 +222,7 @@ subroutine jvc_dense(costs, n, rowsol, lapcost)
             do k = low, up - 1
                if (colsol(collist(k)) < 0) then
                   endofpath = collist(k)
-                  unassignedfound = .true.
+                  unassignedfound = .TRUE.
                   exit
                end if
             end do
@@ -243,7 +243,7 @@ subroutine jvc_dense(costs, n, rowsol, lapcost)
                   if (abs(v2 - dmin) < resolution) then
                      if (colsol(j) < 0) then
                         endofpath = j
-                        unassignedfound = .true.
+                        unassignedfound = .TRUE.
                         exit
                      else
                         ! Add to scan list

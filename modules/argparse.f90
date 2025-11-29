@@ -73,9 +73,9 @@ logical function get_arg(arg) result(success)
       call get_command_argument(iarg, length=arglen)
       allocate (character(arglen) :: arg)
       call get_command_argument(iarg, arg)
-      success = .true.
+      success = .TRUE.
    else
-      success = .false.
+      success = .FALSE.
    end if
 end function
 

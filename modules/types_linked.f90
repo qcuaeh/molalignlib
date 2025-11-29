@@ -82,8 +82,8 @@ type, public :: chaintree_node_t
    integer :: num_links
    integer :: num_children
    integer :: global_idx
-   integer, pointer :: atoms1_size => null()
-   integer, pointer :: atoms2_size => null()
+   integer, pointer :: n_atoms1 => null()
+   integer, pointer :: n_atoms2 => null()
    integer, pointer :: total_chains => null()
    integer, pointer :: total_links => null()
    integer, pointer :: total_partrefs => null()
@@ -166,7 +166,7 @@ function signature_equivalence(signature1, signature2) result(equiv)
    integer :: i, j
 
    if (size(signature1) /= size(signature2)) then
-      equiv = .false.
+      equiv = .FALSE.
       return
    end if
 
@@ -182,12 +182,12 @@ function signature_equivalence(signature1, signature2) result(equiv)
          end if
       end do
       if (matches1 /= matches2) then
-         equiv = .false.
+         equiv = .FALSE.
          return
       end if
    end do
 
-   equiv = .true.
+   equiv = .TRUE.
 end function
 
 logical function isdescendant(part, top_part)
@@ -196,7 +196,7 @@ logical function isdescendant(part, top_part)
    type(partition_node_t), pointer :: up_part
 
    if (part%depth <= top_part%depth) then
-      isdescendant = .false.
+      isdescendant = .FALSE.
       return
    end if
 
@@ -206,9 +206,9 @@ logical function isdescendant(part, top_part)
    end do
 
    if (associated(up_part, top_part)) then
-      isdescendant = .true.
+      isdescendant = .TRUE.
    else
-      isdescendant = .false.
+      isdescendant = .FALSE.
    end if
 end function
 
@@ -642,8 +642,8 @@ function new_bare_chain() result(chain)
    chain%num_links = 0
    chain%num_children = 0
    chain%global_idx = 0
-   chain%atoms1_size => null()
-   chain%atoms2_size => null()
+   chain%n_atoms1 => null()
+   chain%n_atoms2 => null()
    chain%total_chains => null()
    chain%total_links => null()
    chain%total_partrefs => null()
@@ -654,8 +654,8 @@ function new_bare_chain() result(chain)
    chain%last_link => null()
 end function
 
-function new_root_chain(atoms1_size, atoms2_size) result(chain)
-   integer, intent(in) :: atoms1_size, atoms2_size
+function new_root_chain(n_atoms1, n_atoms2) result(chain)
+   integer, intent(in) :: n_atoms1, n_atoms2
    type(chaintree_node_t), pointer :: chain
 
    chain => new_bare_chain()
@@ -664,13 +664,13 @@ function new_root_chain(atoms1_size, atoms2_size) result(chain)
    chain%global_idx = 1
 
    ! Allocate counters for root and assign initial values
-   allocate(chain%atoms1_size)
-   allocate(chain%atoms2_size)
+   allocate(chain%n_atoms1)
+   allocate(chain%n_atoms2)
    allocate(chain%total_chains)
    allocate(chain%total_links)
    allocate(chain%total_partrefs)
-   chain%atoms1_size = atoms1_size
-   chain%atoms2_size = atoms2_size
+   chain%n_atoms1 = n_atoms1
+   chain%n_atoms2 = n_atoms2
    chain%total_chains = 1
    chain%total_links = 0    ! No links initially
    chain%total_partrefs = 0 ! No partrefs initially
@@ -704,14 +704,14 @@ function new_chain_link(chain) result(link)
    link%global_idx = chain%total_links
 
    ! Allocate item directories
-   allocate(link%itemdir1(chain%atoms1_size))
-   allocate(link%itemdir2(chain%atoms2_size))
+   allocate(link%itemdir1(chain%n_atoms1))
+   allocate(link%itemdir2(chain%n_atoms2))
 
    ! Initialize all pointers to null
-   do i = 1, chain%atoms1_size
+   do i = 1, chain%n_atoms1
       link%itemdir1(i)%ptr => null()
    end do
-   do i = 1, chain%atoms2_size
+   do i = 1, chain%n_atoms2
       link%itemdir2(i)%ptr => null()
    end do
 
@@ -757,7 +757,7 @@ subroutine print_part_tree(partition_tree)
 
    ! Allocate tracking array for tree lines (max depth 100)
    allocate(is_last_child(100))
-   is_last_child = .false.
+   is_last_child = .FALSE.
 
    ! Print root line
    write(stderr, '(A)') 'ROOT'
@@ -820,8 +820,8 @@ function new_child_chain(chain, split_part) result(new_chain)
    new_chain%parent_chain => chain
 
    ! Point to parent's counters
-   new_chain%atoms1_size => chain%atoms1_size
-   new_chain%atoms2_size => chain%atoms2_size
+   new_chain%n_atoms1 => chain%n_atoms1
+   new_chain%n_atoms2 => chain%n_atoms2
    new_chain%total_chains => chain%total_chains
    new_chain%total_links => chain%total_links
    new_chain%total_partrefs => chain%total_partrefs
@@ -935,7 +935,7 @@ subroutine print_chain_tree(assignment_tree)
 
    ! Allocate tracking array for tree lines (max depth 100)
    allocate(is_last_child(100))
-   is_last_child = .false.
+   is_last_child = .FALSE.
 
    ! Print children recursively
    write(stderr, '(A)') 'ROOT'
@@ -1284,11 +1284,11 @@ function is_partition_uneven(link) result(uneven)
    logical :: uneven
    type(partref_node_t), pointer :: partref
 
-   uneven = .false.
+   uneven = .FALSE.
    partref => link%first_partref
    do while (associated(partref))
       if (partref%part%num_items1 /= partref%part%num_items2) then
-         uneven = .true.
+         uneven = .TRUE.
          return
       end if
       partref => partref%nextref

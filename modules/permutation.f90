@@ -73,19 +73,19 @@ logical function is_permutation(perm) result(isperm)
    integer :: n, i
 
    n = size(perm)
-   seen = .false.
-   isperm = .true.
+   seen = .FALSE.
+   isperm = .TRUE.
 
    do i = 1, n
       if (perm(i) < 1 .or. perm(i) > n) then
-         isperm = .false.
+         isperm = .FALSE.
          return
       end if
       if (seen(perm(i))) then
-         isperm = .false.
+         isperm = .FALSE.
          return
       end if
-      seen(perm(i)) = .true.
+      seen(perm(i)) = .TRUE.
    end do
 end function
 
@@ -95,7 +95,7 @@ elemental function subperm_equality(left, right) result(equality)
    integer :: i, idx
 
    if (left%atomset_size /= right%atomset_size) then
-      equality = .false.
+      equality = .FALSE.
       return
    end if
 
@@ -103,12 +103,12 @@ elemental function subperm_equality(left, right) result(equality)
    do i = 1, left%atomset_size
       idx = left%atomset(i)
       if (left%atomperm(idx) /= right%atomperm(idx)) then
-         equality = .false.
+         equality = .FALSE.
          return
       end if
    end do
 
-   equality = .true.
+   equality = .TRUE.
 end function
 
 subroutine subperm_init(subperm, perm_size)
@@ -245,7 +245,7 @@ subroutine perm1_next3 ( n, p, more, rank )
     do i = 1, n
       p(i) = i
     end do
-    more = .true.
+    more = .TRUE.
     rank = 1
   else
     n2 = n
@@ -266,7 +266,7 @@ subroutine perm1_next3 ( n, p, more, rank )
         do i = 1, n
           p(i) = i
         end do
-        more = .false.
+        more = .FALSE.
         rank = 1
         exit
       end if

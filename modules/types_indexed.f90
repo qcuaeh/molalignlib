@@ -47,8 +47,8 @@ type, public :: partree_item_t
    integer :: items1_offset, items1_count
    integer :: items2_offset, items2_count
    ! OPTIMIZED: Store unique signature values, frequencies, and total length
-   integer :: signature_values(MAX_COORD)       ! unique values in signature
-   integer :: signature_frequencies(MAX_COORD)  ! frequency of each unique value
+   integer :: signature_values(MAX_COORDNUM)       ! unique values in signature
+   integer :: signature_frequencies(MAX_COORDNUM)  ! frequency of each unique value
    integer :: signature_unique_count            ! number of unique values
    integer :: signature_size            ! total signature length (sum of frequencies)
 end type
@@ -62,7 +62,7 @@ type, public :: chain_item_t
 end type
 
 type, public :: assigntree_item_t
-   integer :: atoms1_size, atoms2_size
+   integer :: n_atoms1, n_atoms2
    integer :: num_links, num_children
    ! Cross-tree reference (0 = null)
    integer :: split_part_idx      ! points to part array
@@ -95,7 +95,7 @@ type, public :: array_trees_t
    integer, allocatable :: adjcs1_list(:,:)     ! Direct 2D adjacency lists for adjcs1 [atom_idx, neighbor_idx]
    integer, allocatable :: adjcs2_list(:,:)     ! Direct 2D adjacency lists for adjcs2 [atom_idx, neighbor_idx]
    ! Metadata
-   integer :: atoms1_size, atoms2_size  ! number of atoms in each molecule
+   integer :: n_atoms1, n_atoms2  ! number of atoms in each molecule
    integer :: total_items1, total_items2, total_parts
    integer :: total_links, total_chains
    integer :: total_partref_entries
@@ -109,29 +109,29 @@ contains
 subroutine cache_adjacency_lists(adjcs1, adjcs2, cache_arrays)
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(array_trees_t), intent(inout) :: cache_arrays
-   integer :: i, atoms1_size, atoms2_size
+   integer :: i, n_atoms1, n_atoms2
 
-   atoms1_size = size(adjcs1)
-   atoms2_size = size(adjcs2)
+   n_atoms1 = size(adjcs1)
+   n_atoms2 = size(adjcs2)
 
    ! Allocate adjacency arrays
-   allocate(cache_arrays%adjcs1_cn(atoms1_size))
-   allocate(cache_arrays%adjcs2_cn(atoms2_size))
-   allocate(cache_arrays%adjcs1_list(atoms1_size, MAX_COORD))
-   allocate(cache_arrays%adjcs2_list(atoms2_size, MAX_COORD))
+   allocate(cache_arrays%adjcs1_cn(n_atoms1))
+   allocate(cache_arrays%adjcs2_cn(n_atoms2))
+   allocate(cache_arrays%adjcs1_list(n_atoms1, MAX_COORDNUM))
+   allocate(cache_arrays%adjcs2_list(n_atoms2, MAX_COORDNUM))
 
    ! Initialize adjacency lists to zero
    cache_arrays%adjcs1_list = 0
    cache_arrays%adjcs2_list = 0
 
    ! Copy adjacency data for molecule 1
-   do i = 1, atoms1_size
+   do i = 1, n_atoms1
       cache_arrays%adjcs1_cn(i) = adjcs1(i)%cn
       cache_arrays%adjcs1_list(i, 1:adjcs1(i)%cn) = adjcs1(i)%list(1:adjcs1(i)%cn)
    end do
 
    ! Copy adjacency data for molecule 2
-   do i = 1, atoms2_size
+   do i = 1, n_atoms2
       cache_arrays%adjcs2_cn(i) = adjcs2(i)%cn
       cache_arrays%adjcs2_list(i, 1:adjcs2(i)%cn) = adjcs2(i)%list(1:adjcs2(i)%cn)
    end do
@@ -168,8 +168,8 @@ subroutine cache_assignment_tree(assignment_tree, cache_arrays)
    integer :: partref_idx, link_idx
 
    ! Set assignment tree metadata
-   cache_arrays%atoms1_size = assignment_tree%atoms1_size
-   cache_arrays%atoms2_size = assignment_tree%atoms2_size
+   cache_arrays%n_atoms1 = assignment_tree%n_atoms1
+   cache_arrays%n_atoms2 = assignment_tree%n_atoms2
    cache_arrays%total_chains = assignment_tree%total_chains
    cache_arrays%total_links = assignment_tree%total_links
    cache_arrays%total_partref_entries = assignment_tree%total_partrefs
@@ -178,8 +178,8 @@ subroutine cache_assignment_tree(assignment_tree, cache_arrays)
    allocate(cache_arrays%chain(cache_arrays%total_links))
    allocate(cache_arrays%assigntree(cache_arrays%total_chains))
    allocate(cache_arrays%partref_entries(cache_arrays%total_partref_entries))
-   allocate(cache_arrays%itemdir1_entries(cache_arrays%total_links, cache_arrays%atoms1_size))
-   allocate(cache_arrays%itemdir2_entries(cache_arrays%total_links, cache_arrays%atoms2_size))
+   allocate(cache_arrays%itemdir1_entries(cache_arrays%total_links, cache_arrays%n_atoms1))
+   allocate(cache_arrays%itemdir2_entries(cache_arrays%total_links, cache_arrays%n_atoms2))
 
    ! Initialize arrays
    cache_arrays%partref_entries = 0
@@ -197,7 +197,7 @@ subroutine convert_signature(part, cache_arrays, part_idx)
    type(partition_node_t), pointer, intent(in) :: part
    type(array_trees_t), intent(inout) :: cache_arrays
    integer, intent(in) :: part_idx
-   integer :: temp_values(MAX_COORD)
+   integer :: temp_values(MAX_COORDNUM)
    integer :: temp_count, i, j, value
    logical :: found
 
@@ -217,14 +217,14 @@ subroutine convert_signature(part, cache_arrays, part_idx)
    cache_arrays%partree(part_idx)%signature_unique_count = 0
    do i = 1, temp_count
       value = temp_values(i)
-      found = .false.
+      found = .FALSE.
 
       ! Check if this value is already in unique list
       do j = 1, cache_arrays%partree(part_idx)%signature_unique_count
          if (cache_arrays%partree(part_idx)%signature_values(j) == value) then
             cache_arrays%partree(part_idx)%signature_frequencies(j) = &
                cache_arrays%partree(part_idx)%signature_frequencies(j) + 1
-            found = .true.
+            found = .TRUE.
             exit
          end if
       end do
@@ -239,8 +239,8 @@ subroutine convert_signature(part, cache_arrays, part_idx)
    end do
 
    ! Zero out unused entries using intrinsic operation
-   cache_arrays%partree(part_idx)%signature_values(cache_arrays%partree(part_idx)%signature_unique_count + 1:MAX_COORD) = 0
-   cache_arrays%partree(part_idx)%signature_frequencies(cache_arrays%partree(part_idx)%signature_unique_count + 1:MAX_COORD) = 0
+   cache_arrays%partree(part_idx)%signature_values(cache_arrays%partree(part_idx)%signature_unique_count + 1:MAX_COORDNUM) = 0
+   cache_arrays%partree(part_idx)%signature_frequencies(cache_arrays%partree(part_idx)%signature_unique_count + 1:MAX_COORDNUM) = 0
 end subroutine
 
 recursive subroutine convert_parts_recurse(part, cache_arrays, item1_idx, item2_idx)
@@ -362,8 +362,8 @@ recursive subroutine convert_chains_recurse(chain, cache_arrays, partref_idx, li
    ! Convert this chain (existing conversion logic)
    chain_idx = chain%global_idx
 
-   cache_arrays%assigntree(chain_idx)%atoms1_size = chain%atoms1_size
-   cache_arrays%assigntree(chain_idx)%atoms2_size = chain%atoms2_size
+   cache_arrays%assigntree(chain_idx)%n_atoms1 = chain%n_atoms1
+   cache_arrays%assigntree(chain_idx)%n_atoms2 = chain%n_atoms2
    cache_arrays%assigntree(chain_idx)%num_links = chain%num_links
    cache_arrays%assigntree(chain_idx)%num_children = chain%num_children
 
@@ -532,7 +532,7 @@ subroutine print_part_tree_array(cache_arrays)
 
    ! Allocate tracking array for tree lines (max depth 100)
    allocate(is_last_child(100))
-   is_last_child = .false.
+   is_last_child = .FALSE.
 
    ! Print root line
    write(stderr, '(A)') 'ROOT'
@@ -752,7 +752,7 @@ subroutine print_chain_tree_array(atomtypes, cache_arrays)
 
    ! Allocate tracking array for tree lines (max depth 100)
    allocate(is_last_child(100))
-   is_last_child = .false.
+   is_last_child = .FALSE.
 
    ! Print children recursively (root is always at index 1)
    write(stdout, '(A)') '*'

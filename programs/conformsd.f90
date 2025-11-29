@@ -56,26 +56,25 @@ integer :: i
 
 ! Set default options
 
-stats_flag = .false.
-heavy_flag = .false.
-mirror_flag = .false.
-align_flag = .false.
-remap_flag = .false.
-coords_flag = .false.
-tree_flag = .false.
-mass_flag = .false.
-stoch_flag = .true.
-adaptive_flag = .true.
-rebond_flag = .false.
-label_flag = .false.
-random_flag = .false.
-full_flag = .false.
-atomorder_flag = .false.
+stats_flag = .FALSE.
+heavy_flag = .FALSE.
+mirror_flag = .FALSE.
+align_flag = .FALSE.
+remap_flag = .FALSE.
+coords_flag = .FALSE.
+tree_flag = .FALSE.
+mass_flag = .FALSE.
+stoch_flag = .TRUE.
+adaptive_flag = .TRUE.
+rebond_flag = .FALSE.
+label_flag = .FALSE.
+random_flag = .FALSE.
+atomorder_flag = .FALSE.
 
 num_records = 1
 confo_thres = 100
+max_trials = MAX_TRIALS_DEFAULT
 unitout = stdout
-max_trials = huge( ik)
 
 ! Read command options
 
@@ -84,26 +83,24 @@ call init_args()
 do while (get_arg(arg))
    select case (lowercase(arg))
    case ('-align')
-      align_flag = .true.
+      align_flag = .TRUE.
    case ('-remap')
-      remap_flag = .true.
+      remap_flag = .TRUE.
    case ('-atomorder')
-      atomorder_flag = .true.
-   case ('-full')
-      full_flag = .true.
+      atomorder_flag = .TRUE.
    case ('-exhaustive')
-      stoch_flag = .false.
+      stoch_flag = .FALSE.
    case ('-stochastic')
-      stoch_flag = .true.
-      adaptive_flag = .false.
+      stoch_flag = .TRUE.
+      adaptive_flag = .FALSE.
    case ('-label')
-      label_flag = .true.
+      label_flag = .TRUE.
    case ('-heavy')
-      heavy_flag = .true.
+      heavy_flag = .TRUE.
    case ('-mass')
-      mass_flag = .true.
+      mass_flag = .TRUE.
    case ('-mirror')
-      mirror_flag = .true.
+      mirror_flag = .TRUE.
    case ('-thres')
       call read_optarg( arg, confo_thres)
    case ('-trials')
@@ -111,16 +108,16 @@ do while (get_arg(arg))
    case ('-records')
       call read_optarg( arg, num_records)
    case ('-coords')
-      coords_flag = .true.
+      coords_flag = .TRUE.
       call read_optarg( arg, coords_path)
    case ('-tree')
-      tree_flag = .true.
+      tree_flag = .TRUE.
    case ('-stats')
-      stats_flag = .true.
+      stats_flag = .TRUE.
    case ('-random')
-      random_flag = .true.
+      random_flag = .TRUE.
    case ('-rebond')
-      rebond_flag = .true.
+      rebond_flag = .TRUE.
    case default
       call read_posarg( arg, posargs)
    end select

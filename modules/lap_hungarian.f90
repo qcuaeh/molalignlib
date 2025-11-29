@@ -154,7 +154,7 @@ do  j = 1, m
 end do
 if (irs <= irl) go to 140
 
-lsw = .true.
+lsw = .TRUE.
 icl0 = icl
 icbl = 0
 do  j = 1, m
@@ -185,7 +185,7 @@ do  i = 1, n
          iw(new,4) = i
          if (iw(new,1) == 0) then
             j1 = new
-            lsw = .false.
+            lsw = .FALSE.
          else
             icl = icl + 1
             iw(icl,2) = new

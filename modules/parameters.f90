@@ -21,8 +21,14 @@ use iso_fortran_env, only: int32, int64, real32, real64
 !use iso_c_binding, only: c_int, c_long, c_float, c_double
 implicit none
 
-! Debug flags
-logical, parameter :: DEBUG_TESTS = .false.
+! Do debug tests
+logical, parameter :: DEBUG_TESTS = .FALSE.
+
+! Exit if random trials exceeds MAX_TRIALS
+logical, parameter :: MAX_TRIALS_EXIT = .TRUE.
+
+! Prune unfeasible atom assignments
+logical, parameter :: PRUNE_ASSIGNMENTS = .TRUE.
 
 ! Numerical kinds
 integer, parameter :: ik = int32 ! 32-bit integer kind
@@ -33,18 +39,18 @@ integer, parameter :: rk = real64 ! Double precision kind
 !real(rk), parameter :: CONV_TOL = 1E-6 ! Single precision
 real(rk), parameter :: CONV_TOL = 1E-10 ! Double precision
 
-! Mean squared distance tolerance
-real(rk), parameter :: MSD_TOL = 1E-6
+! Squared distance tolerance
+real(rk), parameter :: SQDIST_TOL = 1E-6
 
 ! Common character lengths
 integer, parameter :: wl = 32 ! Word length
 integer, parameter :: ll = 256 ! Line length
 
-! Maximum number of atoms (currently not used)
-integer, parameter :: MAX_ATOMS = 1000000
-
 ! Maximum coordination number
-integer, parameter :: MAX_COORD = 10
+integer, parameter :: MAX_COORDNUM = 10
+
+! Default number of random trials to exit early
+integer, parameter :: MAX_TRIALS_DEFAULT = 10000
 
 ! Displayed decimal places
 integer, parameter :: DECIMAL_PLACES = 6

@@ -32,7 +32,6 @@ logical :: stats_flag
 logical :: tree_flag
 logical :: rebond_flag
 logical :: atomorder_flag
-logical :: full_flag
 
 ! Bounds
 integer :: max_trials

@@ -69,19 +69,20 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
       call random_initialize()
 
       ! Optimize atom permutation
-      do while (registry%records(1)%freq < confo_thres .and. registry%num_trials < max_trials)
+      do
 
          ! Get randomly rotated coords2
          total_rotation = randrotquat()
          coords2r = rotated_coords( coords2, total_rotation)
 
          ! Assign atoms with current orientation
-         if (full_flag) then
-            call assign_atoms_local_full( coords1, coords2r, cache_arrays, atomperm1, permdist)
-         else
+         if (PRUNE_ASSIGNMENTS) then
             call assign_atoms_greedy( coords1, coords2r, cache_arrays, atomperm1, permdist)
             call assign_atoms_local_pruned( coords1, coords2r, cache_arrays, atomperm1, permdist)
+         else
+            call assign_atoms_local( coords1, coords2r, cache_arrays, atomperm1, permdist)
          end if
+
          rotation = least_rotquat( atomset1, atomperm1, coords1, coords2r)
          total_rotation = quatmul( total_rotation, rotation)
          call rotate_coords( atomset2, coords2r, rotation)
@@ -89,13 +90,11 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
          steps = 1
 
          do
-            if (full_flag) then
-               call assign_atoms_local_full( coords1, coords2r, cache_arrays, new_atomperm, &
-                     new_permdist)
-            else
+            if (PRUNE_ASSIGNMENTS) then
                new_permdist = permdist
-               call assign_atoms_local_pruned( coords1, coords2r, cache_arrays, new_atomperm, &
-                     new_permdist)
+               call assign_atoms_local_pruned( coords1, coords2r, cache_arrays, new_atomperm, new_permdist)
+            else
+               call assign_atoms_local( coords1, coords2r, cache_arrays, new_atomperm, new_permdist)
             end if
 !            write (stdout,*) permdist, new_permdist
             if (all(atomperm1 == new_atomperm)) exit
@@ -110,6 +109,15 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
          ! Update results
          call insert_record_atomperm( registry, atomperm1, steps, total_rotation, 0, permdist)
 
+         if (registry%records(1)%freq > confo_thres) then
+            exit
+         end if
+
+         if (MAX_TRIALS_EXIT) then
+            if (registry%num_trials > max_trials) then
+               exit
+            end if
+         end if
       end do
 
    else
@@ -155,13 +163,9 @@ subroutine assign_atomperm_conformer( adjcs1, adjcs2, atomtypes, coords1, coords
       call print_chain_tree_array( atomtypes, cache_arrays)
    end if
 
-   ! Assign atoms using greedy and local pruned methods
-   if (full_flag) then
-      call assign_atoms_local_full( coords1, coords2, cache_arrays, atomperm1, permdist)
-   else
-      call assign_atoms_greedy( coords1, coords2, cache_arrays, atomperm1, permdist)
-      call assign_atoms_local_pruned( coords1, coords2, cache_arrays, atomperm1, permdist)
-   end if
+   call assign_atoms_local( coords1, coords2, cache_arrays, atomperm1, permdist)
+!   call assign_atoms_greedy( coords1, coords2, cache_arrays, atomperm1, permdist)
+!   call assign_atoms_local_pruned( coords1, coords2, cache_arrays, atomperm1, permdist)
 end subroutine
 
 end module
