@@ -160,7 +160,7 @@ end if
 ! Collect atom types in a partition
 call collect_atomtypes( atomset1, atomset2, atoms1, atoms2, atomtypes)
 
-! Abort if atom types do not match
+! Abort if molecules are not isomers
 if (any(atomtypes%parts%num_items1 /= atomtypes%parts%num_items2)) then
    write (stderr, '(A)') 'Error: These molecules are not isomers'
    stop 1
@@ -252,6 +252,12 @@ if (align_flag) then
       end do
 
    else
+
+      ! Abort if atom types do not match
+      if (any(atomtypes%itemdir1 /= atomtypes%itemdir2)) then
+         write (stderr, '(A)') 'Error: Atom types do not match'
+         stop 1
+      end if
 
       allocate (atomperm1(size( coords1w, 2)))
       call init_identity_permutation( atomperm1)
