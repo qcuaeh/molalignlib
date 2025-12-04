@@ -134,11 +134,9 @@ end do
 
 select case (ipos)
 case (0)
-   write (stderr, '(A)') 'Error: Missing file paths'
-   stop 1
+   stop 'File paths are missing'
 case (1)
-   write (stderr, '(A)') 'Error: Too few file paths'
-   stop 1
+   stop 'Too few file paths'
 case (2)
    call open2read( posargs(1)%arg, typein, unitin)
    call read_file( unitin, typein, title1, atoms1, bonds1)
@@ -147,8 +145,7 @@ case (2)
    call read_file( unitin, typein, title2, atoms2, bonds2)
    close (unitin)
 case default
-   write (stderr, '(A)') 'Error: Too many file paths'
-   stop 1
+   stop 'Too many file paths'
 end select
 
 if (coords_flag) then
@@ -171,8 +168,7 @@ call collect_atomtypes( atomset1, atomset2, atoms1, atoms2, atomtypes)
 
 ! Abort if molecules are not isomers
 if (any(atomtypes%parts%num_items1 /= atomtypes%parts%num_items2)) then
-   write (stderr, '(A)') 'Error: These molecules are not isomers'
-   stop 1
+   stop 'These molecules are not isomers'
 end if
 
 ! Set adjacency lists
@@ -182,14 +178,11 @@ if (rebond_flag) then
 else
    if (size(bonds1) < 1 .or. size(bonds2) < 1) then
       if (size(bonds1) < 1 .and. size(bonds2) < 1) then
-         write (stdout,'(A)') 'Error: Molecules have no bonds!'
-         stop 1
+         stop 'Molecules have no bonds!'
       else if (size(bonds1) < 1) then
-         write (stdout,'(A)') 'Error: First molecule has no bonds!'
-         stop 1
+         stop 'First molecule has no bonds!'
       else if (size(bonds2) < 1) then
-         write (stdout,'(A)') 'Error: Second molecule has no bonds!'
-         stop 1
+         stop 'Second molecule has no bonds!'
       end if
    end if
    call adjacency_from_bonds( atomset1, bonds1, size(atoms1), adjcs1)
@@ -307,8 +300,7 @@ if (align_flag) then
 
       ! Abort if atom types do not match
       if (any(atomtypes%itemdir1 /= atomtypes%itemdir2)) then
-         write (stderr, '(A)') 'Error: Atom types do not match'
-         stop 1
+         stop 'Atom types do not match'
       end if
 
       allocate (atomperm1(size( coords1w, 2)))
@@ -335,8 +327,7 @@ else
    coords2w = get_weighted_coords( atoms2, weights2)
 
    if (remap_flag) then
-      write (stdout, '(A)') 'Error: Remapping without alignment is not implemented'
-      stop 1
+      stop 'Remapping without alignment is not implemented'
    else
       allocate (atomperm1(size(coords1w, 2)))
       call init_identity_permutation( atomperm1)

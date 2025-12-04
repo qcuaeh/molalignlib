@@ -92,8 +92,8 @@ subroutine parse_path(filepath, filetype)
       dirname = filepath(:pos-1)
       basename = filepath(pos+1:)
       if (len(basename) == 0) then
-         write (stderr, '(A,1X,A)') 'Error: File name is missing'
-         stop 1
+         write (stderr, '(A,1X,A)') 'STOP File name is missing'
+         stop
       end if
    else
       dirname = '.'
@@ -104,12 +104,12 @@ subroutine parse_path(filepath, filetype)
       filename = basename(:pos-1)
       filetype = basename(pos+1:)
       if (len(filename) == 0 .or. len(filetype) == 0) then
-         write (stderr, '(A,1X,A)') 'Error: Invalid file name', basename
-         stop 1
+         write (stderr, '(A,1X,A)') 'STOP Invalid file name', basename
+         stop
       end if
    else
-      write (stderr, '(A,1X,A)') 'Error: File extension is missing', basename
-      stop 1
+      write (stderr, '(A,1X,A)') 'STOP File extension is missing', basename
+      stop
    end if
 end subroutine
 

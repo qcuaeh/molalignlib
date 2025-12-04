@@ -49,15 +49,14 @@ subroutine read_posarg(arg, posargs)
    type(strlist_type), dimension(:), intent(inout) :: posargs
 
    if (arg(1:1) == '-') then
-      write (stderr, '(a,1x,a)') 'Error: Unknown option:', arg
-      stop 1
+      write (stderr, '(A,1X,A)') 'STOP Unknown option:', arg
+      stop
    end if
 
    ipos = ipos + 1
 
    if (ipos > size(posargs)) then
-      write (stderr, '(a)') 'Error: Too many arguments'
-      stop 1
+      stop 'Too many arguments'
    end if
 
    posargs(ipos)%arg = arg
@@ -87,15 +86,15 @@ subroutine get_optarg(option, optarg)
    iarg = iarg + 1
 
    if (iarg > command_argument_count()) then
-      write (stderr, '(a,1x,a,1x,a)') 'Error: Option', option, 'requires an argument'
-      stop 1
+      write (stderr, '(A,1X,A,1X,A)') 'STOP Option', option, 'requires an argument'
+      stop
    else
       call get_command_argument(iarg, length=arglen)
       allocate (character(arglen) :: optarg)
       call get_command_argument(iarg, optarg)
       if (optarg(1:1) == '-') then
-         write (stderr, '(a,1x,a,1x,a)') 'Error: Option', option, 'requires an argument'
-         stop 1
+         write (stderr, '(A,1X,A,1X,A)') 'STOP Option', option, 'requires an argument'
+         stop
       end if
    end if
 end subroutine
@@ -116,8 +115,8 @@ subroutine int_read_optarg(option, optarg)
    call get_optarg(option, chararg)
    read (chararg, *, iostat=stat) optarg
    if (stat /= 0) then
-      write (stderr, '(a,1x,a,1x,a)') 'Error: Option', option, 'requires an integer argument'
-      stop 1
+      write (stderr, '(A,1X,A,1X,A)') 'STOP Option', option, 'requires an integer argument'
+      stop
    end if
 end subroutine
 
@@ -130,8 +129,8 @@ subroutine real_read_optarg(option, optarg)
    call get_optarg(option, chararg)
    read (chararg, *, iostat=stat) optarg
    if (stat /= 0) then
-      write (stderr, '(a,1x,a,1x,a)') 'Error: Option', option, 'requires a numeric argument'
-      stop 1
+      write (stderr, '(A,1X,A,1X,A)') 'STOP Option', option, 'requires a numeric argument'
+      stop
    end if
 end subroutine
 

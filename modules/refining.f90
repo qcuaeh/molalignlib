@@ -122,9 +122,9 @@ subroutine compute_scna_partition(adjcs1, adjcs2, atomtypes, hna_chain)
 
    ! Verify that molecules are conformers
    if (is_partition_uneven(hna_chain%last_link)) then
-      write(stderr, '(A)') "Error: Molecules are not conformers!"
+      write(stderr, '(A)') 'STOP Molecules are not conformers!'
 !      call print_partition_chain(hna_chain)
-      stop 1
+      stop
    end if
 end subroutine
 
@@ -538,9 +538,9 @@ recursive subroutine split_dependent_parts(adjcs1, adjcs2, hna_chain, branch, br
 
    ! Verify that molecules are conformers
    if (is_partition_uneven(hna_chain%last_link)) then
-      write(stderr, '(A)') "Error: Molecules are not conformers!"
+      write(stderr, '(A)') 'STOP Molecules are not conformers!'
 !      call print_partition_chain(hna_chain)
-      stop 1
+      stop
    end if
 
    ! Find a degenerate descendant part to split

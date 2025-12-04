@@ -93,9 +93,9 @@ subroutine adjmat_to_adjcs_all(adjmat, adjcs)
             nadj = nadj + 1
             if (nadj > MAX_COORDNUM) then
                write (stderr, '(A,1X,I0,1X,A,1X,A)') &
-                     'Error: Coordination number of atom', i, &
+                     'STOP Coordination number of atom', i, &
                      'exceeds', MAX_COORDNUM
-               stop 1
+               stop
             end if
             adjcs(i)%list(nadj) = j
          end if
@@ -122,9 +122,9 @@ subroutine adjmat_to_adjcs_subset(atomset, adjmat, adjcs)
             nadj = nadj + 1
             if (nadj > MAX_COORDNUM) then
                write (stderr, '(A,1X,I0,1X,A,1X,A)') &
-                     'Error: Coordination number of atom', atomidx, &
+                     'STOP Coordination number of atom', atomidx, &
                      'exceeds', MAX_COORDNUM
-               stop 1
+               stop
             end if
             adjcs(atomidx)%list(nadj) = atomset(i)
          end if

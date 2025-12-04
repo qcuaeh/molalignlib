@@ -33,8 +33,8 @@ subroutine open2read(filepath, filetype, fileunit)
    call parse_path(filepath, filetype)
    open(newunit=fileunit, file=filepath, action='read', status='old', iostat=stat)
    if (stat /= 0) then
-      write (stderr, '(A,1X,A,1X,A)') 'Error: opening', filepath, 'for reading'
-      stop 1
+      write (stderr, '(A,1X,A,1X,A)') 'STOP opening', filepath, 'for reading'
+      stop
    end if
 end subroutine
 
@@ -55,8 +55,8 @@ subroutine read_file(unit, typein, title, atoms, bonds)
    case ('mol2')
       call readfile_mol2(unit, title, atoms, bonds)
    case default
-      write (stderr, '(A,A,A)') 'Error: File format "', typein, '" is not supported'
-      stop 1
+      write (stderr, '(A,A,A)') 'STOP File format "', typein, '" is not supported'
+      stop
    end select
 end subroutine
 
@@ -75,14 +75,12 @@ subroutine readfile_xyz(unit, title, atoms, bonds)
    ! Read number of atoms
    read (unit, *, iostat=stat) n_atoms
    if (stat /= 0) then
-      write (stderr, '(A)') 'Error: Invalid XYZ format'
-      stop 1
+      stop 'Invalid XYZ format'
    end if
 
    ! Check for empty file
    if (n_atoms <= 0) then
-      write (stderr, '(A)') 'Error: File contains no atoms'
-      stop 1
+      stop 'File contains no atoms'
    end if
 
    allocate (atoms(n_atoms))
@@ -91,16 +89,14 @@ subroutine readfile_xyz(unit, title, atoms, bonds)
    ! Read title line
    read (unit,'(A)',iostat=stat) buffer
    if (stat /= 0) then
-      write (stderr, '(A)') 'Error: Invalid XYZ format'
-      stop 1
+      stop 'Invalid XYZ format'
    end if
    title = trim(buffer)
 
    do i = 1, n_atoms
       read (unit,*,iostat=stat) elsym, coords
       if (stat /= 0) then
-         write (stderr, '(A)') 'Error: Invalid XYZ format'
-         stop 1
+         stop 'Invalid XYZ format'
       end if
 
       call split_symbol(elsym, elnum, label)
@@ -109,8 +105,8 @@ subroutine readfile_xyz(unit, title, atoms, bonds)
       if (label_flag .and. label /= '') then
          read (label,*,iostat=stat) atoms(i)%typeid
          if (stat /= 0) then
-            write (stderr, '(A,A)') 'Error: Invalid label', label
-            stop 1
+            write (stderr, '(A,A)') 'STOP Invalid label', label
+            stop
          end if
       end if
    end do
@@ -129,28 +125,24 @@ subroutine readfile_mol(unit, title, atoms, bonds)
    ! Read header block (3 lines)
    read (unit, '(A)', iostat=stat) buffer
    if (stat /= 0) then
-      write (stderr, '(A)') 'Error: Invalid MOL format'
-      stop 1
+      stop 'Invalid MOL format'
    end if
    title = trim(buffer)
 
    read (unit, '(A)', iostat=stat) buffer
    if (stat /= 0) then
-      write (stderr, '(A)') 'Error: Invalid MOL format'
-      stop 1
+      stop 'Invalid MOL format'
    end if
 
    read (unit, '(A)', iostat=stat) buffer
    if (stat /= 0) then
-      write (stderr, '(A)') 'Error: Invalid MOL format'
-      stop 1
+      stop 'Invalid MOL format'
    end if
 
    ! Read counts line and determine format version
    read (unit, '(A)', iostat=stat) buffer
    if (stat /= 0) then
-      write (stderr, '(A)') 'Error: Invalid MOL format'
-      stop 1
+      stop 'Invalid MOL format'
    end if
 
    ! Check if this is V3000 format
@@ -164,8 +156,7 @@ subroutine readfile_mol(unit, title, atoms, bonds)
 
    ! Check for empty molecule
    if (size(atoms) <= 0) then
-      write (stderr, '(A)') 'Error: File contains no atoms'
-      stop 1
+      stop 'File contains no atoms'
    end if
 end subroutine
 
@@ -188,8 +179,7 @@ subroutine readfile_sdf(unit, title, atoms, bonds)
          ! End of file reached, this is acceptable here
          exit
       else if (stat > 0) then
-         write (stderr, '(A)') 'Error: Reading SDF property data'
-         stop 1
+         stop 'Reading SDF property data'
       end if
       if (trim(buffer) == '$$$$') then
          ! End of molecule reached
@@ -214,13 +204,11 @@ subroutine read_v2000_format(unit, counts_line, atoms, bonds)
    ! Parse counts from V2000 format
    read (counts_line(1:3), '(I3)', iostat=stat) n_atoms
    if (stat /= 0) then
-      write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
-      stop 1
+      stop 'Invalid MOL/SDF format'
    end if
    read (counts_line(4:6), '(I3)', iostat=stat) n_bonds
    if (stat /= 0) then
-      write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
-      stop 1
+      stop 'Invalid MOL/SDF format'
    end if
 
    allocate (atoms(n_atoms))
@@ -228,23 +216,19 @@ subroutine read_v2000_format(unit, counts_line, atoms, bonds)
    do i = 1, n_atoms
       read (unit,'(A)',iostat=stat) buffer
       if (stat /= 0) then
-         write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
-         stop 1
+         stop 'Invalid MOL/SDF format'
       end if
       read (buffer(1:10), '(F10.4)', iostat=stat) coords(1)
       if (stat /= 0) then
-         write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
-         stop 1
+         stop 'Invalid MOL/SDF format'
       end if
       read (buffer(11:20), '(F10.4)', iostat=stat) coords(2)
       if (stat /= 0) then
-         write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
-         stop 1
+         stop 'Invalid MOL/SDF format'
       end if
       read (buffer(21:30), '(F10.4)', iostat=stat) coords(3)
       if (stat /= 0) then
-         write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
-         stop 1
+         stop 'Invalid MOL/SDF format'
       end if
 
       elsym = adjustl(buffer(32:34))
@@ -258,23 +242,19 @@ subroutine read_v2000_format(unit, counts_line, atoms, bonds)
    do i = 1, n_bonds
       read (unit, '(A)', iostat=stat) buffer
       if (stat /= 0) then
-         write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
-         stop 1
+         stop 'Invalid MOL/SDF format'
       end if
       read (buffer(1:3), '(I3)', iostat=stat) atomidx1
       if (stat /= 0) then
-         write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
-         stop 1
+         stop 'Invalid MOL/SDF format'
       end if
       read (buffer(4:6), '(I3)', iostat=stat) atomidx2
       if (stat /= 0) then
-         write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
-         stop 1
+         stop 'Invalid MOL/SDF format'
       end if
       read (buffer(7:9), '(I3)', iostat=stat) typeid
       if (stat /= 0) then
-         write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
-         stop 1
+         stop 'Invalid MOL/SDF format'
       end if
 
       bonds(i)%atomidx1 = atomidx1
@@ -300,8 +280,7 @@ subroutine read_v3000_format(unit, counts_line, atoms, bonds)
    do
       read (unit, '(A)', iostat=stat) buffer
       if (stat /= 0) then
-         write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
-         stop 1
+         stop 'Invalid MOL/SDF format'
       end if
       if (index(buffer, 'BEGIN CTAB') > 0) exit
    end do
@@ -310,16 +289,14 @@ subroutine read_v3000_format(unit, counts_line, atoms, bonds)
    do
       read (unit, '(A)', iostat=stat) buffer
       if (stat /= 0) then
-         write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
-         stop 1
+         stop 'Invalid MOL/SDF format'
       end if
       if (index(buffer, 'COUNTS') > 0) then
          ! Parse: M  V30 COUNTS n_atoms n_bonds ...
          pos = index(buffer, 'COUNTS')
          read (buffer(pos+6:), *, iostat=stat) n_atoms, n_bonds
          if (stat /= 0) then
-            write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
-            stop 1
+            stop 'Invalid MOL/SDF format'
          end if
          exit
       end if
@@ -331,8 +308,7 @@ subroutine read_v3000_format(unit, counts_line, atoms, bonds)
    do
       read (unit, '(A)', iostat=stat) buffer
       if (stat /= 0) then
-         write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
-         stop 1
+         stop 'Invalid MOL/SDF format'
       end if
       if (index(buffer, 'BEGIN ATOM') > 0) exit
    end do
@@ -342,14 +318,12 @@ subroutine read_v3000_format(unit, counts_line, atoms, bonds)
    do i = 1, n_atoms
       read (unit, '(A)', iostat=stat) buffer
       if (stat /= 0) then
-         write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
-         stop 1
+         stop 'Invalid MOL/SDF format'
       end if
       pos = index(buffer, 'V30')
       read (buffer(pos+3:), *, iostat=stat) dummy_int, elsym, coords
       if (stat /= 0) then
-         write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
-         stop 1
+         stop 'Invalid MOL/SDF format'
       end if
 
       call split_symbol(elsym, elnum, label)
@@ -358,8 +332,8 @@ subroutine read_v3000_format(unit, counts_line, atoms, bonds)
       if (label_flag .and. label /= '') then
          read (label,*,iostat=stat) atoms(i)%typeid
          if (stat /= 0) then
-            write (stderr, '(A,A)') 'Error: Invalid label', label
-            stop 1
+            write (stderr, '(A,A)') 'STOP Invalid label', label
+            stop
          end if
       end if
    end do
@@ -368,8 +342,7 @@ subroutine read_v3000_format(unit, counts_line, atoms, bonds)
    do
       read (unit, '(A)', iostat=stat) buffer
       if (stat /= 0) then
-         write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
-         stop 1
+         stop 'Invalid MOL/SDF format'
       end if
       if (index(buffer, 'END ATOM') > 0) exit
    end do
@@ -380,8 +353,7 @@ subroutine read_v3000_format(unit, counts_line, atoms, bonds)
       do
          read (unit, '(A)', iostat=stat) buffer
          if (stat /= 0) then
-            write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
-            stop 1
+            stop 'Invalid MOL/SDF format'
          end if
          if (index(buffer, 'BEGIN BOND') > 0) exit
       end do
@@ -391,14 +363,12 @@ subroutine read_v3000_format(unit, counts_line, atoms, bonds)
       do i = 1, n_bonds
          read (unit, '(A)', iostat=stat) buffer
          if (stat /= 0) then
-            write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
-            stop 1
+            stop 'Invalid MOL/SDF format'
          end if
          pos = index(buffer, 'V30')
          read (buffer(pos+3:), *, iostat=stat) dummy_int, typeid, atomidx1, atomidx2
          if (stat /= 0) then
-            write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
-            stop 1
+            stop 'Invalid MOL/SDF format'
          end if
 
          bonds(i)%atomidx1 = atomidx1
@@ -410,8 +380,7 @@ subroutine read_v3000_format(unit, counts_line, atoms, bonds)
       do
          read (unit, '(A)', iostat=stat) buffer
          if (stat /= 0) then
-            write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
-            stop 1
+            stop 'Invalid MOL/SDF format'
          end if
          if (index(buffer, 'END BOND') > 0) exit
       end do
@@ -421,8 +390,7 @@ subroutine read_v3000_format(unit, counts_line, atoms, bonds)
    do
       read (unit, '(A)', iostat=stat) buffer
       if (stat /= 0) then
-         write (stderr, '(A)') 'Error: Invalid MOL/SDF format'
-         stop 1
+         stop 'Invalid MOL/SDF format'
       end if
       if (index(buffer, 'END CTAB') > 0) exit
    end do
@@ -445,8 +413,7 @@ subroutine readfile_mol2(unit, title, atoms, bonds)
    do
       read (unit, '(A)', iostat=stat) buffer
       if (stat /= 0) then
-         write (stderr, '(A)') 'Error: Invalid MOL2 format'
-         stop 1
+         stop 'Invalid MOL2 format'
       end if
       if (trim(buffer) == '@<TRIPOS>MOLECULE') exit
    end do
@@ -454,22 +421,19 @@ subroutine readfile_mol2(unit, title, atoms, bonds)
    ! Read molecule name
    read (unit, '(A)', iostat=stat) buffer
    if (stat /= 0) then
-      write (stderr, '(A)') 'Error: Invalid MOL2 format'
-      stop 1
+      stop 'Invalid MOL2 format'
    end if
    title = trim(buffer)
 
    ! Read counts line
    read (unit, *, iostat=stat) n_atoms, n_bonds
    if (stat /= 0) then
-      write (stderr, '(A)') 'Error: Invalid MOL2 format'
-      stop 1
+      stop 'Invalid MOL2 format'
    end if
 
    ! Check for empty file
    if (n_atoms <= 0) then
-      write (stderr, '(A)') 'Error: File contains no atoms'
-      stop 1
+      stop 'File contains no atoms'
    end if
 
    allocate (atoms(n_atoms))
@@ -478,8 +442,7 @@ subroutine readfile_mol2(unit, title, atoms, bonds)
    do
       read (unit, '(A)', iostat=stat) buffer
       if (stat /= 0) then
-         write (stderr, '(A)') 'Error: Invalid MOL2 format'
-         stop 1
+         stop 'Invalid MOL2 format'
       end if
       if (trim(buffer) == '@<TRIPOS>ATOM') exit
    end do
@@ -489,8 +452,7 @@ subroutine readfile_mol2(unit, title, atoms, bonds)
    do i = 1, n_atoms
       read (unit,*,iostat=stat) dummy, elsym, coords, typestr
       if (stat /= 0) then
-         write (stderr, '(A)') 'Error: Invalid MOL2 format'
-         stop 1
+         stop 'Invalid MOL2 format'
       end if
 
       call split_symbol(elsym, elnum, label)
@@ -499,8 +461,8 @@ subroutine readfile_mol2(unit, title, atoms, bonds)
       if (label_flag .and. label /= '') then
          read (label,*,iostat=stat) atoms(i)%typeid
          if (stat /= 0) then
-            write (stderr, '(A,A)') 'Error: Invalid label', label
-            stop 1
+            write (stderr, '(A,A)') 'STOP Invalid label', label
+            stop
          end if
       end if
    end do
@@ -512,8 +474,7 @@ subroutine readfile_mol2(unit, title, atoms, bonds)
       do
          read (unit, '(A)', iostat=stat) buffer
          if (stat /= 0) then
-            write (stderr, '(A)') 'Error: Invalid MOL2 format'
-            stop 1
+            stop 'Invalid MOL2 format'
          end if
          if (trim(buffer) == '@<TRIPOS>BOND') exit
       end do
@@ -523,8 +484,7 @@ subroutine readfile_mol2(unit, title, atoms, bonds)
       do i = 1, n_bonds
          read (unit, *, iostat=stat) dummy, atomidx1, atomidx2, typestr
          if (stat /= 0) then
-            write (stderr, '(A)') 'Error: Invalid MOL2 format'
-            stop 1
+            stop 'Invalid MOL2 format'
          end if
 
          bonds(i)%atomidx1 = atomidx1

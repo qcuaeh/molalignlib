@@ -31,8 +31,8 @@ subroutine open2write(filepath, unit)
 
    open(newunit=unit, file=filepath, action='write', status='replace', iostat=stat)
    if (stat /= 0) then
-      write (stderr, '(A,1X,A,1X,A)') "Error: Can't open", filepath, 'for writing'
-      stop 1
+      write (stderr, '(A,1X,A,1X,A)') 'STOP Can''t open', filepath, 'for writing'
+      stop
    end if
 end subroutine
 
@@ -52,8 +52,8 @@ subroutine writefile(unit, typeout, title, atoms, bonds, atomperm1)
    case ('sdf')
       call writefile_sdf(unit, title, atoms, bonds, atomperm1)
    case default
-      write (stderr, '(A,A,A)') 'Error: File format "', typeout, '" is not supported'
-      stop 1
+      write (stderr, '(A,A,A)') 'STOP File format "', typeout, '" is not supported'
+      stop
    end select
 end subroutine
 
