@@ -100,8 +100,8 @@ type, public :: array_trees_t
    integer :: total_links, total_chains
    integer :: total_partref_entries
    ! Assignment statistics
-   real(rk) :: partial_combinations
-   real(rk) :: total_combinations
+   real(real64) :: partial_combinations
+   real(real64) :: total_combinations
 end type
 
 contains
@@ -760,15 +760,15 @@ subroutine print_chain_tree_array(atomtypes, cache_arrays)
    write(stdout, *)
 
    ! Print assignment statistics
-   if (cache_arrays%total_combinations > 2**24) then
-      write(stdout, '(A,ES8.2)') "Total combinations: ", cache_arrays%total_combinations
+   if (cache_arrays%total_combinations < 1.0E+12) then
+      write(stdout, '(A,I0)') "Total combinations: ", int(cache_arrays%total_combinations, kind=int64)
    else
-      write(stdout, '(A,I0)') "Total combinations: ", int(cache_arrays%total_combinations)
+      write(stdout, '(A,ES10.4)') "Total combinations: ", cache_arrays%total_combinations
    end if
-   if (cache_arrays%partial_combinations > 2**24) then
-      write(stdout, '(A,ES8.2)') "Sum of partial combinations: ", cache_arrays%partial_combinations
+   if (cache_arrays%partial_combinations < 1.0E+12) then
+      write(stdout, '(A,I0)') "Sum of partial combinations: ", int(cache_arrays%partial_combinations, kind=int64)
    else
-      write(stdout, '(A,I0)') "Sum of partial combinations: ", int(cache_arrays%partial_combinations)
+      write(stdout, '(A,ES10.4)') "Sum of partial combinations: ", cache_arrays%partial_combinations
    end if
    write(stdout, *)
 
