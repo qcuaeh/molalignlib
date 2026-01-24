@@ -69,7 +69,9 @@ heavy_flag = .FALSE.
 mirror_flag = .FALSE.
 align_flag = .FALSE.
 remap_flag = .FALSE.
+test_flag = .FALSE.
 aligned_flag = .FALSE.
+write_aligned = .FALSE.
 mass_flag = .FALSE.
 stoch_flag = .TRUE.
 adaptive_flag = .TRUE.
@@ -149,6 +151,7 @@ case default
 end select
 
 if (aligned_flag) then
+   write_aligned = .TRUE.
    call parse_path( coords_path, typeout)
    call open2write( coords_path, unitout)
 end if
@@ -282,7 +285,7 @@ if (align_flag) then
          rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2r))
          adjd = adjacencydiff( atomset1, atomperm1, adjcs1, adjcs2)
 
-         if (aligned_flag) then
+         if (write_aligned) then
             title2 = 'RMSD=' // str(rmsd) // ' Δadj=' // str(adjd)
             call set_coords( atoms2, coords2r)
             call writefile( unitout, typeout, title2, atoms2, bonds2, atomperm1)
@@ -310,7 +313,7 @@ if (align_flag) then
       rmsd = sqrt(sqdistmean( atomset1, atomperm1, weights1, coords1, coords2r))
       adjd = adjacencydiff( atomset1, atomperm1, adjcs1, adjcs2)
 
-      if (aligned_flag) then
+      if (write_aligned) then
          title2 = 'RMSD=' // str(rmsd) // ' Δadj=' // str(adjd)
          call set_coords( atoms2, coords2r)
          call writefile( unitout, typeout, title2, atoms2, bonds2, atomperm1)
@@ -335,7 +338,7 @@ else
       adjd = adjacencydiff( atomset1, atomperm1, adjcs1, adjcs2)
    end if
 
-   if (aligned_flag) then
+   if (write_aligned) then
       title2 = 'RMSD=' // str(rmsd) // ' Δadj=' // str(adjd)
       call set_coords( atoms2, coords2)
       call writefile( unitout, typeout, title2, atoms2, bonds2, atomperm1)

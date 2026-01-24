@@ -27,7 +27,9 @@ logical :: align_flag
 logical :: remap_flag
 logical :: stoch_flag
 logical :: adaptive_flag
+logical :: test_flag
 logical :: aligned_flag
+logical :: write_aligned
 logical :: stats_flag
 logical :: tree_flag
 logical :: bond_flag

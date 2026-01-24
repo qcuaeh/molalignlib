@@ -24,6 +24,8 @@ use options
 implicit none
 
 real(rk) :: prune_tol
+! Expected value factor = 2*SQRT(3) ≈ 3.4641
+real(rk), parameter :: EVALFAC = 3.4641
 procedure(prune_proc), pointer :: prune_procedure
 
 abstract interface
@@ -114,7 +116,7 @@ subroutine prune_rd( atomtypes, coords1, coords2, prunes)
          do j = 1, num_items2
             jatom = atomtypes%parts(h)%items2(j)
             do k = 1, atomtypes%num_parts
-               if (any(abs(dists2(jatom)%u(k)%u - dists1(iatom)%u(k)%u) > 3.4641*prune_tol)) then
+               if (any(abs(dists2(jatom)%u(k)%u - dists1(iatom)%u(k)%u) > EVALFAC*prune_tol)) then
                   prunes(h)%a(j, i) = .TRUE.
                   exit
                end if

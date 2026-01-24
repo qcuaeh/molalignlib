@@ -136,6 +136,8 @@ subroutine insert_record_atomperm(registry, atomperm1, steps, rotation, permdiff
       else
          registry%overflow = .TRUE.
       end if
+   else
+      registry%overflow = .TRUE.
    end if
 end subroutine
 
@@ -204,6 +206,8 @@ subroutine insert_record_moldiff(registry, moldiffs, atomperm1, steps, rotation,
                   else
                      registry%overflow = .TRUE.
                   end if
+               else
+                  registry%overflow = .TRUE.
                end if
             end if
             return
@@ -240,6 +244,8 @@ subroutine insert_record_moldiff(registry, moldiffs, atomperm1, steps, rotation,
       else
          registry%overflow = .TRUE.
       end if
+   else
+      registry%overflow = .TRUE.
    end if
 end subroutine
 

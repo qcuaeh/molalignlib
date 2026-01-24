@@ -61,7 +61,9 @@ heavy_flag = .FALSE.
 mirror_flag = .FALSE.
 align_flag = .FALSE.
 remap_flag = .FALSE.
+test_flag = .FALSE.
 aligned_flag = .FALSE.
+write_aligned = .FALSE.
 tree_flag = .FALSE.
 mass_flag = .FALSE.
 stoch_flag = .TRUE.
@@ -140,6 +142,7 @@ case default
 end select
 
 if (aligned_flag) then
+   write_aligned = .TRUE.
    call parse_path( coords_path, typeout)
    call open2write( coords_path, unitout)
 end if
@@ -228,7 +231,7 @@ if (align_flag) then
          coords2r = rotated_coords( coords2, rotquat, center1)
          rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2r))
 
-         if (aligned_flag) then
+         if (write_aligned) then
             title2 = 'RMSD=' // str( rmsd)
             coords2r = rotated_coords( coords2, rotquat, center1)
             call set_coords( atoms2, coords2r)
@@ -257,7 +260,7 @@ if (align_flag) then
       coords2r = rotated_coords( coords2, rotquat, center1)
       rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2r))
 
-      if (aligned_flag) then
+      if (write_aligned) then
          title2 = 'RMSD=' // str( rmsd)
          coords2r = rotated_coords( coords2, rotquat, center1)
          call set_coords( atoms2, coords2r)
@@ -283,7 +286,7 @@ else
       rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2))
    end if
 
-   if (aligned_flag) then
+   if (write_aligned) then
       title2 = 'RMSD=' // str( rmsd)
       coords2r = rotated_coords( coords2, rotquat, center1)
       call set_coords( atoms2, coords2r)

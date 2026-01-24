@@ -2,28 +2,26 @@
 shopt -s nullglob
 unalias -a
 
-run_tests() {
-   suffix=$1
-   subdir=$2
-   shift 2
-   for file in "$testdir/$subdir"/*.xyz; do
-      name=$(basename "$file" .xyz)_$suffix
-      echo -n "Running test $subdir/$name... "
+run_tests_jcim2c01187() {
+   subtestdir=$testdir/jcim.2c01187/$1
+   options=(-align -remap -test -stats -records 10 -prune "$1")
+   rmsdexec=./build/atormsd
+   while read name; do
+      echo -n "Running test $subtestdir/$name... "
       if $write_test; then
-         "$executable" "$@" < "$file" > "$testdir/$subdir/$name.out" 2>&1
+         $rmsdexec "${options[@]}" "$subtestdir/${name}_1.xyz" "$subtestdir/${name}_2.xyz" > "$subtestdir/$name.out" 2>&1
          echo done
       else
-         if diff -bB "$testdir/$subdir/$name.out" <("$executable" "$@" < "$file" 2>&1); then
+         if diff -bB "$subtestdir/$name.out" <($rmsdexec "${options[@]}" "$subtestdir/${name}_1.xyz" "$subtestdir/${name}_2.xyz" 2>&1); then
             echo ok
          else
             echo failed
          fi
       fi
-   done
+   done < $subtestdir/test_files
 }
 
 testdir=$PWD/tests
-executable=./build/atormsd
 write_test=false
 
 while getopts ":w" opt; do
@@ -38,4 +36,6 @@ while getopts ":w" opt; do
   esac
 done
 
-run_tests prune17 jcim.2c01187/0.05 -stdin -coords -stats -N 5 -align -remap -prune 0.05
+run_tests_jcim2c01187 0.05
+#run_tests_jcim2c01187 0.1
+#run_tests_jcim2c01187 0.2
