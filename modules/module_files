@@ -22,7 +22,6 @@ types_linked.f90
 types_indexed.f90
 assorting.f90
 refining.f90
-biasing_isomer.f90
 pruning_atoms.f90
 assignment_atoms.f90
 assignment_bonds.f90
@@ -30,4 +29,3 @@ assignment_conformer.f90
 recording.f90
 alignment_atoms.f90
 alignment_conformer.f90
-alignment_isomer.f90
