@@ -69,13 +69,13 @@ heavy_flag = .FALSE.
 mirror_flag = .FALSE.
 align_flag = .FALSE.
 remap_flag = .FALSE.
-coords_flag = .FALSE.
+aligned_flag = .FALSE.
 mass_flag = .FALSE.
 stoch_flag = .TRUE.
 adaptive_flag = .TRUE.
 label_flag = .FALSE.
 random_flag = .FALSE.
-rebond_flag = .FALSE.
+bond_flag = .FALSE.
 atomorder_flag = .FALSE.
 
 num_records = 1
@@ -110,15 +110,15 @@ do while (get_arg(arg))
       call read_optarg( arg, max_trials)
    case ('-records')
       call read_optarg( arg, num_records)
-   case ('-coords')
-      coords_flag = .TRUE.
+   case ('-aligned')
+      aligned_flag = .TRUE.
       call read_optarg( arg, coords_path)
    case ('-stats')
       stats_flag = .TRUE.
    case ('-random')
       random_flag = .TRUE.
-   case ('-rebond')
-      rebond_flag = .TRUE.
+   case ('-bond')
+      bond_flag = .TRUE.
    case ('-confo1')
       match_diff_bonds => toggle_bonds1
    case ('-confo2')
@@ -148,7 +148,7 @@ case default
    stop 'Too many file paths'
 end select
 
-if (coords_flag) then
+if (aligned_flag) then
    call parse_path( coords_path, typeout)
    call open2write( coords_path, unitout)
 end if
@@ -172,7 +172,7 @@ if (any(atomtypes%parts%num_items1 /= atomtypes%parts%num_items2)) then
 end if
 
 ! Set adjacency lists
-if (rebond_flag) then
+if (bond_flag) then
    call adjacency_from_atoms( atomset1, atoms1, adjcs1)
    call adjacency_from_atoms( atomset2, atoms2, adjcs2)
 else
@@ -282,7 +282,7 @@ if (align_flag) then
          rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2r))
          adjd = adjacencydiff( atomset1, atomperm1, adjcs1, adjcs2)
 
-         if (coords_flag) then
+         if (aligned_flag) then
             title2 = 'RMSD=' // str(rmsd) // ' Δadj=' // str(adjd)
             call set_coords( atoms2, coords2r)
             call writefile( unitout, typeout, title2, atoms2, bonds2, atomperm1)
@@ -310,7 +310,7 @@ if (align_flag) then
       rmsd = sqrt(sqdistmean( atomset1, atomperm1, weights1, coords1, coords2r))
       adjd = adjacencydiff( atomset1, atomperm1, adjcs1, adjcs2)
 
-      if (coords_flag) then
+      if (aligned_flag) then
          title2 = 'RMSD=' // str(rmsd) // ' Δadj=' // str(adjd)
          call set_coords( atoms2, coords2r)
          call writefile( unitout, typeout, title2, atoms2, bonds2, atomperm1)
@@ -335,7 +335,7 @@ else
       adjd = adjacencydiff( atomset1, atomperm1, adjcs1, adjcs2)
    end if
 
-   if (coords_flag) then
+   if (aligned_flag) then
       title2 = 'RMSD=' // str(rmsd) // ' Δadj=' // str(adjd)
       call set_coords( atoms2, coords2)
       call writefile( unitout, typeout, title2, atoms2, bonds2, atomperm1)

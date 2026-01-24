@@ -27,10 +27,10 @@ logical :: align_flag
 logical :: remap_flag
 logical :: stoch_flag
 logical :: adaptive_flag
-logical :: coords_flag
+logical :: aligned_flag
 logical :: stats_flag
 logical :: tree_flag
-logical :: rebond_flag
+logical :: bond_flag
 logical :: atomorder_flag
 
 ! Bounds

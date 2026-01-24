@@ -60,7 +60,7 @@ stats_flag = .FALSE.
 mirror_flag = .FALSE.
 align_flag = .FALSE.
 remap_flag = .FALSE.
-coords_flag = .FALSE.
+aligned_flag = .FALSE.
 mass_flag = .FALSE.
 label_flag = .FALSE.
 random_flag = .FALSE.
@@ -103,8 +103,8 @@ do while (get_arg(arg))
       call read_optarg( arg, max_trials)
    case ('-records')
       call read_optarg( arg, num_records)
-   case ('-coords')
-      coords_flag = .TRUE.
+   case ('-aligned')
+      aligned_flag = .TRUE.
       call read_optarg( arg, coords_path)
    case ('-stats')
       stats_flag = .TRUE.
@@ -131,7 +131,7 @@ case default
    stop 'Too many file paths'
 end select
 
-if (coords_flag) then
+if (aligned_flag) then
    call parse_path( coords_path, typeout)
    call open2write( coords_path, unitout)
 end if
@@ -201,7 +201,7 @@ if (align_flag) then
          coords2r = rotated_coords( coords2, rotquat, center1)
          rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2r))
 
-         if (coords_flag) then
+         if (aligned_flag) then
             title2 = 'RMSD=' // str( rmsd)
             coords2r = rotated_coords( coords2, rotquat, center1)
             call set_coords( atoms2, coords2r)
@@ -229,7 +229,7 @@ if (align_flag) then
       coords2r = rotated_coords( coords2, rotquat, center1)
       rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2r))
 
-      if (coords_flag) then
+      if (aligned_flag) then
          title2 = 'RMSD=' // str( rmsd)
          coords2r = rotated_coords( coords2, rotquat, center1)
          call set_coords( atoms2, coords2r)
@@ -256,7 +256,7 @@ else
       rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2))
    end if
 
-   if (coords_flag) then
+   if (aligned_flag) then
       title2 = 'RMSD=' // str( rmsd)
       coords2r = rotated_coords( coords2, rotquat, center1)
       call set_coords( atoms2, coords2r)
