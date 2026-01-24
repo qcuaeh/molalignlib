@@ -7,24 +7,49 @@ Build all programs
 ./build.sh
 ```
 
-ConfRMSD program
-----------------
+*atormsd*
+-----------
 ### Usage
 ```
-ConfRMSD file1 file2 [options]
+atormsd file1 file2 [options]
 ```
 
 ### Options
 `-align` Align atoms to minimize the RMSD.  
 `-remap` Remap atoms to minimize the RMSD.  
-`-rebond` Set bonds from atom distances.  
-`-naive` Probe all feasible assignment combinations.  
+`-prune TOL` Prune assignments exceeding tolerance *TOL*.  
+`-thres N` Exit if count threshold *N* is reached.  
+`-trials N` Exit if trial limit *N* is reached.  
+`-records N` Record the *N* lowest RMSDs (1 by default).  
+`-atomorder` Print optimized atom order.  
+`-aligned FILE` Write aligned coordinates to *FILE*.  
 `-heavy` Ignore hydrogen atoms.  
 `-mass` Use mass weighted coordinates.  
 `-mirror` Reflect aligned coordinates.  
-`-mapping` Print optimal mapping.  
+`-stats` Print detailed optimization stats.  
+`-random` Set random seed from clock.  
+`-test` Print output and aligned coordinates to stdout.  
+
+*conformsd*
+-----------
+### Usage
+```
+conformsd file1 file2 [options]
+```
+
+### Options
+`-align` Align atoms to minimize the RMSD.  
+`-remap` Remap atoms to minimize the RMSD.  
+`-bond` Set bonds from atom distances.  
+`-thres N` Exit if count threshold *N* is reached.  
+`-trials N` Exit if trial limit *N* is reached.  
+`-records N` Record the *N* lowest RMSDs (1 by default).  
+`-atomorder` Print optimized atom order.  
 `-aligned FILE` Write aligned coordinates to *FILE*.  
-`-stats` Print detailed stats of the calculation.  
 `-tree` Print the assignment tree.  
-`-test` Use always the same seed for testing.  
-`-n N` Find the *N* lowest RMSDs (1 by default).
+`-heavy` Ignore hydrogen atoms.  
+`-mass` Use mass weighted coordinates.  
+`-mirror` Reflect aligned coordinates.  
+`-stats` Print detailed optimization stats.  
+`-random` Set random seed from clock.  
+`-test` Print output and aligned coordinates to stdout.  
