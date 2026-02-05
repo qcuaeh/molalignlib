@@ -22,7 +22,7 @@ use permutation
 use euclidean
 use assignment_atoms
 use types_linked
-use refining
+use refinement
 use pruning_atoms
 use recording
 use options

@@ -21,10 +21,9 @@ argparse.f90
 types_linked.f90
 types_indexed.f90
 assorting.f90
-refining.f90
+refinement.f90
 pruning_atoms.f90
 assignment_atoms.f90
-assignment_bonds.f90
 assignment_conformer.f90
 recording.f90
 alignment_atoms.f90

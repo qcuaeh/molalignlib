@@ -26,7 +26,7 @@ use adjacency
 use pruning_atoms
 use types_linked
 use types_indexed
-use refining
+use refinement
 use assignment_atoms
 use assignment_conformer
 use recording
