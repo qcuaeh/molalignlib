@@ -28,7 +28,6 @@ use file_reading
 use file_writing
 use argparse
 use assorting
-use pruning_atoms
 use recording
 use assignment_conformer
 use alignment_conformer

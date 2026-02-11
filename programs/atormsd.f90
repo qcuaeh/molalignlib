@@ -23,7 +23,6 @@ use molecule
 use euclidean
 use utils
 use chemistry
-use adjacency
 use permutation
 use file_reading
 use file_writing

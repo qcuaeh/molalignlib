@@ -1,10 +1,13 @@
 MolAlignLib
 ===========
 
-Build all programs
-------------------
+Building
+--------
+To build the executables, GFortran 4.8+ (or any other Fortran 2008 compiler) is required:
 ```
-./build.sh
+mkdir build && cd build
+cmake ..
+make
 ```
 
 *atormsd*

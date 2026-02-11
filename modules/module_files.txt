@@ -28,3 +28,5 @@ assignment_conformer.f90
 recording.f90
 alignment_atoms.f90
 alignment_conformer.f90
+atormsd_c_binding.f90
+conformsd_c_binding.f90

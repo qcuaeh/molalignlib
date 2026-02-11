@@ -31,7 +31,7 @@ build_library() {
          "$env_FC" "${comp_flags[@]}" -J "$blddir" -c "$srcfile" -o "$objfile"
       fi
       ar rcs "$blddir/molalignlib.a" "$objfile"
-   done < <(grep -v '^#' "$srcdir/module_files")
+   done < <(grep -Ev '^$|^#' "$srcdir/module_files.txt")
 }
 
 build_programs() {
@@ -42,7 +42,7 @@ build_programs() {
       execfile=$blddir/$progname
       echo Building program $progname...
       "$env_FC" "${comp_flags[@]}" "${link_flags[@]}" -J "$blddir" "$srcfile" "$molalignlib" -o "$execfile"
-   done < <(grep -v '^#' "$srcdir/program_files")
+   done < <(grep -Ev '^$|^#' "$srcdir/program_files.txt")
 }
 
 if test ! -e ./build.env; then
