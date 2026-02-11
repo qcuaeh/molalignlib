@@ -33,7 +33,7 @@ logical :: write_aligned
 logical :: stats_flag
 logical :: tree_flag
 logical :: bond_flag
-logical :: atomorder_flag
+logical :: mapping_flag
 
 ! Bounds
 integer :: max_trials

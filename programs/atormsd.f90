@@ -65,7 +65,7 @@ write_aligned = .FALSE.
 mass_flag = .FALSE.
 label_flag = .FALSE.
 random_flag = .FALSE.
-atomorder_flag = .FALSE.
+mapping_flag = .FALSE.
 
 num_records = 1
 ato_thres = 10
@@ -83,8 +83,8 @@ do while (get_arg(arg))
       align_flag = .TRUE.
    case ('-remap')
       remap_flag = .TRUE.
-   case ('-atomorder')
-      atomorder_flag = .TRUE.
+   case ('-mapping')
+      mapping_flag = .TRUE.
    case ('-near')
       prune_procedure => prune_none
    case ('-prune')
@@ -218,7 +218,7 @@ if (align_flag) then
             call writefile( unitout, typeout, title2, atoms2, bonds2, atomperm1)
          else
             write (stdout,'(A)',advance='no') str( rmsd)
-            if (atomorder_flag) then
+            if (mapping_flag) then
                write (stdout,'(1X)',advance='no')
                call print_permutation(atomperm1)
             end if
@@ -273,7 +273,7 @@ else
       call writefile( unitout, typeout, title2, atoms2, bonds2, atomperm1)
    else
       write (stdout,'(A)',advance='no') str( rmsd)
-      if (remap_flag .and. atomorder_flag) then
+      if (remap_flag .and. mapping_flag) then
          write (stdout,'(1X)',advance='no')
          call print_permutation(atomperm1)
       end if
