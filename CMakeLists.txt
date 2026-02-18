@@ -1,4 +1,5 @@
-cmake_minimum_required(VERSION 3.17.5)
+cmake_minimum_required(VERSION 3.15)
+
 project(MolAlignLib VERSION 1.0 LANGUAGES Fortran C)
 
 # Set default build type to Release if not specified
@@ -34,7 +35,7 @@ add_subdirectory(modules)
 # Build the original Fortran programs
 add_subdirectory(programs)
 
-# Installation rules
+# Installation rules for the Fortran library
 install(TARGETS molalignlib
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
@@ -45,3 +46,8 @@ install(DIRECTORY ${CMAKE_Fortran_MODULE_DIRECTORY}/
     FILES_MATCHING PATTERN "*.mod"
 )
 
+# Build Python extension only when called from scikit-build
+if(SKBUILD)
+    message(STATUS "Detected scikit-build environment; enabling Python extension build")
+    add_subdirectory(bindings)
+endif()
