@@ -51,6 +51,9 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
    type(chaintree_node_t), pointer :: hna_chain
    type(array_trees_t) :: cache_arrays
 
+   ! Allocations
+   allocate (coords2r, mold=coords2)
+
    ! Pre-compute assignment tree for decision making
    call compute_sc_hna_chain( adjcs1, adjcs2, atomtypes, hna_chain)
    call build_assignment_tree( adjcs1, adjcs2, hna_chain%last_link, cache_arrays)
@@ -71,9 +74,10 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
       ! Optimize atom permutation
       do
 
-         ! Get randomly rotated coords2
+         ! Apply random rotation to coords2 copy
+         coords2r = coords2
          total_rotation = randrotquat()
-         coords2r = rotated_coords( coords2, total_rotation)
+         call rotate_coords( atomset2, coords2r, total_rotation)
 
          ! Assign atoms with current orientation
          if (PRUNE_ASSIGNMENTS) then
@@ -129,7 +133,8 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
       rotation = least_rotquat( atomset1, atomperm1, coords1, coords2)
       
       ! Rotate coords2 and calculate permdist
-      coords2r = rotated_coords( coords2, rotation)
+      coords2r = coords2
+      call rotate_coords( atomset2, coords2r, rotation)
       permdist = sqdistsum( atomset1, atomperm1, coords1, coords2r)
       
       ! Initialize registry with a single record

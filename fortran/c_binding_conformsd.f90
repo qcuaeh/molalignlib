@@ -161,16 +161,14 @@ subroutine conformsd_calculate(                                              &
                                           coords1w, coords2w, registry)
          if (stats_flag) call print_records(registry)
          atomperm1 = registry%records(1)%atomperm1
-         rotquat   = least_rotquat(atomset1, atomperm1, coords1w, coords2w)
       else
          if (any(atomtypes%itemdir1 /= atomtypes%itemdir2)) then
             c_error_code = 3;  return
          end if
-         allocate(atomperm1(size(coords1w, 2)))
-         call init_identity_permutation(atomperm1)
-         rotquat = least_rotquat(atomset1, atomperm1, coords1w, coords2w)
+         call init_identity_permutation(size(atoms1), atomperm1)
       end if
 
+      rotquat = least_rotquat(atomset1, atomperm1, coords1w, coords2w)
       coords2r = rotated_coords(coords2, rotquat, center1)
       rmsd = sqrt(sqdistmean(atomset1, atomperm1, weights1, coords1, coords2r))
       call build_homogeneous_transform(rotquat, center1, center2, c_transform)
@@ -184,8 +182,7 @@ subroutine conformsd_calculate(                                              &
          if (any(atomtypes%itemdir1 /= atomtypes%itemdir2)) then
             c_error_code = 3;  return
          end if
-         allocate(atomperm1(size(coords1w, 2)))
-         call init_identity_permutation(atomperm1)
+         call init_identity_permutation(size(atoms1), atomperm1)
       end if
       rmsd = sqrt(sqdistmean(atomset1, atomperm1, weights1, coords1, coords2))
    end if

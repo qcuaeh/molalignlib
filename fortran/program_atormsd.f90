@@ -212,7 +212,7 @@ if (align_flag) then
                write (stdout,'(1X)',advance='no')
                call print_permutation(atomperm1)
             end if
-            write (stdout, *)
+            write (stdout,*)
          end if
       end do
 
@@ -223,8 +223,7 @@ if (align_flag) then
          stop 'Atom types do not match'
       end if
 
-      allocate (atomperm1(size( coords1w, 2)))
-      call init_identity_permutation( atomperm1)
+      call init_identity_permutation( size(atoms1), atomperm1)
       rotquat = least_rotquat( atomset1, atomperm1, coords1w, coords2w)
       coords2r = rotated_coords( coords2, rotquat, center1)
       rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2r))
@@ -249,19 +248,18 @@ else
    if (remap_flag) then
       call prune_procedure( atomtypes, coords1, coords2, prunes)
       call assign_atoms_pruned( atomtypes, coords1w, coords2w, prunes, atomperm1)
+      rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2))
+      write (stdout,'(A)',advance='no') str( rmsd)
+      if (print_mapping_flag) then
+         write (stdout,'(1X)',advance='no')
+         call print_permutation(atomperm1)
+      end if
+      write (stdout,*)
    else
-      allocate (atomperm1(size( coords1w, 2)))
-      call init_identity_permutation( atomperm1)
+      call init_identity_permutation( size(atoms1), atomperm1)
+      rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2))
+      write (stdout,'(A)') str( rmsd)
    end if
-
-   rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2))
-
-   write (stdout,'(A)',advance='no') str( rmsd)
-   if (remap_flag .and. print_mapping_flag) then
-      write (stdout,'(1X)',advance='no')
-      call print_permutation(atomperm1)
-   end if
-   write (stdout, *)
 
 end if
 

@@ -435,12 +435,8 @@ subroutine assign_atoms_greedy(coords1, coords2, cache_arrays, atomperm1, permdi
    ! Perform greedy exploration with JVC optimization (starting from root chain at index 1)
    call recur_assign_atoms_greedy(coords1, coords2, cache_arrays, 1, greedy_perm)
 
-   ! Convert subperm type to permutation array
-   allocate (atomperm1(greedy_perm%atomperm_size))
-   atomperm1 = greedy_perm%atomperm
-
    ! Calculate total distance
-   permdist = sqdistsum(atomperm1, coords1, coords2)
+   permdist = sqdistsum(greedy_perm%atomset, greedy_perm%atomperm, coords1, coords2)
 end subroutine
 
 recursive subroutine recur_assign_atoms_global(coords1, coords2, cache_arrays, &

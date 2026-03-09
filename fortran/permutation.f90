@@ -43,12 +43,15 @@ subroutine print_permutation(permutation)
    end do
 end subroutine
 
-subroutine init_identity_permutation(permutation)
-   integer(ik), dimension(:), intent(out) :: permutation
+subroutine init_identity_permutation(n_items, permutation)
+   integer, intent(in) :: n_items
+   integer(ik), dimension(:), allocatable, intent(out) :: permutation
    ! Local variables
    integer(ik) :: i
 
-   do i = 1, size(permutation)
+   allocate (permutation(n_items))
+
+   do i = 1, n_items
       permutation(i) = i
    end do
 end subroutine

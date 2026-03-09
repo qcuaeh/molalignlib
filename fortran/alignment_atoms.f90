@@ -42,6 +42,9 @@ subroutine optimize_atomperm_atoms(atomset1, atomset2, atomtypes, prunes, coords
    real(rk), dimension(:,:), allocatable :: coords2r
    real(rk) :: permdist, steps, rotation(4), total_rotation(4)
 
+   ! Allocations
+   allocate (coords2r, mold=coords2)
+
    ! Initialize local minima registry
    call reset_registry( registry)
 
@@ -51,9 +54,10 @@ subroutine optimize_atomperm_atoms(atomset1, atomset2, atomtypes, prunes, coords
    ! Optimize atom permutation
    do while (registry%records(1)%freq < ato_thres .and. registry%num_trials < max_trials)
 
-      ! Aply a random total_rotation to coords2
+      ! Apply random rotation to coords2 copy
+      coords2r = coords2
       total_rotation = randrotquat()
-      coords2r = rotated_coords( coords2, total_rotation)
+      call rotate_coords( atomset2, coords2r, total_rotation)
 
       ! Assign atoms with current orientation
       call assign_atoms_pruned( atomtypes, coords1, coords2r, prunes, atomperm1)

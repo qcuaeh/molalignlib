@@ -73,11 +73,10 @@ subroutine assign_atoms_pruned( atomtypes, coords1, coords2, prunes, atomperm1)
    real(rk) :: dist
    integer(ik) :: h
 
-   allocate (atomperm1(size(coords1, 2)))
    allocate (partperm(maxval(atomtypes%parts%num_items1)))
 
    ! Initialize atomperm1 as identity permutation
-   call init_identity_permutation(atomperm1)
+   call init_identity_permutation(size(coords1, 2), atomperm1)
 
    ! Optimize atomperm1 for each block
    do h = 1, atomtypes%num_parts
@@ -100,11 +99,10 @@ subroutine assign_atoms_nearest( atomtypes, coords1, coords2, atomperm1)
    real(rk) :: dist
    integer(ik) :: h
 
-   allocate (atomperm1(size(coords1, 2)))
    allocate (partperm(maxval(atomtypes%parts%num_items1)))
 
    ! Initialize atomperm1 as identity permutation
-   call init_identity_permutation(atomperm1)
+   call init_identity_permutation(size(coords1, 2), atomperm1)
 
    ! Fill distance matrix for each block
    do h = 1, atomtypes%num_parts
