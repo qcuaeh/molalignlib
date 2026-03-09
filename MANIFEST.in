@@ -1,1 +1,3 @@
-include molalignlib/*
+include fortran/modules
+include fortran/programs
+include bindings

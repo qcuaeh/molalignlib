@@ -1,2 +1,0 @@
-atormsd.f90 atormsd
-conformsd.f90 conformsd

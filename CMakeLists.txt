@@ -26,28 +26,10 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU")
     set(CMAKE_C_FLAGS_DEBUG "-O0 -g -Wall -Wextra")
 endif()
 
-# Set module output directory
-set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/modules)
+add_subdirectory(fortran)
+add_subdirectory(bindings)
 
-# Create the static library
-add_subdirectory(modules)
-
-# Build the original Fortran programs
-add_subdirectory(programs)
-
-# Installation rules for the Fortran library
-install(TARGETS molalignlib
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-)
-
-install(DIRECTORY ${CMAKE_Fortran_MODULE_DIRECTORY}/
-    DESTINATION include/molalignlib
-    FILES_MATCHING PATTERN "*.mod"
-)
-
-# Build Python extension only when called from scikit-build
 if(SKBUILD)
     message(STATUS "Detected scikit-build environment; enabling Python extension build")
-    add_subdirectory(bindings)
+    add_subdirectory(python)
 endif()
