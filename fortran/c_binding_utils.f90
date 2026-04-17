@@ -9,7 +9,7 @@ module c_binding_utils
    use pruning_atoms
    use recording
    use alignment_atoms
-   use options
+   use flags
    implicit none
 
 contains

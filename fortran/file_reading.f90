@@ -19,7 +19,7 @@ use parameters
 use str_utils
 use chemdata
 use molecule
-use options
+use flags
 
 implicit none
 
@@ -33,9 +33,11 @@ subroutine parse_label( label, elnum, group)
    integer(ik), intent(out) :: elnum, group
    ! Local variables
    character(:), allocatable :: normalized_label, elsym
+   character(symlen), dimension(:), allocatable :: normalized_atomic_symbols
    integer(ik) :: pos, z
 
    normalized_label = lowercase(trim(adjustl(label)))
+   normalized_atomic_symbols = lowercase(atomic_symbols)
    pos = verify(normalized_label, LOWERCHAR)
 
    if (pos == 0) then
@@ -53,19 +55,11 @@ subroutine parse_label( label, elnum, group)
 
    elnum = 0
    do z = 1, num_elems
-      if (elsym == atomic_symbols(z)) then
+      if (elsym == normalized_atomic_symbols(z)) then
          elnum = z
          return
       end if
    end do
-
-   ! Custom symbols
-   select case (elsym)
-   case ('x') ! Dummy atom
-      elnum = 257
-   case ('lj') ! Lennard-Jones atom
-      elnum = 258
-   end select
 end subroutine
 
 subroutine read_file(unit, in_format, title, atoms, bonds)

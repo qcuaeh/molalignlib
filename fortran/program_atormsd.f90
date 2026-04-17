@@ -32,10 +32,10 @@ use file_utils
 use file_reading
 use file_writing
 use argparse
-use options
+use flags
 implicit none
 
-logical(lk) :: print_mapping_flag
+logical(lk) :: print_map_flag
 logical(lk) :: write_aligned_flag
 character(:), allocatable :: title1, title2
 character(:), allocatable :: arg, coords_path
@@ -52,7 +52,9 @@ real(rk), dimension(:), allocatable :: weights1, weights2
 real(rk), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, coords2r
 integer(ik), dimension(:), allocatable :: atomset1, atomset2
 integer(ik), dimension(:), allocatable :: atomperm1
+integer(ik) :: num_records, max_trials, conv_freq
 integer(ik) :: in_unit, out_unit
+integer(ik) :: error_code
 integer(ik) :: i
 
 ! Set default options
@@ -65,10 +67,10 @@ write_aligned_flag = .FALSE.
 mass_flag = .FALSE.
 label_flag = .FALSE.
 random_flag = .FALSE.
-print_mapping_flag = .FALSE.
+print_map_flag = .FALSE.
 
 num_records = 1
-ato_thres = 10
+conv_freq = 10
 max_trials = MAX_TRIALS_DEFAULT
 out_unit = stdout
 prune_procedure => prune_none
@@ -84,7 +86,7 @@ do while (get_arg(arg))
    case ('-remap')
       remap_flag = .TRUE.
    case ('-printmap')
-      print_mapping_flag = .TRUE.
+      print_map_flag = .TRUE.
    case ('-near')
       prune_procedure => prune_none
    case ('-prune')
@@ -98,8 +100,8 @@ do while (get_arg(arg))
       mass_flag = .TRUE.
    case ('-mirror')
       mirror_flag = .TRUE.
-   case ('-thres')
-      call read_optarg(arg, ato_thres)
+   case ('-freq')
+      call read_optarg(arg, conv_freq)
    case ('-trials')
       call read_optarg( arg, max_trials)
    case ('-records')
@@ -187,7 +189,9 @@ if (align_flag) then
       ! Remap atoms to minimize the MSD
       call prune_procedure( atomtypes, coords1, coords2, prunes)
       call allocate_registry( registry, num_records)
-      call optimize_atomperm_atoms( atomset1, atomset2, atomtypes, prunes, coords1w, coords2w, registry)
+      call optimize_atomperm_atoms( atomset1, atomset2, atomtypes, prunes, &
+            coords1w, coords2w, conv_freq, max_trials, registry, error_code)
+      if (error_code /= 0) stop 'Error: Assignment failed'
 
       ! Print optimization stats
       if (stats_flag) then
@@ -208,7 +212,7 @@ if (align_flag) then
             call write_file( out_unit, out_format, title2, atoms2, bonds2, atomperm1)
          else
             write (stdout,'(A)',advance='no') str( rmsd)
-            if (print_mapping_flag) then
+            if (print_map_flag) then
                write (stdout,'(1X)',advance='no')
                call print_permutation(atomperm1)
             end if
@@ -247,10 +251,11 @@ else
 
    if (remap_flag) then
       call prune_procedure( atomtypes, coords1, coords2, prunes)
-      call assign_atoms_pruned( atomtypes, coords1w, coords2w, prunes, atomperm1)
+      call assign_atoms_pruned( atomtypes, coords1w, coords2w, prunes, atomperm1, error_code)
+      if (error_code /= 0) stop 'Error: Assignment failed'
       rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2))
       write (stdout,'(A)',advance='no') str( rmsd)
-      if (print_mapping_flag) then
+      if (print_map_flag) then
          write (stdout,'(1X)',advance='no')
          call print_permutation(atomperm1)
       end if

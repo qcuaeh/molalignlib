@@ -10,7 +10,7 @@ module c_binding_atormsd
    use recording
    use alignment_atoms
    use c_binding_utils
-   use options
+   use flags
    implicit none
 
 contains
@@ -32,7 +32,7 @@ subroutine atormsd_calculate(                                        &
       c_align_flag, c_remap_flag, c_heavy_flag, c_mass_flag,         &
       c_mirror_flag, c_label_flag,                                   &
       c_stats_flag, c_random_flag,                                   &
-      c_prune_tol, c_ato_thres, c_max_trials,                       &
+      c_prune_tol, c_conv_freq, c_max_trials,                       &
       c_rmsd, c_natoms, c_atomperm, c_transform, c_error_code)      &
       bind(C, name="atormsd_calculate")
 
@@ -51,7 +51,7 @@ subroutine atormsd_calculate(                                        &
    logical(lk), intent(in), value :: c_mirror_flag, c_label_flag
    logical(lk), intent(in), value :: c_stats_flag, c_random_flag
    real(rk),    intent(in), value :: c_prune_tol
-   integer(ik), intent(in), value :: c_ato_thres, c_max_trials
+   integer(ik), intent(in), value :: c_conv_freq, c_max_trials
 
    ! --- outputs ---
    real(rk),               intent(out) :: c_rmsd
@@ -69,6 +69,8 @@ subroutine atormsd_calculate(                                        &
    real(rk), dimension(:),   allocatable :: weights1, weights2
    real(rk), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, coords2r
    integer(ik),  dimension(:),   allocatable :: atomset1, atomset2, atomperm1
+   integer(ik) :: num_records, max_trials, conv_freq
+   integer(ik) :: error_code
    integer(ik) :: i
 
    c_error_code = 0;  c_rmsd = 0.0_rk;  c_natoms = 0
@@ -87,7 +89,7 @@ subroutine atormsd_calculate(                                        &
       prune_tol = c_prune_tol
    end if
 
-   ato_thres  = c_ato_thres
+   conv_freq  = c_conv_freq
    max_trials = c_max_trials
    num_records= 1
 
@@ -139,7 +141,11 @@ subroutine atormsd_calculate(                                        &
       if (remap_flag) then
          call prune_procedure(atomtypes, coords1, coords2, prunes)
          call allocate_registry(registry, num_records)
-         call optimize_atomperm_atoms(atomset1, atomset2, atomtypes, prunes, coords1w, coords2w, registry)
+         call optimize_atomperm_atoms(atomset1, atomset2, atomtypes, prunes, &
+               coords1w, coords2w, conv_freq, max_trials, registry, error_code)
+         if (error_code /= 0) then
+            c_error_code = error_code;  return
+         end if
          if (stats_flag) call print_records(registry)
          atomperm1 = registry%records(1)%atomperm1
       else
@@ -159,7 +165,10 @@ subroutine atormsd_calculate(                                        &
 
       if (remap_flag) then
          call prune_procedure(atomtypes, coords1, coords2, prunes)
-         call assign_atoms_pruned(atomtypes, coords1w, coords2w, prunes, atomperm1)
+         call assign_atoms_pruned(atomtypes, coords1w, coords2w, prunes, atomperm1, error_code)
+         if (error_code /= 0) then
+            c_error_code = error_code;  return
+         end if
       else
          if (any(atomtypes%itemdir1 /= atomtypes%itemdir2)) then
             c_error_code = 2;  return

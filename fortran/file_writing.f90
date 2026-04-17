@@ -19,7 +19,7 @@ use parameters
 use permutation
 use chemdata
 use molecule
-use options
+use flags
 
 implicit none
 
@@ -66,7 +66,7 @@ subroutine write_file_xyz(unit, title, atoms, bonds, atomperm1)
 
    do i = 1, n_atoms
       iatom = atoms(atomperm1(i))
-      write (unit, '(A,3(2X,F12.6))') capitalized(atomic_symbols(iatom%elnum)), iatom%coords
+      write (unit, '(A,3(2X,F12.6))') atomic_symbols(iatom%elnum), iatom%coords
    end do
 end subroutine
 
@@ -107,7 +107,7 @@ subroutine write_file_sdf(unit, title, atoms, bonds, atomperm1)
    do i = 1, n_atoms
       iatom = atoms(atomperm1(i))
       write (unit, '(3F10.4,1X,A3,I2,11I3)') &
-         iatom%coords, capitalized(atomic_symbols(iatom%elnum)), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+         iatom%coords, atomic_symbols(iatom%elnum), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
    end do
 
    ! Bond block
@@ -164,7 +164,7 @@ subroutine write_file_mol2(unit, title, atoms, bonds, atomperm1)
          atomtype = 'H'
       end if
       write (unit, '(I4,2X,A2,3(1X,F12.6),2X,A4,1X,I2,1X,A4,1X,F7.3)') &
-         i, capitalized(atomic_symbols(iatom%elnum)), iatom%coords, atomtype, 1, 'MOL1', 0.
+         i, atomic_symbols(iatom%elnum), iatom%coords, atomtype, 1, 'MOL1', 0.
    end do
 
    write (unit, '(A)') '@<TRIPOS>BOND'

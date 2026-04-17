@@ -20,7 +20,7 @@ use types_basic
 use sorting
 use molecule
 use types_linked
-use options
+use flags
 implicit none
 
 real(rk) :: prune_tol

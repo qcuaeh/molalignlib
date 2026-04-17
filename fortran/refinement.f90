@@ -23,7 +23,7 @@ use adjacency
 use molecule
 use types_linked
 use types_indexed
-use options
+use flags
 implicit none
 private
 public refine_hna_part

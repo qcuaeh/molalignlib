@@ -31,7 +31,7 @@ extern "C" {
  * @param stats_flag    Print optimisation statistics
  * @param random_flag   Use random algorithm
  * @param prune_tol     Pruning tolerance (negative = disable pruning)
- * @param ato_thres     Atom threshold
+ * @param conv_freq     Convergence frequency
  * @param max_trials    Maximum number of trials
  *
  * @param rmsd          [out] Calculated RMSD value
@@ -48,7 +48,7 @@ void atormsd_calculate(
     bool align_flag, bool remap_flag, bool heavy_flag, bool mass_flag,
     bool mirror_flag, bool label_flag,
     bool stats_flag, bool random_flag,
-    double prune_tol, int ato_thres, int max_trials,
+    double prune_tol, int conv_freq, int max_trials,
     double *rmsd, int *natoms, int *atomperm,
     double *transform, int *error_code);
 

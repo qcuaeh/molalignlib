@@ -11,7 +11,7 @@ module c_binding_conformsd
    use assignment_conformer
    use alignment_conformer
    use c_binding_utils
-   use options
+   use flags
    implicit none
 
 contains
@@ -36,7 +36,7 @@ subroutine conformsd_calculate(                                              &
       c_align_flag, c_remap_flag, c_heavy_flag, c_mass_flag,                &
       c_mirror_flag, c_label_flag, c_bond_flag,                             &
       c_stats_flag, c_random_flag,                                          &
-      c_confo_thres, c_max_trials,                                           &
+      c_conv_freq, c_max_trials,                                           &
       c_rmsd, c_natoms, c_atomperm, c_transform, c_error_code)              &
       bind(C, name="conformsd_calculate")
 
@@ -58,7 +58,7 @@ subroutine conformsd_calculate(                                              &
    logical(lk), intent(in), value :: c_align_flag, c_remap_flag, c_heavy_flag, c_mass_flag
    logical(lk), intent(in), value :: c_mirror_flag, c_label_flag, c_bond_flag
    logical(lk), intent(in), value :: c_stats_flag, c_random_flag
-   integer(ik), intent(in), value :: c_confo_thres, c_max_trials
+   integer(ik), intent(in), value :: c_conv_freq, c_max_trials
 
    ! --- outputs ---
    real(rk),               intent(out) :: c_rmsd
@@ -77,6 +77,7 @@ subroutine conformsd_calculate(                                              &
    real(rk), dimension(:),   allocatable :: weights1, weights2
    real(rk), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, coords2r
    integer(ik),  dimension(:),   allocatable :: atomset1, atomset2, atomperm1
+   integer(ik) :: num_records, max_trials, conv_freq
    integer(ik) :: i
 
    c_error_code = 0;  c_rmsd = 0.0_rk;  c_natoms = 0
@@ -91,7 +92,7 @@ subroutine conformsd_calculate(                                              &
    stoch_flag   = .TRUE.;   adaptive_flag = .TRUE.
    print_tree_flag     = .FALSE.
 
-   confo_thres = c_confo_thres
+   conv_freq = c_conv_freq
    max_trials  = c_max_trials
    num_records = 1
 
@@ -158,7 +159,7 @@ subroutine conformsd_calculate(                                              &
       if (remap_flag) then
          call allocate_registry(registry, num_records)
          call optimize_atomperm_conformer(atomset1, atomset2, adjcs1, adjcs2, atomtypes, &
-                                          coords1w, coords2w, registry)
+               coords1w, coords2w, conv_freq, max_trials, registry)
          if (stats_flag) call print_records(registry)
          atomperm1 = registry%records(1)%atomperm1
       else

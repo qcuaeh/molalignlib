@@ -25,17 +25,20 @@ use types_linked
 use refinement
 use pruning_atoms
 use recording
-use options
+use flags
 implicit none
 
 contains
 
-subroutine optimize_atomperm_atoms(atomset1, atomset2, atomtypes, prunes, coords1, coords2, registry)
+subroutine optimize_atomperm_atoms(atomset1, atomset2, atomtypes, prunes, coords1, &
+      coords2, conv_freq, max_trials, registry, error_code)
    integer(ik), dimension(:), intent(in) :: atomset1, atomset2
    type(partition_t), intent(in) :: atomtypes
    type(bool_matrix), dimension(:), intent(in) :: prunes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
+   integer(ik), intent(in) :: conv_freq, max_trials
    type(registry_t), intent(inout) :: registry
+   integer(ik), intent(out) :: error_code
 
    ! Local variables
    integer(ik), dimension(:), allocatable :: atomperm1, new_atomperm
@@ -45,6 +48,8 @@ subroutine optimize_atomperm_atoms(atomset1, atomset2, atomtypes, prunes, coords
    ! Allocations
    allocate (coords2r, mold=coords2)
 
+   error_code = 0
+
    ! Initialize local minima registry
    call reset_registry( registry)
 
@@ -52,7 +57,7 @@ subroutine optimize_atomperm_atoms(atomset1, atomset2, atomtypes, prunes, coords
    call random_initialize()
 
    ! Optimize atom permutation
-   do while (registry%records(1)%freq < ato_thres .and. registry%num_trials < max_trials)
+   do while (registry%records(1)%freq < conv_freq .and. registry%num_trials < max_trials)
 
       ! Apply random rotation to coords2 copy
       coords2r = coords2
@@ -60,14 +65,16 @@ subroutine optimize_atomperm_atoms(atomset1, atomset2, atomtypes, prunes, coords
       call rotate_coords( atomset2, coords2r, total_rotation)
 
       ! Assign atoms with current orientation
-      call assign_atoms_pruned( atomtypes, coords1, coords2r, prunes, atomperm1)
+      call assign_atoms_pruned( atomtypes, coords1, coords2r, prunes, atomperm1, error_code)
+      if (error_code /= 0) return
       rotation = least_rotquat( atomset1, atomperm1, coords1, coords2r)
       call rotate_coords( atomset1, coords2r, rotation)
       total_rotation = quatmul( total_rotation, rotation)
       steps = 1
 
       do
-         call assign_atoms_pruned( atomtypes, coords1, coords2r, prunes, new_atomperm)
+         call assign_atoms_pruned( atomtypes, coords1, coords2r, prunes, new_atomperm, error_code)
+         if (error_code /= 0) return
          if (all(new_atomperm == atomperm1)) exit
          atomperm1 = new_atomperm
          rotation = least_rotquat( atomset1, atomperm1, coords1, coords2r)

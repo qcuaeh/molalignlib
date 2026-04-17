@@ -102,7 +102,6 @@ subroutine bonds_from_atoms(atoms, bonds)
    integer(ik) :: i, j, n_atoms, n_bonds
    real(rk), allocatable :: atom_radii(:)
    real(rk) :: atom_dist
-   type(bond_t), dimension(:), allocatable :: temp_bonds
 
    n_atoms = size(atoms)
 

@@ -14,7 +14,7 @@
 ! You should have received a copy of the GNU General Public License
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-module options
+module flags
 use parameters
 implicit none
 
@@ -31,12 +31,5 @@ logical(lk) :: stoch_flag
 logical(lk) :: adaptive_flag
 logical(lk) :: stats_flag
 logical(lk) :: print_tree_flag
-
-! Bounds
-integer(ik) :: max_trials
-integer(ik) :: num_records
-integer(ik) :: ato_thres
-integer(ik) :: iso_thres
-integer(ik) :: confo_thres
 
 end module

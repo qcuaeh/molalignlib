@@ -1,7 +1,7 @@
 kinds_fortran.f90
 parameters.f90
 types_basic.f90
-options.f90
+flags.f90
 str_utils.f90
 randlib.f90
 random.f90
@@ -9,9 +9,8 @@ sorting.f90
 permutation.f90
 eigen_jacobi.f90
 #eigen_lapack.f90
-#lap_hungarian.f90
-lap_jvc_dense.f90
-lap_jvc_sparse.f90
+lap_hungarian.f90
+lap_jv_sparse.f90
 euclidean.f90
 chemdata.f90
 adjacency.f90

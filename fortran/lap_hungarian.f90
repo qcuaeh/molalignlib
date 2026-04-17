@@ -19,7 +19,7 @@ use parameters
 implicit none
 contains
 
-subroutine assndx(mode, a, n, m, k, sum)
+subroutine assndx(mode, a, n, m, k, s)
 !https://wp.csiro.au/alanmiller/assndx.f90
 ! Code converted using TO_F90 by Alan Miller
 ! Date: 2002-03-06  Time: 08:36:31
@@ -51,7 +51,7 @@ real(rk), intent(in out)  :: a(:,:)
 integer(ik), intent(in)   :: n
 integer(ik), intent(in)   :: m
 integer(ik), intent(out)  :: k(:)
-real(rk), intent(out)     :: sum
+real(rk), intent(out)     :: s
 
 logical(lk)  :: lsw
 integer(ik)  :: i, icbl, icl, icl0, iflag, imax, imin, ipp, irl, irs, &
@@ -67,14 +67,14 @@ end if
 imax = max(n,m)
 imin = min(n,m)
 allocate ( iw(imax,6) )
-sum = 0.0
+s = 0.0
 if (n <= m) then
    do  i = 1, n
       rmin = a(i,1)
       do  j = 1, m
          rmin = min(rmin, a(i,j))
       end do
-      sum = sum + rmin
+      s = s + rmin
       a(i,1:m) = a(i,1:m) - rmin
    end do
 end if
@@ -84,7 +84,7 @@ if (n >= m) then
       do  i = 1, n
          rmin = min(rmin,a(i,j))
       end do
-      sum = sum + rmin
+      s = s + rmin
       a(1:n,j) = a(1:n,j) - rmin
    end do
 end if
@@ -169,7 +169,7 @@ do  i = 1, irl
       rmin = min(rmin, a(iw(i,6), iw(j,3)))
    end do
 end do
-sum = sum + rmin * (irl+icbl-imax)
+s = s + rmin * (irl+icbl-imax)
 
 do  i = 1, n
    if (iw(i,5) == 0) then

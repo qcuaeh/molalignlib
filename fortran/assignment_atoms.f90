@@ -1,5 +1,5 @@
 ! MolAlignLib
-! Copyright (C) 2025 José M. Vásquez
+! Copyright (C) 2022 José M. Vásquez
 
 ! This program is free software: you can redistribute it and/or modify
 ! it under the terms of the GNU General Public License as published by
@@ -16,293 +16,179 @@
 
 module assignment_atoms
 use parameters
+use flags
 use types_basic
-use random
-use euclidean
 use permutation
-use lap_hungarian
 use lap_jv_sparse
-use options
+use lap_hungarian
+use euclidean
+use random
 implicit none
 private
 public assign_atoms
 public assign_atoms_pruned
-public assign_atoms_nearest
 
 contains
 
-subroutine assign_atoms(atomtypes, costs, atomperm1)
-!------------------------------------------------------------------------
-! Finds the optimal mapping between points with fixed orientation.
-! Uses assndx (Hungarian algorithm) per partition block.
-! Assumes num_items1 == num_items2 for all parts.
-!------------------------------------------------------------------------
+subroutine assign_atoms( atomtypes, costs, atomperm1)
+! ----------------------------------------------------------------
+! Finds the optimal mapping between points with fixed orientation
+! ----------------------------------------------------------------
    type(partition_t), target, intent(in) :: atomtypes
    type(real_matrix), dimension(:), intent(in) :: costs
-   integer(ik), dimension(:), allocatable, intent(inout) :: atomperm1
+   integer(ik), dimension(:), intent(out) :: atomperm1
+   ! Local variables
+   integer(ik), dimension(:), allocatable :: k
+   real(rk), dimension(:,:), allocatable :: a
+   integer(ik) :: h, i, j, n, m
+   real(rk) :: s
 
-   type(partition_part_t), pointer :: part
-   integer(ik), dimension(:), allocatable :: partperm
-   real(rk), allocatable :: a(:,:)
-   real(rk) :: lapcost
-   integer(ik) :: h, m
+   n =  maxval(atomtypes%parts%num_items1)
+   m =  maxval(atomtypes%parts%num_items2)
+   allocate (k(n))
+   allocate (a(n, m))
 
-   m = maxval(atomtypes%parts%num_items1)
-   allocate (partperm(m), a(m, m))
-
+   ! Optimize atomperm1 for each block
    do h = 1, atomtypes%num_parts
-      part => atomtypes%parts(h)
-      m = part%num_items1
-      ! assndx modifies its cost matrix in-place, so copy costs into a
-      ! working array. assndx uses a(row, col) = a(item1, item2) with
-      ! MODE=1, which minimises Sum_i a(i, k(i))
-      a(1:m, 1:m) = costs(h)%a(1:m, 1:m)
-      call assndx(1, a(1:m, 1:m), m, m, partperm(1:m), lapcost)
-      ! partperm(i) is the item2 index assigned to item1 i.
-      atomperm1(part%items1) = part%items2(partperm(1:m))
+      n = atomtypes%parts(h)%num_items1
+      m = atomtypes%parts(h)%num_items2
+      a(1:n, 1:m) = costs(h)%a(1:n, 1:m)
+      call assndx(1, a, n, m, k, s)
+      atomperm1(atomtypes%parts(h)%items1) = atomtypes%parts(h)%items2(k(1:n))
    end do
 end subroutine
 
-subroutine assign_atoms_pruned(atomtypes, coords1, coords2, prunes, atomperm1)
-!------------------------------------------------------------------------
-! Finds the optimal mapping between points with fixed orientation.
-! Uses jovosap (Jonker-Volgenant sparse algorithm) with a pruned cost matrix.
-!------------------------------------------------------------------------
+subroutine assign_atoms_pruned( atomtypes, coords1, coords2, prunes, atomperm1, error_code)
+! ----------------------------------------------------------------
+! Finds the optimal mapping between points with fixed orientation
+! ----------------------------------------------------------------
    type(partition_t), target, intent(in) :: atomtypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    type(bool_matrix), dimension(:), intent(in) :: prunes
    integer(ik), dimension(:), allocatable, intent(out) :: atomperm1
-
-   type(partition_part_t), pointer :: part
-   integer(ik), dimension(:), allocatable :: partperm
+   integer(ik), intent(out) :: error_code
+   ! Local variables
+   integer(ik), dimension(:), allocatable :: perm1
+   integer(ik) :: h, n
    real(rk) :: dist
-   integer(ik) :: h
 
-   allocate (partperm(maxval(atomtypes%parts%num_items1)))
+   error_code = 0
+   allocate (perm1(maxval(atomtypes%parts%num_items1)))
+   allocate (atomperm1(sum(atomtypes%parts%num_items1)))
 
-   ! Initialise atomperm1 as the identity permutation.
-   call init_identity_permutation(size(coords1, 2), atomperm1)
-
+   ! Optimize atomperm1 for each block
    do h = 1, atomtypes%num_parts
-      part => atomtypes%parts(h)
-      call solve_lap_pruned(part%num_items1, part%items1, part%items2, &
-                            coords1, coords2, prunes(h)%a, partperm, dist)
-      atomperm1(part%items1) = part%items2(partperm(1:part%num_items1))
+      n = atomtypes%parts(h)%num_items1
+      call solve_lap_pruned(n, atomtypes%parts(h)%items1, atomtypes%parts(h)%items2, &
+            coords1, coords2, prunes(h)%a, perm1, dist, error_code)
+      if (error_code /= 0) return
+      atomperm1(atomtypes%parts(h)%items1) = atomtypes%parts(h)%items2(perm1(1:n))
    end do
 end subroutine
 
-subroutine assign_atoms_nearest(atomtypes, coords1, coords2, atomperm1)
-!------------------------------------------------------------------------
-! Finds the optimal mapping between points with fixed orientation.
-! Uses jovosap (Jonker-Volgenant sparse algorithm) restricted to nearest neighbours.
-!------------------------------------------------------------------------
-   type(partition_t), target, intent(in) :: atomtypes
-   real(rk), dimension(:,:), intent(in) :: coords1, coords2
-   integer(ik), dimension(:), allocatable, intent(out) :: atomperm1
+subroutine solve_lap_pruned(n, s1, s2, x1, x2, pruned, perm1, dist, error_code)
+! Adapted from GMIN: A program for finding global minima
+! Copyright (C) 1999-2006 David J. Wales
 
-   type(partition_part_t), pointer :: part
-   integer(ik), dimension(:), allocatable :: partperm
-   real(rk) :: dist
-   integer(ik) :: h
-
-   allocate (partperm(maxval(atomtypes%parts%num_items1)))
-
-   ! Initialise atomperm1 as the identity permutation.
-   call init_identity_permutation(size(coords1, 2), atomperm1)
-
-   do h = 1, atomtypes%num_parts
-      part => atomtypes%parts(h)
-      call solve_lap_nearest(part%num_items1, part%items1, part%items2, &
-                             coords1, coords2, partperm, dist)
-      atomperm1(part%items1) = part%items2(partperm(1:part%num_items1))
-   end do
-end subroutine
-
-subroutine solve_lap_pruned(n, s1, s2, x1, x2, pruned, partperm, dist)
-!--------------------------------------------------------------------
-! Interface to jovosap for minimum-distance atom mapping with a
-! pruned (sparse) cost matrix.
+!   Interface to spjv.f for calculating minimum distance
+!   of two atomic configurations with respect to
+!   particle permutations.
+!   The function permdist determines the distance or weight function,
 !
-! partperm(i) = j  means  x1(:, s1(i)) <--> x2(:, s2(j))
-! dist = sum_i  ||x1(:,s1(i)) - x2(:,s2(partperm(i)))||^2
-!--------------------------------------------------------------------
+!       Tomas Oppelstrup, Jul 10, 2003
+!       tomaso@nada.kth.se
+!
+
+!   This is the main routine for minimum distance calculation.
+!   Given two coordinate vectors x1,x2 of particles each, return
+!   the minimum distance in dist, and the permutation in perm1.
+!   perm1 is an integer vector such that
+!     x1(i) <--> x2(perm1(i))
+!   i.e.
+!     sum(i=1,n) permdist(x1(i), x2(perm1(i))) == dist
+
+!   Input
+!     n  : System size
+!     x1,x2: Coordinate vectors (n particles)
+
    integer(ik), intent(in) :: n
    integer(ik), intent(in) :: s1(n), s2(n)
-   real(rk),    intent(in) :: x1(3, *), x2(3, *)
+   real(rk), intent(in) :: x1(3, *), x2(3, *)
    logical(lk), intent(in) :: pruned(n, n)
+   real(rk), parameter :: scale = 1.0e6_rk ! Precision
 
-   integer(ik), intent(out) :: partperm(n)
-   real(rk),    intent(out) :: dist
+!   Output
+!     perm1: Permutation so that x1(i) <--> x2(perm1(i))
+!     dist: Minimum attainable distance
+!   We have
+   integer(ik), intent(out) :: perm1(n)
+   real(rk), intent(out) :: dist
+   integer(ik), intent(out) :: error_code
 
-   ! Sparse matrix storage (CSR-style)
-   integer(ik), allocatable :: kk(:), first(:), y(:)
-   integer(int64), allocatable :: cc(:), u(:), v(:)
+!   Internal variables
+!   cc, kk, first:
+!     Sparse matrix of distances
+!   first(i):
+!     Beginning of row i in data,index vectors
+!   kk(first(i)..first(i+1)-1):
+!     Column indexes of existing elements in row i
+!   cc(first(i)..first(i+1)-1):
+!     Matrix elements of row i
+   integer(ik) :: first(n+1), y(n)
+!   integer :: m, i, j, k, l, l2, a, sz, t
    integer(ik) :: i, j, k, sz
-   integer(int64) :: h
-   real(rk), parameter :: scale = 1.0e6_rk
+   integer(int64) :: u(n), v(n), h
+   integer(ik), allocatable :: kk(:)
+   integer(int64), allocatable :: cc(:)
 
+   error_code = 0
    sz = n*n - count(pruned)
 
-   allocate (kk(sz), cc(sz), first(n+1), y(n), u(n), v(n))
+   allocate (kk(sz))
+   allocate (cc(sz))
 
-   ! Build row-pointer array.
    first(1) = 1
    do i = 1, n
       first(i+1) = first(i) + n - count(pruned(:, i))
    end do
 
-   ! Fill sparse cost matrix (scaled squared distances).
+!  Compute the sparse cost matrix...
+
    do i = 1, n
       k = first(i)
       do j = 1, n
          if (.not. pruned(j, i)) then
-            cc(k) = nint(sum((x1(:, s1(i)) - x2(:, s2(j)))**2) * scale, int64)
+            cc(k) = nint(sum((x1(:, s1(i)) - x2(:, s2(j)))**2)*scale, int64)
             kk(k) = j
             k = k + 1
          end if
       end do
    end do
 
-   call jovosap(n, sz, cc, kk, first, partperm, y, u, v, h)
+!   Call bipartite matching routine
+   call jovosap(n, sz, cc, kk, first, perm1, y, u, v, h)
 
    if (h < 0) then
-      ! jovosap returns h=-1 when the initial guess was already optimal;
-      ! recompute the objective from the stored cost entries.
-      h = 0_int64
+!   If initial guess correct, deduce solution distance
+!   which is not done in jovosap
+      h = 0
       do i = 1, n
          j = first(i)
-         do while (kk(j) /= partperm(i))
+30       if (j > sz) then
+            write (stderr, '(a)') 'Error: Assignment failed'
+            error_code = 3
+            return
+         end if
+         if (kk(j) /= perm1(i)) then
             j = j + 1
-         end do
+            goto 30
+         end if
          h = h + cc(j)
       end do
    end if
 
    if (DEBUG_TESTS) then
-      if (.not. is_permutation(partperm)) then
-         error stop 'Assignment is not a permutation'
-      end if
-   end if
-
-   dist = real(h, rk) / scale
-end subroutine
-
-subroutine solve_lap_nearest(n, s1, s2, x1, x2, partperm, dist)
-!--------------------------------------------------------------------
-! Interface to jovosap restricted to the maxnei nearest neighbours
-! of each atom (sparse approximation to the full assignment problem).
-!
-! Adapted from GMIN: A program for finding global minima
-! Copyright (C) 1999-2006 David J. Wales
-! Original interface by Tomas Oppelstrup, Jul 10, 2003.
-!
-! partperm(i) = j  means  x1(:, s1(i)) <--> x2(:, s2(j))
-! dist = sum_i  ||x1(:,s1(i)) - x2(:,s2(partperm(i)))||^2
-!--------------------------------------------------------------------
-   integer(ik), intent(in) :: n
-   integer(ik), intent(in) :: s1(n), s2(n)
-   real(rk),    intent(in) :: x1(3, *), x2(3, *)
-   integer(ik), parameter  :: maxnei = 20
-
-   integer(ik), intent(out) :: partperm(n)
-   real(rk),    intent(out) :: dist
-
-   integer(ik), allocatable :: kk(:), first(:), y(:)
-   integer(int64), allocatable :: cc(:), u(:), v(:)
-   integer(ik) :: m, i, j, k, l, l2, a, sz, t
-   integer(int64) :: d_int, hswap, h
-   real(rk), parameter :: scale = 1.0e6_rk
-
-   m = min(n, maxnei)
-   sz = m * n
-
-   allocate (kk(sz), cc(sz), first(n+1), y(n), u(n), v(n))
-
-   first(1) = 1
-   do i = 1, n
-      first(i+1) = first(i) + m
-   end do
-
-   if (m == n) then
-      ! Full matrix case.
-      do i = 1, n
-         k = first(i)
-         do j = 1, n
-            cc(k) = nint(sum((x1(:, s1(i)) - x2(:, s2(j)))**2) * scale, int64)
-            kk(k) = j
-            k = k + 1
-         end do
-      end do
-
-   else
-      ! Sparse case: keep only the m nearest neighbours per row using
-      ! a max-heap of size m so each row costs O(n log m).
-      do i = 1, n
-         k = first(i) - 1
-
-         ! Seed the heap with the first m neighbours.
-         do j = 1, m
-            cc(k+j) = nint(sum((x1(:, s1(i)) - x2(:, s2(j)))**2) * scale, int64)
-            kk(k+j) = j
-            ! Sift up.
-            l = j
-            do while (l > 1)
-               l2 = l / 2
-               if (cc(k+l2) < cc(k+l)) then
-                  hswap    = cc(k+l2); cc(k+l2) = cc(k+l); cc(k+l) = hswap
-                  t        = kk(k+l2); kk(k+l2) = kk(k+l); kk(k+l) = t
-                  l = l2
-               else
-                  exit
-               end if
-            end do
-         end do
-
-         ! Process remaining neighbours; replace heap root if closer.
-         do j = m+1, n
-            d_int = nint(sum((x1(:, s1(i)) - x2(:, s2(j)))**2) * scale, int64)
-            if (d_int < cc(k+1)) then
-               cc(k+1) = d_int
-               kk(k+1) = j
-               ! Sift down.
-               l = 1
-               do
-                  l2 = 2 * l
-                  if (l2 + 1 <= m) then
-                     a = merge(k+l2+1, k+l2, cc(k+l2+1) > cc(k+l2))
-                  else if (l2 <= m) then
-                     a = k + l2
-                  else
-                     exit
-                  end if
-                  if (cc(a) > cc(k+l)) then
-                     hswap  = cc(a); cc(a) = cc(k+l); cc(k+l) = hswap
-                     t      = kk(a); kk(a) = kk(k+l); kk(k+l) = t
-                     l      = a - k
-                  else
-                     exit
-                  end if
-               end do
-            end if
-         end do
-      end do
-   end if
-
-   call jovosap(n, sz, cc, kk, first, partperm, y, u, v, h)
-
-   if (h < 0) then
-      h = 0_int64
-      do i = 1, n
-         j = first(i)
-         do while (kk(j) /= partperm(i))
-            j = j + 1
-         end do
-         h = h + cc(j)
-      end do
-   end if
-
-   if (DEBUG_TESTS) then
-      if (.not. is_permutation(partperm)) then
+      if (.not. is_permutation(perm1)) then
          error stop 'Assignment is not a permutation'
       end if
    end if

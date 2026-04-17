@@ -20,113 +20,115 @@ use str_utils
 implicit none
 
 integer(ik), parameter :: symlen = 3 ! Symbol length
-integer(ik), parameter :: num_elems = 103
+integer(ik), parameter :: num_elems = 105
 
 ! Element symbols
 character(symlen), parameter :: atomic_symbols(num_elems) = [ &
-'h ', &
-'he', &
-'li', &
-'be', &
-'b ', &
-'c ', &
-'n ', &
-'o ', &
-'f ', &
-'ne', &
-'na', &
-'mg', &
-'al', &
-'si', &
-'p ', &
-'s ', &
-'cl', &
-'ar', &
-'k ', &
-'ca', &
-'sc', &
-'ti', &
-'v ', &
-'cr', &
-'mn', &
-'fe', &
-'co', &
-'ni', &
-'cu', &
-'zn', &
-'ga', &
-'ge', &
-'as', &
-'se', &
-'br', &
-'kr', &
-'rb', &
-'sr', &
-'y ', &
-'zr', &
-'nb', &
-'mo', &
-'tc', &
-'ru', &
-'rh', &
-'pd', &
-'ag', &
-'cd', &
-'in', &
-'sn', &
-'sb', &
-'te', &
-'i ', &
-'xe', &
-'cs', &
-'ba', &
-'la', &
-'ce', &
-'pr', &
-'nd', &
-'pm', &
-'sm', &
-'eu', &
-'gd', &
-'tb', &
-'dy', &
-'ho', &
-'er', &
-'tm', &
-'yb', &
-'lu', &
-'hf', &
-'ta', &
-'w ', &
-'re', &
-'os', &
-'ir', &
-'pt', &
-'au', &
-'hg', &
-'tl', &
-'pb', &
-'bi', &
-'po', &
-'at', &
-'rn', &
-'fr', &
-'ra', &
-'ac', &
-'th', &
-'pa', &
-'u ', &
-'np', &
-'pu', &
-'am', &
-'cm', &
-'bk', &
-'cf', &
-'es', &
-'fm', &
-'md', &
-'no', &
-'lr'  &
+'H ', &
+'He', &
+'Li', &
+'Be', &
+'B ', &
+'C ', &
+'N ', &
+'O ', &
+'F ', &
+'Ne', &
+'Na', &
+'Mg', &
+'Al', &
+'Si', &
+'P ', &
+'S ', &
+'Cl', &
+'Ar', &
+'K ', &
+'Ca', &
+'Sc', &
+'Ti', &
+'V ', &
+'Cr', &
+'Mn', &
+'Fe', &
+'Co', &
+'Ni', &
+'Cu', &
+'Zn', &
+'Ga', &
+'Ge', &
+'As', &
+'Se', &
+'Br', &
+'Kr', &
+'Rb', &
+'Sr', &
+'Y ', &
+'Zr', &
+'Nb', &
+'Mo', &
+'Tc', &
+'Ru', &
+'Rh', &
+'Pd', &
+'Ag', &
+'Cd', &
+'In', &
+'Sn', &
+'Sb', &
+'Te', &
+'I ', &
+'Xe', &
+'Cs', &
+'Ba', &
+'La', &
+'Ce', &
+'Pr', &
+'Nd', &
+'Pm', &
+'Sm', &
+'Eu', &
+'Gd', &
+'Tb', &
+'Dy', &
+'Ho', &
+'Er', &
+'Tm', &
+'Yb', &
+'Lu', &
+'Hf', &
+'Ta', &
+'W ', &
+'Re', &
+'Os', &
+'Ir', &
+'Pt', &
+'Au', &
+'Hg', &
+'Tl', &
+'Pb', &
+'Bi', &
+'Po', &
+'At', &
+'Rn', &
+'Fr', &
+'Ra', &
+'Ac', &
+'Th', &
+'Pa', &
+'U ', &
+'Np', &
+'Pu', &
+'Am', &
+'Cm', &
+'Bk', &
+'Cf', &
+'Es', &
+'Fm', &
+'Md', &
+'No', &
+'Lr', &
+'X ', & ! Dummy atom
+'LJ'  & ! Lennard-Jones atom
 ]
 
 ! Standard atomic masses
@@ -234,7 +236,9 @@ real(rk), target :: atomic_masses(num_elems) = [ &
 257.0, &  ! Fm
 258.0, &  ! Md
 259.0, &  ! No
-262.0  &  ! Lr
+262.0, &  ! Lr
+0.0,   &  ! X
+0.0    &  ! LJ
 ]
 
 ! Atomic covalent radii (Angstrom)
@@ -342,7 +346,9 @@ real(rk), parameter :: covalent_radii(num_elems) = [ &
 1.67, &  ! Fm
 1.73, &  ! Md
 1.76, &  ! No
-1.61  &  ! Lr
+1.61, &  ! Lr
+0.0,  &  ! X
+0.0   &  ! LJ
 ]
 
 ! Atomic Van der Waals radii (Angstrom)
@@ -450,7 +456,9 @@ real(rk), parameter :: vdw_radii(num_elems) = [ &
 2.45, &  ! Fm
 2.46, &  ! Md
 2.46, &  ! No
-2.46  &  ! Lr
+2.46, &  ! Lr
+0.0,  &  ! X
+0.0   &  ! LJ
 ]
 
 end module

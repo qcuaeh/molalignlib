@@ -26,7 +26,6 @@ public str
 public int
 public lowercase
 public uppercase
-public capitalized
 
 interface int
    module procedure int_str
@@ -44,7 +43,7 @@ character(*), parameter :: ALPHACHAR = LOWERCHAR // UPPERCHAR
 
 contains
 
-function lowercase(x) result(y)
+elemental function lowercase(x) result(y)
    character(*), intent(in) :: x
    character(len(x)) :: y
    integer(ik) :: i, j
@@ -58,7 +57,7 @@ function lowercase(x) result(y)
    end do
 end function
 
-function uppercase(x) result(y)
+elemental function uppercase(x) result(y)
    character(*), intent(in) :: x
    character(len(x)) :: y
    integer(ik) :: i, j
@@ -66,26 +65,6 @@ function uppercase(x) result(y)
       i = index(LOWERCHAR, x(j:j))
       if (i > 0) then
          y(j:j) = UPPERCHAR(i:i)
-      else
-         y(j:j) = x(j:j)
-      end if
-   end do
-end function
-
-function capitalized(x) result(y)
-   character(*), intent(in) :: x
-   character(len(x)) :: y
-   integer(ik) :: i, j
-   i = index(LOWERCHAR, x(1:1))
-   if (i > 0) then
-      y(1:1) = UPPERCHAR(i:i)
-   else
-      y(1:1) = x(1:1)
-   end if
-   do j = 2, len(x)
-      i = index(UPPERCHAR, x(j:j))
-      if (i > 0) then
-         y(j:j) = LOWERCHAR(i:i)
       else
          y(j:j) = x(j:j)
       end if

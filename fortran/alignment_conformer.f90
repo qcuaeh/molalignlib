@@ -30,17 +30,18 @@ use refinement
 use assignment_atoms
 use assignment_conformer
 use recording
-use options
+use flags
 implicit none
 
 contains
 
 subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atomtypes, &
-      coords1, coords2, registry)
+      coords1, coords2, conv_freq, max_trials, registry)
    integer(ik), dimension(:), intent(in) :: atomset1, atomset2
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(partition_t), intent(in) :: atomtypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
+   integer(ik), intent(in) :: conv_freq, max_trials
    type(registry_t), target, intent(inout) :: registry
 
    ! Local variables
@@ -66,7 +67,7 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
    call reset_registry( registry)
 
    if ((stoch_flag .and. .not. adaptive_flag) .or. (stoch_flag .and. adaptive_flag .and. &
-         cache_arrays%total_combinations > confo_thres*cache_arrays%partial_combinations)) then
+         cache_arrays%total_combinations > conv_freq*cache_arrays%partial_combinations)) then
 
       ! Initialize random number generator
       call random_initialize()
@@ -113,7 +114,7 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
          ! Update results
          call insert_record_atomperm( registry, atomperm1, steps, total_rotation, 0, permdist)
 
-         if (registry%records(1)%freq > confo_thres) then
+         if (registry%records(1)%freq > conv_freq) then
             exit
          end if
 

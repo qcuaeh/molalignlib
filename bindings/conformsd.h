@@ -35,7 +35,7 @@ extern "C" {
  * @param bond_flag     Derive connectivity from geometry, not bond table
  * @param stats_flag    Print optimisation statistics
  * @param random_flag   Use random algorithm
- * @param confo_thres   Conformer threshold
+ * @param conv_freq   Convergence frequency
  * @param max_trials    Maximum number of trials
  *
  * @param rmsd          [out] Calculated RMSD value
@@ -55,7 +55,7 @@ void conformsd_calculate(
     bool align_flag, bool remap_flag, bool heavy_flag, bool mass_flag,
     bool mirror_flag, bool label_flag, bool bond_flag,
     bool stats_flag, bool random_flag,
-    int confo_thres, int max_trials,
+    int conv_freq, int max_trials,
     double *rmsd, int *natoms, int *atomperm,
     double *transform, int *error_code);
 

@@ -17,7 +17,7 @@
 module assorting
 use parameters
 use types_basic
-use options
+use flags
 use chemdata
 use molecule
 implicit none
