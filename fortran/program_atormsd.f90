@@ -31,7 +31,7 @@ use alignment_atoms
 use file_utils
 use file_reading
 use file_writing
-use argparse
+use arg_parsing
 use flags
 implicit none
 
@@ -87,8 +87,6 @@ do while (get_arg(arg))
       remap_flag = .TRUE.
    case ('-printmap')
       print_map_flag = .TRUE.
-   case ('-near')
-      prune_procedure => prune_none
    case ('-prune')
       prune_procedure => prune_rd
       call read_optarg(arg, prune_tol)

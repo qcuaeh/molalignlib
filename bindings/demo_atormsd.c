@@ -16,9 +16,8 @@
 enum {
     OPT_ALIGN = 1, OPT_REMAP, OPT_HEAVY, OPT_MASS,
     OPT_MIRROR, OPT_LABEL, OPT_PRINTMAP, OPT_PRINTTRANS,
-    OPT_STATS, OPT_RANDOM, OPT_NEAR,
-    OPT_PRUNE, OPT_FREQ, OPT_TRIALS,
-    OPT_HELP
+    OPT_STATS, OPT_RANDOM, OPT_PRUNE, OPT_FREQ,
+    OPT_TRIALS, OPT_HELP
 };
 
 static const long_opt_t long_options[] = {
@@ -30,7 +29,6 @@ static const long_opt_t long_options[] = {
     {"label",           0, OPT_LABEL},
     {"stats",           0, OPT_STATS},
     {"random",          0, OPT_RANDOM},
-    {"near",            0, OPT_NEAR},
     {"prune",           1, OPT_PRUNE},
     {"freq",            1, OPT_FREQ},
     {"trials",          1, OPT_TRIALS},
@@ -49,7 +47,6 @@ static const opt_info_t opt_info[] = {
     [OPT_LABEL]           = {"Use atom labels for matching",                       NULL   },
     [OPT_STATS]           = {"Print optimisation statistics",                      NULL   },
     [OPT_RANDOM]          = {"Use random algorithm",                               NULL   },
-    [OPT_NEAR]            = {"Disable pruning (default)",                          NULL   },
     [OPT_PRUNE]           = {"Set pruning tolerance",                              "TOL"  },
     [OPT_FREQ]            = {"Set convergence frequency (default: 10)",            "N"    },
     [OPT_TRIALS]          = {"Set maximum number of trials (default: 10000)",      "N"    },
@@ -103,7 +100,6 @@ int main(int argc, char **argv)
         case OPT_LABEL:           label_flag    = true;         break;
         case OPT_STATS:           stats_flag    = true;         break;
         case OPT_RANDOM:          random_flag   = true;         break;
-        case OPT_NEAR:            prune_tol     = -1.0;         break;
         case OPT_PRUNE:           prune_tol     = atof(optarg); break;
         case OPT_FREQ:           conv_freq     = atoi(optarg); break;
         case OPT_TRIALS:          max_trials    = atoi(optarg); break;

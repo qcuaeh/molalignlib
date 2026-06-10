@@ -30,7 +30,7 @@ build_library() {
          "$FC" "${comp_flags[@]}" -J "$blddir" -c "$srcfile" -o "$objfile"
       fi
       object_files+=("$objfile")
-   done < <(grep -Ehv '^$|^#' "$srcdir/program_dependencies.txt")
+   done < <(grep -Ehv '^$|^#' "$srcdir/fortran_modules.txt")
 }
 
 build_programs() {
@@ -39,14 +39,14 @@ build_programs() {
       execfile=$blddir/$progname
       echo Building program $progname...
       "$FC" "$srcfile" "${object_files[@]}" -o "$execfile" "${comp_flags[@]}" "${link_flags[@]}" -J "$blddir"
-   done < <(grep -Ehv '^$|^#' "$srcdir/program_list.txt")
+   done < <(grep -Ehv '^$|^#' "$srcdir/fortran_programs.txt")
 }
 
-blddir=$PWD/build
+blddir=$PWD/build/fortran
 srcdir=$PWD/fortran
 
 if test ! -e "$blddir"; then
-   mkdir "$blddir"
+   mkdir -p "$blddir"
 elif test ! -d "$blddir"; then
    echo Error: $blddir exists but is not a directory
    exit 1

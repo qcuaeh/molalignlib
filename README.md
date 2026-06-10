@@ -1,12 +1,10 @@
 MolAlignLib
 ===========
 
-A library for computing the Root-Mean-Square Deviation (RMSD) between pairs of
-atom clusters or molecular conformers, with support for optimal atom remapping
-and structural alignment.  The core is written in Fortran; C and Python bindings
-are provided alongside two standalone command-line programs.
+A high-performance library to compute optimal RMSD between atom clusters and symmetry-corrected RMSD between molecular conformers.
 
----
+MolAlignLib uses the Hierarchical Neighborhood of Atoms (HNA) partitioning to achieve exact, topologically valid atom assignments between conformers in milliseconds, even for highly symmetric molecules that are intractable by conventional graph-isomorphism approaches.
+
 
 Table of Contents
 -----------------
@@ -18,16 +16,14 @@ Table of Contents
 4. [C Binding](#c-binding)
    - [atormsd_calculate](#atormsd_calculate)
    - [conformsd_calculate](#conformsd_calculate)
-5. [Python Binding](#python-binding)
-   - [Installation](#python-installation)
+5. [Python API](#python-api)
+   - [Installation](#installation)
    - [AtomCluster](#atomcluster)
    - [Conformer](#conformer)
    - [RMSDResult](#rmsdresult)
-   - [Python Examples](#python-examples)
+   - [Examples](#examples)
 6. [Algorithm Notes](#algorithm-notes)
-7. [License](#license)
 
----
 
 Overview
 --------
@@ -36,8 +32,8 @@ MolAlignLib exposes two distinct RMSD calculation modes:
 
 | Mode | Program / function | When to use |
 |------|-------------------|-------------|
-| **AtoRMSD** | `atormsd` / `atormsd_calculate` | Unstructured atom clusters — no bond topology required |
-| **ConfoRMSD** | `conformsd` / `conformsd_calculate` | Molecular conformers — bond topology is used to guide atom matching |
+| **atoRMSD** | `atormsd` / `atormsd_calculate` | Unstructured atom clusters — no bond topology required |
+| **confoRMSD** | `conformsd` / `conformsd_calculate` | Molecular conformers — bond topology guides atom matching via HNA partitioning |
 
 Both modes support:
 - **Alignment** (`-align`): optimally rotate and translate one structure onto the other.
@@ -46,7 +42,6 @@ Both modes support:
 - **Heavy-atom only** (`-heavy`): exclude hydrogen atoms.
 - **Mirror images** (`-mirror`): reflect the second structure before comparison.
 
----
 
 Building from Source
 --------------------
@@ -54,46 +49,42 @@ Building from Source
 ### Requirements
 
 - CMake ≥ 3.15
-- GFortran ≥ 4.8 (or Intel Fortran; any Fortran 2008-compliant compiler)
+- GFortran ≥ 7.0 (or Intel Fortran; any Fortran 2008-compliant compiler)
 - A C compiler (for the C binding)
 
 ### Steps
 
 ```bash
-git clone https://github.com/your-org/molalignlib.git
+git clone -b devel https://github.com/qcuaeh/molalignlib.git
 cd molalignlib
 mkdir build && cd build
 cmake ..
 make
 ```
 
-After a successful build the following are available inside `build/`:
+After a successful build the following are available inside `build/fortran`:
 
 | Artifact | Description |
 |----------|-------------|
 | `atormsd` | Standalone cluster RMSD program |
 | `conformsd` | Standalone conformer RMSD program |
-| `libmolalignlib.a` | Static library for C and Fortran consumers |
+| `libmolalignlib.a` | C binding static library |
 
+### Python extension modules
 
-### Installing the Python package
+See the [Python API](#python-api) section below.
 
-See the [Python Installation](#python-installation) section below.
-
----
 
 Command-line Programs
 ---------------------
 
 ### atormsd
 
-Calculate RMSD between two atom clusters.  No bond information is needed.
+Calculate RMSD between two unstructured atom clusters. No bond information is needed; atom matching is guided by element type and spatial proximity alone.
 
 ```
 atormsd file1 file2 [options]
 ```
-
-**Supported file formats:** XYZ, SDF, and Mol2.
 
 #### Options
 
@@ -102,8 +93,7 @@ atormsd file1 file2 [options]
 | `-align` | | Align atoms to minimise the RMSD |
 | `-remap` | | Remap atoms to minimise the RMSD |
 | `-label` | | Use atom labels to distinguish atom types |
-| `-near` | | Use nearest-neighbour assignment without pruning (default) |
-| `-prune` | `TOL` | Prune candidate assignments whose distance exceeds *TOL* Å |
+| `-prune` | `TOL` | Prune assignments with pair distances exceeding *TOL* Å |
 | `-freq` | `N` | Stop if the best solution is found *N* consecutive times |
 | `-trials` | `N` | Stop after at most *N* optimisation trials |
 | `-records` | `N` | Record the *N* lowest RMSDs found (default: 1) |
@@ -134,40 +124,51 @@ atormsd mol1.sdf mol2.sdf -align -remap -heavy -mass
 atormsd mol1.xyz mol2.xyz -align -remap -aligned mol2_aligned.xyz
 ```
 
----
 
 ### conformsd
 
-Calculate RMSD between two molecular conformers using bond topology to guide
-atom matching.
+Calculate the symmetry-corrected RMSD between two molecular conformers. Bond topology is used to build the HNA partition, which guides atom matching and guarantees chemically valid assignments even for highly symmetric molecules. For alignment calculations, the algorithm automatically selects between stochastic orientation sampling and direct enumeration based on the structure of the assignment tree, avoiding unnecessary computation.
 
 ```
 conformsd file1 file2 [options]
 ```
 
-#### Options
+**Supported file formats:** XYZ, SDF, and Mol2.
 
-All options from `atormsd` are available, plus:
+#### Options
 
 | Option | Argument | Description |
 |--------|----------|-------------|
-| `-bond` | | Derive bond connectivity from interatomic distances instead of the file's bond table |
-| `-exhaustive` | | Force exhaustive enumeration of all valid assignments regardless of assignment tree topology |
-| `-stochastic` | | Force non-adaptive stochastic search regardless of assignment tree topology |
+| `-align` | | Align atoms to minimise the RMSD |
+| `-remap` | | Remap atoms to minimise the RMSD |
+| `-label` | | Use atom labels to distinguish atom types |
+| `-freq` | `N` | Stop if the best solution is found *N* consecutive times |
+| `-trials` | `N` | Stop after at most *N* optimisation trials |
+| `-records` | `N` | Record the *N* lowest RMSDs found (default: 1) |
+| `-printmap` | | Print the optimised atom mapping to stdout |
 | `-printtree` | | Print the internal assignment tree |
+| `-aligned` | `FILE` | Write aligned coordinates of molecule 2 to *FILE* |
+| `-heavy` | | Ignore hydrogen atoms |
+| `-mass` | | Use mass-weighted coordinates |
+| `-mirror` | | Reflect molecule 2 before comparison |
+| `-bond` | | Derive bond connectivity from interatomic distances instead of the file's bond table |
+| `-exhaustive` | | Force exhaustive orientation-independent search regardless of assignment tree topology |
+| `-stochastic` | | Force stochastic fixed-orientation search regardless of assignment tree topology |
+| `-stats` | | Print detailed optimisation statistics |
+| `-random` | | Seed the random-number generator from the system clock |
 
-`-exhaustive` and `-stochastic` are mutually exclusive. If neither is given, the strategy is chosen automatically based on the ratio of total to partial assignment combinations in the tree: stochastic sampling is used when the ratio is high, and exhaustive enumeration when it is low.
+`-exhaustive` and `-stochastic` are mutually exclusive. If neither is given, the strategy is chosen automatically based on the ratio of total to partial assignment combinations in the tree: stochastic fixed-orientation search is used when the ratio is high, and exhaustive orientation-independent search when it is low.
 
 #### Examples
 
 ```bash
-# RMSD between two SDF conformers with remapping and alignment
+# Symmetry-corrected RMSD with remapping and alignment
 conformsd conf1.sdf conf2.sdf -align -remap
 
 # Derive connectivity from geometry (useful for XYZ input)
 conformsd conf1.xyz conf2.xyz -align -remap -bond
 
-# Exhaustive search, heavy atoms only
+# Heavy atoms only, exhaustive search
 conformsd conf1.sdf conf2.sdf -align -remap -heavy -exhaustive
 
 # Print the atom permutation that maps conf2 onto conf1
@@ -181,16 +182,14 @@ for i in 1 2 3; do
 done
 ```
 
----
-
 C Binding
 ---------
 
-Include the appropriate header and link against `libmolalignlib`.
+Compile the static library, include the appropriate header and link against `libmolalignlib`.
 
 ```c
-#include "atormsd.h"   /* for atormsd_calculate  */
 #include "conformsd.h" /* for conformsd_calculate */
+#include "atormsd.h"   /* for atormsd_calculate  */
 ```
 
 ### Atom data layout
@@ -211,7 +210,7 @@ in row-major (C) order: `[x_0, y_0, z_0, x_1, y_1, z_1, ...]`.
 ### Transform output
 
 Both functions write a row-major 4 × 4 homogeneous transformation matrix
-(16 `double` values) to the `transform` output parameter.  The matrix maps
+(16 `double` values) to the `transform` output parameter. The matrix maps
 molecule-2 coordinates into the molecule-1 reference frame:
 
 ```
@@ -219,8 +218,6 @@ p_out = R * p_in + t
 ```
 
 The matrix is the identity when `align_flag = false`.
-
----
 
 ### atormsd_calculate
 
@@ -309,7 +306,6 @@ Compile:
 gcc example.c -o example -lmolalignlib -lgfortran -lm
 ```
 
----
 
 ### conformsd_calculate
 
@@ -333,19 +329,39 @@ Bond data is passed as a flat `int` array of length `n_bonds * 3`, packed as:
 [ atom1_0, atom2_0, type_0, atom1_1, atom2_1, type_1, ... ]
 ```
 
-Atom indices are **1-based**.  When `bond_flag = true` the library derives
+Atom indices are **1-based**. When `bond_flag = true` the library derives
 connectivity from atomic geometry and the bond arrays may be empty
 (`n_bonds = 0`, `bond_data = NULL`).
 
-#### Additional parameters (beyond those shared with atormsd_calculate)
+#### Parameters
 
 | Parameter | Direction | Description |
 |-----------|-----------|-------------|
+| `n_atoms1` | in | Number of atoms in molecule 1 |
+| `atom_data1` | in | Packed atom data for molecule 1, length `n_atoms1*2` |
+| `coords1` | in | Coordinates for molecule 1, length `n_atoms1*3` |
 | `n_bonds1` | in | Number of bonds in molecule 1 |
 | `bond_data1` | in | Flat bond array for molecule 1, length `n_bonds1*3` |
+| `n_atoms2` | in | Number of atoms in molecule 2 |
+| `atom_data2` | in | Packed atom data for molecule 2, length `n_atoms2*2` |
+| `coords2` | in | Coordinates for molecule 2, length `n_atoms2*3` |
 | `n_bonds2` | in | Number of bonds in molecule 2 |
 | `bond_data2` | in | Flat bond array for molecule 2, length `n_bonds2*3` |
+| `align_flag` | in | Enable structural alignment |
+| `remap_flag` | in | Enable atom remapping |
+| `heavy_flag` | in | Use only heavy (non-hydrogen) atoms |
+| `mass_flag` | in | Weight atoms by atomic mass |
+| `mirror_flag` | in | Mirror molecule 2 before comparison |
+| `label_flag` | in | Use atom labels for type matching |
 | `bond_flag` | in | Derive connectivity from geometry (ignores bond arrays) |
+| `stats_flag` | in | Print optimisation statistics to stdout |
+| `random_flag` | in | Seed RNG from system clock |
+| `conv_freq` | in | Convergence frequency threshold |
+| `max_trials` | in | Maximum number of optimisation trials |
+| `rmsd` | out | Calculated RMSD (Å) |
+| `natoms` | out | Number of elements written to `atomperm` |
+| `atomperm` | out | Atom permutation, **0-based**; caller must allocate ≥ `natoms` elements |
+| `transform` | out | 4 × 4 homogeneous transform (row-major, 16 doubles) |
 | `error_code` | out | `0` = success; `1` = not isomers; `2` = missing bonds; `3` = atom type mismatch |
 
 #### Minimal example
@@ -389,44 +405,41 @@ int main(void)
 }
 ```
 
----
+Python API
+----------
 
-Python Binding
---------------
+The Python API provides a higher-level interface to MolAlignLib.
 
 You can try the Python API without any installation on Binder:
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qcuaeh/molalignlib.git/devel?urlpath=%2Fdoc%2Ftree%2Fpython%2Fexamples%2Fexamples.ipynb)
 
 ### Installation
 
-For a local installation, Python ≥ 3.8 is required. The package uses
-[scikit-build-core](https://scikit-build-core.readthedocs.io/) with Cython.
+Python ≥ 3.8, scikit-build-core, Cython, NumPy and Chemfiles are required.
 
 ```bash
-# Install build tools
-pip install scikit-build-core cython numpy
+# Upgrade pip (recommended)
+python3 -m pip install --user --upgrade pip
+
+# Install build tools and dependencies
+python3 -m pip install --user scikit-build-core cython numpy chemfiles
 
 # Install the package (builds the Fortran library automatically)
-pip install .
+python3 -m pip install --user .
 ```
 
-Runtime dependencies (`numpy`, `chemfiles`) are installed automatically.
-
 > **Note:** `pip install .` does not build the standalone executables. Use the
-> plain CMake workflow above to build `atormsd` and `conformsd`.
+> plain CMake workflow above to build `conformsd` and `atormsd`.
 
 ### Quick start
 
 ```python
-from molalignlib import read_clusters, read_conformers, AtomCluster, Conformer
+from molalignlib import read_conformers, read_clusters, Conformer, AtomCluster
 ```
-
----
 
 ### AtomCluster
 
-Represents an unstructured set of atoms with no bond topology.  Wraps
-`atormsd_calculate` internally.
+Represents an unstructured set of atoms with no bond topology. Useful for comparing metal clusters, nanoparticles, or other systems where connectivity is absent or irrelevant. Wraps `atormsd_calculate`.
 
 #### Construction
 
@@ -447,29 +460,26 @@ mol = AtomCluster(atom_data=atom_data, coords=coords, name="dimer")
 #### Reading multiple frames
 
 ```python
-clusters = read_clusters("trajectory.xyz")          # all frames → list
-mol0, mol1 = read_clusters("trajectory.xyz", frames=(0, 1))  # specific frames → tuple
+clusters = read_clusters("trajectory.xyz")           # all frames → list
+mol0, mol1 = read_clusters("trajectory.xyz", frames=(0, 1))
 ```
 
 #### Computing RMSD
 
 ```python
 result = mol0.rmsd_to(mol1,
-    align=True,        # structural alignment (default True)
-    remap=True,        # atom remapping      (default True)
-    heavy_only=False,  # include H atoms     (default False)
+    align=True,
+    remap=True,
+    heavy_only=False,
     mass_weighted=False,
     mirror=False,
     use_labels=False,
     stats=False,
     random=False,
-    prune_tol=-1.0,    # disable pruning     (default -1.0)
+    prune_tol=-1.0,    # disable pruning (default -1.0)
     conv_freq=10,
     max_trials=10000,
 )
-print(result.rmsd)              # float, Å
-print(result.atom_permutation)  # int32 array, 0-based
-print(result.transform)         # 4×4 float64 array
 ```
 
 #### Writing output
@@ -478,18 +488,18 @@ print(result.transform)         # 4×4 float64 array
 mol.write_xyz("output.xyz", comment="my cluster")
 ```
 
----
-
 ### Conformer
 
-Represents a molecule with full bond topology.  Wraps `conformsd_calculate`
-internally.
+Represents a molecule with full bond topology. The HNA partitioning is used internally to guarantee chemically valid atom assignments, handling arbitrary degrees of topological symmetry efficiently. Wraps `conformsd_calculate`.
 
 #### Construction
 
 ```python
 # From a file (single frame; bond table is parsed automatically)
 conf = Conformer.from_file("molecule.sdf")
+
+# From a file (specific frame in a multi-frame SDF)
+conf = Conformer.from_file("poses.sdf", frame_idx=3)
 
 # From numpy arrays
 import numpy as np
@@ -502,7 +512,7 @@ conf = Conformer(atom_data=atom_data, coords=coords, bond_data=bond_data)
 #### Reading multiple frames
 
 ```python
-conformers = read_conformers("poses.sdf")          # all frames → list
+conformers = read_conformers("poses.sdf")           # all frames → list
 c0, c1 = read_conformers("poses.sdf", frames=(0, 1))
 ```
 
@@ -522,9 +532,10 @@ result = c0.rmsd_to(c1,
     conv_freq=100,
     max_trials=10000,
 )
+print(result.rmsd)              # float, Å
+print(result.atom_permutation)  # int32 array, 0-based
+print(result.transform)         # 4×4 float64 array
 ```
-
----
 
 ### RMSDResult
 
@@ -544,11 +555,50 @@ other_aligned = result.apply_to(other)
 other_aligned.write_xyz("aligned.xyz")
 ```
 
----
+### Examples
 
-### Python Examples
+#### Example 1 — Symmetry-corrected RMSD between two conformers
 
-#### Example 1 — Align one cluster to another
+```python
+from molalignlib import read_conformers
+
+c0, c1 = read_conformers("PRDCC002527_poses.sdf", frames=(0, 1))
+
+result = c0.rmsd_to(c1, remap=True, align=True)
+print(f"RMSD = {result.rmsd:.4f} Å")
+
+c1_aligned = result.apply_to(c1)
+c1_aligned.write_xyz("aligned.xyz", comment=f"RMSD={result.rmsd:.4f}")
+```
+
+#### Example 2 — RMSD matrix for a full conformer ensemble
+
+```python
+from molalignlib import read_conformers
+
+conformers = read_conformers("PRDCC002527_poses.sdf")
+
+for c0 in conformers:
+    for c1 in conformers:
+        result = c1.rmsd_to(c0, remap=True, align=True)
+        print(f"{result.rmsd:.4f}", end="  ")
+    print()
+```
+
+#### Example 3 — RMSD of the first frame against every other frame (clusters)
+
+```python
+from molalignlib import read_clusters
+
+clusters = read_clusters("Co138_frames.xyz")
+ref = clusters[0]
+
+for mol in clusters[1:]:
+    result = mol.rmsd_to(ref, remap=True, align=True, prune_tol=0.1)
+    print(f"{result.rmsd:.4f}")
+```
+
+#### Example 4 — Align one cluster to another and save the result
 
 ```python
 from molalignlib import read_clusters
@@ -562,34 +612,7 @@ mol1_aligned = result.apply_to(mol1)
 mol1_aligned.write_xyz("Co138_aligned.xyz", comment=f"RMSD={result.rmsd:.4f}")
 ```
 
-#### Example 2 — RMSD of the first frame against every other frame
-
-```python
-from molalignlib import read_clusters
-
-clusters = read_clusters("Co138_frames.xyz")
-ref = clusters[0]
-
-for mol in clusters[1:]:
-    result = mol.rmsd_to(ref, remap=True, align=True, prune_tol=0.1)
-    print(f"{result.rmsd:.4f}")
-```
-
-#### Example 3 — Full RMSD matrix for a set of conformers
-
-```python
-from molalignlib import read_conformers
-
-conformers = read_conformers("PRDCC002527_poses.sdf")
-
-for mol0 in conformers:
-    for mol1 in conformers:
-        result = mol1.rmsd_to(mol0, remap=True, align=True)
-        print(f"{result.rmsd:.4f}", end="  ")
-    print()
-```
-
-#### Example 4 — Build AtomCluster from an ASE or RDKit object
+#### Example 5 — Build AtomCluster from an ASE object
 
 ```python
 import numpy as np
@@ -605,36 +628,11 @@ coords = ase_atoms.get_positions().astype(np.float64)
 cluster = AtomCluster(atom_data=atom_data, coords=coords)
 ```
 
----
 
 Algorithm Notes
 ---------------
 
-- **AtoRMSD:** algorithm described in [Vásquez-Pérez et al., *J. Chem. Inf. Model.* (2023)](https://doi.org/10.1021/acs.jcim.2c01187).
-- **ConfoRMSD:** algorithm described in [Vásquez-Pérez et al., *J. Chem. Theory Comput.* (2026)](https://doi.org/10.1021/acs.jctc.6c00545).
-- **Transform output:** the 4 × 4 homogeneous transformation matrix encodes
-  both the optimal rotation *R* and the translation *t* needed to superimpose
-  molecule 2 on molecule 1.
-- **Default maximum trials:** 10,000 random orientations for alignment, chosen
-  to avoid excessive computation times.  The convergence frequency threshold
-  defaults to 10 for `atormsd` and 100 for `conformsd`; numerical experiments
-  showed that a threshold below 100 can produce incorrect assignments.
-
----
-
-License
--------
-
-MolAlignLib — Copyright © 2025 José M. Vásquez
-
-This program is free software: you can redistribute it and/or modify it under
-the terms of the **GNU General Public License** as published by the Free
-Software Foundation, either version 3 of the License, or (at your option) any
-later version.
-
-This program is distributed in the hope that it will be useful, but **without
-any warranty**; without even the implied warranty of merchantability or fitness
-for a particular purpose.  See the GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along with
-this program.  If not, see <https://www.gnu.org/licenses/>.
+- **atoRMSD:** uses a stochastic strategy with distance-based pruning for unstructured clusters where no bond topology is available. Algorithm described in [Vásquez-Pérez et al., *J. Chem. Inf. Model.* (2023)](https://doi.org/10.1021/acs.jcim.2c01187).
+- **confoRMSD:** uses the Hierarchical Neighborhood of Atoms (HNA) partitioning to decompose the assignment problem into independent branches, reducing the number of evaluated combinations from the product of branch possibilities to their sum. For alignment calculations, the algorithm adaptively selects between stochastic orientation sampling (efficient for highly symmetric molecules) and exhaustive enumeration (efficient for molecules with few branches), based on the ratio of total to partial combinations in the assignment tree. Benchmarks show 100% topologically correct assignments across 1.4 million molecular pairs with millisecond-scale mean execution times. Full algorithm description in [Vásquez-Pérez et al., *J. Chem. Theory Comput.* (2026)](https://doi.org/10.1021/acs.jctc.6c00545).
+- **Transform output:** the 4 × 4 homogeneous transformation matrix encodes both the optimal rotation *R* and the translation *t* needed to superimpose molecule 2 on molecule 1.
+- **Default maximum trials:** 10,000 random orientations for alignment. The convergence frequency threshold defaults to 10 for `atormsd` and 100 for `conformsd`; numerical experiments show that values below 100 can produce incorrect assignments for conformers.

@@ -1,4 +1,5 @@
 kinds_iso_c.f90
+#kinds_iso_fortran.f90
 parameters.f90
 types_basic.f90
 flags.f90
@@ -28,3 +29,7 @@ alignment_conformer.f90
 c_binding_utils.f90
 c_binding_atormsd.f90
 c_binding_conformsd.f90
+file_utils.f90
+file_reading.f90
+file_writing.f90
+arg_parsing.f90

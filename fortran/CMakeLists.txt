@@ -22,15 +22,15 @@ endfunction()
 # ---------------------------------------------------------------------------
 # Collect sources
 # ---------------------------------------------------------------------------
-read_source_list(library_modules.txt      LIB_SOURCES)
-read_source_list(program_dependencies.txt PROG_DEP_SOURCES)
+read_source_list(library_modules.txt LIB_SOURCES)
 
 # ---------------------------------------------------------------------------
 # Target: molalignlib
-#   Uses kinds_iso_c.f90 (for C bindings). Excluded from default build;
-#   built only when called from scikit-build or explicitly requested.
+#   Uses kinds_iso_c.f90 (for C bindings). Part of the default build.
+#   All module sources live here; programs link against this library so
+#   nothing is compiled twice.
 # ---------------------------------------------------------------------------
-add_library(molalignlib STATIC EXCLUDE_FROM_ALL ${LIB_SOURCES})
+add_library(molalignlib STATIC ${LIB_SOURCES})
 
 set_target_properties(molalignlib PROPERTIES
     POSITION_INDEPENDENT_CODE ON
@@ -51,25 +51,12 @@ install(TARGETS molalignlib
 
 # ---------------------------------------------------------------------------
 # Targets: programs (skipped when called from scikit-build)
-#   molalignprog is an OBJECT library that compiles the dependency sources
-#   once with kinds_fortran.f90. Each executable links against it so modules
-#   are never written concurrently.
+#   Each executable links against molalignlib directly — no intermediate
+#   OBJECT library needed, so no sources are compiled a second time.
 # ---------------------------------------------------------------------------
 if(NOT SKBUILD)
 
-    add_library(molalignprog OBJECT ${PROG_DEP_SOURCES})
-
-    set_target_properties(molalignprog PROPERTIES
-        Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/modules/molalignprog
-    )
-
-    file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/modules/molalignprog)
-
-    target_include_directories(molalignprog PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/modules/molalignprog>
-    )
-
-    file(STRINGS ${CMAKE_CURRENT_SOURCE_DIR}/program_list.txt _prog_lines)
+    file(STRINGS ${CMAKE_CURRENT_SOURCE_DIR}/fortran_programs.txt _prog_lines)
 
     foreach(line ${_prog_lines})
         string(REGEX MATCH "^#" _comment "${line}")
@@ -86,10 +73,10 @@ if(NOT SKBUILD)
                         ${FORTRAN_SRC_DIR}/${src_rel}
                     )
 
-                    target_link_libraries(${exec_name} PRIVATE molalignprog)
+                    target_link_libraries(${exec_name} PRIVATE molalignlib)
 
                     set_target_properties(${exec_name} PROPERTIES
-                        Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/modules/molalignprog
+                        Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/modules/molalignlib
                     )
 
                     install(TARGETS ${exec_name} RUNTIME DESTINATION bin)
