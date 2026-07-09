@@ -33,7 +33,8 @@ extern "C" {
  * @param mirror_flag   Mirror second molecule
  * @param label_flag    Use atom type labels for matching
  * @param bond_flag     Derive connectivity from geometry, not bond table
- * @param stats_flag    Print optimisation statistics
+ * @param print_stats    Print optimisation statistics
+ * @param print_assigntree Print the atom-assignment search tree
  * @param random_flag   Use random algorithm
  * @param conv_freq   Convergence frequency
  * @param max_trials    Maximum number of trials
@@ -54,7 +55,7 @@ void conformsd_calculate(
     int n_bonds2, const int *bond_data2,
     bool align_flag, bool remap_flag, bool heavy_flag, bool mass_flag,
     bool mirror_flag, bool label_flag, bool bond_flag,
-    bool stats_flag, bool random_flag,
+    bool print_stats, bool print_assigntree, bool random_flag,
     int conv_freq, int max_trials,
     double *rmsd, int *natoms, int *atomperm,
     double *transform, int *error_code);

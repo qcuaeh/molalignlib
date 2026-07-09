@@ -30,10 +30,10 @@ Overview
 
 MolAlignLib exposes two distinct RMSD calculation modes:
 
-| Mode | Program / function | When to use |
+| Program | Function | When to use |
 |------|-------------------|-------------|
-| **atoRMSD** | `atormsd` / `atormsd_calculate` | Unstructured atom clusters — no bond topology required |
-| **confoRMSD** | `conformsd` / `conformsd_calculate` | Molecular conformers — bond topology guides atom matching via HNA partitioning |
+| **atormsd** | atormsd_calculate | Unstructured atom clusters — no bond topology required |
+| **conformsd** | conformsd_calculate | Molecular conformers — bond topology guides atom matching via HNA partitioning |
 
 Both modes support:
 - **Alignment** (`-align`): optimally rotate and translate one structure onto the other.
@@ -66,9 +66,9 @@ After a successful build the following are available inside `build/fortran`:
 
 | Artifact | Description |
 |----------|-------------|
-| `atormsd` | Standalone cluster RMSD program |
-| `conformsd` | Standalone conformer RMSD program |
-| `libmolalignlib.a` | C binding static library |
+| **atormsd** | Standalone cluster RMSD program |
+| **conformsd** | Standalone conformer RMSD program |
+| **libmolalignlib.a** | C binding static library |
 
 ### Python extension modules
 
@@ -90,20 +90,20 @@ atormsd file1 file2 [options]
 
 | Option | Argument | Description |
 |--------|----------|-------------|
-| `-align` | | Align atoms to minimise the RMSD |
-| `-remap` | | Remap atoms to minimise the RMSD |
-| `-label` | | Use atom labels to distinguish atom types |
-| `-prune` | `TOL` | Prune assignments with pair distances exceeding *TOL* Å |
-| `-freq` | `N` | Stop if the best solution is found *N* consecutive times |
-| `-trials` | `N` | Stop after at most *N* optimisation trials |
-| `-records` | `N` | Record the *N* lowest RMSDs found (default: 1) |
-| `-printmap` | | Print the optimised atom mapping to stdout |
-| `-aligned` | `FILE` | Write aligned coordinates of molecule 2 to *FILE* |
-| `-heavy` | | Ignore hydrogen atoms |
-| `-mass` | | Use mass-weighted coordinates |
-| `-mirror` | | Reflect molecule 2 before comparison |
-| `-stats` | | Print detailed optimisation statistics |
-| `-random` | | Seed the random-number generator from the system clock |
+| &#8211;align | | Align atoms to minimise the RMSD |
+| &#8211;remap | | Remap atoms to minimise the RMSD |
+| &#8211;label | | Use atom labels to distinguish atom types |
+| &#8211;prune | TOL | Prune assignments with pair distances exceeding *TOL* Å |
+| &#8211;freq | N | Stop if the best solution is found *N* consecutive times |
+| &#8211;trials | N | Stop after at most *N* optimisation trials |
+| &#8211;records | N | Record the *N* lowest RMSDs found (default: 1) |
+| &#8211;assignment | | Print the optimised atom mapping to stdout |
+| &#8211;aligned | FILE | Write aligned coordinates of molecule 2 to *FILE* |
+| &#8211;heavy | | Ignore hydrogen atoms |
+| &#8211;mass | | Use mass-weighted coordinates |
+| &#8211;mirror | | Reflect molecule 2 before comparison |
+| &#8211;stats | | Print detailed optimisation statistics |
+| &#8211;random | | Seed the random-number generator from the system clock |
 
 #### Examples
 
@@ -112,7 +112,7 @@ atormsd file1 file2 [options]
 atormsd mol1.xyz mol2.xyz
 
 # Align and remap atoms, print the mapping
-atormsd mol1.xyz mol2.xyz -align -remap -printmap
+atormsd mol1.xyz mol2.xyz -align -remap -assignment
 
 # Remap with distance pruning, keep the 3 best solutions
 atormsd mol1.xyz mol2.xyz -align -remap -prune 0.5 -records 3
@@ -139,23 +139,23 @@ conformsd file1 file2 [options]
 
 | Option | Argument | Description |
 |--------|----------|-------------|
-| `-align` | | Align atoms to minimise the RMSD |
-| `-remap` | | Remap atoms to minimise the RMSD |
-| `-label` | | Use atom labels to distinguish atom types |
-| `-freq` | `N` | Stop if the best solution is found *N* consecutive times |
-| `-trials` | `N` | Stop after at most *N* optimisation trials |
-| `-records` | `N` | Record the *N* lowest RMSDs found (default: 1) |
-| `-printmap` | | Print the optimised atom mapping to stdout |
-| `-printtree` | | Print the internal assignment tree |
-| `-aligned` | `FILE` | Write aligned coordinates of molecule 2 to *FILE* |
-| `-heavy` | | Ignore hydrogen atoms |
-| `-mass` | | Use mass-weighted coordinates |
-| `-mirror` | | Reflect molecule 2 before comparison |
-| `-bond` | | Derive bond connectivity from interatomic distances instead of the file's bond table |
-| `-exhaustive` | | Force exhaustive orientation-independent search regardless of assignment tree topology |
-| `-stochastic` | | Force stochastic fixed-orientation search regardless of assignment tree topology |
-| `-stats` | | Print detailed optimisation statistics |
-| `-random` | | Seed the random-number generator from the system clock |
+| &#8211;align | | Align atoms to minimise the RMSD |
+| &#8211;remap | | Remap atoms to minimise the RMSD |
+| &#8211;label | | Use atom labels to distinguish atom types |
+| &#8211;freq | N | Stop if the best solution is found *N* consecutive times |
+| &#8211;trials | N | Stop after at most *N* optimisation trials |
+| &#8211;records | N | Record the *N* lowest RMSDs found (default: 1) |
+| &#8211;assignment | | Print the optimised atom mapping to stdout |
+| &#8211;assigntree | | Print the internal assignment tree |
+| &#8211;aligned | FILE | Write aligned coordinates of molecule 2 to *FILE* |
+| &#8211;heavy | | Ignore hydrogen atoms |
+| &#8211;mass | | Use mass-weighted coordinates |
+| &#8211;mirror | | Reflect molecule 2 before comparison |
+| &#8211;bond | | Derive bond connectivity from interatomic distances instead of the file's bond table |
+| &#8211;exhaustive | | Force exhaustive orientation-independent search regardless of assignment tree topology |
+| &#8211;stochastic | | Force stochastic fixed-orientation search regardless of assignment tree topology |
+| &#8211;stats | | Print detailed optimisation statistics |
+| &#8211;random | | Seed the random-number generator from the system clock |
 
 `-exhaustive` and `-stochastic` are mutually exclusive. If neither is given, the strategy is chosen automatically based on the ratio of total to partial assignment combinations in the tree: stochastic fixed-orientation search is used when the ratio is high, and exhaustive orientation-independent search when it is low.
 
@@ -172,7 +172,7 @@ conformsd conf1.xyz conf2.xyz -align -remap -bond
 conformsd conf1.sdf conf2.sdf -align -remap -heavy -exhaustive
 
 # Print the atom permutation that maps conf2 onto conf1
-conformsd conf1.sdf conf2.sdf -align -remap -printmap
+conformsd conf1.sdf conf2.sdf -align -remap -assignment
 
 # Compute an RMSD matrix for all poses in an SDF file (shell loop)
 for i in 1 2 3; do
@@ -227,7 +227,7 @@ void atormsd_calculate(
     int n_atoms2, const int *atom_data2, const double *coords2,
     bool align_flag, bool remap_flag, bool heavy_flag, bool mass_flag,
     bool mirror_flag, bool label_flag,
-    bool stats_flag, bool random_flag,
+    bool print_stats, bool random_flag,
     double prune_tol, int conv_freq, int max_trials,
     double *rmsd, int *natoms, int *atomperm,
     double *transform, int *error_code);
@@ -237,28 +237,28 @@ void atormsd_calculate(
 
 | Parameter | Direction | Description |
 |-----------|-----------|-------------|
-| `n_atoms1` | in | Number of atoms in molecule 1 |
-| `atom_data1` | in | Packed atom data for molecule 1, length `n_atoms1*2` |
-| `coords1` | in | Coordinates for molecule 1, length `n_atoms1*3` |
-| `n_atoms2` | in | Number of atoms in molecule 2 |
-| `atom_data2` | in | Packed atom data for molecule 2, length `n_atoms2*2` |
-| `coords2` | in | Coordinates for molecule 2, length `n_atoms2*3` |
-| `align_flag` | in | Enable structural alignment |
-| `remap_flag` | in | Enable atom remapping |
-| `heavy_flag` | in | Use only heavy (non-hydrogen) atoms |
-| `mass_flag` | in | Weight atoms by atomic mass |
-| `mirror_flag` | in | Mirror molecule 2 before comparison |
-| `label_flag` | in | Use atom labels for type matching |
-| `stats_flag` | in | Print optimisation statistics to stdout |
-| `random_flag` | in | Seed RNG from system clock |
-| `prune_tol` | in | Pruning distance tolerance (Å); negative value disables pruning |
-| `conv_freq` | in | Convergence frequency threshold |
-| `max_trials` | in | Maximum number of optimisation trials |
-| `rmsd` | out | Calculated RMSD (Å) |
-| `natoms` | out | Number of elements written to `atomperm` |
-| `atomperm` | out | Atom permutation, **0-based**; caller must allocate ≥ `natoms` elements |
-| `transform` | out | 4 × 4 homogeneous transform (row-major, 16 doubles) |
-| `error_code` | out | `0` = success; `1` = not isomers; `2` = atom type mismatch |
+| **n_atoms1** | in | Number of atoms in molecule 1 |
+| **atom_data1** | in | Packed atom data for molecule 1, length `n_atoms1*2` |
+| **coords1** | in | Coordinates for molecule 1, length `n_atoms1*3` |
+| **n_atoms2** | in | Number of atoms in molecule 2 |
+| **atom_data2** | in | Packed atom data for molecule 2, length `n_atoms2*2` |
+| **coords2** | in | Coordinates for molecule 2, length `n_atoms2*3` |
+| **align_flag** | in | Enable structural alignment |
+| **remap_flag** | in | Enable atom remapping |
+| **heavy_flag** | in | Use only heavy (non-hydrogen) atoms |
+| **mass_flag** | in | Weight atoms by atomic mass |
+| **mirror_flag** | in | Mirror molecule 2 before comparison |
+| **label_flag** | in | Use atom labels for type matching |
+| **print_stats** | in | Print optimisation statistics to stdout |
+| **random_flag** | in | Seed RNG from system clock |
+| **prune_tol** | in | Pruning distance tolerance (Å); negative value disables pruning |
+| **conv_freq** | in | Convergence frequency threshold |
+| **max_trials** | in | Maximum number of optimisation trials |
+| **rmsd** | out | Calculated RMSD (Å) |
+| **natoms** | out | Number of elements written to `atomperm` |
+| **atomperm** | out | Atom permutation, **0-based**; caller must allocate ≥ `natoms` elements |
+| **transform** | out | 4 × 4 homogeneous transform (row-major, 16 doubles) |
+| **error_code** | out | `0` = success; `1` = not isomers; `2` = atom type mismatch |
 
 #### Minimal example
 
@@ -317,7 +317,7 @@ void conformsd_calculate(
     int n_bonds2, const int *bond_data2,
     bool align_flag, bool remap_flag, bool heavy_flag, bool mass_flag,
     bool mirror_flag, bool label_flag, bool bond_flag,
-    bool stats_flag, bool random_flag,
+    bool print_stats, bool random_flag,
     int conv_freq, int max_trials,
     double *rmsd, int *natoms, int *atomperm,
     double *transform, int *error_code);
@@ -337,32 +337,32 @@ connectivity from atomic geometry and the bond arrays may be empty
 
 | Parameter | Direction | Description |
 |-----------|-----------|-------------|
-| `n_atoms1` | in | Number of atoms in molecule 1 |
-| `atom_data1` | in | Packed atom data for molecule 1, length `n_atoms1*2` |
-| `coords1` | in | Coordinates for molecule 1, length `n_atoms1*3` |
-| `n_bonds1` | in | Number of bonds in molecule 1 |
-| `bond_data1` | in | Flat bond array for molecule 1, length `n_bonds1*3` |
-| `n_atoms2` | in | Number of atoms in molecule 2 |
-| `atom_data2` | in | Packed atom data for molecule 2, length `n_atoms2*2` |
-| `coords2` | in | Coordinates for molecule 2, length `n_atoms2*3` |
-| `n_bonds2` | in | Number of bonds in molecule 2 |
-| `bond_data2` | in | Flat bond array for molecule 2, length `n_bonds2*3` |
-| `align_flag` | in | Enable structural alignment |
-| `remap_flag` | in | Enable atom remapping |
-| `heavy_flag` | in | Use only heavy (non-hydrogen) atoms |
-| `mass_flag` | in | Weight atoms by atomic mass |
-| `mirror_flag` | in | Mirror molecule 2 before comparison |
-| `label_flag` | in | Use atom labels for type matching |
-| `bond_flag` | in | Derive connectivity from geometry (ignores bond arrays) |
-| `stats_flag` | in | Print optimisation statistics to stdout |
-| `random_flag` | in | Seed RNG from system clock |
-| `conv_freq` | in | Convergence frequency threshold |
-| `max_trials` | in | Maximum number of optimisation trials |
-| `rmsd` | out | Calculated RMSD (Å) |
-| `natoms` | out | Number of elements written to `atomperm` |
-| `atomperm` | out | Atom permutation, **0-based**; caller must allocate ≥ `natoms` elements |
-| `transform` | out | 4 × 4 homogeneous transform (row-major, 16 doubles) |
-| `error_code` | out | `0` = success; `1` = not isomers; `2` = missing bonds; `3` = atom type mismatch |
+| **n_atoms1** | in | Number of atoms in molecule 1 |
+| **atom_data1** | in | Packed atom data for molecule 1, length `n_atoms1*2` |
+| **coords1** | in | Coordinates for molecule 1, length `n_atoms1*3` |
+| **n_bonds1** | in | Number of bonds in molecule 1 |
+| **bond_data1** | in | Flat bond array for molecule 1, length `n_bonds1*3` |
+| **n_atoms2** | in | Number of atoms in molecule 2 |
+| **atom_data2** | in | Packed atom data for molecule 2, length `n_atoms2*2` |
+| **coords2** | in | Coordinates for molecule 2, length `n_atoms2*3` |
+| **n_bonds2** | in | Number of bonds in molecule 2 |
+| **bond_data2** | in | Flat bond array for molecule 2, length `n_bonds2*3` |
+| **align_flag** | in | Enable structural alignment |
+| **remap_flag** | in | Enable atom remapping |
+| **heavy_flag** | in | Use only heavy (non-hydrogen) atoms |
+| **mass_flag** | in | Weight atoms by atomic mass |
+| **mirror_flag** | in | Mirror molecule 2 before comparison |
+| **label_flag** | in | Use atom labels for type matching |
+| **bond_flag** | in | Derive connectivity from geometry (ignores bond arrays) |
+| **print_stats** | in | Print optimisation statistics to stdout |
+| **random_flag** | in | Seed RNG from system clock |
+| **conv_freq** | in | Convergence frequency threshold |
+| **max_trials** | in | Maximum number of optimisation trials |
+| **rmsd** | out | Calculated RMSD (Å) |
+| **natoms** | out | Number of elements written to `atomperm` |
+| **atomperm** | out | Atom permutation, **0-based**; caller must allocate ≥ `natoms` elements |
+| **transform** | out | 4 × 4 homogeneous transform (row-major, 16 doubles) |
+| **error_code** | out | `0` = success; `1` = not isomers; `2` = missing bonds; `3` = atom type mismatch |
 
 #### Minimal example
 
@@ -543,9 +543,9 @@ Returned by every `.rmsd_to()` call.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `rmsd` | `float` | Root-mean-square deviation in Å |
-| `atom_permutation` | `int32 ndarray (n,)` | 0-based index array mapping *other* atoms onto *self* |
-| `transform` | `float64 ndarray (4, 4)` | Homogeneous rotation + translation matrix (maps *other* → *self* frame) |
+| **rmsd** | `float` | Root-mean-square deviation in Å |
+| **atom_permutation** | `int32 ndarray (n,)` | 0-based index array mapping *other* atoms onto *self* |
+| **transform** | `float64 ndarray (4, 4)` | Homogeneous rotation + translation matrix (maps *other* → *self* frame) |
 
 #### Applying the result
 

@@ -31,7 +31,7 @@ subroutine atormsd_calculate(                                        &
       n_atoms2,  c_atom_data2,  c_coords2,                            &
       c_align_flag, c_remap_flag, c_heavy_flag, c_mass_flag,         &
       c_mirror_flag, c_label_flag,                                   &
-      c_stats_flag, c_random_flag,                                   &
+      c_print_stats, c_random_flag,                                   &
       c_prune_tol, c_conv_freq, c_max_trials,                       &
       c_rmsd, c_natoms, c_atomperm, c_transform, c_error_code)      &
       bind(C, name="atormsd_calculate")
@@ -49,7 +49,7 @@ subroutine atormsd_calculate(                                        &
    ! --- flags ---
    logical(lk), intent(in), value :: c_align_flag, c_remap_flag, c_heavy_flag, c_mass_flag
    logical(lk), intent(in), value :: c_mirror_flag, c_label_flag
-   logical(lk), intent(in), value :: c_stats_flag, c_random_flag
+   logical(lk), intent(in), value :: c_print_stats, c_random_flag
    real(rk),    intent(in), value :: c_prune_tol
    integer(ik), intent(in), value :: c_conv_freq, c_max_trials
 
@@ -76,11 +76,15 @@ subroutine atormsd_calculate(                                        &
    c_error_code = 0;  c_rmsd = 0.0_rk;  c_natoms = 0
    call set_identity_transform(c_transform)
 
-   ! --- set option flags ---
-   align_flag   = c_align_flag;    remap_flag  = c_remap_flag
-   heavy_flag   = c_heavy_flag;    mass_flag   = c_mass_flag
-   mirror_flag  = c_mirror_flag;   label_flag  = c_label_flag
-   stats_flag   = c_stats_flag;    random_flag = c_random_flag
+   ! --- set options ---
+   align_flag  = c_align_flag
+   remap_flag  = c_remap_flag
+   heavy_flag  = c_heavy_flag
+   mass_flag   = c_mass_flag
+   mirror_flag = c_mirror_flag
+   label_flag  = c_label_flag
+   random_flag = c_random_flag
+   print_stats = c_print_stats
 
    if (c_prune_tol < 0.0_rk) then
       prune_procedure => prune_none
@@ -146,7 +150,7 @@ subroutine atormsd_calculate(                                        &
          if (error_code /= 0) then
             c_error_code = error_code;  return
          end if
-         if (stats_flag) call print_records(registry)
+         if (print_stats) call print_records(registry)
          atomperm1 = registry%records(1)%atomperm1
       else
          if (any(atomtypes%itemdir1 /= atomtypes%itemdir2)) then

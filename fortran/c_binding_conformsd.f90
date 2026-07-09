@@ -35,7 +35,7 @@ subroutine conformsd_calculate(                                              &
       n_bonds2,  c_bond_data2,                                                  &
       c_align_flag, c_remap_flag, c_heavy_flag, c_mass_flag,                &
       c_mirror_flag, c_label_flag, c_bond_flag,                             &
-      c_stats_flag, c_random_flag,                                          &
+      c_print_stats, c_print_assigntree, c_random_flag,                      &
       c_conv_freq, c_max_trials,                                           &
       c_rmsd, c_natoms, c_atomperm, c_transform, c_error_code)              &
       bind(C, name="conformsd_calculate")
@@ -57,7 +57,7 @@ subroutine conformsd_calculate(                                              &
    ! --- flags ---
    logical(lk), intent(in), value :: c_align_flag, c_remap_flag, c_heavy_flag, c_mass_flag
    logical(lk), intent(in), value :: c_mirror_flag, c_label_flag, c_bond_flag
-   logical(lk), intent(in), value :: c_stats_flag, c_random_flag
+   logical(lk), intent(in), value :: c_print_stats, c_print_assigntree, c_random_flag
    integer(ik), intent(in), value :: c_conv_freq, c_max_trials
 
    ! --- outputs ---
@@ -83,15 +83,19 @@ subroutine conformsd_calculate(                                              &
    c_error_code = 0;  c_rmsd = 0.0_rk;  c_natoms = 0
    call set_identity_transform(c_transform)
 
-   ! --- set option flags ---
-   align_flag  = c_align_flag;    remap_flag  = c_remap_flag
-   heavy_flag  = c_heavy_flag;    mass_flag   = c_mass_flag
-   mirror_flag = c_mirror_flag;   label_flag  = c_label_flag
-   bond_flag   = c_bond_flag;     stats_flag  = c_stats_flag
+   ! --- set options ---
+   align_flag  = c_align_flag
+   remap_flag  = c_remap_flag
+   heavy_flag  = c_heavy_flag
+   mass_flag   = c_mass_flag
+   mirror_flag = c_mirror_flag
+   label_flag  = c_label_flag
+   bond_flag   = c_bond_flag
    random_flag = c_random_flag
-   stoch_flag   = .TRUE.;   adaptive_flag = .TRUE.
-   print_tree_flag     = .FALSE.
-
+   print_stats = c_print_stats
+   print_assigntree = c_print_assigntree
+   stochastic_flag   = .TRUE.
+   adaptive_flag = .TRUE.
    conv_freq = c_conv_freq
    max_trials  = c_max_trials
    num_records = 1
@@ -160,7 +164,7 @@ subroutine conformsd_calculate(                                              &
          call allocate_registry(registry, num_records)
          call optimize_atomperm_conformer(atomset1, atomset2, adjcs1, adjcs2, atomtypes, &
                coords1w, coords2w, conv_freq, max_trials, registry)
-         if (stats_flag) call print_records(registry)
+         if (print_stats) call print_records(registry)
          atomperm1 = registry%records(1)%atomperm1
       else
          if (any(atomtypes%itemdir1 /= atomtypes%itemdir2)) then

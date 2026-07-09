@@ -15,7 +15,7 @@ cdef extern from "conformsd.h":
         int n_bonds2, const int *bond_data2,
         bint align_flag, bint remap_flag, bint heavy_flag, bint mass_flag,
         bint mirror_flag, bint label_flag, bint bond_flag,
-        bint stats_flag, bint random_flag,
+        bint print_stats, bint print_assigntree, bint random_flag,
         int conv_freq, int max_trials,
         double *rmsd, int *natoms, int *atomperm,
         double *transform, int *error_code)
@@ -45,7 +45,8 @@ def calculate(
     bint mirror_flag   = False,
     bint label_flag    = False,
     bint bond_flag     = False,
-    bint stats_flag    = False,
+    bint print_stats    = False,
+    bint print_assigntree = False,
     bint random_flag   = False,
     int  conv_freq      = 100,
     int  max_trials    = 10000,
@@ -63,6 +64,8 @@ def calculate(
         ``[[a1, a2, bond_type], ...]`` (1-based atom indices).
         Pass ``None`` (or omit) when ``bond_flag=True``; in that case the
         library derives connectivity from geometry.
+    print_assigntree : bool
+        Print the atom-assignment search tree during optimisation.
     (remaining keyword arguments map 1-to-1 onto the C flags)
 
     Returns
@@ -136,7 +139,7 @@ def calculate(
             <const int    *>bd2.data,
             align_flag, remap_flag, heavy_flag, mass_flag,
             mirror_flag, label_flag, bond_flag,
-            stats_flag, random_flag,
+            print_stats, print_assigntree, random_flag,
             conv_freq, max_trials,
             &rmsd_val, &natoms, atomperm,
             tf, &err,

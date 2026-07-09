@@ -59,14 +59,14 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
    call compute_sc_hna_chain( adjcs1, adjcs2, atomtypes, hna_chain)
    call build_assignment_tree( adjcs1, adjcs2, hna_chain%last_link, cache_arrays)
 
-   if (print_tree_flag) then
+   if (print_assigntree) then
       call print_chain_tree_array( atomtypes, cache_arrays)
    end if
 
    ! Reset registry for new conformer
    call reset_registry( registry)
 
-   if ((stoch_flag .and. .not. adaptive_flag) .or. (stoch_flag .and. adaptive_flag .and. &
+   if ((stochastic_flag .and. .not. adaptive_flag) .or. (stochastic_flag .and. adaptive_flag .and. &
          cache_arrays%total_combinations > conv_freq*cache_arrays%partial_combinations)) then
 
       ! Initialize random number generator
@@ -165,7 +165,7 @@ subroutine assign_atomperm_conformer( adjcs1, adjcs2, atomtypes, coords1, coords
    call compute_sc_hna_chain( adjcs1, adjcs2, atomtypes, hna_chain)
    call build_assignment_tree( adjcs1, adjcs2, hna_chain%last_link, cache_arrays)
 
-   if (print_tree_flag) then
+   if (print_assigntree) then
       call print_chain_tree_array( atomtypes, cache_arrays)
    end if
 

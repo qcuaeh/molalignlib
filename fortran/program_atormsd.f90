@@ -35,8 +35,8 @@ use arg_parsing
 use flags
 implicit none
 
-logical(lk) :: print_map_flag
-logical(lk) :: write_aligned_flag
+logical(lk) :: print_assignment
+logical(lk) :: write_aligned
 character(:), allocatable :: title1, title2
 character(:), allocatable :: arg, coords_path
 character(:), allocatable :: in_format, out_format
@@ -59,15 +59,15 @@ integer(ik) :: i
 
 ! Set default options
 
-stats_flag = .FALSE.
 mirror_flag = .FALSE.
 align_flag = .FALSE.
 remap_flag = .FALSE.
-write_aligned_flag = .FALSE.
 mass_flag = .FALSE.
 label_flag = .FALSE.
 random_flag = .FALSE.
-print_map_flag = .FALSE.
+print_stats = .FALSE.
+print_assignment = .FALSE.
+write_aligned = .FALSE.
 
 num_records = 1
 conv_freq = 10
@@ -85,8 +85,6 @@ do while (get_arg(arg))
       align_flag = .TRUE.
    case ('-remap')
       remap_flag = .TRUE.
-   case ('-printmap')
-      print_map_flag = .TRUE.
    case ('-prune')
       prune_procedure => prune_rd
       call read_optarg(arg, prune_tol)
@@ -105,10 +103,12 @@ do while (get_arg(arg))
    case ('-records')
       call read_optarg( arg, num_records)
    case ('-aligned')
-      write_aligned_flag = .TRUE.
+      write_aligned = .TRUE.
       call read_optarg( arg, coords_path)
+   case ('-assignment')
+      print_assignment = .TRUE.
    case ('-stats')
-      stats_flag = .TRUE.
+      print_stats = .TRUE.
    case ('-random')
       random_flag = .TRUE.
    case default
@@ -170,7 +170,7 @@ end if
 
 if (align_flag) then
 
-   if (write_aligned_flag) then
+   if (write_aligned) then
       call open2write( coords_path, out_format, out_unit)
    end if
 
@@ -192,7 +192,7 @@ if (align_flag) then
       if (error_code /= 0) stop 'Error: Assignment failed'
 
       ! Print optimization stats
-      if (stats_flag) then
+      if (print_stats) then
          call print_records( registry)
       end if
 
@@ -203,14 +203,14 @@ if (align_flag) then
          coords2r = rotated_coords( coords2, rotquat, center1)
          rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2r))
 
-         if (write_aligned_flag) then
+         if (write_aligned) then
             title2 = 'rmsd=' // str( rmsd)
             coords2r = rotated_coords( coords2, rotquat, center1)
             call set_coords( atoms2, coords2r)
             call write_file( out_unit, out_format, title2, atoms2, bonds2, atomperm1)
          else
             write (stdout,'(A)',advance='no') str( rmsd)
-            if (print_map_flag) then
+            if (print_assignment) then
                write (stdout,'(1X)',advance='no')
                call print_permutation(atomperm1)
             end if
@@ -230,7 +230,7 @@ if (align_flag) then
       coords2r = rotated_coords( coords2, rotquat, center1)
       rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2r))
 
-      if (write_aligned_flag) then
+      if (write_aligned) then
          title2 = 'rmsd=' // str( rmsd)
          coords2r = rotated_coords( coords2, rotquat, center1)
          call set_coords( atoms2, coords2r)
@@ -253,7 +253,7 @@ else
       if (error_code /= 0) stop 'Error: Assignment failed'
       rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2))
       write (stdout,'(A)',advance='no') str( rmsd)
-      if (print_map_flag) then
+      if (print_assignment) then
          write (stdout,'(1X)',advance='no')
          call print_permutation(atomperm1)
       end if

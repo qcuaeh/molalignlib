@@ -15,7 +15,7 @@
 /* option value constants */
 enum {
     OPT_ALIGN = 1, OPT_REMAP, OPT_HEAVY, OPT_MASS,
-    OPT_MIRROR, OPT_LABEL, OPT_PRINTMAP, OPT_PRINTTRANS,
+    OPT_MIRROR, OPT_LABEL, OPT_ASSIGNMENT, OPT_PRINTTRANS,
     OPT_STATS, OPT_RANDOM, OPT_PRUNE, OPT_FREQ,
     OPT_TRIALS, OPT_HELP
 };
@@ -32,7 +32,7 @@ static const long_opt_t long_options[] = {
     {"prune",           1, OPT_PRUNE},
     {"freq",            1, OPT_FREQ},
     {"trials",          1, OPT_TRIALS},
-    {"printmap",        0, OPT_PRINTMAP},
+    {"assignment",      0, OPT_ASSIGNMENT},
     {"printtrans",      0, OPT_PRINTTRANS},
     {"help",            0, OPT_HELP},
     {NULL, 0, 0}
@@ -50,7 +50,7 @@ static const opt_info_t opt_info[] = {
     [OPT_PRUNE]           = {"Set pruning tolerance",                              "TOL"  },
     [OPT_FREQ]            = {"Set convergence frequency (default: 10)",            "N"    },
     [OPT_TRIALS]          = {"Set maximum number of trials (default: 10000)",      "N"    },
-    [OPT_PRINTMAP]        = {"Print the atom permutation",                         NULL   },
+    [OPT_ASSIGNMENT]      = {"Print the atom permutation",                         NULL   },
     [OPT_PRINTTRANS]      = {"Print the 4x4 homogeneous transformation matrix",    NULL   },
     [OPT_HELP]            = {"Show this help message",                             NULL   },
 };
@@ -69,8 +69,8 @@ int main(int argc, char **argv)
     const char *optarg = NULL;
     bool align_flag = false, remap_flag = false, heavy_flag = false, mass_flag = false;
     bool mirror_flag = false, label_flag = false;
-    bool print_mapping = false, print_transform = false;
-    bool stats_flag = false, random_flag = false;
+    bool print_assignment = false, print_transform = false;
+    bool print_stats = false, random_flag = false;
     double prune_tol = -1.0;
     int conv_freq = 10, max_trials = 10000;
     int argi = 1, opt;
@@ -98,13 +98,13 @@ int main(int argc, char **argv)
         case OPT_MASS:            mass_flag     = true;         break;
         case OPT_MIRROR:          mirror_flag   = true;         break;
         case OPT_LABEL:           label_flag    = true;         break;
-        case OPT_STATS:           stats_flag    = true;         break;
+        case OPT_STATS:           print_stats   = true;         break;
         case OPT_RANDOM:          random_flag   = true;         break;
         case OPT_PRUNE:           prune_tol     = atof(optarg); break;
-        case OPT_FREQ:           conv_freq     = atoi(optarg); break;
+        case OPT_FREQ:            conv_freq     = atoi(optarg); break;
         case OPT_TRIALS:          max_trials    = atoi(optarg); break;
-        case OPT_PRINTMAP:   print_mapping   = true;       break;
-        case OPT_PRINTTRANS: print_transform = true;       break;
+        case OPT_ASSIGNMENT:      print_assignment = true;      break;
+        case OPT_PRINTTRANS:      print_transform = true;       break;
         case OPT_HELP: print_usage(argv[0]); return 0;
         default:
             print_usage(argv[0]); return 1;
@@ -132,7 +132,7 @@ int main(int argc, char **argv)
         n2, atom_data2, coords2,
         align_flag, remap_flag, heavy_flag, mass_flag,
         mirror_flag, label_flag,
-        stats_flag, random_flag,
+        print_stats, random_flag,
         prune_tol, conv_freq, max_trials,
         &rmsd, &natoms, atomperm,
         transform, &error_code);
@@ -151,7 +151,7 @@ int main(int argc, char **argv)
 
     printf("RMSD: %.6f\n", rmsd);
 
-    if (print_mapping) {
+    if (print_assignment) {
         int i;
         printf("Mapping:");
         for (i = 0; i < natoms; i++) printf(" %d", atomperm[i] + 1); /* 1-based */

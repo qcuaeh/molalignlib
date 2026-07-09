@@ -28,7 +28,7 @@ extern "C" {
  * @param mass_flag     Use atomic masses as weights
  * @param mirror_flag   Mirror second molecule
  * @param label_flag    Use atom type labels for matching
- * @param stats_flag    Print optimisation statistics
+ * @param print_stats    Print optimisation statistics
  * @param random_flag   Use random algorithm
  * @param prune_tol     Pruning tolerance (negative = disable pruning)
  * @param conv_freq     Convergence frequency
@@ -47,7 +47,7 @@ void atormsd_calculate(
     int n_atoms2, const int *atom_data2, const double *coords2,
     bool align_flag, bool remap_flag, bool heavy_flag, bool mass_flag,
     bool mirror_flag, bool label_flag,
-    bool stats_flag, bool random_flag,
+    bool print_stats, bool random_flag,
     double prune_tol, int conv_freq, int max_trials,
     double *rmsd, int *natoms, int *atomperm,
     double *transform, int *error_code);

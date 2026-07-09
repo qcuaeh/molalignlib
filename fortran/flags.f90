@@ -27,9 +27,9 @@ logical(lk) :: heavy_flag
 logical(lk) :: mass_flag
 logical(lk) :: align_flag
 logical(lk) :: remap_flag
-logical(lk) :: stoch_flag
+logical(lk) :: stochastic_flag
 logical(lk) :: adaptive_flag
-logical(lk) :: stats_flag
-logical(lk) :: print_tree_flag
+logical(lk) :: print_stats
+logical(lk) :: print_assigntree
 
 end module
