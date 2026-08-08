@@ -38,7 +38,7 @@ implicit none
 logical(lk) :: print_assignment
 logical(lk) :: write_aligned
 character(:), allocatable :: title1, title2
-character(:), allocatable :: arg, coords_path
+character(:), allocatable :: arg, aligned_path
 character(:), allocatable :: in_format, out_format
 type(strlist_type) :: posargs(2)
 type(atom_t), dimension(:), allocatable :: atoms1, atoms2
@@ -53,7 +53,7 @@ real(rk), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, c
 integer(ik), dimension(:), allocatable :: atomset1, atomset2
 integer(ik), dimension(:), allocatable :: atomperm1
 integer(ik) :: num_records, max_trials, conv_freq
-integer(ik) :: in_unit, out_unit
+integer(ik) :: in_unit, aligned_unit
 integer(ik) :: i
 
 ! Set default options
@@ -76,7 +76,6 @@ write_aligned = .FALSE.
 num_records = 1
 conv_freq = 100
 max_trials = MAX_TRIALS_DEFAULT
-out_unit = stdout
 
 ! Read command options
 
@@ -111,7 +110,7 @@ do while (get_arg(arg))
       call read_optarg( arg, num_records)
    case ('-aligned')
       write_aligned = .TRUE.
-      call read_optarg( arg, coords_path)
+      call read_optarg( arg, aligned_path)
    case ('-assignment')
       print_assignment = .TRUE.
    case ('-assigntree')
@@ -201,32 +200,35 @@ end if
 if (align_flag) then
 
    if (write_aligned) then
-      call open2write( coords_path, out_format, out_unit)
+      call open2write( aligned_path, out_format, aligned_unit)
    end if
 
    center1 = get_centroid( atomset1, atoms1, weights1)
    center2 = get_centroid( atomset2, atoms2, weights2)
    call translate_coords( coords2, center1 - center2)
 
-   ! Get weighted-centered coordinates
    coords1w = get_weighted_coords( atoms1, weights1, center1)
    coords2w = get_weighted_coords( atoms2, weights2, center2)
 
-   if (remap_flag) then
+else
 
-      ! Remap atoms to minimize the MSD
+   coords1w = get_weighted_coords( atoms1, weights1)
+   coords2w = get_weighted_coords( atoms2, weights2)
+
+end if
+
+if (remap_flag) then
+
+   if (align_flag) then
+
       call allocate_registry( registry, num_records)
       call optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atomtypes, &
             coords1w, coords2w, conv_freq, max_trials, registry)
 
-      ! Print optimization stats
-      if (print_stats) then
-         call print_records( registry)
-      end if
+      if (print_stats) call print_records( registry)
 
       do i = 1, registry%occ_records
          atomperm1 = registry%records(i)%atomperm1
-!         rotquat = registry%records(i)%rotquat
          rotquat = least_rotquat( atomset1, atomperm1, coords1w, coords2w)
          coords2r = rotated_coords( coords2, rotquat, center1)
          rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2r))
@@ -234,7 +236,7 @@ if (align_flag) then
          if (write_aligned) then
             title2 = 'rmsd=' // str( rmsd)
             call set_coords( atoms2, coords2r)
-            call write_file( out_unit, out_format, title2, atoms2, bonds2, atomperm1)
+            call write_file( aligned_unit, out_format, title2, atoms2, bonds2, atomperm1)
          else
             write (stdout,'(A)',advance='no') str( rmsd)
             if (print_assignment) then
@@ -243,49 +245,52 @@ if (align_flag) then
             end if
             write (stdout,*)
          end if
-
       end do
 
    else
 
-      ! Abort if atom types do not match
-      if (any(atomtypes%itemdir1 /= atomtypes%itemdir2)) then
-         stop 'Atom types do not match'
-      end if
+      call assign_atomperm_conformer( adjcs1, adjcs2, atomtypes, coords1w, coords2w, atomperm1)
 
-      call init_identity_permutation( size(atoms1), atomperm1)
-      rotquat = least_rotquat( atomset1, atomperm1, coords1w, coords2w)
-      coords2r = rotated_coords( coords2, rotquat, center1)
+      coords2r = coords2
       rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2r))
-
-      if (write_aligned) then
-         title2 = 'rmsd=' // str( rmsd)
-         call set_coords( atoms2, coords2r)
-         call write_file( out_unit, out_format, title2, atoms2, bonds2, atomperm1)
-      else
-         write (stdout,'(A)') str( rmsd)
+      write (stdout,'(A)',advance='no') str( rmsd)
+      if (print_assignment) then
+         write (stdout,'(1X)',advance='no')
+         call print_permutation(atomperm1)
       end if
+      write (stdout,*)
 
    end if
 
 else
 
-   ! Get weighted coordinates
-   coords1w = get_weighted_coords( atoms1, weights1)
-   coords2w = get_weighted_coords( atoms2, weights2)
+   ! Maintain input atom order
+   call init_array( atomperm1, size(atoms1), identity)
 
-   if (remap_flag) then
-      call assign_atomperm_conformer( adjcs1, adjcs2, atomtypes, coords1w, coords2w, atomperm1)
-      rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2))
-      write (stdout,'(A)',advance='no') str( rmsd)
-      if (remap_flag .and. print_assignment) then
-         write (stdout,'(1X)',advance='no')
-         call print_permutation(atomperm1)
-      end if
-      write (stdout,*)
+   ! Abort if atoms do not match
+   if (any(atomtypes%itemdir1 /= atomtypes%itemdir2)) then
+      stop 'Atoms do not match'
+   end if
+
+   ! Abort if bonds do not match
+   if (adjacencydiff( atomset1, atomperm1, adjcs1, adjcs2) > 0) then
+      stop 'Bonds do not match'
+   end if
+
+   if (align_flag) then
+      rotquat = least_rotquat( atomset1, atomperm1, coords1w, coords2w)
+      coords2r = rotated_coords( coords2, rotquat, center1)
    else
-      call init_identity_permutation( size(atoms1), atomperm1)
-      rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2))
+      coords2r = coords2
+   end if
+
+   rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2r))
+
+   if (align_flag .and. write_aligned) then
+      title2 = 'rmsd=' // str( rmsd)
+      call set_coords( atoms2, coords2r)
+      call write_file( aligned_unit, out_format, title2, atoms2, bonds2, atomperm1)
+   else
       write (stdout,'(A)') str( rmsd)
    end if
 

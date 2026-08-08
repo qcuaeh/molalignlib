@@ -31,7 +31,36 @@ interface operator(==)
    module procedure subperm_equality
 end interface
 
+abstract interface
+   integer function int_f(i)
+      use parameters
+      integer(ik), intent(in) :: i
+   end function
+end interface
+
+interface init_array
+   module procedure init_array_integer
+end interface
+
 contains
+
+integer function identity(i)
+   integer(ik), intent(in) :: i
+   identity = i
+end function
+
+subroutine init_array_integer(array, n, f)
+   integer(ik), dimension(:), allocatable, intent(out) :: array
+   integer, intent(in) :: n
+   procedure(int_f) :: f
+   integer(ik) :: i
+
+   allocate (array(n))
+
+   do i = 1, n
+      array(i) = f(i)
+   end do
+end subroutine
 
 subroutine print_permutation(permutation)
    integer(ik), dimension(:), intent(in) :: permutation
@@ -40,19 +69,6 @@ subroutine print_permutation(permutation)
    write (stdout,'(I0)',advance='no') permutation(1)
    do i = 2, size(permutation)
       write (stdout,'(",",I0)',advance='no') permutation(i)
-   end do
-end subroutine
-
-subroutine init_identity_permutation(n_items, permutation)
-   integer, intent(in) :: n_items
-   integer(ik), dimension(:), allocatable, intent(out) :: permutation
-   ! Local variables
-   integer(ik) :: i
-
-   allocate (permutation(n_items))
-
-   do i = 1, n_items
-      permutation(i) = i
    end do
 end subroutine
 

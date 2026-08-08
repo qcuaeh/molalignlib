@@ -15,17 +15,15 @@ module c_binding_atormsd
 
 contains
 
-! ---------------------------------------------------------------------------
-! C-callable wrapper for atormsd functionality.
+! C callable wrapper for atormsd functionality.
 !
 ! Caller supplies pre-read molecular data as flat C arrays:
 !   c_atom_data1/2 : packed atom data, length n_atoms*2:
-!                     [elnum0, label0, elnum1, label1, ...]
-!                   label = 0 means unlabelled.
-!   coords1/2     : XYZ coordinates, row-major (n_atoms x 3), length n_atoms*3
+!                    [elnum0, label0, elnum1, label1, ...]
+!                    label = 0 means unlabelled.
+!   coords1/2      : XYZ coordinates, row-major (n_atoms x 3), length n_atoms*3
 !
 ! No bond data is needed for the atom-RMSD calculation.
-! ---------------------------------------------------------------------------
 subroutine atormsd_calculate(                                        &
       n_atoms1,  c_atom_data1,  c_coords1,                            &
       n_atoms2,  c_atom_data2,  c_coords2,                            &
@@ -36,31 +34,31 @@ subroutine atormsd_calculate(                                        &
       c_rmsd, c_natoms, c_atomperm, c_transform, c_error_code)      &
       bind(C, name="atormsd_calculate")
 
-   ! --- molecule 1 ---
+   ! Molecule 1
    integer(ik), intent(in), value :: n_atoms1
    integer(ik), dimension(n_atoms1*2), intent(in) :: c_atom_data1
    real(rk),    dimension(n_atoms1*3), intent(in) :: c_coords1
 
-   ! --- molecule 2 ---
+   ! Molecule 2
    integer(ik), intent(in), value :: n_atoms2
    integer(ik), dimension(n_atoms2*2), intent(in) :: c_atom_data2
    real(rk),    dimension(n_atoms2*3), intent(in) :: c_coords2
 
-   ! --- flags ---
+   ! Flags
    logical(lk), intent(in), value :: c_align_flag, c_remap_flag, c_heavy_flag, c_mass_flag
    logical(lk), intent(in), value :: c_mirror_flag, c_label_flag
    logical(lk), intent(in), value :: c_print_stats, c_random_flag
    real(rk),    intent(in), value :: c_prune_tol
    integer(ik), intent(in), value :: c_conv_freq, c_max_trials
 
-   ! --- outputs ---
-   real(rk),               intent(out) :: c_rmsd
-   integer(ik),            intent(out) :: c_natoms
+   ! Outputs
+   real(rk),                  intent(out) :: c_rmsd
+   integer(ik),                intent(out) :: c_natoms
    integer(ik), dimension(*), intent(out) :: c_atomperm
-   real(rk),               intent(out) :: c_transform(16)
-   integer(ik),            intent(out) :: c_error_code
+   real(rk),                  intent(out) :: c_transform(16)
+   integer(ik),                intent(out) :: c_error_code
 
-   ! --- local ---
+   ! Local variables
    type(atom_t), dimension(:), allocatable :: atoms1, atoms2
    type(bool_matrix), dimension(:), allocatable :: prunes
    type(partition_t) :: atomtypes
@@ -68,7 +66,7 @@ subroutine atormsd_calculate(                                        &
    real(rk) :: rmsd, center1(3), center2(3), rotquat(4)
    real(rk), dimension(:),   allocatable :: weights1, weights2
    real(rk), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, coords2r
-   integer(ik),  dimension(:),   allocatable :: atomset1, atomset2, atomperm1
+   integer(ik), dimension(:), allocatable :: atomset1, atomset2, atomperm1
    integer(ik) :: num_records, max_trials, conv_freq
    integer(ik) :: error_code
    integer(ik) :: i
@@ -76,7 +74,7 @@ subroutine atormsd_calculate(                                        &
    c_error_code = 0;  c_rmsd = 0.0_rk;  c_natoms = 0
    call set_identity_transform(c_transform)
 
-   ! --- set options ---
+   ! Set options
    align_flag  = c_align_flag
    remap_flag  = c_remap_flag
    heavy_flag  = c_heavy_flag
@@ -93,30 +91,34 @@ subroutine atormsd_calculate(                                        &
       prune_tol = c_prune_tol
    end if
 
-   conv_freq  = c_conv_freq
-   max_trials = c_max_trials
-   num_records= 1
+   conv_freq   = c_conv_freq
+   max_trials  = c_max_trials
+   num_records = 1
 
-   ! --- build atom_t arrays from packed C arrays ---
+   ! Build atom_t arrays from packed C arrays
    call build_atoms(n_atoms1, c_atom_data1, c_coords1, atoms1)
    call build_atoms(n_atoms2, c_atom_data2, c_coords2, atoms2)
 
-   ! --- atom sets ---
    if (heavy_flag) then
+      ! Include only heavy atoms
       call include_heavy_atoms(atoms1, atomset1)
       call include_heavy_atoms(atoms2, atomset2)
    else
+      ! Include all atoms
       call include_all_atoms(atoms1, atomset1)
       call include_all_atoms(atoms2, atomset2)
    end if
 
+   ! Collect atom types in a partition
    call collect_atomtypes(atomset1, atomset2, atoms1, atoms2, atomtypes)
 
+   ! Abort if molecules are not isomers
    if (any(atomtypes%parts%num_items1 /= atomtypes%parts%num_items2)) then
-      c_error_code = 1;  return
+      c_error_code = 1
+      return
    end if
 
-   ! --- weights ---
+   ! Get user defined atom weights
    if (mass_flag) then
       weights1 = atomic_masses(atoms1%elnum)
       weights2 = atomic_masses(atoms2%elnum)
@@ -125,16 +127,18 @@ subroutine atormsd_calculate(                                        &
       allocate (weights2(size(atoms2)), source=1.0_rk)
    end if
 
-   ! --- coordinates (mirror if requested) ---
+   ! Get mol1 coordinates
    coords1 = get_coords(atoms1)
+
+   ! Get mol2 coordinates
    if (mirror_flag) then
       coords2 = get_mirrored_coords(atoms2)
    else
       coords2 = get_coords(atoms2)
    end if
 
-   ! --- alignment / RMSD ---
    if (align_flag) then
+
       center1 = get_centroid(atomset1, atoms1, weights1)
       center2 = get_centroid(atomset2, atoms2, weights2)
       call translate_coords(coords2, center1 - center2)
@@ -142,44 +146,69 @@ subroutine atormsd_calculate(                                        &
       coords1w = get_weighted_coords(atoms1, weights1, center1)
       coords2w = get_weighted_coords(atoms2, weights2, center2)
 
-      if (remap_flag) then
-         call prune_procedure(atomtypes, coords1, coords2, prunes)
+   else
+
+      coords1w = get_weighted_coords(atoms1, weights1)
+      coords2w = get_weighted_coords(atoms2, weights2)
+
+   end if
+
+   if (remap_flag) then
+
+      call prune_procedure(atomtypes, coords1, coords2, prunes)
+
+      if (align_flag) then
+
          call allocate_registry(registry, num_records)
          call optimize_atomperm_atoms(atomset1, atomset2, atomtypes, prunes, &
                coords1w, coords2w, conv_freq, max_trials, registry, error_code)
          if (error_code /= 0) then
-            c_error_code = error_code;  return
+            c_error_code = error_code
+            return
          end if
+
          if (print_stats) call print_records(registry)
+
          atomperm1 = registry%records(1)%atomperm1
+         rotquat = least_rotquat(atomset1, atomperm1, coords1w, coords2w)
+         coords2r = rotated_coords(coords2, rotquat, center1)
+         rmsd = sqrt(sqdistmean(atomset1, atomperm1, weights1, coords1, coords2r))
+         call build_homogeneous_transform(rotquat, center1, center2, c_transform)
+
       else
-         if (any(atomtypes%itemdir1 /= atomtypes%itemdir2)) then
-            c_error_code = 2;  return
-         end if
-         call init_identity_permutation( size(atoms1), atomperm1)
-      end if
 
-      rotquat = least_rotquat(atomset1, atomperm1, coords1w, coords2w)
-      coords2r = rotated_coords(coords2, rotquat, center1)
-      rmsd = sqrt(sqdistmean(atomset1, atomperm1, weights1, coords1, coords2r))
-      call build_homogeneous_transform(rotquat, center1, center2, c_transform)
-   else
-      coords1w = get_weighted_coords(atoms1, weights1)
-      coords2w = get_weighted_coords(atoms2, weights2)
-
-      if (remap_flag) then
-         call prune_procedure(atomtypes, coords1, coords2, prunes)
          call assign_atoms_pruned(atomtypes, coords1w, coords2w, prunes, atomperm1, error_code)
          if (error_code /= 0) then
-            c_error_code = error_code;  return
+            c_error_code = error_code
+            return
          end if
-      else
-         if (any(atomtypes%itemdir1 /= atomtypes%itemdir2)) then
-            c_error_code = 2;  return
-         end if
-         call init_identity_permutation( size(atoms1), atomperm1)
+
+         coords2r = coords2
+         rmsd = sqrt(sqdistmean(atomset1, atomperm1, weights1, coords1, coords2r))
+
       end if
-      rmsd = sqrt(sqdistmean(atomset1, atomperm1, weights1, coords1, coords2))
+
+   else
+
+      ! Maintain input atom order
+      call init_array(atomperm1, size(atoms1), identity)
+
+      ! Abort if atoms do not match
+      if (any(atomtypes%itemdir1 /= atomtypes%itemdir2)) then
+         c_error_code = 2
+         return
+      end if
+
+      if (align_flag) then
+         rotquat = least_rotquat(atomset1, atomperm1, coords1w, coords2w)
+         coords2r = rotated_coords(coords2, rotquat, center1)
+         call build_homogeneous_transform(rotquat, center1, center2, c_transform)
+      else
+         coords2r = coords2
+      end if
+
+      rmsd = sqrt(sqdistmean(atomset1, atomperm1, weights1, coords1, coords2r))
+
    end if
 
    c_rmsd   = rmsd
