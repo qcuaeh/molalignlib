@@ -57,15 +57,45 @@ Building from Source
 ```bash
 git clone -b devel https://github.com/qcuaeh/molalignlib.git
 cd molalignlib
-mkdir build && cd build
-cmake ..
-make
+cmake -B build
+make -C build
+make -C build install
 ```
 
-After a successful build the following are available inside `build/fortran`:
+By default, `install` places files under the system prefix (`/usr/local` on Linux/macOS), which typically requires `sudo`:
+
+```bash
+sudo make -C build install
+```
+
+### User-local install
+
+To install without root privileges, set `CMAKE_INSTALL_PREFIX` at configure time to a directory you own, e.g. `~/.local`:
+
+```bash
+cmake -B build -DCMAKE_INSTALL_PREFIX=$HOME/.local
+make -C build
+make -C build install
+```
+
+This installs:
+
+| Artifact | Destination |
+|----------|-------------|
+| `atormsd`, `conformsd` | `$HOME/.local/bin` |
+| `libmolalignlib.a` | `$HOME/.local/lib` |
+| `atormsd.h`, `conformsd.h` | `$HOME/.local/include/molalignlib` |
+
+Make sure `$HOME/.local/bin` is on your `PATH` to run the installed executables directly:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+After a successful build (before installing), the following are also available directly inside `build/fortran`:
 
 | Artifact | Description |
-|----------|-------------|
+|----------|--------------|
 | **atormsd** | Standalone cluster RMSD program |
 | **conformsd** | Standalone conformer RMSD program |
 | **libmolalignlib.a** | C binding static library |
@@ -151,7 +181,7 @@ conformsd file1 file2 [options]
 | &#8211;heavy | | Ignore hydrogen atoms |
 | &#8211;mass | | Use mass-weighted coordinates |
 | &#8211;mirror | | Reflect molecule 2 before comparison |
-| &#8211;bond | | Derive bond connectivity from interatomic distances instead of the file's bond table |
+| &#8211;bond | TOL | Derive bond connectivity from interatomic distances instead of the file's bond table, using detection tolerance *TOL* |
 | &#8211;exhaustive | | Force exhaustive orientation-independent search regardless of assignment tree topology |
 | &#8211;stochastic | | Force stochastic fixed-orientation search regardless of assignment tree topology |
 | &#8211;stats | | Print detailed optimisation statistics |
@@ -166,7 +196,7 @@ conformsd file1 file2 [options]
 conformsd conf1.sdf conf2.sdf -align -remap
 
 # Derive connectivity from geometry (useful for XYZ input)
-conformsd conf1.xyz conf2.xyz -align -remap -bond
+conformsd conf1.xyz conf2.xyz -align -remap -bond 0.4
 
 # Heavy atoms only, exhaustive search
 conformsd conf1.sdf conf2.sdf -align -remap -heavy -exhaustive
@@ -316,8 +346,8 @@ void conformsd_calculate(
     int n_atoms2, const int *atom_data2, const double *coords2,
     int n_bonds2, const int *bond_data2,
     bool align_flag, bool remap_flag, bool heavy_flag, bool mass_flag,
-    bool mirror_flag, bool label_flag, bool bond_flag,
-    bool print_stats, bool random_flag,
+    bool mirror_flag, bool label_flag, bool bond_flag, double bond_tol,
+    bool print_stats, bool print_assigntree, bool random_flag,
     int conv_freq, int max_trials,
     double *rmsd, int *natoms, int *atomperm,
     double *transform, int *error_code);
@@ -331,7 +361,9 @@ Bond data is passed as a flat `int` array of length `n_bonds * 3`, packed as:
 
 Atom indices are **1-based**. When `bond_flag = true` the library derives
 connectivity from atomic geometry and the bond arrays may be empty
-(`n_bonds = 0`, `bond_data = NULL`).
+(`n_bonds = 0`, `bond_data = NULL`). In that case `bond_tol` (bond detection
+tolerance) has no default and must be supplied; it is ignored when
+`bond_flag = false`.
 
 #### Parameters
 
@@ -347,14 +379,16 @@ connectivity from atomic geometry and the bond arrays may be empty
 | **coords2** | in | Coordinates for molecule 2, length `n_atoms2*3` |
 | **n_bonds2** | in | Number of bonds in molecule 2 |
 | **bond_data2** | in | Flat bond array for molecule 2, length `n_bonds2*3` |
-| **align_flag** | in | Enable structural alignment |
-| **remap_flag** | in | Enable atom remapping |
+| **align_flag** | in | Enable structural alignment (default `false` in the Python/Cython wrapper) |
+| **remap_flag** | in | Enable atom remapping (default `false` in the Python/Cython wrapper) |
 | **heavy_flag** | in | Use only heavy (non-hydrogen) atoms |
 | **mass_flag** | in | Weight atoms by atomic mass |
 | **mirror_flag** | in | Mirror molecule 2 before comparison |
 | **label_flag** | in | Use atom labels for type matching |
 | **bond_flag** | in | Derive connectivity from geometry (ignores bond arrays) |
+| **bond_tol** | in | Bond detection tolerance; required when `bond_flag = true`, ignored otherwise (no default) |
 | **print_stats** | in | Print optimisation statistics to stdout |
+| **print_assigntree** | in | Print the internal assignment tree |
 | **random_flag** | in | Seed RNG from system clock |
 | **conv_freq** | in | Convergence frequency threshold |
 | **max_trials** | in | Maximum number of optimisation trials |
@@ -362,7 +396,7 @@ connectivity from atomic geometry and the bond arrays may be empty
 | **natoms** | out | Number of elements written to `atomperm` |
 | **atomperm** | out | Atom permutation, **0-based**; caller must allocate ≥ `natoms` elements |
 | **transform** | out | 4 × 4 homogeneous transform (row-major, 16 doubles) |
-| **error_code** | out | `0` = success; `1` = not isomers; `2` = missing bonds; `3` = atom type mismatch |
+| **error_code** | out | `0` = success; `1` = not isomers; `2` = atom type mismatch; `3` = missing bonds; `4` = bond connectivity mismatch (only possible when `remap_flag = false`). Numbered to match `atormsd_calculate` where applicable. |
 
 #### Minimal example
 
@@ -394,8 +428,9 @@ int main(void)
         4, ad2, xy2, 3, bd2,
         /*align=*/true, /*remap=*/true,
         /*heavy=*/false, /*mass=*/false,
-        /*mirror=*/false, /*label=*/false, /*bond_flag=*/false,
-        /*stats=*/false, /*random=*/false,
+        /*mirror=*/false, /*label=*/false,
+        /*bond_flag=*/false, /*bond_tol=*/0.0,
+        /*stats=*/false, /*print_assigntree=*/false, /*random=*/false,
         /*conv_freq=*/100, /*max_trials=*/10000,
         &rmsd, &natoms, atomperm, transform, &error_code);
 
@@ -468,8 +503,8 @@ mol0, mol1 = read_clusters("trajectory.xyz", frames=(0, 1))
 
 ```python
 result = mol0.rmsd_to(mol1,
-    align=True,
-    remap=True,
+    align=True,       # default: False
+    remap=True,       # default: False
     heavy_only=False,
     mass_weighted=False,
     mirror=False,
@@ -520,13 +555,14 @@ c0, c1 = read_conformers("poses.sdf", frames=(0, 1))
 
 ```python
 result = c0.rmsd_to(c1,
-    align=True,
-    remap=True,
+    align=True,        # default: False
+    remap=True,        # default: False
     heavy_only=False,
     mass_weighted=False,
     mirror=False,
     use_labels=False,
     bond_flag=False,   # True → derive bonds from geometry
+    bond_tol=None,     # required (float), no default, when bond_flag=True
     stats=False,
     random=False,
     conv_freq=100,

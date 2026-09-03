@@ -247,8 +247,8 @@ class AtomCluster(object):
     def rmsd_to(
         self,
         other,
-        align=True,
-        remap=True,
+        align=False,
+        remap=False,
         heavy_only=False,
         mass_weighted=False,
         mirror=False,
@@ -348,13 +348,14 @@ class Conformer(object):
     def rmsd_to(
         self,
         other,
-        align=True,
-        remap=True,
+        align=False,
+        remap=False,
         heavy_only=False,
         mass_weighted=False,
         mirror=False,
         use_labels=False,
         bond_flag=False,
+        bond_tol=None,
         stats=False,
         random=False,
         conv_freq=100,
@@ -362,6 +363,10 @@ class Conformer(object):
     ):
         if not isinstance(other, Conformer):
             raise TypeError("Expected Conformer, got {}".format(type(other).__name__))
+
+        # bond_tol has no default: it is required whenever bond_flag=True.
+        if bond_flag and bond_tol is None:
+            raise ValueError("bond_tol is required when bond_flag=True")
 
         rmsd_val, perm, tf = conformsd.calculate(
             self._atom_data, self._coords,
@@ -375,6 +380,7 @@ class Conformer(object):
             mirror_flag=mirror,
             label_flag=use_labels,
             bond_flag=bond_flag,
+            bond_tol=bond_tol,
             print_stats=stats,
             random_flag=random,
             conv_freq=conv_freq,

@@ -25,13 +25,22 @@ contains
 !   n_bonds1/2     : number of bonds (may be 0 when bond_flag=1, i.e. derive from geometry)
 !   c_bond_data1/2 : flat bond array, length n_bonds*3, layout: [atom1, atom2, type, ...]
 !                    (1-based atom indices as in the original file)
+!   c_bond_tol     : bond detection tolerance (only used, and required, when
+!                    c_bond_flag is true; no default)
+!
+! c_error_code values (numbered to match atormsd_calculate where applicable):
+!   0 = success
+!   1 = not isomers
+!   2 = atom type mismatch
+!   3 = missing bonds
+!   4 = bond connectivity mismatch (only possible when c_remap_flag is false)
 subroutine conformsd_calculate(                                              &
       n_atoms1,  c_atom_data1,  c_coords1,                                    &
       n_bonds1,  c_bond_data1,                                                  &
       n_atoms2,  c_atom_data2,  c_coords2,                                    &
       n_bonds2,  c_bond_data2,                                                  &
       c_align_flag, c_remap_flag, c_heavy_flag, c_mass_flag,                &
-      c_mirror_flag, c_label_flag, c_bond_flag,                             &
+      c_mirror_flag, c_label_flag, c_bond_flag, c_bond_tol,                 &
       c_print_stats, c_print_assigntree, c_random_flag,                      &
       c_conv_freq, c_max_trials,                                           &
       c_rmsd, c_natoms, c_atomperm, c_transform, c_error_code)              &
@@ -54,6 +63,7 @@ subroutine conformsd_calculate(                                              &
    ! Flags
    logical(lk), intent(in), value :: c_align_flag, c_remap_flag, c_heavy_flag, c_mass_flag
    logical(lk), intent(in), value :: c_mirror_flag, c_label_flag, c_bond_flag
+   real(rk),    intent(in), value :: c_bond_tol
    logical(lk), intent(in), value :: c_print_stats, c_print_assigntree, c_random_flag
    integer(ik), intent(in), value :: c_conv_freq, c_max_trials
 
@@ -88,6 +98,7 @@ subroutine conformsd_calculate(                                              &
    mirror_flag      = c_mirror_flag
    label_flag       = c_label_flag
    bond_flag        = c_bond_flag
+   bond_tol         = c_bond_tol
    random_flag      = c_random_flag
    print_stats      = c_print_stats
    print_assigntree = c_print_assigntree
@@ -131,7 +142,7 @@ subroutine conformsd_calculate(                                              &
 
    ! Abort if either molecule has no bonds
    if (size(bonds1) < 1 .or. size(bonds2) < 1) then
-      c_error_code = 2
+      c_error_code = 3
       return
    end if
 
@@ -206,7 +217,7 @@ subroutine conformsd_calculate(                                              &
 
       ! Abort if atoms do not match
       if (any(atomtypes%itemdir1 /= atomtypes%itemdir2)) then
-         c_error_code = 3
+         c_error_code = 2
          return
       end if
 

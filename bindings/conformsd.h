@@ -33,6 +33,8 @@ extern "C" {
  * @param mirror_flag   Mirror second molecule
  * @param label_flag    Use atom type labels for matching
  * @param bond_flag     Derive connectivity from geometry, not bond table
+ * @param bond_tol      Bond detection tolerance for geometry-based connectivity.
+ *                      Required (no default) when bond_flag=true; unused otherwise.
  * @param print_stats    Print optimisation statistics
  * @param print_assigntree Print the atom-assignment search tree
  * @param random_flag   Use random algorithm
@@ -45,8 +47,10 @@ extern "C" {
  * @param transform     [out] Row-major 4x4 homogeneous transform (16 doubles).
  *                            Maps molecule-2 coords to molecule-1 frame:
  *                            p_out = R*p_in + t. Identity when align_flag=false.
- * @param error_code    [out] 0=success, 1=not isomers, 2=missing bonds,
- *                            3=atom types mismatch
+ * @param error_code    [out] 0=success, 1=not isomers, 2=atom type mismatch,
+ *                            3=missing bonds, 4=bond connectivity mismatch
+ *                            (only possible when remap_flag=false). Numbered
+ *                            to match atormsd_calculate where applicable.
  */
 void conformsd_calculate(
     int n_atoms1, const int *atom_data1, const double *coords1,
@@ -54,7 +58,7 @@ void conformsd_calculate(
     int n_atoms2, const int *atom_data2, const double *coords2,
     int n_bonds2, const int *bond_data2,
     bool align_flag, bool remap_flag, bool heavy_flag, bool mass_flag,
-    bool mirror_flag, bool label_flag, bool bond_flag,
+    bool mirror_flag, bool label_flag, bool bond_flag, double bond_tol,
     bool print_stats, bool print_assigntree, bool random_flag,
     int conv_freq, int max_trials,
     double *rmsd, int *natoms, int *atomperm,

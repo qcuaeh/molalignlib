@@ -14,7 +14,7 @@ cdef extern from "conformsd.h":
         int n_atoms2, const int *atom_data2, const double *coords2,
         int n_bonds2, const int *bond_data2,
         bint align_flag, bint remap_flag, bint heavy_flag, bint mass_flag,
-        bint mirror_flag, bint label_flag, bint bond_flag,
+        bint mirror_flag, bint label_flag, bint bond_flag, double bond_tol,
         bint print_stats, bint print_assigntree, bint random_flag,
         int conv_freq, int max_trials,
         double *rmsd, int *natoms, int *atomperm,
@@ -23,8 +23,10 @@ cdef extern from "conformsd.h":
 
 _ERROR_MESSAGES = {
     1: "Molecules are not isomers (different atom counts or compositions).",
-    2: "Missing bond data for one or both conformers.",
-    3: "Atom types mismatch between the two conformers.",
+    2: "Atom type mismatch between the two conformers.",
+    3: "Missing bond data for one or both conformers.",
+    4: "Bond connectivity mismatch between the two conformers (only raised "
+       "when remap_flag=False).",
 }
 
 # Sentinel used by rmsd.py when bond_flag=True (geometry-derived connectivity).
@@ -38,13 +40,14 @@ def calculate(
     np.ndarray[np.float64_t, ndim=2] coords2,
     bond_data1                        = None,
     bond_data2                        = None,
-    bint align_flag    = True,
-    bint remap_flag    = True,
+    bint align_flag    = False,
+    bint remap_flag    = False,
     bint heavy_flag    = False,
     bint mass_flag     = False,
     bint mirror_flag   = False,
     bint label_flag    = False,
     bint bond_flag     = False,
+    bond_tol                          = None,
     bint print_stats    = False,
     bint print_assigntree = False,
     bint random_flag   = False,
@@ -64,6 +67,12 @@ def calculate(
         ``[[a1, a2, bond_type], ...]`` (1-based atom indices).
         Pass ``None`` (or omit) when ``bond_flag=True``; in that case the
         library derives connectivity from geometry.
+    bond_tol : float, required when bond_flag=True
+        Bond detection tolerance for geometry-based connectivity. Has no
+        default and is ignored when bond_flag=False.
+    align_flag, remap_flag : bool
+        Both default to ``False``: by default no structural alignment or
+        atom remapping is performed.
     print_assigntree : bool
         Print the atom-assignment search tree during optimisation.
     (remaining keyword arguments map 1-to-1 onto the C flags)
@@ -109,6 +118,15 @@ def calculate(
     cdef int nb1 = bd1.shape[0]
     cdef int nb2 = bd2.shape[0]
 
+    # bond_tol has no default: it is required (and only used) when
+    # bond_flag=True, since that is what triggers geometry-based bond
+    # perception inside the library.
+    cdef double c_bond_tol = 0.0
+    if bond_flag:
+        if bond_tol is None:
+            raise ValueError("bond_tol is required when bond_flag=True")
+        c_bond_tol = <double>bond_tol
+
     # ------------------------------------------------------------------ #
     # Output buffers                                                       #
     # ------------------------------------------------------------------ #
@@ -138,7 +156,7 @@ def calculate(
             nb2,
             <const int    *>bd2.data,
             align_flag, remap_flag, heavy_flag, mass_flag,
-            mirror_flag, label_flag, bond_flag,
+            mirror_flag, label_flag, bond_flag, c_bond_tol,
             print_stats, print_assigntree, random_flag,
             conv_freq, max_trials,
             &rmsd_val, &natoms, atomperm,

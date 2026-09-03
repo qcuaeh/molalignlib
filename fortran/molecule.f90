@@ -100,34 +100,36 @@ subroutine bonds_from_atoms(atoms, bonds)
    type(bond_t), dimension(:), allocatable, intent(out) :: bonds
    ! Local variables
    integer(ik) :: i, j, n_atoms, n_bonds
-   real(rk), allocatable :: atom_radii(:)
    real(rk) :: atom_dist
+   real(rk), dimension(:), allocatable :: atom_radii
+   logical(lk), dimension(:,:), allocatable :: is_bonded
 
    n_atoms = size(atoms)
+   allocate (is_bonded(n_atoms, n_atoms))
+   is_bonded = .FALSE.
 
    ! Set atom radii
-   atom_radii = 1.2*covalent_radii(atoms%elnum)
+   atom_radii = covalent_radii(atoms%elnum)
 
-   ! First pass: count bonds
-   n_bonds = 0
+   ! Single pass: compute distances once, cache result in matrix
    do i = 1, n_atoms
       do j = i + 1, n_atoms
          atom_dist = sqrt(sum((atoms(i)%coords - atoms(j)%coords)**2))
-         if (atom_dist < atom_radii(i) + atom_radii(j)) then
-            n_bonds = n_bonds + 1
-         end if
+         is_bonded(i, j) = atom_dist < atom_radii(i) + atom_radii(j) + bond_tol
       end do
    end do
 
-   ! Allocate bonds array with exact size
-   allocate(bonds(n_bonds))
+   ! Count bonds from cached matrix (cheap, no distance calc)
+   n_bonds = count(is_bonded)
 
-   ! Second pass: populate bonds
+   ! Allocate bonds array with exact size
+   allocate (bonds(n_bonds))
+
+   ! Populate bonds from cached matrix
    n_bonds = 0
    do i = 1, n_atoms
       do j = i + 1, n_atoms
-         atom_dist = sqrt(sum((atoms(i)%coords - atoms(j)%coords)**2))
-         if (atom_dist < atom_radii(i) + atom_radii(j)) then
+         if (is_bonded(i, j)) then
             n_bonds = n_bonds + 1
             bonds(n_bonds)%atomidx1 = i
             bonds(n_bonds)%atomidx2 = j
@@ -135,6 +137,8 @@ subroutine bonds_from_atoms(atoms, bonds)
          end if
       end do
    end do
+
+   deallocate (is_bonded)
 end subroutine
 
 subroutine adjacency_from_bonds(atomset, atoms, bonds, adjcs)

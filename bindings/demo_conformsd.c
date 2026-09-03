@@ -4,6 +4,8 @@
  * Reads XYZ files and passes coordinate/element arrays to the Fortran library.
  * Because XYZ carries no bond table, bond_flag is set to true so that
  * connectivity is derived from atomic geometry inside the library.
+ * -bond TOL (bond detection tolerance) has no default, so it must always be
+ * supplied on the command line for this demo.
  *
  * Compile:
  *   gcc demo_conformsd.c -o demo_conformsd -lm -lgfortran -lmolalignlib
@@ -18,6 +20,7 @@
 enum {
     OPT_ALIGN = 1, OPT_REMAP, OPT_HEAVY, OPT_MASS,
     OPT_MIRROR, OPT_LABEL,
+    OPT_BOND,
     OPT_ASSIGNMENT, OPT_PRINTTRANS,
     OPT_STATS, OPT_ASSIGNTREE, OPT_RANDOM,
     OPT_FREQ, OPT_TRIALS,
@@ -31,6 +34,7 @@ static const long_opt_t long_options[] = {
     {"mass",            0, OPT_MASS},
     {"mirror",          0, OPT_MIRROR},
     {"label",           0, OPT_LABEL},
+    {"bond",            1, OPT_BOND},
     {"stats",           0, OPT_STATS},
     {"assigntree",      0, OPT_ASSIGNTREE},
     {"random",          0, OPT_RANDOM},
@@ -49,6 +53,7 @@ static const opt_info_t opt_info[] = {
     [OPT_MASS]            = {"Weight atoms by their atomic masses",                NULL },
     [OPT_MIRROR]          = {"Mirror the second molecule",                         NULL },
     [OPT_LABEL]           = {"Use atom labels for matching",                       NULL },
+    [OPT_BOND]            = {"Bond detection tolerance (required, no default)", "TOL" },
     [OPT_STATS]           = {"Print optimisation statistics",                      NULL },
     [OPT_ASSIGNTREE]      = {"Print the atom-assignment search tree",              NULL },
     [OPT_RANDOM]          = {"Use random algorithm",                               NULL },
@@ -77,6 +82,8 @@ int main(int argc, char **argv)
     bool print_assignment = false, print_transform = false;
     bool print_stats = false, print_assigntree = false, random_flag = false;
     int conv_freq = 100, max_trials = 10000;
+    double bond_tol = 0.0;
+    bool bond_set = false;
     int argi = 1, opt;
 
     /* positional arguments collected during the parse loop */
@@ -102,6 +109,7 @@ int main(int argc, char **argv)
         case OPT_MASS:            mass_flag       = true;         break;
         case OPT_MIRROR:          mirror_flag     = true;         break;
         case OPT_LABEL:           label_flag      = true;         break;
+        case OPT_BOND:            bond_tol        = atof(optarg); bond_set = true; break;
         case OPT_STATS:           print_stats     = true;         break;
         case OPT_ASSIGNTREE:      print_assigntree = true;        break;
         case OPT_RANDOM:          random_flag     = true;         break;
@@ -119,6 +127,15 @@ int main(int argc, char **argv)
         fprintf(stderr, "Error: expected exactly two XYZ file arguments\n");
         print_usage(argv[0]); return 1;
     }
+
+    /* XYZ carries no bond table, so this demo always derives connectivity
+     * from geometry (bond_flag=true, see below). bond_tol has no default
+     * and is therefore mandatory whenever bond_flag is true. */
+    if (!bond_set) {
+        fprintf(stderr, "Error: -bond TOL is required (no default value)\n");
+        print_usage(argv[0]); return 1;
+    }
+
     const char *file1 = posargs[0];
     const char *file2 = posargs[1];
 
@@ -137,7 +154,7 @@ int main(int argc, char **argv)
         n1, atom_data1, coords1, /*n_bonds1=*/0, /*bond_data1=*/NULL,
         n2, atom_data2, coords2, /*n_bonds2=*/0, /*bond_data2=*/NULL,
         align_flag, remap_flag, heavy_flag, mass_flag,
-        mirror_flag, label_flag, /*bond_flag=*/true,
+        mirror_flag, label_flag, /*bond_flag=*/true, bond_tol,
         print_stats, print_assigntree, random_flag,
         conv_freq, max_trials,
         &rmsd, &natoms, atomperm,
@@ -146,8 +163,9 @@ int main(int argc, char **argv)
     if (error_code != 0) {
         switch (error_code) {
         case 1: fprintf(stderr, "Error: molecules are not isomers\n");  break;
-        case 2: fprintf(stderr, "Error: molecules have no bonds\n");    break;
-        case 3: fprintf(stderr, "Error: atom types do not match\n");    break;
+        case 2: fprintf(stderr, "Error: atom types do not match\n");    break;
+        case 3: fprintf(stderr, "Error: molecules have no bonds\n");    break;
+        case 4: fprintf(stderr, "Error: molecules have different bond connectivity\n"); break;
         default: fprintf(stderr, "Error: error code %d\n", error_code); break;
         }
         free(atom_data1); free(coords1);
