@@ -106,7 +106,7 @@ subroutine bonds_from_atoms(atoms, bonds)
    n_atoms = size(atoms)
 
    ! Set atom radii
-   atom_radii = 1.2*covalent_radii(atoms%elnum)
+   atom_radii = bond_tol*covalent_radii(atoms%elnum)
 
    ! First pass: count bonds
    n_bonds = 0

@@ -21,6 +21,7 @@ implicit none
 
 integer(ik), parameter :: symlen = 3 ! Symbol length
 integer(ik), parameter :: num_elems = 105
+real(rk) :: bond_tol
 
 ! Element symbols
 character(symlen), parameter :: atomic_symbols(num_elems) = [ &
@@ -133,7 +134,7 @@ character(symlen), parameter :: atomic_symbols(num_elems) = [ &
 
 ! Standard atomic masses
 ! Source: mendeleev Python library
-real(rk), target :: atomic_masses(num_elems) = [ &
+real(rk), parameter :: atomic_masses(num_elems) = [ &
 1.0, &  ! H
 4.0, &  ! He
 6.9, &  ! Li

@@ -85,6 +85,7 @@ do while (get_arg(arg))
    select case (lowercase(arg))
    case ('-bond')
       bond_flag = .TRUE.
+      call read_optarg(arg, bond_tol)
    case ('-align')
       align_flag = .TRUE.
    case ('-remap')
