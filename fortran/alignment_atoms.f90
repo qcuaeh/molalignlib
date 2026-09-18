@@ -21,7 +21,7 @@ use chemdata
 use permutation
 use euclidean
 use assignment_atoms
-use types_linked
+use linked_list_types
 use refinement
 use pruning_atoms
 use recording

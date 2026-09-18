@@ -16,13 +16,13 @@
 
 module refinement
 use parameters
-use types_basic
+use common_types
 use random
 use chemdata
 use adjacency
 use molecule
-use types_linked
-use types_indexed
+use linked_list_types
+use indexed_list_types
 use flags
 implicit none
 private

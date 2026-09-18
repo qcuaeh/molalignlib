@@ -2,6 +2,18 @@
 shopt -s nullglob
 unalias -a
 
+compile_module() {
+   filename=$1
+   srcfile=$srcdir/$filename
+   objfile=$blddir/${filename%.*}.o
+   if ! test -e "$objfile" || test "$srcfile" -nt "$objfile"
+   then
+      echo Compiling $filename...
+      "$FC" "${comp_flags[@]}" -J "$blddir" -c "$srcfile" -o "$objfile"
+   fi
+   object_files+=("$objfile")
+}
+
 build_library() {
    if $full_build; then
       full_build=false
@@ -21,16 +33,11 @@ build_library() {
    else
       comp_flags+=("${build_flags[@]}")
    fi
+   # Compile the kinds module first since every other module depends on it
+   compile_module "$kinds_module"
    while read -r filename; do
-      srcfile=$srcdir/$filename
-      objfile=$blddir/${filename%.*}.o
-      if ! test -e "$objfile" || test "$srcfile" -nt "$objfile"
-      then
-         echo Compiling $filename...
-         "$FC" "${comp_flags[@]}" -J "$blddir" -c "$srcfile" -o "$objfile"
-      fi
-      object_files+=("$objfile")
-   done < <(grep -Ehv '^$|^#' "$srcdir/fortran_modules.txt")
+      compile_module "$filename"
+   done < <(grep -Ehv '^$|^#' "$srcdir/modules.txt")
 }
 
 build_programs() {
@@ -39,11 +46,15 @@ build_programs() {
       execfile=$blddir/$progname
       echo Building program $progname...
       "$FC" "$srcfile" "${object_files[@]}" -o "$execfile" "${comp_flags[@]}" "${link_flags[@]}" -J "$blddir"
-   done < <(grep -Ehv '^$|^#' "$srcdir/fortran_programs.txt")
+   done < <(grep -Ehv '^$|^#' "$srcdir/programs.txt")
 }
 
-blddir=$PWD/build/fortran
-srcdir=$PWD/fortran
+srcdir=$PWD
+blddir=$PWD/build
+
+# make.sh builds the standalone Fortran programs (no C bindings needed),
+# so it uses the plain-Fortran kinds module.
+kinds_module=kinds_iso_fortran.f90
 
 if test ! -e "$blddir"; then
    mkdir -p "$blddir"

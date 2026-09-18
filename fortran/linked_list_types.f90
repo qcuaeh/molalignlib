@@ -14,9 +14,9 @@
 ! You should have received a copy of the GNU General Public License
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-module types_linked
+module linked_list_types
 use parameters
-use types_basic
+use common_types
 implicit none
 private
 ! Public procedures

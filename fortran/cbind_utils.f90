@@ -1,4 +1,4 @@
-module c_binding_utils
+module cbind_utils
    use parameters   ! ik == c_int, rk == c_double - no iso_c_binding needed
    use molecule
    use euclidean
@@ -102,4 +102,4 @@ subroutine set_identity_transform(htrans)
    htrans(11) = 1.0_rk;  htrans(16) = 1.0_rk
 end subroutine set_identity_transform
 
-end module c_binding_utils
+end module cbind_utils

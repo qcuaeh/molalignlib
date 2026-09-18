@@ -17,10 +17,10 @@
 module assignment_conformer
 use parameters
 use random
-use types_basic
+use common_types
 use permutation
 use euclidean
-use types_indexed
+use indexed_list_types
 implicit none
 private
 public assign_atoms_greedy

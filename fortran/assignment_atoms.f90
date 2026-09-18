@@ -17,7 +17,7 @@
 module assignment_atoms
 use parameters
 use flags
-use types_basic
+use common_types
 use permutation
 use lap_jv_sparse
 use lap_hungarian

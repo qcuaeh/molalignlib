@@ -1,38 +1,82 @@
 set(FORTRAN_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
-# ---------------------------------------------------------------------------
-# Helper: read a source-list file, strip blank lines and comments,
-# and prepend the Fortran directory to each entry.
-# ---------------------------------------------------------------------------
-function(read_source_list filename out_var)
-    file(STRINGS ${CMAKE_CURRENT_SOURCE_DIR}/${filename} _lines)
-    set(_sources "")
-    foreach(line ${_lines})
-        string(REGEX MATCH "^#" _comment "${line}")
-        if(NOT _comment)
-            string(STRIP "${line}" line)
-            if(line)
-                list(APPEND _sources ${FORTRAN_SRC_DIR}/${line})
-            endif()
-        endif()
-    endforeach()
-    set(${out_var} "${_sources}" PARENT_SCOPE)
-endfunction()
+# molalignlib is consumed by the C/Cython bindings, so it needs the
+# ISO-C-compatible kinds module.
+set(KINDS_MODULE kinds_iso_c.f90)
 
 # ---------------------------------------------------------------------------
-# Collect sources
+# Helper: append one module (by filename, relative to FORTRAN_SRC_DIR)
+# to a source list variable. A macro runs in the caller's scope, so it
+# can update out_var directly with no PARENT_SCOPE plumbing needed.
 # ---------------------------------------------------------------------------
-read_source_list(library_modules.txt LIB_SOURCES)
+macro(add_module_source out_var filename)
+    list(APPEND ${out_var} ${FORTRAN_SRC_DIR}/${filename})
+endmacro()
+
+# ---------------------------------------------------------------------------
+# Collect sources: the kinds module first, then the rest of modules.txt,
+# then clibs.txt (one bare filename per line, same as modules.txt — just
+# the C-binding sources such as clib_atormsd.f90 and clib_conformsd.f90).
+# Blank lines and comments are stripped from both files as they're read.
+#
+# There is only one library target below, so both C bindings' Fortran
+# sources are compiled straight into it rather than into per-binding
+# static libraries; clibs.txt just keeps them listed separately from the
+# core modules for clarity, without needing a separate library per entry.
+# ---------------------------------------------------------------------------
+set(LIB_SOURCES "")
+add_module_source(LIB_SOURCES ${KINDS_MODULE})
+
+file(STRINGS ${CMAKE_CURRENT_SOURCE_DIR}/modules.txt _module_lines)
+foreach(line ${_module_lines})
+    string(REGEX MATCH "^#" _comment "${line}")
+    if(NOT _comment)
+        string(STRIP "${line}" line)
+        if(line)
+            add_module_source(LIB_SOURCES ${line})
+        endif()
+    endif()
+endforeach()
+
+file(STRINGS ${CMAKE_CURRENT_SOURCE_DIR}/clibs.txt _clib_lines)
+foreach(line ${_clib_lines})
+    string(REGEX MATCH "^#" _comment "${line}")
+    if(NOT _comment)
+        string(STRIP "${line}" line)
+        if(line)
+            add_module_source(LIB_SOURCES ${line})
+        endif()
+    endif()
+endforeach()
 
 # ---------------------------------------------------------------------------
 # Target: molalignlib
 #   Uses kinds_iso_c.f90 (for C bindings). Part of the default build.
-#   All module sources live here; programs link against this library so
-#   nothing is compiled twice.
+#   All module sources live here, including clib_atormsd.f90 and
+#   clib_conformsd.f90 — a single library, not one per binding. Programs
+#   below and the Cython extensions (see python/CMakeLists.txt) all link
+#   against this one target so nothing is compiled twice.
+#
+#   Symbol visibility defaults to hidden (-fvisibility=hidden, set
+#   globally in the top-level CMakeLists.txt). Each Cython extension
+#   still statically links this library independently, so each .so ends
+#   up with its own private copy of molalignlib's symbols; hidden
+#   visibility keeps those private copies out of the dynamic symbol
+#   table so they don't collide if both extensions are imported into the
+#   same Python process. This is unaffected by using one library instead
+#   of two, since visibility only governs the *dynamic* symbol table
+#   used when a .so is loaded, not which static library the objects came
+#   from.
 # ---------------------------------------------------------------------------
 add_library(molalignlib STATIC ${LIB_SOURCES})
 
+# OUTPUT_NAME is set explicitly because CMake would otherwise derive the
+# archive name from the target name itself (libmolalignlib.a). The CMake
+# target stays named "molalignlib" everywhere else in the build (programs,
+# the Cython extensions in python/CMakeLists.txt, install() below) — only
+# the file that lands on disk is renamed, to libmolalign.a.
 set_target_properties(molalignlib PROPERTIES
+    OUTPUT_NAME molalign
     POSITION_INDEPENDENT_CODE ON
     Fortran_MODULE_DIRECTORY  ${CMAKE_BINARY_DIR}/modules/molalignlib
 )
@@ -56,7 +100,7 @@ install(TARGETS molalignlib
 # ---------------------------------------------------------------------------
 if(NOT SKBUILD)
 
-    file(STRINGS ${CMAKE_CURRENT_SOURCE_DIR}/fortran_programs.txt _prog_lines)
+    file(STRINGS ${CMAKE_CURRENT_SOURCE_DIR}/programs.txt _prog_lines)
 
     foreach(line ${_prog_lines})
         string(REGEX MATCH "^#" _comment "${line}")

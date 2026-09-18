@@ -14,10 +14,10 @@
 ! You should have received a copy of the GNU General Public License
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-module types_indexed
+module indexed_list_types
 use parameters
-use types_basic
-use types_linked
+use common_types
+use linked_list_types
 use chemdata
 use adjacency
 implicit none

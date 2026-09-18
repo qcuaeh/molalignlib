@@ -15,6 +15,6 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module kinds
-! Native fortran kinds
+! Portable fortran kinds
 use, intrinsic :: iso_fortran_env, only: lk=>int8, ik=>int32, rk=>real64
 end module
