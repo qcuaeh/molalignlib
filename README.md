@@ -5,6 +5,11 @@ A high-performance library to compute optimal RMSD between atom clusters and sym
 
 MolAlignLib uses the Hierarchical Neighborhood of Atoms (HNA) partitioning to achieve exact, topologically valid atom assignments between conformers in milliseconds, even for highly symmetric molecules that are intractable by conventional graph-isomorphism approaches.
 
+### Try It Online
+
+You can try the Python API without any installation on Binder:
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qcuaeh/molalignlib.git/devel?urlpath=%2Fdoc%2Ftree%2Fpython%2Fexamples%2Fexamples.ipynb)
+
 
 Table of Contents
 -----------------
@@ -16,14 +21,14 @@ Table of Contents
 4. [C Binding](#c-binding)
    - [atormsd_calculate](#atormsd_calculate)
    - [conformsd_calculate](#conformsd_calculate)
+   - [Demo program](#demo-program)
 5. [Python API](#python-api)
    - [Installation](#installation)
-   - [AtomCluster](#atomcluster)
+   - [Atoms](#atoms)
    - [Conformer](#conformer)
    - [RMSDResult](#rmsdresult)
-     - [Retrieving multiple ranked solutions](#retrieving-multiple-ranked-solutions)
-   - [Examples](#examples)
-6. [Algorithm Notes](#algorithm-notes)
+6. [Runnable examples](#runnable-examples)
+7. [Algorithm Notes](#algorithm-notes)
 
 
 Overview
@@ -33,8 +38,8 @@ MolAlignLib exposes two distinct RMSD calculation modes:
 
 | Program | Function | When to use |
 |------|-------------------|-------------|
-| **atormsd** | atormsd_calculate | Unstructured atom clusters — no bond topology required |
-| **conformsd** | conformsd_calculate | Molecular conformers — bond topology guides atom matching via HNA partitioning |
+| **atormsd** | atormsd_calculate | Unstructured atom clusters (no bond topology required) |
+| **conformsd** | conformsd_calculate | Molecular conformers (bond topology guides atom matching via HNA partitioning) |
 
 Both modes support:
 - **Alignment** (`-align`): optimally rotate and translate one structure onto the other.
@@ -84,8 +89,8 @@ This installs:
 | Artifact | Destination |
 |----------|-------------|
 | `atormsd`, `conformsd` | `$HOME/.local/bin` |
-| `libmolalignlib.a` | `$HOME/.local/lib` |
-| `atormsd.h`, `conformsd.h` | `$HOME/.local/include/molalignlib` |
+| `libmolalign.a` | `$HOME/.local/lib` |
+| `molalign.h` | `$HOME/.local/include/molalignlib` |
 
 Make sure `$HOME/.local/bin` is on your `PATH` to run the installed executables directly:
 
@@ -99,7 +104,7 @@ After a successful build (before installing), the following are also available d
 |----------|--------------|
 | **atormsd** | Standalone cluster RMSD program |
 | **conformsd** | Standalone conformer RMSD program |
-| **libmolalignlib.a** | C binding static library |
+| **libmolalign.a** | Static library containing the core algorithms and both C bindings (`atormsd_calculate`, `conformsd_calculate`) |
 
 ### Python extension modules
 
@@ -121,20 +126,20 @@ atormsd file1 file2 [options]
 
 | Option | Argument | Description |
 |--------|----------|-------------|
-| &#8211;align | | Align atoms to minimise the RMSD |
-| &#8211;remap | | Remap atoms to minimise the RMSD |
-| &#8211;label | | Use atom labels to distinguish atom types |
-| &#8211;prune | TOL | Prune assignments with pair distances exceeding *TOL* Å |
-| &#8211;freq | N | Stop if the best solution is found *N* consecutive times |
-| &#8211;trials | N | Stop after at most *N* optimisation trials |
-| &#8211;records | N | Record the *N* lowest RMSDs found (default: 1) |
-| &#8211;assignment | | Print the optimised atom mapping to stdout |
-| &#8211;aligned | FILE | Write aligned coordinates of molecule 2 to *FILE* |
-| &#8211;heavy | | Ignore hydrogen atoms |
-| &#8211;mass | | Use mass-weighted coordinates |
-| &#8211;mirror | | Reflect molecule 2 before comparison |
-| &#8211;stats | | Print detailed optimisation statistics |
-| &#8211;random | | Seed the random-number generator from the system clock |
+| -align | | Align atoms to minimise the RMSD |
+| -remap | | Remap atoms to minimise the RMSD |
+| -label | | Use atom labels to distinguish atom types |
+| -prune | TOL | Enable pruning: discard assignments with pair distances exceeding *TOL* Å |
+| -freq | N | Stop if the best solution is found *N* consecutive times |
+| -trials | N | Stop after at most *N* optimisation trials |
+| -records | N | Record the *N* lowest RMSDs found (default: 1) |
+| -assignment | | Print the optimised atom mapping to stdout |
+| -aligned | FILE | Write aligned coordinates of molecule 2 to *FILE* |
+| -heavy | | Ignore hydrogen atoms |
+| -mass | | Use mass-weighted coordinates |
+| -mirror | | Reflect molecule 2 before comparison |
+| -stats | | Print detailed optimisation statistics |
+| -random | | Seed the random-number generator from the system clock |
 
 #### Examples
 
@@ -170,23 +175,23 @@ conformsd file1 file2 [options]
 
 | Option | Argument | Description |
 |--------|----------|-------------|
-| &#8211;align | | Align atoms to minimise the RMSD |
-| &#8211;remap | | Remap atoms to minimise the RMSD |
-| &#8211;label | | Use atom labels to distinguish atom types |
-| &#8211;freq | N | Stop if the best solution is found *N* consecutive times |
-| &#8211;trials | N | Stop after at most *N* optimisation trials |
-| &#8211;records | N | Record the *N* lowest RMSDs found (default: 1) |
-| &#8211;assignment | | Print the optimised atom mapping to stdout |
-| &#8211;assigntree | | Print the internal assignment tree |
-| &#8211;aligned | FILE | Write aligned coordinates of molecule 2 to *FILE* |
-| &#8211;heavy | | Ignore hydrogen atoms |
-| &#8211;mass | | Use mass-weighted coordinates |
-| &#8211;mirror | | Reflect molecule 2 before comparison |
-| &#8211;bond | TOL | Derive bond connectivity from interatomic distances instead of the file's bond table, using detection tolerance *TOL* |
-| &#8211;exhaustive | | Force exhaustive orientation-independent search regardless of assignment tree topology |
-| &#8211;stochastic | | Force stochastic fixed-orientation search regardless of assignment tree topology |
-| &#8211;stats | | Print detailed optimisation statistics |
-| &#8211;random | | Seed the random-number generator from the system clock |
+| -align | | Align atoms to minimise the RMSD |
+| -remap | | Remap atoms to minimise the RMSD |
+| -label | | Use atom labels to distinguish atom types |
+| -freq | N | Stop if the best solution is found *N* consecutive times |
+| -trials | N | Stop after at most *N* optimisation trials |
+| -records | N | Record the *N* lowest RMSDs found (default: 1) |
+| -assignment | | Print the optimised atom mapping to stdout |
+| -assigntree | | Print the internal assignment tree |
+| -aligned | FILE | Write aligned coordinates of molecule 2 to *FILE* |
+| -heavy | | Ignore hydrogen atoms |
+| -mass | | Use mass-weighted coordinates |
+| -mirror | | Reflect molecule 2 before comparison |
+| -bond | TOL | Derive bond connectivity from interatomic distances instead of the file's bond table, using detection tolerance *TOL* |
+| -exhaustive | | Force exhaustive orientation-independent search regardless of assignment tree topology |
+| -stochastic | | Force stochastic fixed-orientation search regardless of assignment tree topology |
+| -stats | | Print detailed optimisation statistics |
+| -random | | Seed the random-number generator from the system clock |
 
 `-exhaustive` and `-stochastic` are mutually exclusive. If neither is given, the strategy is chosen automatically based on the ratio of total to partial assignment combinations in the tree: stochastic fixed-orientation search is used when the ratio is high, and exhaustive orientation-independent search when it is low.
 
@@ -197,7 +202,7 @@ conformsd file1 file2 [options]
 conformsd conf1.sdf conf2.sdf -align -remap
 
 # Derive connectivity from geometry (useful for XYZ input)
-conformsd conf1.xyz conf2.xyz -align -remap -bond 0.4
+conformsd conf1.xyz conf2.xyz -align -remap -bond 0.3
 
 # Heavy atoms only, exhaustive search
 conformsd conf1.sdf conf2.sdf -align -remap -heavy -exhaustive
@@ -216,11 +221,10 @@ done
 C Binding
 ---------
 
-Compile the static library, include the appropriate header and link against `libmolalignlib`.
+Include `molalign.h` and link against `libmolalign`, which contains both `atormsd_calculate` and `conformsd_calculate`: one header, one library, no separate per-binding include or link step.
 
 ```c
-#include "conformsd.h" /* for conformsd_calculate */
-#include "atormsd.h"   /* for atormsd_calculate  */
+#include "molalign.h" /* for atormsd_calculate and conformsd_calculate */
 ```
 
 ### Atom data layout
@@ -232,8 +236,8 @@ Both functions receive atom information as a flat `int` array of length
 [ elnum_0, label_0, elnum_1, label_1, ... ]
 ```
 
-- `elnum` — atomic number (e.g. 6 for carbon, 8 for oxygen).
-- `label` — user-defined integer label; pass `0` for unlabelled atoms.
+- `elnum`: atomic number (e.g. 6 for carbon, 8 for oxygen).
+- `label`: user-defined integer label; pass `0` for unlabelled atoms.
 
 Coordinates are passed as a flat `double` array of length `n_atoms * 3`,
 in row-major (C) order: `[x_0, y_0, z_0, x_1, y_1, z_1, ...]`.
@@ -241,7 +245,7 @@ in row-major (C) order: `[x_0, y_0, z_0, x_1, y_1, z_1, ...]`.
 ### Transform output
 
 Both functions write row-major 4 × 4 homogeneous transformation matrices
-(16 `double` values each) to the `transform_list` output parameter — one
+(16 `double` values each) to the `transform_list` output parameter, one
 per returned record, flattened back-to-back. Record `i` (0-based) occupies
 `transform_list[i*16 .. i*16+15]`. Each matrix maps molecule-2 coordinates
 into the molecule-1 reference frame:
@@ -256,7 +260,7 @@ A matrix is the identity when `align_flag = false`.
 
 Both functions accept an `n_records` parameter requesting up to that many
 ranked candidate solutions (best RMSD first) instead of just the single
-best one. `occ_records` reports how many were actually found — it can be
+best one. `occ_records` reports how many were actually found; it can be
 smaller than `n_records`, and it is always `1` unless both `align_flag`
 and `remap_flag` are true. All output arrays (`rmsd_list`, `atomperm_list`,
 `transform_list`) are flattened and must be pre-allocated by the caller
@@ -272,11 +276,16 @@ void atormsd_calculate(
     bool align_flag, bool remap_flag, bool heavy_flag, bool mass_flag,
     bool mirror_flag, bool label_flag,
     bool print_stats, bool random_flag,
-    double prune_tol, int conv_freq, int max_trials,
+    bool prune_flag, double prune_tol, int conv_freq, int max_trials,
     int n_records,
     double *rmsd_list, int *natoms, int *atomperm_list,
     double *transform_list, int *occ_records, int *error_code);
 ```
+
+Pruning discards candidate atom pairings whose interatomic distance differs
+by more than `prune_tol`, speeding up the search. When `prune_flag = true`,
+`prune_tol` (Å) has no default and must be supplied; it is ignored when
+`prune_flag = false`.
 
 #### Parameters
 
@@ -296,7 +305,8 @@ void atormsd_calculate(
 | **label_flag** | in | Use atom labels for type matching |
 | **print_stats** | in | Print optimisation statistics to stdout |
 | **random_flag** | in | Seed RNG from system clock |
-| **prune_tol** | in | Pruning distance tolerance (Å); negative value disables pruning |
+| **prune_flag** | in | Enable pruning (discard candidate pairings by distance) |
+| **prune_tol** | in | Pruning distance tolerance (Å); required when `prune_flag = true`, ignored otherwise (no default) |
 | **conv_freq** | in | Convergence frequency threshold |
 | **max_trials** | in | Maximum number of optimisation trials |
 | **n_records** | in | Maximum number of ranked candidate solutions to return (≥ 1). Values > 1 only take effect when `align_flag` and `remap_flag` are both true |
@@ -312,7 +322,7 @@ void atormsd_calculate(
 ```c
 #include <stdio.h>
 #include <stdlib.h>
-#include "atormsd.h"
+#include "molalign.h"
 
 int main(void)
 {
@@ -339,7 +349,7 @@ int main(void)
         /*heavy=*/false, /*mass=*/false,
         /*mirror=*/false, /*label=*/false,
         /*stats=*/false, /*random=*/false,
-        /*prune_tol=*/-1.0, /*conv_freq=*/10, /*max_trials=*/10000,
+        /*prune_flag=*/false, /*prune_tol=*/0.0, /*conv_freq=*/10, /*max_trials=*/10000,
         /*n_records=*/1,
         rmsd_list, &natoms, atomperm_list,
         transform_list, &occ_records, &error_code);
@@ -367,7 +377,7 @@ atormsd_calculate(
     /*heavy=*/false, /*mass=*/false,
     /*mirror=*/false, /*label=*/false,
     /*stats=*/false, /*random=*/false,
-    /*prune_tol=*/-1.0, /*conv_freq=*/10, /*max_trials=*/10000,
+    /*prune_flag=*/false, /*prune_tol=*/0.0, /*conv_freq=*/10, /*max_trials=*/10000,
     /*n_records=*/N_RECORDS,
     rmsd_list, &natoms, atomperm_list,
     transform_list, &occ_records, &error_code);
@@ -380,7 +390,7 @@ for (int i = 0; i < occ_records; i++) {
 Compile:
 
 ```bash
-gcc example.c -o example -lmolalignlib -lgfortran -lm
+gcc example.c -o example -lmolalign -lgfortran -lm
 ```
 
 
@@ -452,7 +462,7 @@ tolerance) has no default and must be supplied; it is ignored when
 
 ```c
 #include <stdio.h>
-#include "conformsd.h"
+#include "molalign.h"
 
 int main(void)
 {
@@ -497,13 +507,17 @@ As with `atormsd_calculate`, pass `n_records > 1` and size the output
 arrays accordingly to retrieve several ranked solutions in one call; loop
 over the first `occ_records` entries.
 
+### Demo program
+
+A self-contained demo program (bindings/atormsd_demo.c) show how
+to call `atormsd_calculate` directly from C, using flat coordinate/element
+arrays read from XYZ files. Compile and run instructions are in each file's
+header comment.
+
 Python API
 ----------
 
-The Python API provides a higher-level interface to MolAlignLib.
-
-You can try the Python API without any installation on Binder:
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qcuaeh/molalignlib.git/devel?urlpath=%2Fdoc%2Ftree%2Fpython%2Fexamples%2Fexamples.ipynb)
+The Python API provides a higher-level interface to MolAlignLib. (See [Try It Online](#try-it-online) above to test it on Binder without installing anything.)
 
 ### Installation
 
@@ -523,37 +537,34 @@ python3 -m pip install --user .
 > **Note:** `pip install .` does not build the standalone executables. Use the
 > plain CMake workflow above to build `conformsd` and `atormsd`.
 
-### Quick start
-
-```python
-from molalignlib import read_conformers, read_clusters, Conformer, AtomCluster
-```
-
-### AtomCluster
+### Atoms
 
 Represents an unstructured set of atoms with no bond topology. Useful for comparing metal clusters, nanoparticles, or other systems where connectivity is absent or irrelevant. Wraps `atormsd_calculate`.
 
 #### Construction
 
 ```python
-# From a file (single frame)
-mol = AtomCluster.from_file("cluster.xyz")
+# From a file (defaults to the first frame)
+mol = Atoms.from_file("clusters.xyz")
 
 # From a file (specific frame in a multi-frame trajectory)
-mol = AtomCluster.from_file("trajectory.xyz", frame_idx=3)
+mol = Atoms.from_file("clusters.xyz", frame_idx=2)
 
-# From numpy arrays directly
+# From element symbols and coordinates directly
 import numpy as np
-atom_data = np.array([[26, 0], [26, 0]], dtype=np.int32)  # two Fe atoms
-coords    = np.array([[0.0, 0.0, 0.0], [2.5, 0.0, 0.0]], dtype=np.float64)
-mol = AtomCluster(atom_data=atom_data, coords=coords, name="dimer")
+symbols = ["Fe", "Fe"]
+coords  = np.array([[0.0, 0.0, 0.0], [2.5, 0.0, 0.0]], dtype=np.float64)
+mol = Atoms.from_symbols(symbols, coords, name="dimer")
+
+# From atomic numbers and coordinates directly
+mol = Atoms.from_numbers([26, 26], coords, name="dimer")  # two Fe atoms
 ```
 
 #### Reading multiple frames
 
 ```python
-clusters = read_clusters("trajectory.xyz")           # all frames → list
-mol0, mol1 = read_clusters("trajectory.xyz", frames=(0, 1))
+clusters = read_clusters("clusters.xyz")           # all frames, returns a list
+mol0, mol1 = read_clusters("clusters.xyz", frames=(0, 1))
 ```
 
 #### Computing RMSD
@@ -562,32 +573,42 @@ mol0, mol1 = read_clusters("trajectory.xyz", frames=(0, 1))
 RMSD) first. By default only the single best solution is computed:
 
 ```python
-results = mol0.rmsd_to(mol1,
-    align=True,       # default: False
-    remap=True,       # default: False
-    heavy_only=False,
-    mass_weighted=False,
-    mirror=False,
-    use_labels=False,
-    stats=False,
-    random=False,
-    prune_tol=-1.0,    # disable pruning (default -1.0)
-    conv_freq=10,
-    max_trials=10000,
-    n_records=1,       # request up to this many ranked solutions
-)
+results = mol0.rmsd_to(mol1, align=True, remap=True)
 result = results[0]   # best (lowest RMSD) solution
 print(result.rmsd)
 ```
 
+##### `Atoms.rmsd_to()` parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| **other** | `Atoms` | *required* | The structure to compare against `self` |
+| **align** | `bool` | `False` | Optimally rotate and translate `other` onto `self` |
+| **remap** | `bool` | `False` | Find the atom permutation that minimises the RMSD |
+| **heavy_only** | `bool` | `False` | Exclude hydrogen atoms from the calculation |
+| **mass_weighted** | `bool` | `False` | Weight each atom by its atomic mass |
+| **mirror** | `bool` | `False` | Reflect `other` before comparison |
+| **use_labels** | `bool` | `False` | Use atom labels to distinguish atom types |
+| **stats** | `bool` | `False` | Print detailed optimisation statistics |
+| **random** | `bool` | `False` | Seed the random-number generator from the system clock |
+| **prune** | `bool` | `False` | Enable pruning: discard assignments with pair distances exceeding `prune_tol` |
+| **prune_tol** | `float` | `None` | Pruning distance tolerance (Å); **required** when `prune=True` |
+| **conv_freq** | `int` | `10` | Stop searching once the best solution has been found this many consecutive times |
+| **max_trials** | `int` | `10000` | Stop after at most this many optimisation trials |
+| **n_records** | `int` | `1` | Request up to this many ranked solutions (see below) |
+
 Pass `n_records > 1` (with `align=True, remap=True`) to retrieve several
-ranked candidate solutions in one call — see
-[Retrieving multiple ranked solutions](#retrieving-multiple-ranked-solutions).
+ranked candidate solutions in one call.
 
 #### Writing output
 
+`write()` uses chemfiles, so it supports the same range of formats as
+reading (XYZ, PDB, SDF, MOL2, ...); the output format is inferred from
+the file extension:
+
 ```python
-mol.write_xyz("output.xyz", comment="my cluster")
+mol.write("output.xyz", comment="my cluster")
+mol.write("output.pdb")
 ```
 
 ### Conformer
@@ -597,25 +618,28 @@ Represents a molecule with full bond topology. The HNA partitioning is used inte
 #### Construction
 
 ```python
-# From a file (single frame; bond table is parsed automatically)
-conf = Conformer.from_file("molecule.sdf")
+# From a file (defaults to the first frame; bond table is parsed automatically)
+conf = Conformer.from_file("conformers.sdf")
 
 # From a file (specific frame in a multi-frame SDF)
-conf = Conformer.from_file("poses.sdf", frame_idx=3)
+conf = Conformer.from_file("conformers.sdf", frame_idx=2)
 
-# From numpy arrays
+# From element symbols, coordinates, and bonds directly
 import numpy as np
-atom_data = np.array([[6,0],[8,0],[1,0],[1,0]], dtype=np.int32)
+symbols   = ["C", "O", "H", "H"]
 coords    = np.zeros((4, 3), dtype=np.float64)
 bond_data = np.array([[1,2,2],[1,3,1],[1,4,1]], dtype=np.int32)  # 1-based
-conf = Conformer(atom_data=atom_data, coords=coords, bond_data=bond_data)
+conf = Conformer.from_symbols(symbols, coords, bond_data=bond_data)
+
+# From atomic numbers, coordinates, and bonds directly
+conf = Conformer.from_numbers([6, 8, 1, 1], coords, bond_data=bond_data)
 ```
 
 #### Reading multiple frames
 
 ```python
-conformers = read_conformers("poses.sdf")           # all frames → list
-c0, c1 = read_conformers("poses.sdf", frames=(0, 1))
+conformers = read_conformers("conformers.sdf")           # all frames, returns a list
+c0, c1 = read_conformers("conformers.sdf", frames=(0, 1))
 ```
 
 #### Computing RMSD
@@ -624,30 +648,47 @@ c0, c1 = read_conformers("poses.sdf", frames=(0, 1))
 RMSD) first. By default only the single best solution is computed:
 
 ```python
-results = c0.rmsd_to(c1,
-    align=True,        # default: False
-    remap=True,         # default: False
-    heavy_only=False,
-    mass_weighted=False,
-    mirror=False,
-    use_labels=False,
-    bond_flag=False,   # True → derive bonds from geometry
-    bond_tol=None,     # required (float), no default, when bond_flag=True
-    stats=False,
-    random=False,
-    conv_freq=100,
-    max_trials=10000,
-    n_records=1,        # request up to this many ranked solutions
-)
+results = c0.rmsd_to(c1, align=True, remap=True)
 result = results[0]             # best (lowest RMSD) solution
 print(result.rmsd)              # float, Å
 print(result.atom_permutation)  # int32 array, 0-based
 print(result.transform)         # 4×4 float64 array
 ```
 
+##### `Conformer.rmsd_to()` parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| **other** | `Conformer` | *required* | The structure to compare against `self` |
+| **align** | `bool` | `False` | Optimally rotate and translate `other` onto `self` |
+| **remap** | `bool` | `False` | Find the atom permutation that minimises the RMSD |
+| **heavy_only** | `bool` | `False` | Exclude hydrogen atoms from the calculation |
+| **mass_weighted** | `bool` | `False` | Weight each atom by its atomic mass |
+| **mirror** | `bool` | `False` | Reflect `other` before comparison |
+| **use_labels** | `bool` | `False` | Use atom labels to distinguish atom types |
+| **infer_bonds** | `bool` | `False` | Infer bond connectivity from geometry instead of using each structure's bond table |
+| **bond_tol** | `float` | `0.3` | Bond-detection tolerance (Å); used only when `infer_bonds=True` |
+| **stats** | `bool` | `False` | Print detailed optimisation statistics |
+| **random** | `bool` | `False` | Seed the random-number generator from the system clock |
+| **conv_freq** | `int` | `100` | Stop searching once the best solution has been found this many consecutive times |
+| **max_trials** | `int` | `10000` | Stop after at most this many optimisation trials |
+| **n_records** | `int` | `1` | Request up to this many ranked solutions (see below) |
+
 Pass `n_records > 1` (with `align=True, remap=True`) to retrieve several
-ranked candidate solutions in one call — see
-[Retrieving multiple ranked solutions](#retrieving-multiple-ranked-solutions).
+ranked candidate solutions in one call.
+
+#### Writing output
+
+Like `Atoms.write()`, the output format is inferred from the file
+extension. Bond connectivity is written too (when the target format
+supports it, e.g. SDF/MOL2); bond *orders* are not currently preserved,
+only which atoms are bonded. Writing to a format with no bond table
+(e.g. XYZ) simply omits connectivity:
+
+```python
+conf.write("output.sdf", comment="my conformer")
+conf.write("output.xyz")  # coordinates and symbols only
+```
 
 ### RMSDResult
 
@@ -658,16 +699,21 @@ solution (best/lowest RMSD first). Each `RMSDResult` holds:
 |-----------|------|-------------|
 | **rmsd** | `float` | Root-mean-square deviation in Å |
 | **atom_permutation** | `int32 ndarray (n,)` | 0-based index array mapping *other* atoms onto *self* |
-| **transform** | `float64 ndarray (4, 4)` | Homogeneous rotation + translation matrix (maps *other* → *self* frame) |
+| **transform** | `float64 ndarray (4, 4)` | Homogeneous rotation + translation matrix (maps *other* to *self* frame) |
 
 #### Applying the result
 
+Use the ´apply_to´ method to apply the result to the coordinates:
 ```python
 # Produce a new object that is aligned and reordered to match the reference
-result = mol0.rmsd_to(other, align=True, remap=True)[0]
-other_aligned = result.apply_to(other)
-other_aligned.write_xyz("aligned.xyz")
+result = mol0.rmsd_to(mol1, align=True, remap=True)[0]
+mol1_aligned = result.apply_to(mol1)
+mol1_aligned.write("aligned.xyz")
 ```
+
+`write()` is available on both `Atoms` and `Conformer` (see
+[Writing output](#writing-output) under [Atoms](#atoms) and
+[Writing output](#writing-output-1) under [Conformer](#conformer)).
 
 #### Retrieving multiple ranked solutions
 
@@ -686,97 +732,15 @@ for i, result in enumerate(results):
 best = results[0]
 ```
 
-### Examples
 
-#### Example 1 — Symmetry-corrected RMSD between two conformers
+Runnable examples
+-----------------
 
-```python
-from molalignlib import read_conformers
-
-c0, c1 = read_conformers("PRDCC002527_poses.sdf", frames=(0, 1))
-
-result = c0.rmsd_to(c1, remap=True, align=True)[0]
-print(f"RMSD = {result.rmsd:.4f} Å")
-
-c1_aligned = result.apply_to(c1)
-c1_aligned.write_xyz("aligned.xyz", comment=f"RMSD={result.rmsd:.4f}")
-```
-
-#### Example 2 — RMSD matrix for a full conformer ensemble
-
-```python
-from molalignlib import read_conformers
-
-conformers = read_conformers("PRDCC002527_poses.sdf")
-
-for c0 in conformers:
-    for c1 in conformers:
-        result = c1.rmsd_to(c0, remap=True, align=True)[0]
-        print(f"{result.rmsd:.4f}", end="  ")
-    print()
-```
-
-#### Example 3 — RMSD of the first frame against every other frame (clusters)
-
-```python
-from molalignlib import read_clusters
-
-clusters = read_clusters("Co138_frames.xyz")
-ref = clusters[0]
-
-for mol in clusters[1:]:
-    result = mol.rmsd_to(ref, remap=True, align=True, prune_tol=0.1)[0]
-    print(f"{result.rmsd:.4f}")
-```
-
-#### Example 4 — Align one cluster to another and save the result
-
-```python
-from molalignlib import read_clusters
-
-mol0, mol1 = read_clusters("Co138_frames.xyz", frames=(0, 1))
-
-result = mol0.rmsd_to(mol1, remap=True, align=True, prune_tol=0.1, stats=True)[0]
-print(f"RMSD = {result.rmsd:.4f} Å")
-
-mol1_aligned = result.apply_to(mol1)
-mol1_aligned.write_xyz("Co138_aligned.xyz", comment=f"RMSD={result.rmsd:.4f}")
-```
-
-#### Example 5 — Build AtomCluster from an ASE object
-
-```python
-import numpy as np
-from molalignlib import AtomCluster
-
-# Suppose `ase_atoms` is an ASE Atoms object
-atom_data = np.column_stack([
-    ase_atoms.get_atomic_numbers(),
-    np.zeros(len(ase_atoms), dtype=np.int32),
-]).astype(np.int32)
-coords = ase_atoms.get_positions().astype(np.float64)
-
-cluster = AtomCluster(atom_data=atom_data, coords=coords)
-```
-
-#### Example 6 — Retrieve several ranked solutions instead of just the best
-
-```python
-from molalignlib import read_clusters
-
-mol0, mol1 = read_clusters("Co138_frames.xyz", frames=(0, 1))
-
-# Ask for up to 5 ranked candidate mappings
-results = mol0.rmsd_to(mol1, remap=True, align=True, prune_tol=0.1, n_records=5)
-
-for i, result in enumerate(results):
-    print(f"Solution {i}: RMSD = {result.rmsd:.4f} Å")
-
-# The list is sorted best-first
-best = results[0]
-mol1_aligned = best.apply_to(mol1)
-mol1_aligned.write_xyz("Co138_aligned.xyz", comment=f"RMSD={best.rmsd:.4f}")
-```
+For fully runnable examples see
+[`python/examples/examples.py`](python/examples/examples.py)
+and the equivalent Jupyter notebook
+[`python/examples/examples.ipynb`](python/examples/examples.ipynb)
+(the one launched by the [Binder link](#try-it-online) above).
 
 
 Algorithm Notes

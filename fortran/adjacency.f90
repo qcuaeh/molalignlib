@@ -16,7 +16,7 @@
 
 module adjacency
 use parameters
-use types_basic
+use common_types
 use permutation
 use euclidean
 use sorting

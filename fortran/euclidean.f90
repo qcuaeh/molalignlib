@@ -16,7 +16,7 @@
 
 module euclidean
 use parameters
-use types_basic
+use common_types
 use permutation
 use random
 use eigen

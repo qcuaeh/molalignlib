@@ -17,7 +17,7 @@
 module assignment_atoms
 use parameters
 use flags
-use types_basic
+use common_types
 use permutation
 use lap_jv_sparse
 use lap_hungarian
@@ -175,8 +175,9 @@ subroutine solve_lap_pruned(n, s1, s2, x1, x2, pruned, perm1, dist, error_code)
       do i = 1, n
          j = first(i)
 30       if (j > sz) then
-            write (stderr, '(a)') 'Error: Assignment failed'
-            error_code = 3
+            ! Assignment failed
+            ! Pruning tolerance might be too tight
+            error_code = 1
             return
          end if
          if (kk(j) /= perm1(i)) then

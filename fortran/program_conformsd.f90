@@ -83,9 +83,6 @@ call init_args()
 
 do while (get_arg(arg))
    select case (lowercase(arg))
-   case ('-bond')
-      bond_flag = .TRUE.
-      call read_optarg(arg, bond_tol)
    case ('-align')
       align_flag = .TRUE.
    case ('-remap')
@@ -95,6 +92,9 @@ do while (get_arg(arg))
    case ('-stochastic')
       stochastic_flag = .TRUE.
       adaptive_flag = .FALSE.
+   case ('-bond')
+      bond_flag = .TRUE.
+      call read_optarg(arg, bond_tol)
    case ('-label')
       label_flag = .TRUE.
    case ('-heavy')

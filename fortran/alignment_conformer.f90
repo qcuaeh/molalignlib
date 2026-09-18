@@ -16,7 +16,7 @@
 
 module alignment_conformer
 use parameters
-use types_basic
+use common_types
 use str_utils
 use random
 use chemdata
@@ -24,8 +24,8 @@ use permutation
 use euclidean
 use adjacency
 use pruning_atoms
-use types_linked
-use types_indexed
+use linked_list_types
+use indexed_list_types
 use refinement
 use assignment_atoms
 use assignment_conformer
