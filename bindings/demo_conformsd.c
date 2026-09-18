@@ -23,7 +23,7 @@ enum {
     OPT_BOND,
     OPT_ASSIGNMENT, OPT_PRINTTRANS,
     OPT_STATS, OPT_ASSIGNTREE, OPT_RANDOM,
-    OPT_FREQ, OPT_TRIALS,
+    OPT_FREQ, OPT_TRIALS, OPT_RECORDS,
     OPT_HELP
 };
 
@@ -40,6 +40,7 @@ static const long_opt_t long_options[] = {
     {"random",          0, OPT_RANDOM},
     {"freq",            1, OPT_FREQ},
     {"trials",          1, OPT_TRIALS},
+    {"records",         1, OPT_RECORDS},
     {"assignment",      0, OPT_ASSIGNMENT},
     {"printtrans",      0, OPT_PRINTTRANS},
     {"help",            0, OPT_HELP},
@@ -59,6 +60,7 @@ static const opt_info_t opt_info[] = {
     [OPT_RANDOM]          = {"Use random algorithm",                               NULL },
     [OPT_FREQ]            = {"Set convergence frequency (default: 100)",           "N"  },
     [OPT_TRIALS]          = {"Set maximum number of trials (default: 10000)",      "N"  },
+    [OPT_RECORDS]         = {"Return up to N ranked solutions (default: 1)",       "N"  },
     [OPT_ASSIGNMENT]      = {"Print the atom permutation",                         NULL },
     [OPT_PRINTTRANS]      = {"Print the 4x4 homogeneous transformation matrix",    NULL },
     [OPT_HELP]            = {"Show this help message",                             NULL },
@@ -82,6 +84,7 @@ int main(int argc, char **argv)
     bool print_assignment = false, print_transform = false;
     bool print_stats = false, print_assigntree = false, random_flag = false;
     int conv_freq = 100, max_trials = 10000;
+    int n_records = 1;
     double bond_tol = 0.0;
     bool bond_set = false;
     int argi = 1, opt;
@@ -95,10 +98,10 @@ int main(int argc, char **argv)
     int *atom_data1 = NULL, *atom_data2 = NULL;
     double *coords1 = NULL, *coords2 = NULL;
 
-    /* outputs */
-    double rmsd, transform[16];
-    int natoms = 0, error_code = 0;
-    int *atomperm = NULL;
+    /* outputs (flattened across up to n_records candidate solutions) */
+    double *rmsd_list = NULL, *transform_list = NULL;
+    int natoms = 0, occ_records = 0, error_code = 0;
+    int *atomperm_list = NULL;
 
     while ((opt = parse_long_opt(argc, argv, &argi, &optarg,
                                  long_options, posargs, &npos)) != -1) {
@@ -115,6 +118,7 @@ int main(int argc, char **argv)
         case OPT_RANDOM:          random_flag     = true;         break;
         case OPT_FREQ:            conv_freq       = atoi(optarg); break;
         case OPT_TRIALS:          max_trials      = atoi(optarg); break;
+        case OPT_RECORDS:         n_records       = atoi(optarg); break;
         case OPT_ASSIGNMENT:      print_assignment = true;        break;
         case OPT_PRINTTRANS:      print_transform = true;         break;
         case OPT_HELP:            print_usage(argv[0]); return 0;
@@ -125,6 +129,10 @@ int main(int argc, char **argv)
 
     if (npos != 2) {
         fprintf(stderr, "Error: expected exactly two XYZ file arguments\n");
+        print_usage(argv[0]); return 1;
+    }
+    if (n_records < 1) {
+        fprintf(stderr, "Error: -records must be at least 1\n");
         print_usage(argv[0]); return 1;
     }
 
@@ -144,9 +152,19 @@ int main(int argc, char **argv)
         free(atom_data1); free(coords1); return 1;
     }
 
-    /* allocate permutation array - worst case is the larger molecule */
-    atomperm = malloc((n1 > n2 ? n1 : n2) * sizeof(int));
-    if (!atomperm) { fprintf(stderr, "Error: out of memory\n"); return 1; }
+    /* allocate output buffers - worst case atom count is the larger molecule,
+     * and every buffer must hold up to n_records candidate solutions */
+    int max_atoms = (n1 > n2 ? n1 : n2);
+    rmsd_list      = malloc((size_t)n_records * sizeof(double));
+    atomperm_list  = malloc((size_t)n_records * (size_t)max_atoms * sizeof(int));
+    transform_list = malloc((size_t)n_records * 16 * sizeof(double));
+    if (!rmsd_list || !atomperm_list || !transform_list) {
+        fprintf(stderr, "Error: out of memory\n");
+        free(atom_data1); free(coords1);
+        free(atom_data2); free(coords2);
+        free(rmsd_list); free(atomperm_list); free(transform_list);
+        return 1;
+    }
 
     /* XYZ has no bond table; pass n_bonds=0 and bond_flag=true so the library
      * derives connectivity from atomic geometry. */
@@ -157,8 +175,9 @@ int main(int argc, char **argv)
         mirror_flag, label_flag, /*bond_flag=*/true, bond_tol,
         print_stats, print_assigntree, random_flag,
         conv_freq, max_trials,
-        &rmsd, &natoms, atomperm,
-        transform, &error_code);
+        n_records,
+        rmsd_list, &natoms, atomperm_list,
+        transform_list, &occ_records, &error_code);
 
     if (error_code != 0) {
         switch (error_code) {
@@ -170,30 +189,37 @@ int main(int argc, char **argv)
         }
         free(atom_data1); free(coords1);
         free(atom_data2); free(coords2);
-        free(atomperm);
+        free(rmsd_list); free(atomperm_list); free(transform_list);
         return error_code;
     }
 
-    printf("RMSD: %.6f\n", rmsd);
+    for (int r = 0; r < occ_records; r++) {
+        const double *rec_transform = &transform_list[r * 16];
+        const int *rec_perm = &atomperm_list[r * natoms];
 
-    if (print_assignment) {
-        int i;
-        printf("Mapping:");
-        for (i = 0; i < natoms; i++) printf(" %d", atomperm[i] + 1); /* 1-based */
-        putchar('\n');
-    }
+        printf("RMSD: %.6f\n", rmsd_list[r]);
 
-    if (print_transform) {
-        int i;
-        printf("Transform:\n");
-        for (i = 0; i < 4; i++)
-            printf("  %12.6f %12.6f %12.6f %12.6f\n",
-                   transform[i*4], transform[i*4+1],
-                   transform[i*4+2], transform[i*4+3]);
+        if (print_assignment) {
+            int i;
+            printf("Mapping:");
+            for (i = 0; i < natoms; i++) printf(" %d", rec_perm[i] + 1); /* 1-based */
+            putchar('\n');
+        }
+
+        if (print_transform) {
+            int i;
+            printf("Transform:\n");
+            for (i = 0; i < 4; i++)
+                printf("  %12.6f %12.6f %12.6f %12.6f\n",
+                       rec_transform[i*4], rec_transform[i*4+1],
+                       rec_transform[i*4+2], rec_transform[i*4+3]);
+        }
+
+        if (r < occ_records - 1) putchar('\n');
     }
 
     free(atom_data1); free(coords1);
     free(atom_data2); free(coords2);
-    free(atomperm);
+    free(rmsd_list); free(atomperm_list); free(transform_list);
     return 0;
 }

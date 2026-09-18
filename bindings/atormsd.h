@@ -8,7 +8,8 @@ extern "C" {
 #endif
 
 /**
- * Calculate RMSD between two atom clusters.
+ * Calculate RMSD between two atom clusters, optionally returning several
+ * ranked candidate solutions instead of just the best one.
  *
  * Molecule data is passed as pre-read flat arrays; no file I/O is performed
  * inside the Fortran library.
@@ -34,12 +35,27 @@ extern "C" {
  * @param conv_freq     Convergence frequency
  * @param max_trials    Maximum number of trials
  *
- * @param rmsd          [out] Calculated RMSD value
- * @param natoms        [out] Number of atoms in the permutation array
- * @param atomperm      [out] Atom permutation, 0-based, caller allocates >= natoms
- * @param transform     [out] Row-major 4x4 homogeneous transform (16 doubles).
- *                            Maps molecule-2 coords to molecule-1 frame:
+ * @param n_records     Maximum number of ranked candidate solutions to
+ *                       return (>=1). Multiple records are only ever
+ *                       produced when both align_flag and remap_flag are
+ *                       true; otherwise exactly one record is written
+ *                       regardless of this value (see occ_records).
+ *
+ * @param rmsd_list     [out] RMSD of each returned record, length n_records.
+ *                            Only the first *occ_records entries are valid.
+ * @param natoms        [out] Number of atoms in each permutation (same for
+ *                            every record)
+ * @param atomperm_list [out] Flattened, 0-based atom permutations, length
+ *                            n_records*natoms. Record i (0-based) occupies
+ *                            atomperm_list[i*natoms .. i*natoms + natoms - 1].
+ *                            Caller allocates >= n_records*natoms.
+ * @param transform_list [out] Flattened row-major 4x4 homogeneous transforms,
+ *                            length n_records*16. Record i occupies
+ *                            transform_list[i*16 .. i*16 + 15]. Maps
+ *                            molecule-2 coords to molecule-1 frame:
  *                            p_out = R*p_in + t. Identity when align_flag=false.
+ *                            Caller allocates >= n_records*16.
+ * @param occ_records   [out] Actual number of records written (<= n_records)
  * @param error_code    [out] 0=success, 1=not isomers, 2=atom types mismatch
  */
 void atormsd_calculate(
@@ -49,8 +65,9 @@ void atormsd_calculate(
     bool mirror_flag, bool label_flag,
     bool print_stats, bool random_flag,
     double prune_tol, int conv_freq, int max_trials,
-    double *rmsd, int *natoms, int *atomperm,
-    double *transform, int *error_code);
+    int n_records,
+    double *rmsd_list, int *natoms, int *atomperm_list,
+    double *transform_list, int *occ_records, int *error_code);
 
 #ifdef __cplusplus
 }

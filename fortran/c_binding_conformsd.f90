@@ -28,6 +28,17 @@ contains
 !   c_bond_tol     : bond detection tolerance (only used, and required, when
 !                    c_bond_flag is true; no default)
 !
+! Multiple ranked candidate solutions:
+!   c_n_records requests up to that many ranked candidate solutions. Records
+!   beyond the first are only ever produced when both c_align_flag and
+!   c_remap_flag are true (the optimize_atomperm_conformer search); in every
+!   other case exactly one record is written regardless of c_n_records.
+!   c_occ_records reports how many were actually written; only the first
+!   c_occ_records entries of c_rmsd_list, c_atomperm_list, and
+!   c_transform_list are meaningful. All output arrays are flattened and
+!   must be allocated by the caller with at least c_n_records elements per
+!   record (natoms for c_atomperm_list, 16 for c_transform_list).
+!
 ! c_error_code values (numbered to match atormsd_calculate where applicable):
 !   0 = success
 !   1 = not isomers
@@ -43,7 +54,9 @@ subroutine conformsd_calculate(                                              &
       c_mirror_flag, c_label_flag, c_bond_flag, c_bond_tol,                 &
       c_print_stats, c_print_assigntree, c_random_flag,                      &
       c_conv_freq, c_max_trials,                                           &
-      c_rmsd, c_natoms, c_atomperm, c_transform, c_error_code)              &
+      c_n_records,                                                          &
+      c_rmsd_list, c_natoms, c_atomperm_list,                                &
+      c_transform_list, c_occ_records, c_error_code)                         &
       bind(C, name="conformsd_calculate")
 
    ! Molecule 1
@@ -67,11 +80,15 @@ subroutine conformsd_calculate(                                              &
    logical(lk), intent(in), value :: c_print_stats, c_print_assigntree, c_random_flag
    integer(ik), intent(in), value :: c_conv_freq, c_max_trials
 
+   ! Requested number of ranked records
+   integer(ik), intent(in), value :: c_n_records
+
    ! Outputs
-   real(rk),                  intent(out) :: c_rmsd
+   real(rk),    dimension(*), intent(out) :: c_rmsd_list
    integer(ik),                intent(out) :: c_natoms
-   integer(ik), dimension(*), intent(out) :: c_atomperm
-   real(rk),                  intent(out) :: c_transform(16)
+   integer(ik), dimension(*), intent(out) :: c_atomperm_list
+   real(rk),    dimension(*), intent(out) :: c_transform_list
+   integer(ik),                intent(out) :: c_occ_records
    integer(ik),                intent(out) :: c_error_code
 
    ! Local variables
@@ -85,10 +102,18 @@ subroutine conformsd_calculate(                                              &
    real(rk), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, coords2r
    integer(ik), dimension(:), allocatable :: atomset1, atomset2, atomperm1
    integer(ik) :: num_records, max_trials, conv_freq
-   integer(ik) :: i
+   integer(ik) :: i, j, natoms_local, base
 
-   c_error_code = 0;  c_rmsd = 0.0_rk;  c_natoms = 0
-   call set_identity_transform(c_transform)
+   c_error_code = 0;  c_occ_records = 0;  c_natoms = 0
+
+   ! Requested record count (must be at least 1)
+   num_records = max(1_ik, c_n_records)
+
+   ! Initialise all requested transform slots to identity so that, even on
+   ! an early error return, every slot the caller allocated is well-defined.
+   do i = 1, num_records
+      call set_identity_transform(c_transform_list((i-1)*16+1:i*16))
+   end do
 
    ! Set options
    align_flag       = c_align_flag
@@ -107,7 +132,6 @@ subroutine conformsd_calculate(                                              &
 
    conv_freq   = c_conv_freq
    max_trials  = c_max_trials
-   num_records = 1
 
    ! Build atom_t and bond_t arrays from flat C arrays
    call build_atoms(n_atoms1, c_atom_data1, c_coords1, atoms1)
@@ -195,11 +219,23 @@ subroutine conformsd_calculate(                                              &
 
          if (print_stats) call print_records(registry)
 
-         atomperm1 = registry%records(1)%atomperm1
-         rotquat = least_rotquat(atomset1, atomperm1, coords1w, coords2w)
-         coords2r = rotated_coords(coords2, rotquat, center1)
-         rmsd = sqrt(sqdistmean(atomset1, atomperm1, weights1, coords1, coords2r))
-         call build_homogeneous_transform(rotquat, center1, center2, c_transform)
+         c_occ_records = registry%occ_records
+         do i = 1, registry%occ_records
+            atomperm1 = registry%records(i)%atomperm1
+            natoms_local = size(atomperm1)
+            rotquat = least_rotquat(atomset1, atomperm1, coords1w, coords2w)
+            coords2r = rotated_coords(coords2, rotquat, center1)
+            rmsd = sqrt(sqdistmean(atomset1, atomperm1, weights1, coords1, coords2r))
+            call build_homogeneous_transform(rotquat, center1, center2, &
+                  c_transform_list((i-1)*16+1:i*16))
+
+            c_rmsd_list(i) = rmsd
+            base = (i-1) * natoms_local
+            do j = 1, natoms_local
+               c_atomperm_list(base+j) = atomperm1(j) - 1  ! 0-based for C
+            end do
+         end do
+         c_natoms = natoms_local
 
       else
 
@@ -207,6 +243,13 @@ subroutine conformsd_calculate(                                              &
 
          coords2r = coords2
          rmsd = sqrt(sqdistmean(atomset1, atomperm1, weights1, coords1, coords2r))
+
+         c_occ_records = 1
+         c_rmsd_list(1) = rmsd
+         c_natoms = size(atomperm1)
+         do j = 1, size(atomperm1)
+            c_atomperm_list(j) = atomperm1(j) - 1  ! 0-based for C
+         end do
 
       end if
 
@@ -230,20 +273,21 @@ subroutine conformsd_calculate(                                              &
       if (align_flag) then
          rotquat = least_rotquat(atomset1, atomperm1, coords1w, coords2w)
          coords2r = rotated_coords(coords2, rotquat, center1)
-         call build_homogeneous_transform(rotquat, center1, center2, c_transform)
+         call build_homogeneous_transform(rotquat, center1, center2, c_transform_list(1:16))
       else
          coords2r = coords2
       end if
 
       rmsd = sqrt(sqdistmean(atomset1, atomperm1, weights1, coords1, coords2r))
 
-   end if
+      c_occ_records = 1
+      c_rmsd_list(1) = rmsd
+      c_natoms = size(atomperm1)
+      do j = 1, size(atomperm1)
+         c_atomperm_list(j) = atomperm1(j) - 1  ! 0-based for C
+      end do
 
-   c_rmsd   = rmsd
-   c_natoms = size(atomperm1)
-   do i = 1, size(atomperm1)
-      c_atomperm(i) = atomperm1(i) - 1  ! 0-based for C
-   end do
+   end if
 
 end subroutine conformsd_calculate
 

@@ -21,6 +21,7 @@ Table of Contents
    - [AtomCluster](#atomcluster)
    - [Conformer](#conformer)
    - [RMSDResult](#rmsdresult)
+     - [Retrieving multiple ranked solutions](#retrieving-multiple-ranked-solutions)
    - [Examples](#examples)
 6. [Algorithm Notes](#algorithm-notes)
 
@@ -239,15 +240,28 @@ in row-major (C) order: `[x_0, y_0, z_0, x_1, y_1, z_1, ...]`.
 
 ### Transform output
 
-Both functions write a row-major 4 × 4 homogeneous transformation matrix
-(16 `double` values) to the `transform` output parameter. The matrix maps
-molecule-2 coordinates into the molecule-1 reference frame:
+Both functions write row-major 4 × 4 homogeneous transformation matrices
+(16 `double` values each) to the `transform_list` output parameter — one
+per returned record, flattened back-to-back. Record `i` (0-based) occupies
+`transform_list[i*16 .. i*16+15]`. Each matrix maps molecule-2 coordinates
+into the molecule-1 reference frame:
 
 ```
 p_out = R * p_in + t
 ```
 
-The matrix is the identity when `align_flag = false`.
+A matrix is the identity when `align_flag = false`.
+
+### Multiple ranked solutions
+
+Both functions accept an `n_records` parameter requesting up to that many
+ranked candidate solutions (best RMSD first) instead of just the single
+best one. `occ_records` reports how many were actually found — it can be
+smaller than `n_records`, and it is always `1` unless both `align_flag`
+and `remap_flag` are true. All output arrays (`rmsd_list`, `atomperm_list`,
+`transform_list`) are flattened and must be pre-allocated by the caller
+for `n_records` records; only the first `occ_records` entries are
+meaningful. `natoms` is the same for every record and is written once.
 
 ### atormsd_calculate
 
@@ -259,8 +273,9 @@ void atormsd_calculate(
     bool mirror_flag, bool label_flag,
     bool print_stats, bool random_flag,
     double prune_tol, int conv_freq, int max_trials,
-    double *rmsd, int *natoms, int *atomperm,
-    double *transform, int *error_code);
+    int n_records,
+    double *rmsd_list, int *natoms, int *atomperm_list,
+    double *transform_list, int *occ_records, int *error_code);
 ```
 
 #### Parameters
@@ -284,10 +299,12 @@ void atormsd_calculate(
 | **prune_tol** | in | Pruning distance tolerance (Å); negative value disables pruning |
 | **conv_freq** | in | Convergence frequency threshold |
 | **max_trials** | in | Maximum number of optimisation trials |
-| **rmsd** | out | Calculated RMSD (Å) |
-| **natoms** | out | Number of elements written to `atomperm` |
-| **atomperm** | out | Atom permutation, **0-based**; caller must allocate ≥ `natoms` elements |
-| **transform** | out | 4 × 4 homogeneous transform (row-major, 16 doubles) |
+| **n_records** | in | Maximum number of ranked candidate solutions to return (≥ 1). Values > 1 only take effect when `align_flag` and `remap_flag` are both true |
+| **rmsd_list** | out | RMSD (Å) of each returned record, length `n_records`; caller allocates |
+| **natoms** | out | Number of elements per permutation record (same for every record) |
+| **atomperm_list** | out | Flattened, **0-based** atom permutations, length `n_records*natoms`. Record `i` occupies `atomperm_list[i*natoms .. i*natoms+natoms-1]`; caller allocates ≥ `n_records*natoms` elements |
+| **transform_list** | out | Flattened row-major 4 × 4 homogeneous transforms, length `n_records*16`. Record `i` occupies `transform_list[i*16 .. i*16+15]`; caller allocates ≥ `n_records*16` elements |
+| **occ_records** | out | Actual number of records written (≤ `n_records`) |
 | **error_code** | out | `0` = success; `1` = not isomers; `2` = atom type mismatch |
 
 #### Minimal example
@@ -311,8 +328,9 @@ int main(void)
                      0.767, 0.596, 0.000,
                     -0.747, 0.596, 0.000 };
 
-    double rmsd, transform[16];
-    int    atomperm[3], natoms, error_code;
+    /* Request a single (best) solution */
+    double rmsd_list[1], transform_list[16];
+    int    atomperm_list[3], natoms, occ_records, error_code;
 
     atormsd_calculate(
         3, ad1, xy1,
@@ -322,11 +340,40 @@ int main(void)
         /*mirror=*/false, /*label=*/false,
         /*stats=*/false, /*random=*/false,
         /*prune_tol=*/-1.0, /*conv_freq=*/10, /*max_trials=*/10000,
-        &rmsd, &natoms, atomperm, transform, &error_code);
+        /*n_records=*/1,
+        rmsd_list, &natoms, atomperm_list,
+        transform_list, &occ_records, &error_code);
 
     if (error_code != 0) { fprintf(stderr, "Error %d\n", error_code); return 1; }
-    printf("RMSD = %.6f Å\n", rmsd);
+    printf("RMSD = %.6f Å\n", rmsd_list[0]);
     return 0;
+}
+```
+
+To retrieve several ranked solutions, allocate the output arrays for
+`n_records` records and loop over the first `occ_records` entries:
+
+```c
+#define N_RECORDS 5
+
+double rmsd_list[N_RECORDS];
+double transform_list[N_RECORDS * 16];
+int    atomperm_list[N_RECORDS * 3];  /* N_RECORDS * natoms (known here to be 3) */
+int    natoms, occ_records, error_code;
+
+atormsd_calculate(
+    3, ad1, xy1, 3, ad2, xy2,
+    /*align=*/true, /*remap=*/true,
+    /*heavy=*/false, /*mass=*/false,
+    /*mirror=*/false, /*label=*/false,
+    /*stats=*/false, /*random=*/false,
+    /*prune_tol=*/-1.0, /*conv_freq=*/10, /*max_trials=*/10000,
+    /*n_records=*/N_RECORDS,
+    rmsd_list, &natoms, atomperm_list,
+    transform_list, &occ_records, &error_code);
+
+for (int i = 0; i < occ_records; i++) {
+    printf("Solution %d: RMSD = %.6f Å\n", i, rmsd_list[i]);
 }
 ```
 
@@ -349,8 +396,9 @@ void conformsd_calculate(
     bool mirror_flag, bool label_flag, bool bond_flag, double bond_tol,
     bool print_stats, bool print_assigntree, bool random_flag,
     int conv_freq, int max_trials,
-    double *rmsd, int *natoms, int *atomperm,
-    double *transform, int *error_code);
+    int n_records,
+    double *rmsd_list, int *natoms, int *atomperm_list,
+    double *transform_list, int *occ_records, int *error_code);
 ```
 
 Bond data is passed as a flat `int` array of length `n_bonds * 3`, packed as:
@@ -392,10 +440,12 @@ tolerance) has no default and must be supplied; it is ignored when
 | **random_flag** | in | Seed RNG from system clock |
 | **conv_freq** | in | Convergence frequency threshold |
 | **max_trials** | in | Maximum number of optimisation trials |
-| **rmsd** | out | Calculated RMSD (Å) |
-| **natoms** | out | Number of elements written to `atomperm` |
-| **atomperm** | out | Atom permutation, **0-based**; caller must allocate ≥ `natoms` elements |
-| **transform** | out | 4 × 4 homogeneous transform (row-major, 16 doubles) |
+| **n_records** | in | Maximum number of ranked candidate solutions to return (≥ 1). Values > 1 only take effect when `align_flag` and `remap_flag` are both true |
+| **rmsd_list** | out | RMSD (Å) of each returned record, length `n_records`; caller allocates |
+| **natoms** | out | Number of elements per permutation record (same for every record) |
+| **atomperm_list** | out | Flattened, **0-based** atom permutations, length `n_records*natoms`. Record `i` occupies `atomperm_list[i*natoms .. i*natoms+natoms-1]`; caller allocates ≥ `n_records*natoms` elements |
+| **transform_list** | out | Flattened row-major 4 × 4 homogeneous transforms, length `n_records*16`. Record `i` occupies `transform_list[i*16 .. i*16+15]`; caller allocates ≥ `n_records*16` elements |
+| **occ_records** | out | Actual number of records written (≤ `n_records`) |
 | **error_code** | out | `0` = success; `1` = not isomers; `2` = atom type mismatch; `3` = missing bonds; `4` = bond connectivity mismatch (only possible when `remap_flag = false`). Numbered to match `atormsd_calculate` where applicable. |
 
 #### Minimal example
@@ -420,8 +470,9 @@ int main(void)
                     -0.925, -0.531, 0.000 };
     int bd2[] = { 1,2,2,  1,3,1,  1,4,1 };
 
-    double rmsd, transform[16];
-    int    atomperm[4], natoms, error_code;
+    /* Request a single (best) solution */
+    double rmsd_list[1], transform_list[16];
+    int    atomperm_list[4], natoms, occ_records, error_code;
 
     conformsd_calculate(
         4, ad1, xy1, 3, bd1,
@@ -432,13 +483,19 @@ int main(void)
         /*bond_flag=*/false, /*bond_tol=*/0.0,
         /*stats=*/false, /*print_assigntree=*/false, /*random=*/false,
         /*conv_freq=*/100, /*max_trials=*/10000,
-        &rmsd, &natoms, atomperm, transform, &error_code);
+        /*n_records=*/1,
+        rmsd_list, &natoms, atomperm_list,
+        transform_list, &occ_records, &error_code);
 
     if (error_code != 0) { fprintf(stderr, "Error %d\n", error_code); return 1; }
-    printf("RMSD = %.6f Å\n", rmsd);
+    printf("RMSD = %.6f Å\n", rmsd_list[0]);
     return 0;
 }
 ```
+
+As with `atormsd_calculate`, pass `n_records > 1` and size the output
+arrays accordingly to retrieve several ranked solutions in one call; loop
+over the first `occ_records` entries.
 
 Python API
 ----------
@@ -501,8 +558,11 @@ mol0, mol1 = read_clusters("trajectory.xyz", frames=(0, 1))
 
 #### Computing RMSD
 
+`rmsd_to()` always returns a **list** of `RMSDResult`, ranked best (lowest
+RMSD) first. By default only the single best solution is computed:
+
 ```python
-result = mol0.rmsd_to(mol1,
+results = mol0.rmsd_to(mol1,
     align=True,       # default: False
     remap=True,       # default: False
     heavy_only=False,
@@ -514,8 +574,15 @@ result = mol0.rmsd_to(mol1,
     prune_tol=-1.0,    # disable pruning (default -1.0)
     conv_freq=10,
     max_trials=10000,
+    n_records=1,       # request up to this many ranked solutions
 )
+result = results[0]   # best (lowest RMSD) solution
+print(result.rmsd)
 ```
+
+Pass `n_records > 1` (with `align=True, remap=True`) to retrieve several
+ranked candidate solutions in one call — see
+[Retrieving multiple ranked solutions](#retrieving-multiple-ranked-solutions).
 
 #### Writing output
 
@@ -553,10 +620,13 @@ c0, c1 = read_conformers("poses.sdf", frames=(0, 1))
 
 #### Computing RMSD
 
+`rmsd_to()` always returns a **list** of `RMSDResult`, ranked best (lowest
+RMSD) first. By default only the single best solution is computed:
+
 ```python
-result = c0.rmsd_to(c1,
+results = c0.rmsd_to(c1,
     align=True,        # default: False
-    remap=True,        # default: False
+    remap=True,         # default: False
     heavy_only=False,
     mass_weighted=False,
     mirror=False,
@@ -567,15 +637,22 @@ result = c0.rmsd_to(c1,
     random=False,
     conv_freq=100,
     max_trials=10000,
+    n_records=1,        # request up to this many ranked solutions
 )
+result = results[0]             # best (lowest RMSD) solution
 print(result.rmsd)              # float, Å
 print(result.atom_permutation)  # int32 array, 0-based
 print(result.transform)         # 4×4 float64 array
 ```
 
+Pass `n_records > 1` (with `align=True, remap=True`) to retrieve several
+ranked candidate solutions in one call — see
+[Retrieving multiple ranked solutions](#retrieving-multiple-ranked-solutions).
+
 ### RMSDResult
 
-Returned by every `.rmsd_to()` call.
+`.rmsd_to()` returns a `list[RMSDResult]`, one element per requested
+solution (best/lowest RMSD first). Each `RMSDResult` holds:
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
@@ -587,8 +664,26 @@ Returned by every `.rmsd_to()` call.
 
 ```python
 # Produce a new object that is aligned and reordered to match the reference
+result = mol0.rmsd_to(other, align=True, remap=True)[0]
 other_aligned = result.apply_to(other)
 other_aligned.write_xyz("aligned.xyz")
+```
+
+#### Retrieving multiple ranked solutions
+
+Set `n_records` to inspect several distinct candidate mappings instead of
+just the best one. This only produces more than one result when both
+`align=True` and `remap=True`; the returned list is otherwise always
+length 1 regardless of `n_records`, and may be shorter than `n_records`
+if fewer distinct solutions were found:
+
+```python
+results = mol0.rmsd_to(mol1, align=True, remap=True, n_records=5)
+
+for i, result in enumerate(results):
+    print(f"Solution {i}: RMSD = {result.rmsd:.4f} Å")
+
+best = results[0]
 ```
 
 ### Examples
@@ -600,7 +695,7 @@ from molalignlib import read_conformers
 
 c0, c1 = read_conformers("PRDCC002527_poses.sdf", frames=(0, 1))
 
-result = c0.rmsd_to(c1, remap=True, align=True)
+result = c0.rmsd_to(c1, remap=True, align=True)[0]
 print(f"RMSD = {result.rmsd:.4f} Å")
 
 c1_aligned = result.apply_to(c1)
@@ -616,7 +711,7 @@ conformers = read_conformers("PRDCC002527_poses.sdf")
 
 for c0 in conformers:
     for c1 in conformers:
-        result = c1.rmsd_to(c0, remap=True, align=True)
+        result = c1.rmsd_to(c0, remap=True, align=True)[0]
         print(f"{result.rmsd:.4f}", end="  ")
     print()
 ```
@@ -630,7 +725,7 @@ clusters = read_clusters("Co138_frames.xyz")
 ref = clusters[0]
 
 for mol in clusters[1:]:
-    result = mol.rmsd_to(ref, remap=True, align=True, prune_tol=0.1)
+    result = mol.rmsd_to(ref, remap=True, align=True, prune_tol=0.1)[0]
     print(f"{result.rmsd:.4f}")
 ```
 
@@ -641,7 +736,7 @@ from molalignlib import read_clusters
 
 mol0, mol1 = read_clusters("Co138_frames.xyz", frames=(0, 1))
 
-result = mol0.rmsd_to(mol1, remap=True, align=True, prune_tol=0.1, stats=True)
+result = mol0.rmsd_to(mol1, remap=True, align=True, prune_tol=0.1, stats=True)[0]
 print(f"RMSD = {result.rmsd:.4f} Å")
 
 mol1_aligned = result.apply_to(mol1)
@@ -662,6 +757,25 @@ atom_data = np.column_stack([
 coords = ase_atoms.get_positions().astype(np.float64)
 
 cluster = AtomCluster(atom_data=atom_data, coords=coords)
+```
+
+#### Example 6 — Retrieve several ranked solutions instead of just the best
+
+```python
+from molalignlib import read_clusters
+
+mol0, mol1 = read_clusters("Co138_frames.xyz", frames=(0, 1))
+
+# Ask for up to 5 ranked candidate mappings
+results = mol0.rmsd_to(mol1, remap=True, align=True, prune_tol=0.1, n_records=5)
+
+for i, result in enumerate(results):
+    print(f"Solution {i}: RMSD = {result.rmsd:.4f} Å")
+
+# The list is sorted best-first
+best = results[0]
+mol1_aligned = best.apply_to(mol1)
+mol1_aligned.write_xyz("Co138_aligned.xyz", comment=f"RMSD={best.rmsd:.4f}")
 ```
 
 

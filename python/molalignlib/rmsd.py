@@ -17,7 +17,12 @@ Conformer
     Represents a molecule with bond topology (a conformer).
     Uses conformsd_calculate under the hood.
 
-Both expose a .rmsd_to(other, **kwargs) method that returns an RMSDResult object.
+Both expose a .rmsd_to(other, n_records=1, **kwargs) method that returns a
+list of RMSDResult objects, best (lowest RMSD) first. By default only the
+single best solution is computed (a list of length 1); pass a larger
+n_records to get several ranked candidate solutions at once. The returned
+list may be shorter than n_records if the library did not find that many
+distinct solutions.
 """
 
 from pathlib import Path
@@ -258,11 +263,21 @@ class AtomCluster(object):
         prune_tol=-1.0,
         conv_freq=10,
         max_trials=10000,
+        n_records=1,
     ):
+        """
+        Compute up to n_records ranked candidate solutions.
+
+        Returns a list of RMSDResult, best (lowest RMSD) first. Records
+        beyond the first are only ever produced when both align=True and
+        remap=True; otherwise the returned list always has length 1
+        regardless of n_records. The list may be shorter than n_records
+        if the library did not find that many distinct solutions.
+        """
         if not isinstance(other, AtomCluster):
             raise TypeError("Expected AtomCluster, got {}".format(type(other).__name__))
 
-        rmsd_val, perm, tf = atormsd.calculate(
+        rmsd_vals, perms, tfs = atormsd.calculate(
             self._atom_data, self._coords,
             other._atom_data, other._coords,
             align_flag=align,
@@ -276,8 +291,12 @@ class AtomCluster(object):
             prune_tol=prune_tol,
             conv_freq=conv_freq,
             max_trials=max_trials,
+            n_records=n_records,
         )
-        return RMSDResult(rmsd=rmsd_val, atom_permutation=perm, transform=tf)
+        return [
+            RMSDResult(rmsd=rmsd_vals[i], atom_permutation=perms[i], transform=tfs[i])
+            for i in range(len(rmsd_vals))
+        ]
 
     def __repr__(self):
         return "AtomCluster(name={!r}, n_atoms={})".format(self._name, self.n_atoms)
@@ -360,7 +379,17 @@ class Conformer(object):
         random=False,
         conv_freq=100,
         max_trials=10000,
+        n_records=1,
     ):
+        """
+        Compute up to n_records ranked candidate solutions.
+
+        Returns a list of RMSDResult, best (lowest RMSD) first. Records
+        beyond the first are only ever produced when both align=True and
+        remap=True; otherwise the returned list always has length 1
+        regardless of n_records. The list may be shorter than n_records
+        if the library did not find that many distinct solutions.
+        """
         if not isinstance(other, Conformer):
             raise TypeError("Expected Conformer, got {}".format(type(other).__name__))
 
@@ -368,7 +397,7 @@ class Conformer(object):
         if bond_flag and bond_tol is None:
             raise ValueError("bond_tol is required when bond_flag=True")
 
-        rmsd_val, perm, tf = conformsd.calculate(
+        rmsd_vals, perms, tfs = conformsd.calculate(
             self._atom_data, self._coords,
             other._atom_data, other._coords,
             bond_data1=self._bond_data if not bond_flag else None,
@@ -385,8 +414,12 @@ class Conformer(object):
             random_flag=random,
             conv_freq=conv_freq,
             max_trials=max_trials,
+            n_records=n_records,
         )
-        return RMSDResult(rmsd=rmsd_val, atom_permutation=perm, transform=tf)
+        return [
+            RMSDResult(rmsd=rmsd_vals[i], atom_permutation=perms[i], transform=tfs[i])
+            for i in range(len(rmsd_vals))
+        ]
 
     def __repr__(self):
         return "Conformer(name={!r}, n_atoms={}, n_bonds={})".format(
