@@ -1,4 +1,5 @@
 parameters.f90
+error_codes.f90
 common_types.f90
 flags.f90
 str_utils.f90

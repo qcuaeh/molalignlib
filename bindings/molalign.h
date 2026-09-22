@@ -45,12 +45,11 @@ extern "C" {
  *
  * @param rmsd_list     [out] RMSD of each returned record, length n_records.
  *                            Only the first *occ_records entries are valid.
- * @param natoms        [out] Number of atoms in each permutation (same for
- *                            every record)
  * @param atomperm_list [out] Flattened, 0-based atom permutations, length
- *                            n_records*natoms. Record i (0-based) occupies
- *                            atomperm_list[i*natoms .. i*natoms + natoms - 1].
- *                            Caller allocates >= n_records*natoms.
+ *                            n_records*n_atoms1 (each permutation has one
+ *                            entry per atom of molecule 1). Record i (0-based)
+ *                            occupies atomperm_list[i*n_atoms1 .. i*n_atoms1 + n_atoms1 - 1].
+ *                            Caller allocates >= n_records*n_atoms1.
  * @param transform_list [out] Flattened row-major 4x4 homogeneous transforms,
  *                            length n_records*16. Record i occupies
  *                            transform_list[i*16 .. i*16 + 15]. Maps
@@ -58,7 +57,13 @@ extern "C" {
  *                            p_out = R*p_in + t. Identity when align_flag=false.
  *                            Caller allocates >= n_records*16.
  * @param occ_records   [out] Actual number of records written (<= n_records)
- * @param error_code    [out] 0=success, 1=not isomers, 2=atom types mismatch
+ * @param error_code    [out] A value from enum molalign_error_code
+ *                            (error_codes.h): MOLALIGN_SUCCESS,
+ *                            MOLALIGN_ERROR_NOT_ISOMERS,
+ *                            MOLALIGN_ERROR_ATOM_TYPE_MISMATCH (only when
+ *                            remap_flag=false), or
+ *                            MOLALIGN_ERROR_PRUNED_ASSIGNMENT_FAILED (only when
+ *                            remap_flag=true).
  */
 void atormsd_calculate(
     int n_atoms1, const int *atom_data1, const double *coords1,
@@ -68,7 +73,7 @@ void atormsd_calculate(
     bool print_stats, bool random_flag,
     bool prune_flag, double prune_tol, int conv_freq, int max_trials,
     int n_records,
-    double *rmsd_list, int *natoms, int *atomperm_list,
+    double *rmsd_list, int *atomperm_list,
     double *transform_list, int *occ_records, int *error_code);
 
 /**
@@ -114,12 +119,11 @@ void atormsd_calculate(
  *
  * @param rmsd_list     [out] RMSD of each returned record, length n_records.
  *                            Only the first *occ_records entries are valid.
- * @param natoms        [out] Number of atoms in each permutation (same for
- *                            every record)
  * @param atomperm_list [out] Flattened, 0-based atom permutations, length
- *                            n_records*natoms. Record i (0-based) occupies
- *                            atomperm_list[i*natoms .. i*natoms + natoms - 1].
- *                            Caller allocates >= n_records*natoms.
+ *                            n_records*n_atoms1 (each permutation has one
+ *                            entry per atom of molecule 1). Record i (0-based)
+ *                            occupies atomperm_list[i*n_atoms1 .. i*n_atoms1 + n_atoms1 - 1].
+ *                            Caller allocates >= n_records*n_atoms1.
  * @param transform_list [out] Flattened row-major 4x4 homogeneous transforms,
  *                            length n_records*16. Record i occupies
  *                            transform_list[i*16 .. i*16 + 15]. Maps
@@ -127,10 +131,15 @@ void atormsd_calculate(
  *                            p_out = R*p_in + t. Identity when align_flag=false.
  *                            Caller allocates >= n_records*16.
  * @param occ_records   [out] Actual number of records written (<= n_records)
- * @param error_code    [out] 0=success, 1=not isomers, 2=atom type mismatch,
- *                            3=missing bonds, 4=bond connectivity mismatch
- *                            (only possible when remap_flag=false). Numbered
- *                            to match atormsd_calculate where applicable.
+ * @param error_code    [out] A value from enum molalign_error_code
+ *                            (error_codes.h): MOLALIGN_SUCCESS,
+ *                            MOLALIGN_ERROR_NOT_ISOMERS,
+ *                            MOLALIGN_ERROR_MISSING_BONDS,
+ *                            MOLALIGN_ERROR_ATOM_TYPE_MISMATCH or
+ *                            MOLALIGN_ERROR_BOND_MISMATCH (both only when
+ *                            remap_flag=false), or
+ *                            MOLALIGN_ERROR_NOT_CONFORMERS (only when
+ *                            remap_flag=true).
  */
 void conformsd_calculate(
     int n_atoms1, const int *atom_data1, const double *coords1,
@@ -142,7 +151,7 @@ void conformsd_calculate(
     bool print_stats, bool print_assigntree, bool random_flag,
     int conv_freq, int max_trials,
     int n_records,
-    double *rmsd_list, int *natoms, int *atomperm_list,
+    double *rmsd_list, int *atomperm_list,
     double *transform_list, int *occ_records, int *error_code);
 
 #ifdef __cplusplus

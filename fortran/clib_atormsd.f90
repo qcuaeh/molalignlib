@@ -11,6 +11,7 @@ module clib_atormsd
    use alignment_atoms
    use cbind_utils
    use flags
+   use error_codes
    implicit none
 
 contains
@@ -18,10 +19,10 @@ contains
 ! C callable wrapper for atormsd functionality.
 !
 ! Caller supplies pre-read molecular data as flat C arrays:
-!   c_atom_data1/2 : packed atom data, length n_atoms*2:
+!   c_atom_data1/2 : packed atom data, length c_n_atoms*2:
 !                    [elnum0, label0, elnum1, label1, ...]
 !                    label = 0 means unlabelled.
-!   coords1/2      : XYZ coordinates, row-major (n_atoms x 3), length n_atoms*3
+!   c_coords1/2    : XYZ coordinates, row-major (c_n_atoms x 3), length c_n_atoms*3
 !
 ! No bond data is needed for the atom-RMSD calculation.
 !
@@ -37,28 +38,34 @@ contains
 !   c_occ_records entries of c_rmsd_list, c_atomperm_list, and
 !   c_transform_list are meaningful. All output arrays are flattened and
 !   must be allocated by the caller with at least c_n_records elements per
-!   record (natoms for c_atomperm_list, 16 for c_transform_list).
+!   record (c_n_atoms1 for c_atomperm_list, 16 for c_transform_list).
+!
+! c_error_code values: see the error_codes module (error_codes.f90) and its
+! C mirror, error_codes.h. This function can return MOLALIGN_SUCCESS,
+! MOLALIGN_ERROR_NOT_ISOMERS, MOLALIGN_ERROR_ATOM_TYPE_MISMATCH (only
+! when c_remap_flag is false) and MOLALIGN_ERROR_PRUNED_ASSIGNMENT_FAILED (only
+! when c_remap_flag is true; passed through from assign_atoms_pruned).
 subroutine atormsd_calculate(                                        &
-      n_atoms1,  c_atom_data1,  c_coords1,                            &
-      n_atoms2,  c_atom_data2,  c_coords2,                            &
+      c_n_atoms1,  c_atom_data1,  c_coords1,                            &
+      c_n_atoms2,  c_atom_data2,  c_coords2,                            &
       c_align_flag, c_remap_flag, c_heavy_flag, c_mass_flag,         &
       c_mirror_flag, c_label_flag,                                   &
       c_print_stats, c_random_flag,                                   &
       c_prune_flag, c_prune_tol, c_conv_freq, c_max_trials,          &
       c_n_records,                                                   &
-      c_rmsd_list, c_natoms, c_atomperm_list,                         &
+      c_rmsd_list, c_atomperm_list,                                       &
       c_transform_list, c_occ_records, c_error_code)                  &
       bind(C, name="atormsd_calculate")
 
    ! Molecule 1
-   integer(ik), intent(in), value :: n_atoms1
-   integer(ik), dimension(n_atoms1*2), intent(in) :: c_atom_data1
-   real(rk),    dimension(n_atoms1*3), intent(in) :: c_coords1
+   integer(ik), intent(in), value :: c_n_atoms1
+   integer(ik), dimension(c_n_atoms1*2), intent(in) :: c_atom_data1
+   real(rk),    dimension(c_n_atoms1*3), intent(in) :: c_coords1
 
    ! Molecule 2
-   integer(ik), intent(in), value :: n_atoms2
-   integer(ik), dimension(n_atoms2*2), intent(in) :: c_atom_data2
-   real(rk),    dimension(n_atoms2*3), intent(in) :: c_coords2
+   integer(ik), intent(in), value :: c_n_atoms2
+   integer(ik), dimension(c_n_atoms2*2), intent(in) :: c_atom_data2
+   real(rk),    dimension(c_n_atoms2*3), intent(in) :: c_coords2
 
    ! Flags
    logical(lk), intent(in), value :: c_align_flag, c_remap_flag, c_heavy_flag, c_mass_flag
@@ -73,7 +80,6 @@ subroutine atormsd_calculate(                                        &
 
    ! Outputs
    real(rk),    dimension(*), intent(out) :: c_rmsd_list
-   integer(ik),                intent(out) :: c_natoms
    integer(ik), dimension(*), intent(out) :: c_atomperm_list
    real(rk),    dimension(*), intent(out) :: c_transform_list
    integer(ik),                intent(out) :: c_occ_records
@@ -88,11 +94,11 @@ subroutine atormsd_calculate(                                        &
    real(rk), dimension(:),   allocatable :: weights1, weights2
    real(rk), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, coords2r
    integer(ik), dimension(:), allocatable :: atomset1, atomset2, atomperm1
-   integer(ik) :: num_records, max_trials, conv_freq
-   integer(ik) :: error_code
-   integer(ik) :: i, j, natoms_local, base
+   integer(ik) :: num_records
+   integer(ik) :: i, j, base
 
-   c_error_code = 0;  c_occ_records = 0;  c_natoms = 0
+   c_error_code = MOLALIGN_SUCCESS
+   c_occ_records = 0
 
    ! Requested record count (must be at least 1)
    num_records = max(1_ik, c_n_records)
@@ -120,12 +126,9 @@ subroutine atormsd_calculate(                                        &
       prune_procedure => prune_none
    end if
 
-   conv_freq   = c_conv_freq
-   max_trials  = c_max_trials
-
    ! Build atom_t arrays from packed C arrays
-   call build_atoms(n_atoms1, c_atom_data1, c_coords1, atoms1)
-   call build_atoms(n_atoms2, c_atom_data2, c_coords2, atoms2)
+   call build_atoms(c_n_atoms1, c_atom_data1, c_coords1, atoms1)
+   call build_atoms(c_n_atoms2, c_atom_data2, c_coords2, atoms2)
 
    if (heavy_flag) then
       ! Include only heavy atoms
@@ -142,7 +145,7 @@ subroutine atormsd_calculate(                                        &
 
    ! Abort if molecules are not isomers
    if (any(atomtypes%parts%num_items1 /= atomtypes%parts%num_items2)) then
-      c_error_code = 1
+      c_error_code = MOLALIGN_ERROR_NOT_ISOMERS
       return
    end if
 
@@ -189,18 +192,14 @@ subroutine atormsd_calculate(                                        &
 
          call allocate_registry(registry, num_records)
          call optimize_atomperm_atoms(atomset1, atomset2, atomtypes, prunes, &
-               coords1w, coords2w, conv_freq, max_trials, registry, error_code)
-         if (error_code /= 0) then
-            c_error_code = error_code
-            return
-         end if
+               coords1w, coords2w, c_conv_freq, c_max_trials, registry, c_error_code)
+         if (c_error_code /= MOLALIGN_SUCCESS) return
 
          if (print_stats) call print_records(registry)
 
          c_occ_records = registry%occ_records
          do i = 1, registry%occ_records
             atomperm1 = registry%records(i)%atomperm1
-            natoms_local = size(atomperm1)
             rotquat = least_rotquat(atomset1, atomperm1, coords1w, coords2w)
             coords2r = rotated_coords(coords2, rotquat, center1)
             rmsd = sqrt(sqdistmean(atomset1, atomperm1, weights1, coords1, coords2r))
@@ -208,28 +207,23 @@ subroutine atormsd_calculate(                                        &
                   c_transform_list((i-1)*16+1:i*16))
 
             c_rmsd_list(i) = rmsd
-            base = (i-1) * natoms_local
-            do j = 1, natoms_local
+            base = (i-1) * c_n_atoms1
+            do j = 1, c_n_atoms1
                c_atomperm_list(base+j) = atomperm1(j) - 1  ! 0-based for C
             end do
          end do
-         c_natoms = natoms_local
 
       else
 
-         call assign_atoms_pruned(atomtypes, coords1w, coords2w, prunes, atomperm1, error_code)
-         if (error_code /= 0) then
-            c_error_code = error_code
-            return
-         end if
+         call assign_atoms_pruned(atomtypes, coords1w, coords2w, prunes, atomperm1, c_error_code)
+         if (c_error_code /= MOLALIGN_SUCCESS) return
 
          coords2r = coords2
          rmsd = sqrt(sqdistmean(atomset1, atomperm1, weights1, coords1, coords2r))
 
          c_occ_records = 1
          c_rmsd_list(1) = rmsd
-         c_natoms = size(atomperm1)
-         do j = 1, size(atomperm1)
+         do j = 1, c_n_atoms1
             c_atomperm_list(j) = atomperm1(j) - 1  ! 0-based for C
          end do
 
@@ -242,7 +236,7 @@ subroutine atormsd_calculate(                                        &
 
       ! Abort if atoms do not match
       if (any(atomtypes%itemdir1 /= atomtypes%itemdir2)) then
-         c_error_code = 2
+         c_error_code = MOLALIGN_ERROR_ATOM_TYPE_MISMATCH
          return
       end if
 
@@ -258,8 +252,7 @@ subroutine atormsd_calculate(                                        &
 
       c_occ_records = 1
       c_rmsd_list(1) = rmsd
-      c_natoms = size(atomperm1)
-      do j = 1, size(atomperm1)
+      do j = 1, c_n_atoms1
          c_atomperm_list(j) = atomperm1(j) - 1  ! 0-based for C
       end do
 

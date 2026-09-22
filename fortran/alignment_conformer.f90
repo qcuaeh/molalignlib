@@ -31,18 +31,20 @@ use assignment_atoms
 use assignment_conformer
 use recording
 use flags
+use error_codes
 implicit none
 
 contains
 
 subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atomtypes, &
-      coords1, coords2, conv_freq, max_trials, registry)
+      coords1, coords2, conv_freq, max_trials, registry, error_code)
    integer(ik), dimension(:), intent(in) :: atomset1, atomset2
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(partition_t), intent(in) :: atomtypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    integer(ik), intent(in) :: conv_freq, max_trials
    type(registry_t), target, intent(inout) :: registry
+   integer(ik), intent(out) :: error_code
 
    ! Local variables
    integer(ik), dimension(:), allocatable :: atomperm1, new_atomperm
@@ -56,8 +58,10 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
    allocate (coords2r, mold=coords2)
 
    ! Pre-compute assignment tree for decision making
-   call compute_sc_hna_chain( adjcs1, adjcs2, atomtypes, hna_chain)
-   call build_assignment_tree( adjcs1, adjcs2, hna_chain%last_link, cache_arrays)
+   call compute_sc_hna_chain( adjcs1, adjcs2, atomtypes, hna_chain, error_code)
+   if (error_code /= MOLALIGN_SUCCESS) return
+   call build_assignment_tree( adjcs1, adjcs2, hna_chain%last_link, cache_arrays, error_code)
+   if (error_code /= MOLALIGN_SUCCESS) return
 
    if (print_assigntree) then
       call print_chain_tree_array( atomtypes, cache_arrays)
@@ -150,11 +154,12 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
    end if
 end subroutine
 
-subroutine assign_atomperm_conformer( adjcs1, adjcs2, atomtypes, coords1, coords2, atomperm1)
+subroutine assign_atomperm_conformer( adjcs1, adjcs2, atomtypes, coords1, coords2, atomperm1, error_code)
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(partition_t), intent(in) :: atomtypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    integer(ik), dimension(:), allocatable, intent(out) :: atomperm1
+   integer(ik), intent(out) :: error_code
 
    ! Local variables
    type(chaintree_node_t), pointer :: hna_chain
@@ -162,8 +167,10 @@ subroutine assign_atomperm_conformer( adjcs1, adjcs2, atomtypes, coords1, coords
    real(rk) :: permdist
 
    ! Pre-compute assignment tree
-   call compute_sc_hna_chain( adjcs1, adjcs2, atomtypes, hna_chain)
-   call build_assignment_tree( adjcs1, adjcs2, hna_chain%last_link, cache_arrays)
+   call compute_sc_hna_chain( adjcs1, adjcs2, atomtypes, hna_chain, error_code)
+   if (error_code /= MOLALIGN_SUCCESS) return
+   call build_assignment_tree( adjcs1, adjcs2, hna_chain%last_link, cache_arrays, error_code)
+   if (error_code /= MOLALIGN_SUCCESS) return
 
    if (print_assigntree) then
       call print_chain_tree_array( atomtypes, cache_arrays)

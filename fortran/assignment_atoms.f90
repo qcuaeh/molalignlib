@@ -23,6 +23,7 @@ use lap_jv_sparse
 use lap_hungarian
 use euclidean
 use random
+use error_codes
 implicit none
 private
 public assign_atoms
@@ -72,9 +73,11 @@ subroutine assign_atoms_pruned( atomtypes, coords1, coords2, prunes, atomperm1, 
    integer(ik) :: h, n
    real(rk) :: dist
 
-   error_code = 0
+   error_code = MOLALIGN_SUCCESS
    allocate (perm1(maxval(atomtypes%parts%num_items1)))
-   allocate (atomperm1(sum(atomtypes%parts%num_items1)))
+   ! atomperm1 is indexed by atom (see items1); atoms outside the atom set
+   ! map to themselves
+   call init_array(atomperm1, size(atomtypes%itemdir1), identity)
 
    ! Optimize atomperm1 for each block
    do h = 1, atomtypes%num_parts
@@ -141,7 +144,7 @@ subroutine solve_lap_pruned(n, s1, s2, x1, x2, pruned, perm1, dist, error_code)
    integer(ik), allocatable :: kk(:)
    integer(int64), allocatable :: cc(:)
 
-   error_code = 0
+   error_code = MOLALIGN_SUCCESS
    sz = n*n - count(pruned)
 
    allocate (kk(sz))
@@ -177,7 +180,7 @@ subroutine solve_lap_pruned(n, s1, s2, x1, x2, pruned, perm1, dist, error_code)
 30       if (j > sz) then
             ! Assignment failed
             ! Pruning tolerance might be too tight
-            error_code = 1
+            error_code = MOLALIGN_ERROR_PRUNED_ASSIGNMENT_FAILED
             return
          end if
          if (kk(j) /= perm1(i)) then

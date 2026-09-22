@@ -24,6 +24,7 @@ use molecule
 use linked_list_types
 use indexed_list_types
 use flags
+use error_codes
 implicit none
 private
 public refine_hna_part
@@ -102,13 +103,16 @@ subroutine refine_hna_partition(adjcs1, adjcs2, hna_chain, num_splits)
    end do
 end subroutine
 
-subroutine compute_sc_hna_chain(adjcs1, adjcs2, atomtypes, hna_chain)
+subroutine compute_sc_hna_chain(adjcs1, adjcs2, atomtypes, hna_chain, error_code)
 ! Iteratively refine HNA partition until self-consistency
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(partition_t), intent(in) :: atomtypes
    type(chaintree_node_t), pointer, intent(out) :: hna_chain
+   integer(ik), intent(out) :: error_code
    ! Local variables
    integer(ik) :: num_splits
+
+   error_code = MOLALIGN_SUCCESS
 
 !   hna_chain => collect_atomtypes_linked( adjcs1, adjcs2)
    hna_chain => chain_from_partition( atomtypes)
@@ -122,9 +126,8 @@ subroutine compute_sc_hna_chain(adjcs1, adjcs2, atomtypes, hna_chain)
 
    ! Verify that molecules are conformers
    if (is_partition_uneven(hna_chain%last_link)) then
-      write(stderr, '(A)') 'Molecules are not conformers!'
-!      call print_partition_chain(hna_chain)
-      stop
+      error_code = MOLALIGN_ERROR_NOT_CONFORMERS
+      return
    end if
 end subroutine
 
@@ -485,13 +488,14 @@ end subroutine
 
 ! Modified split_dependent_parts incorporating split_single_part functionality
 recursive subroutine split_dependent_parts(adjcs1, adjcs2, hna_chain, branch, branch_parts, &
-      branching_part, part_to_split)
+      branching_part, part_to_split, error_code)
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(chaintree_node_t), pointer, intent(inout) :: hna_chain
    type(chaintree_node_t), pointer, intent(inout) :: branch
    type(chain_node_t), pointer, intent(inout) :: branch_parts
    type(partition_node_t), pointer, intent(in) :: branching_part
    type(partition_node_t), pointer, intent(inout) :: part_to_split
+   integer(ik), intent(out) :: error_code
    ! Local variables
    type(partref_node_t), pointer :: partref
    type(partition_node_t), pointer :: next_part_to_split
@@ -499,6 +503,8 @@ recursive subroutine split_dependent_parts(adjcs1, adjcs2, hna_chain, branch, br
    type(chain_node_t), pointer :: first_branch_link
    type(partition_node_t), pointer :: child_part
    integer(ik) :: num_splits
+
+   error_code = MOLALIGN_SUCCESS
 
    ! Incorporate split_single_part logic
    ! Save the last link before creating a new one
@@ -538,9 +544,8 @@ recursive subroutine split_dependent_parts(adjcs1, adjcs2, hna_chain, branch, br
 
    ! Verify that molecules are conformers
    if (is_partition_uneven(hna_chain%last_link)) then
-      write(stderr, '(A)') 'Molecules are not conformers!'
-!      call print_partition_chain(hna_chain)
-      stop
+      error_code = MOLALIGN_ERROR_NOT_CONFORMERS
+      return
    end if
 
    ! Find a degenerate descendant part to split
@@ -559,19 +564,22 @@ recursive subroutine split_dependent_parts(adjcs1, adjcs2, hna_chain, branch, br
    if (associated(next_part_to_split)) then
       ! Call itself again to split the next degenerate descendant part
       call split_dependent_parts(adjcs1, adjcs2, hna_chain, branch, branch_parts, branching_part, &
-            next_part_to_split)
+            next_part_to_split, error_code)
    end if
 end subroutine
 
 ! Updated split_independent_parts to use the merged function signature
-recursive subroutine split_independent_parts(adjcs1, adjcs2, hna_chain, branch, branch_parts)
+recursive subroutine split_independent_parts(adjcs1, adjcs2, hna_chain, branch, branch_parts, error_code)
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(chaintree_node_t), pointer, intent(inout) :: hna_chain, branch
    type(chain_node_t), pointer, intent(in) :: branch_parts
+   integer(ik), intent(out) :: error_code
    ! Local variables
    type(chain_node_t), pointer :: new_branch_parts
    type(chaintree_node_t), pointer :: new_branch
    type(partref_node_t), pointer :: partref
+
+   error_code = MOLALIGN_SUCCESS
 
    ! Process each part in branch_parts
    partref => branch_parts%first_partref
@@ -583,18 +591,21 @@ recursive subroutine split_independent_parts(adjcs1, adjcs2, hna_chain, branch, 
          new_branch_parts => new_bare_link()
          ! Split the target part and continue splitting descendants until convergence
          call split_dependent_parts(adjcs1, adjcs2, hna_chain, new_branch, new_branch_parts, &
-               partref%part, partref%part)
+               partref%part, partref%part, error_code)
+         if (error_code /= MOLALIGN_SUCCESS) return
          ! Recursively process the resulting branch parts
-         call split_independent_parts(adjcs1, adjcs2, hna_chain, new_branch, new_branch_parts)
+         call split_independent_parts(adjcs1, adjcs2, hna_chain, new_branch, new_branch_parts, error_code)
+         if (error_code /= MOLALIGN_SUCCESS) return
       end if
       partref => partref%nextref
    end do
 end subroutine
 
-subroutine build_assignment_tree( adjcs1, adjcs2, hna_link, cache_arrays)
+subroutine build_assignment_tree( adjcs1, adjcs2, hna_link, cache_arrays, error_code)
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(chain_node_t), pointer, intent(in) :: hna_link
    type(array_trees_t), intent(out) :: cache_arrays
+   integer(ik), intent(out) :: error_code
    ! Local variables
    type(partition_node_t), pointer :: partition_tree
    type(chaintree_node_t), pointer :: assignment_tree
@@ -603,6 +614,8 @@ subroutine build_assignment_tree( adjcs1, adjcs2, hna_link, cache_arrays)
    type(partition_node_t), pointer :: child_part
    type(chain_node_t), pointer :: first_link
    type(partref_node_t), pointer :: partref
+
+   error_code = MOLALIGN_SUCCESS
 
    partition_tree => new_root_part()
    branch_parts => new_bare_link()
@@ -619,7 +632,8 @@ subroutine build_assignment_tree( adjcs1, adjcs2, hna_link, cache_arrays)
       partref => partref%nextref
    end do
 
-   call split_independent_parts( adjcs1, adjcs2, hna_chain, assignment_tree, branch_parts)
+   call split_independent_parts( adjcs1, adjcs2, hna_chain, assignment_tree, branch_parts, error_code)
+   if (error_code /= MOLALIGN_SUCCESS) return
 !   call distribute_items( adjcs1, adjcs2, assignment_tree)
 
    ! Cache required data for DFS in fixed size arrays

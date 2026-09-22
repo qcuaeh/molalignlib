@@ -115,7 +115,7 @@ subroutine write_file_sdf(unit, title, atoms, bonds, atomperm1)
    do i = 1, n_bonds
       atomidx1 = atomperm2(bonds(i)%atomidx1)
       atomidx2 = atomperm2(bonds(i)%atomidx2)
-      bondtype = atomperm2(bonds(i)%bondtype)
+      bondtype = bonds(i)%bondtype
       write (unit, '(I3,I3,I3,I3,I3,I3,I3)') atomidx1, atomidx2, bondtype, 0, 0, 0, 0
    end do
 
@@ -171,8 +171,8 @@ subroutine write_file_mol2(unit, title, atoms, bonds, atomperm1)
    do i = 1, n_bonds
       atomidx1 = atomperm2(bonds(i)%atomidx1)
       atomidx2 = atomperm2(bonds(i)%atomidx2)
-      if (atomperm2(bonds(i)%bondtype) > 0) then
-         bondtype = str(atomperm2(bonds(i)%bondtype))
+      if (bonds(i)%bondtype > 0) then
+         bondtype = str(bonds(i)%bondtype)
       else
          bondtype = 'un'
       end if

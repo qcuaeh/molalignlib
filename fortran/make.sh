@@ -49,8 +49,8 @@ build_programs() {
    done < <(grep -Ehv '^$|^#' "$srcdir/programs.txt")
 }
 
-srcdir=$PWD
-blddir=$PWD/build
+srcdir=.
+blddir=build
 
 # make.sh builds the standalone Fortran programs (no C bindings needed),
 # so it uses the plain-Fortran kinds module.

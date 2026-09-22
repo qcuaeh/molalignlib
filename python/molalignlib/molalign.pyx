@@ -17,6 +17,19 @@ from libc.stdlib cimport malloc, free
 
 np.import_array()
 
+cdef extern from "error_codes.h":
+    # Error codes returned via each function's error_code output argument.
+    # Declared once in error_codes.h (itself kept in sync by hand with
+    # the Fortran error_codes module, error_codes.f90) and reused here
+    # instead of hardcoding the numbers a third time.
+    enum: MOLALIGN_SUCCESS
+    enum: MOLALIGN_ERROR_NOT_ISOMERS
+    enum: MOLALIGN_ERROR_ATOM_TYPE_MISMATCH
+    enum: MOLALIGN_ERROR_MISSING_BONDS
+    enum: MOLALIGN_ERROR_BOND_MISMATCH
+    enum: MOLALIGN_ERROR_NOT_CONFORMERS
+    enum: MOLALIGN_ERROR_PRUNED_ASSIGNMENT_FAILED
+
 cdef extern from "molalign.h":
     void c_atormsd_calculate "atormsd_calculate"(
         int n_atoms1, const int *atom_data1, const double *coords1,
@@ -26,7 +39,7 @@ cdef extern from "molalign.h":
         bint print_stats, bint random_flag,
         bint prune_flag, double prune_tol, int conv_freq, int max_trials,
         int n_records,
-        double *rmsd_list, int *natoms, int *atomperm_list,
+        double *rmsd_list, int *atomperm_list,
         double *transform_list, int *occ_records, int *error_code)
 
     void c_conformsd_calculate "conformsd_calculate"(
@@ -39,22 +52,24 @@ cdef extern from "molalign.h":
         bint print_stats, bint print_assigntree, bint random_flag,
         int conv_freq, int max_trials,
         int n_records,
-        double *rmsd_list, int *natoms, int *atomperm_list,
+        double *rmsd_list, int *atomperm_list,
         double *transform_list, int *occ_records, int *error_code)
 
 
 _ATORMSD_ERROR_MESSAGES = {
-    1: "Clusters are not isomers.",
-    2: "Atom types mismatch between the two clusters.",
-    3: "Assignment failed (pruning tolerance is too tight).",
+    MOLALIGN_ERROR_NOT_ISOMERS: "Clusters are not isomers.",
+    MOLALIGN_ERROR_ATOM_TYPE_MISMATCH: "Atom types mismatch between the two clusters.",
+    MOLALIGN_ERROR_PRUNED_ASSIGNMENT_FAILED: "Assignment failed (pruning tolerance might be too tight).",
 }
 
 _CONFORMSD_ERROR_MESSAGES = {
-    1: "Molecules are not isomers (different atom counts or compositions).",
-    2: "Atom type mismatch between the two conformers.",
-    3: "Missing bond data for one or both conformers.",
-    4: "Bond connectivity mismatch between the two conformers (only raised "
+    MOLALIGN_ERROR_NOT_ISOMERS: "Molecules are not isomers (different atom counts or compositions).",
+    MOLALIGN_ERROR_ATOM_TYPE_MISMATCH: "Atom type mismatch between the two conformers.",
+    MOLALIGN_ERROR_MISSING_BONDS: "Missing bond data for one or both conformers.",
+    MOLALIGN_ERROR_BOND_MISMATCH: "Bond connectivity mismatch between the two conformers (only raised "
        "when remap_flag=False).",
+    MOLALIGN_ERROR_NOT_CONFORMERS: "Molecules are not conformers (same composition but different "
+       "bond graphs; only raised when remap_flag=True).",
 }
 
 # Sentinel used by rmsd.py when bond_flag=True (geometry-derived connectivity).
@@ -94,7 +109,7 @@ cdef _validate_bonds(np.ndarray[np.int32_t, ndim=2] bd1,
         raise ValueError("bond_data2 must have shape (b, 3)")
 
 
-cdef int _alloc_buffers(int n_records, int max_atoms,
+cdef int _alloc_buffers(int n_records, int n_atoms,
                          double **rmsd_list, int **atomperm_list,
                          double **transform_list) except -1:
     """
@@ -102,7 +117,7 @@ cdef int _alloc_buffers(int n_records, int max_atoms,
     MemoryError (after freeing any partially-allocated buffers) on failure.
     """
     rmsd_list[0]      = <double *>malloc(n_records * sizeof(double))
-    atomperm_list[0]  = <int *>malloc(n_records * max_atoms * sizeof(int))
+    atomperm_list[0]  = <int *>malloc(n_records * n_atoms * sizeof(int))
     transform_list[0] = <double *>malloc(n_records * 16 * sizeof(double))
 
     if rmsd_list[0] == NULL or atomperm_list[0] == NULL or transform_list[0] == NULL:
@@ -114,14 +129,14 @@ cdef int _alloc_buffers(int n_records, int max_atoms,
 
 
 cdef _pack_outputs(double *rmsd_list, int *atomperm_list, double *transform_list,
-                    int natoms, int occ_records):
+                    int n_atoms, int occ_records):
     """Copy the raw C output buffers into numpy arrays."""
     rmsd = np.array([rmsd_list[i] for i in range(occ_records)], dtype=np.float64)
 
-    perm = np.empty((occ_records, natoms), dtype=np.int32)
+    perm = np.empty((occ_records, n_atoms), dtype=np.int32)
     for r in range(occ_records):
-        for a in range(natoms):
-            perm[r, a] = atomperm_list[r * natoms + a]
+        for a in range(n_atoms):
+            perm[r, a] = atomperm_list[r * n_atoms + a]
 
     transform = np.empty((occ_records, 4, 4), dtype=np.float64)
     for r in range(occ_records):
@@ -177,7 +192,7 @@ def atormsd_calculate(
     -------
     rmsd : float64 ndarray, shape (occ_records,)
         RMSD of each returned candidate solution, best first.
-    atom_permutation : int32 ndarray, shape (occ_records, n_atoms) — 0-based
+    atom_permutation : int32 ndarray, shape (occ_records, n_atoms1) — 0-based
     transform : float64 ndarray, shape (occ_records, 4, 4)
 
     ``occ_records`` (<= n_records) is however many distinct solutions the
@@ -187,7 +202,6 @@ def atormsd_calculate(
 
     cdef int n1 = atom_data1.shape[0]
     cdef int n2 = atom_data2.shape[0]
-    cdef int max_atoms = n1 if n1 > n2 else n2
 
     atom_data1 = np.ascontiguousarray(atom_data1)
     atom_data2 = np.ascontiguousarray(atom_data2)
@@ -203,14 +217,13 @@ def atormsd_calculate(
             raise ValueError("prune_tol is required when prune_flag=True")
         c_prune_tol = <double>prune_tol
 
-    cdef int    natoms      = 0
     cdef int    occ_records = 0
     cdef int    err         = 0
 
     cdef double *rmsd_list
     cdef int    *atomperm_list
     cdef double *transform_list
-    _alloc_buffers(n_records, max_atoms, &rmsd_list, &atomperm_list, &transform_list)
+    _alloc_buffers(n_records, n1, &rmsd_list, &atomperm_list, &transform_list)
 
     try:
         c_atormsd_calculate(
@@ -225,7 +238,7 @@ def atormsd_calculate(
             print_stats, random_flag,
             prune_flag, c_prune_tol, conv_freq, max_trials,
             n_records,
-            rmsd_list, &natoms, atomperm_list,
+            rmsd_list, atomperm_list,
             transform_list, &occ_records, &err,
         )
 
@@ -235,7 +248,7 @@ def atormsd_calculate(
             )
 
         rmsd, perm, transform = _pack_outputs(
-            rmsd_list, atomperm_list, transform_list, natoms, occ_records
+            rmsd_list, atomperm_list, transform_list, n1, occ_records
         )
     finally:
         free(rmsd_list)
@@ -303,7 +316,7 @@ def conformsd_calculate(
     -------
     rmsd : float64 ndarray, shape (occ_records,)
         RMSD of each returned candidate solution, best first.
-    atom_permutation : int32 ndarray, shape (occ_records, n_atoms) — 0-based
+    atom_permutation : int32 ndarray, shape (occ_records, n_atoms1) — 0-based
     transform : float64 ndarray, shape (occ_records, 4, 4)
 
     ``occ_records`` (<= n_records) is however many distinct solutions the
@@ -313,7 +326,6 @@ def conformsd_calculate(
 
     cdef int n1 = atom_data1.shape[0]
     cdef int n2 = atom_data2.shape[0]
-    cdef int max_atoms = n1 if n1 > n2 else n2
 
     atom_data1 = np.ascontiguousarray(atom_data1)
     atom_data2 = np.ascontiguousarray(atom_data2)
@@ -340,14 +352,13 @@ def conformsd_calculate(
             raise ValueError("bond_tol is required when bond_flag=True")
         c_bond_tol = <double>bond_tol
 
-    cdef int    natoms      = 0
     cdef int    occ_records = 0
     cdef int    err         = 0
 
     cdef double *rmsd_list
     cdef int    *atomperm_list
     cdef double *transform_list
-    _alloc_buffers(n_records, max_atoms, &rmsd_list, &atomperm_list, &transform_list)
+    _alloc_buffers(n_records, n1, &rmsd_list, &atomperm_list, &transform_list)
 
     try:
         c_conformsd_calculate(
@@ -366,7 +377,7 @@ def conformsd_calculate(
             print_stats, print_assigntree, random_flag,
             conv_freq, max_trials,
             n_records,
-            rmsd_list, &natoms, atomperm_list,
+            rmsd_list, atomperm_list,
             transform_list, &occ_records, &err,
         )
 
@@ -376,7 +387,7 @@ def conformsd_calculate(
             )
 
         rmsd, perm, transform = _pack_outputs(
-            rmsd_list, atomperm_list, transform_list, natoms, occ_records
+            rmsd_list, atomperm_list, transform_list, n1, occ_records
         )
     finally:
         free(rmsd_list)

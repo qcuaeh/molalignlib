@@ -129,11 +129,15 @@ subroutine collect_atomtypes(atomset1, atomset2, atoms1, atoms2, atomtypes)
    allocate(itemdir1_temp(n_atoms1))
    allocate(itemdir2_temp(n_atoms2))
 
-   ! Initialize
+   ! Initialize counters
    part_count1 = 0
    part_count2 = 0
    atomtypetable%num_items = 0
    current_part = 0
+
+   ! Atoms outside the atom set belong to no part
+   itemdir1_temp = 0
+   itemdir2_temp = 0
 
    ! SINGLE PASS: Process all atoms, build assignments AND count sizes
    ! First molecule

@@ -265,7 +265,8 @@ smaller than `n_records`, and it is always `1` unless both `align_flag`
 and `remap_flag` are true. All output arrays (`rmsd_list`, `atomperm_list`,
 `transform_list`) are flattened and must be pre-allocated by the caller
 for `n_records` records; only the first `occ_records` entries are
-meaningful. `natoms` is the same for every record and is written once.
+meaningful. Each permutation has `n_atoms1` entries, so `atomperm_list`
+needs `n_records*n_atoms1` elements.
 
 ### atormsd_calculate
 
@@ -278,7 +279,7 @@ void atormsd_calculate(
     bool print_stats, bool random_flag,
     bool prune_flag, double prune_tol, int conv_freq, int max_trials,
     int n_records,
-    double *rmsd_list, int *natoms, int *atomperm_list,
+    double *rmsd_list, int *atomperm_list,
     double *transform_list, int *occ_records, int *error_code);
 ```
 
@@ -311,11 +312,10 @@ by more than `prune_tol`, speeding up the search. When `prune_flag = true`,
 | **max_trials** | in | Maximum number of optimisation trials |
 | **n_records** | in | Maximum number of ranked candidate solutions to return (≥ 1). Values > 1 only take effect when `align_flag` and `remap_flag` are both true |
 | **rmsd_list** | out | RMSD (Å) of each returned record, length `n_records`; caller allocates |
-| **natoms** | out | Number of elements per permutation record (same for every record) |
-| **atomperm_list** | out | Flattened, **0-based** atom permutations, length `n_records*natoms`. Record `i` occupies `atomperm_list[i*natoms .. i*natoms+natoms-1]`; caller allocates ≥ `n_records*natoms` elements |
+| **atomperm_list** | out | Flattened, **0-based** atom permutations, length `n_records*n_atoms1` (one entry per atom of molecule 1). Record `i` occupies `atomperm_list[i*n_atoms1 .. i*n_atoms1+n_atoms1-1]`; caller allocates ≥ `n_records*n_atoms1` elements |
 | **transform_list** | out | Flattened row-major 4 × 4 homogeneous transforms, length `n_records*16`. Record `i` occupies `transform_list[i*16 .. i*16+15]`; caller allocates ≥ `n_records*16` elements |
 | **occ_records** | out | Actual number of records written (≤ `n_records`) |
-| **error_code** | out | `0` = success; `1` = not isomers; `2` = atom type mismatch |
+| **error_code** | out | A constant from `enum molalign_error_code` in `error_codes.h`: `MOLALIGN_SUCCESS`; `MOLALIGN_ERROR_NOT_ISOMERS` (molecules are not isomers); `MOLALIGN_ERROR_ATOM_TYPE_MISMATCH` (atom types do not match; only when `remap_flag = false`); `MOLALIGN_ERROR_PRUNED_ASSIGNMENT_FAILED` (assignment failed, e.g. `prune_tol` too tight; only when `remap_flag = true`) |
 
 #### Minimal example
 
@@ -323,6 +323,7 @@ by more than `prune_tol`, speeding up the search. When `prune_flag = true`,
 #include <stdio.h>
 #include <stdlib.h>
 #include "molalign.h"
+#include "error_codes.h"
 
 int main(void)
 {
@@ -340,7 +341,7 @@ int main(void)
 
     /* Request a single (best) solution */
     double rmsd_list[1], transform_list[16];
-    int    atomperm_list[3], natoms, occ_records, error_code;
+    int    atomperm_list[3], occ_records, error_code;
 
     atormsd_calculate(
         3, ad1, xy1,
@@ -351,10 +352,10 @@ int main(void)
         /*stats=*/false, /*random=*/false,
         /*prune_flag=*/false, /*prune_tol=*/0.0, /*conv_freq=*/10, /*max_trials=*/10000,
         /*n_records=*/1,
-        rmsd_list, &natoms, atomperm_list,
+        rmsd_list, atomperm_list,
         transform_list, &occ_records, &error_code);
 
-    if (error_code != 0) { fprintf(stderr, "Error %d\n", error_code); return 1; }
+    if (error_code != MOLALIGN_SUCCESS) { fprintf(stderr, "Error %d\n", error_code); return 1; }
     printf("RMSD = %.6f Å\n", rmsd_list[0]);
     return 0;
 }
@@ -368,8 +369,8 @@ To retrieve several ranked solutions, allocate the output arrays for
 
 double rmsd_list[N_RECORDS];
 double transform_list[N_RECORDS * 16];
-int    atomperm_list[N_RECORDS * 3];  /* N_RECORDS * natoms (known here to be 3) */
-int    natoms, occ_records, error_code;
+int    atomperm_list[N_RECORDS * 3];  /* N_RECORDS * n_atoms1 */
+int    occ_records, error_code;
 
 atormsd_calculate(
     3, ad1, xy1, 3, ad2, xy2,
@@ -379,7 +380,7 @@ atormsd_calculate(
     /*stats=*/false, /*random=*/false,
     /*prune_flag=*/false, /*prune_tol=*/0.0, /*conv_freq=*/10, /*max_trials=*/10000,
     /*n_records=*/N_RECORDS,
-    rmsd_list, &natoms, atomperm_list,
+    rmsd_list, atomperm_list,
     transform_list, &occ_records, &error_code);
 
 for (int i = 0; i < occ_records; i++) {
@@ -407,7 +408,7 @@ void conformsd_calculate(
     bool print_stats, bool print_assigntree, bool random_flag,
     int conv_freq, int max_trials,
     int n_records,
-    double *rmsd_list, int *natoms, int *atomperm_list,
+    double *rmsd_list, int *atomperm_list,
     double *transform_list, int *occ_records, int *error_code);
 ```
 
@@ -452,17 +453,17 @@ tolerance) has no default and must be supplied; it is ignored when
 | **max_trials** | in | Maximum number of optimisation trials |
 | **n_records** | in | Maximum number of ranked candidate solutions to return (≥ 1). Values > 1 only take effect when `align_flag` and `remap_flag` are both true |
 | **rmsd_list** | out | RMSD (Å) of each returned record, length `n_records`; caller allocates |
-| **natoms** | out | Number of elements per permutation record (same for every record) |
-| **atomperm_list** | out | Flattened, **0-based** atom permutations, length `n_records*natoms`. Record `i` occupies `atomperm_list[i*natoms .. i*natoms+natoms-1]`; caller allocates ≥ `n_records*natoms` elements |
+| **atomperm_list** | out | Flattened, **0-based** atom permutations, length `n_records*n_atoms1` (one entry per atom of molecule 1). Record `i` occupies `atomperm_list[i*n_atoms1 .. i*n_atoms1+n_atoms1-1]`; caller allocates ≥ `n_records*n_atoms1` elements |
 | **transform_list** | out | Flattened row-major 4 × 4 homogeneous transforms, length `n_records*16`. Record `i` occupies `transform_list[i*16 .. i*16+15]`; caller allocates ≥ `n_records*16` elements |
 | **occ_records** | out | Actual number of records written (≤ `n_records`) |
-| **error_code** | out | `0` = success; `1` = not isomers; `2` = atom type mismatch; `3` = missing bonds; `4` = bond connectivity mismatch (only possible when `remap_flag = false`). Numbered to match `atormsd_calculate` where applicable. |
+| **error_code** | out | A constant from `enum molalign_error_code` in `error_codes.h`: `MOLALIGN_SUCCESS`; `MOLALIGN_ERROR_NOT_ISOMERS` (molecules are not isomers); `MOLALIGN_ERROR_MISSING_BONDS` (bond data missing for one or both molecules); `MOLALIGN_ERROR_ATOM_TYPE_MISMATCH` (atom types do not match; only when `remap_flag = false`); `MOLALIGN_ERROR_BOND_MISMATCH` (bond connectivity does not match; only when `remap_flag = false`); `MOLALIGN_ERROR_NOT_CONFORMERS` (same composition but different connectivity; only when `remap_flag = true`) |
 
 #### Minimal example
 
 ```c
 #include <stdio.h>
 #include "molalign.h"
+#include "error_codes.h"
 
 int main(void)
 {
@@ -482,7 +483,7 @@ int main(void)
 
     /* Request a single (best) solution */
     double rmsd_list[1], transform_list[16];
-    int    atomperm_list[4], natoms, occ_records, error_code;
+    int    atomperm_list[4], occ_records, error_code;
 
     conformsd_calculate(
         4, ad1, xy1, 3, bd1,
@@ -494,10 +495,10 @@ int main(void)
         /*stats=*/false, /*print_assigntree=*/false, /*random=*/false,
         /*conv_freq=*/100, /*max_trials=*/10000,
         /*n_records=*/1,
-        rmsd_list, &natoms, atomperm_list,
+        rmsd_list, atomperm_list,
         transform_list, &occ_records, &error_code);
 
-    if (error_code != 0) { fprintf(stderr, "Error %d\n", error_code); return 1; }
+    if (error_code != MOLALIGN_SUCCESS) { fprintf(stderr, "Error %d\n", error_code); return 1; }
     printf("RMSD = %.6f Å\n", rmsd_list[0]);
     return 0;
 }

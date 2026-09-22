@@ -3,9 +3,7 @@
  * Demo for atormsd_calculate (array-based interface).
  * Reads XYZ files and passes coordinate/element arrays to the Fortran library.
  *
- * Self-contained: the small CLI-parsing and XYZ-reading helpers below used
- * to live in a shared demo_utils.h header; they are now embedded directly
- * in this file, so nothing beyond molalign.h and libmolalign is needed to
+ * Self-contained: nothing beyond molalign.h and libmolalign is needed to
  * build it.
  *
  * Compile:
@@ -30,6 +28,7 @@
 #include <ctype.h>
 #include <stdbool.h>
 #include "molalign.h"
+#include "error_codes.h"
 
 /* ======================================================================
  * CLI - single-dash long-option parser
@@ -46,44 +45,32 @@ typedef struct {
     const char *arg;   /* argument metavar, or NULL */
 } opt_info_t;
 
-/* Parse options from argv, recognising them in any position relative to
- * non-option arguments.
+/* Parse the next option from argv, recognising options in any position
+ * relative to non-option arguments.
  *
- * Non-option tokens are collected into posargs[0..(*npos)-1] as they are
- * encountered; posargs must point to a caller-allocated array of sufficient
- * size and *npos must be initialised to 0 before the first call.
+ * Non-option tokens are collected into posargs as they are encountered.
+ * *npos counts every one of them (it must be 0 before the first call), but
+ * only the first max_pos are stored, so the caller can detect too many
+ * without posargs overflowing.
  *
- * Sets *arg to the option argument when has_arg=1 and advances *argi.
- * Returns the matched val, 0 for unknown option, -1 when done. */
+ * Sets *arg to the option argument when has_arg=1.
+ * Returns the matched val, 0 on error (unknown option or missing
+ * argument), -1 when done. */
 static int parse_long_opt(int argc, char **argv, int *argi, const char **arg,
                           const long_opt_t *opts,
-                          const char **posargs, int *npos)
+                          const char **posargs, int max_pos, int *npos)
 {
-    const char *p, *name;
-    size_t nlen;
-    int i;
-
-    for (;;) {
-        if (*argi >= argc) return -1;
-        p = argv[*argi];
-
-        /* Non-option token: collect as positional argument and keep scanning. */
-        if (p[0] != '-' || p[1] == '\0') {
-            posargs[(*npos)++] = p;
-            (*argi)++;
-            continue;
-        }
-        break;
-    }
-
-    name = p + 1;
-
-    for (i = 0; opts[i].name; i++) {
-        nlen = strlen(opts[i].name);
-        if (strncmp(name, opts[i].name, nlen) != 0) continue;
-        if (name[nlen] != '\0') continue;   /* exact match only */
-
+    /* Collect non-option tokens ("-" alone counts as one). */
+    while (*argi < argc && (argv[*argi][0] != '-' || argv[*argi][1] == '\0')) {
+        if (*npos < max_pos) posargs[*npos] = argv[*argi];
+        (*npos)++;
         (*argi)++;
+    }
+    if (*argi >= argc) return -1;
+
+    const char *p = argv[(*argi)++];
+    for (int i = 0; opts[i].name; i++) {
+        if (strcmp(p + 1, opts[i].name) != 0) continue;   /* exact match only */
         if (opts[i].has_arg) {
             if (*argi >= argc) {
                 fprintf(stderr, "Error: -%s requires an argument\n", opts[i].name);
@@ -95,7 +82,6 @@ static int parse_long_opt(int argc, char **argv, int *argi, const char **arg,
     }
 
     fprintf(stderr, "Error: unknown option: %s\n", p);
-    (*argi)++;   /* advance past unknown option to avoid an infinite loop */
     return 0;
 }
 
@@ -103,13 +89,11 @@ static int parse_long_opt(int argc, char **argv, int *argi, const char **arg,
 static void print_options(const long_opt_t *opts, const opt_info_t *info)
 {
     for (int i = 0; opts[i].name; i++) {
-        int v = opts[i].val;
-        if (info[v].arg)
-            fprintf(stderr, "  -%-23s %s <%s>\n",
-                    opts[i].name, info[v].desc, info[v].arg);
+        const opt_info_t *oi = &info[opts[i].val];
+        if (oi->arg)
+            fprintf(stderr, "  -%-23s %s <%s>\n", opts[i].name, oi->desc, oi->arg);
         else
-            fprintf(stderr, "  -%-23s %s\n",
-                    opts[i].name, info[v].desc);
+            fprintf(stderr, "  -%-23s %s\n", opts[i].name, oi->desc);
     }
 }
 
@@ -152,56 +136,35 @@ static int elnum_lookup(const char *elsym)
 
 /* Split an atomic label into atomic number and group id.
  *
- * The label is first normalised to lowercase. The leading alphabetic run
- * becomes the element symbol and the trailing digit run becomes the group
- * number (0 if absent). Any other character layout is an error.
+ * The label is matched case-insensitively. Its leading letters are the
+ * element symbol and anything after them must be digits, giving the group
+ * number (0 if absent), e.g. "C", "fe", "H12".
  *
- * Returns 0 on success, -1 on invalid token. */
+ * Returns 0 on success, -1 on invalid label. */
 static int parse_label(const char *sym, int *elnum, int *group)
 {
-    char normalized_label[32];
-    char elsym[32];
-    const char *p;
-    int i, m;
+    char label[32];
+    int i, m = 0;
 
-    /* Normalise to lowercase */
-    for (i = 0; sym[i] && i < (int)(sizeof(normalized_label) - 1); i++)
-        normalized_label[i] = tolower((unsigned char)sym[i]);
-    normalized_label[i] = '\0';
+    for (i = 0; sym[i] && i < (int)sizeof(label) - 1; i++)
+        label[i] = (char)tolower((unsigned char)sym[i]);
+    label[i] = '\0';
 
-    /* Find the length of the leading alphabetic run */
-    p = normalized_label;
-    m = 0;
-    while (p[m] && islower((unsigned char)p[m])) m++;
+    while (islower((unsigned char)label[m])) m++;
+    for (i = m; label[i]; i++)
+        if (!isdigit((unsigned char)label[i])) goto invalid;
 
-    /* Validate suffix: must be all digits (or empty) */
-    for (i = m; normalized_label[i]; i++) {
-        if (!isdigit((unsigned char)normalized_label[i])) {
-            fprintf(stderr, "Invalid atomic label: %s\n", normalized_label);
-            return -1;
-        }
-    }
+    *group = atoi(&label[m]);   /* 0 when there is no digit suffix */
+    label[m] = '\0';            /* keep just the element symbol */
 
-    /* Validate alpha prefix length: 1-3 characters */
-    if (m == 0 || m > 3) {
-        fprintf(stderr, "Invalid atomic label: %s\n", normalized_label);
-        return -1;
-    }
-
-    /* Extract element symbol and group number */
-    strncpy(elsym, normalized_label, m);
-    elsym[m] = '\0';
-
-    *group = (normalized_label[m] != '\0') ? atoi(&normalized_label[m]) : 0;
-
-    /* Lookup atomic number */
-    *elnum = elnum_lookup(elsym);
-    if (*elnum == 0) {
-        fprintf(stderr, "Invalid atomic label: %s\n", normalized_label);
-        return -1;
-    }
-
+    /* Also rejects an empty or over-long symbol: neither is in the table. */
+    *elnum = elnum_lookup(label);
+    if (*elnum == 0) goto invalid;
     return 0;
+
+invalid:
+    fprintf(stderr, "Invalid atomic label: %s\n", sym);
+    return -1;
 }
 
 /* Check that path ends with ".xyz" (case-insensitive). */
@@ -209,11 +172,9 @@ static int has_xyz_extension(const char *path)
 {
     size_t n = strlen(path);
     if (n < 4) return 0;
-    const char *ext = path + n - 4;
-    return (tolower((unsigned char)ext[0]) == '.' &&
-            tolower((unsigned char)ext[1]) == 'x' &&
-            tolower((unsigned char)ext[2]) == 'y' &&
-            tolower((unsigned char)ext[3]) == 'z');
+    for (int i = 0; i < 4; i++)
+        if (tolower((unsigned char)path[n - 4 + i]) != ".xyz"[i]) return 0;
+    return 1;
 }
 
 /* Read an XYZ file into packed atomdata and coords arrays.
@@ -230,9 +191,8 @@ static int read_xyz(const char *path,
                     double **coords_out)
 {
     FILE *fp;
-    int n, i, elnum, group;
+    int n, elnum, group;
     char sym[32], line[256];
-    double x, y, z;
     int *atomdata = NULL;
     double *coords = NULL;
 
@@ -246,35 +206,31 @@ static int read_xyz(const char *path,
 
     if (fscanf(fp, " %d", &n) != 1 || n <= 0) {
         fprintf(stderr, "Error: invalid atom count in '%s'\n", path);
-        fclose(fp); return 1;
+        goto fail;
     }
 
-    fgets(line, sizeof(line), fp);   /* rest of count line */
-    fgets(line, sizeof(line), fp);   /* title line         */
+    /* Skip the rest of the count line and the title line. */
+    if (!fgets(line, sizeof(line), fp) || !fgets(line, sizeof(line), fp)) {
+        fprintf(stderr, "Error: missing title line in '%s'\n", path);
+        goto fail;
+    }
 
-    atomdata = malloc(n * 2 * sizeof(int));
-    coords   = malloc(n * 3 * sizeof(double));
+    atomdata = malloc((size_t)n * 2 * sizeof(int));
+    coords   = malloc((size_t)n * 3 * sizeof(double));
     if (!atomdata || !coords) {
         fprintf(stderr, "Error: out of memory\n");
-        free(atomdata); free(coords);
-        fclose(fp); return 1;
+        goto fail;
     }
 
-    for (i = 0; i < n; i++) {
-        if (fscanf(fp, " %31s %lf %lf %lf", sym, &x, &y, &z) != 4) {
+    for (int i = 0; i < n; i++) {
+        double *xyz = &coords[i*3];
+        if (fscanf(fp, " %31s %lf %lf %lf", sym, &xyz[0], &xyz[1], &xyz[2]) != 4) {
             fprintf(stderr, "Error: malformed atom line %d in '%s'\n", i+1, path);
-            free(atomdata); free(coords);
-            fclose(fp); return 1;
+            goto fail;
         }
-        if (parse_label(sym, &elnum, &group) != 0) {
-            free(atomdata); free(coords);
-            fclose(fp); return 1;
-        }
+        if (parse_label(sym, &elnum, &group) != 0) goto fail;
         atomdata[i*2]     = elnum;
         atomdata[i*2 + 1] = group;
-        coords[i*3]       = x;
-        coords[i*3 + 1]   = y;
-        coords[i*3 + 2]   = z;
     }
 
     fclose(fp);
@@ -282,6 +238,12 @@ static int read_xyz(const char *path,
     *atomdata_out = atomdata;
     *coords_out   = coords;
     return 0;
+
+fail:
+    free(atomdata);
+    free(coords);
+    fclose(fp);
+    return 1;
 }
 
 /* ======================================================================
@@ -359,18 +321,8 @@ int main(int argc, char **argv)
     const char *posargs[2] = {NULL, NULL};
     int npos = 0;
 
-    /* molecule data */
-    int n1 = 0, n2 = 0;
-    int *atom_data1 = NULL, *atom_data2 = NULL;
-    double *coords1 = NULL, *coords2 = NULL;
-
-    /* outputs (flattened across up to n_records candidate solutions) */
-    double *rmsd_list = NULL, *transform_list = NULL;
-    int natoms = 0, occ_records = 0, error_code = 0;
-    int *atomperm_list = NULL;
-
-    while ((opt = parse_long_opt(argc, argv, &argi, &optarg,
-                                 long_options, posargs, &npos)) != -1) {
+    while ((opt = parse_long_opt(argc, argv, &argi, &optarg, long_options,
+                                 posargs, 2, &npos)) != -1) {
         switch (opt) {
         case OPT_ALIGN:           align_flag    = true;         break;
         case OPT_REMAP:           remap_flag    = true;         break;
@@ -400,26 +352,28 @@ int main(int argc, char **argv)
         fprintf(stderr, "Error: -records must be at least 1\n");
         print_usage(argv[0]); return 1;
     }
-    const char *file1 = posargs[0];
-    const char *file2 = posargs[1];
 
-    if (read_xyz(file1, &n1, &atom_data1, &coords1) != 0) return 1;
-    if (read_xyz(file2, &n2, &atom_data2, &coords2) != 0) {
-        free(atom_data1); free(coords1); return 1;
-    }
+    /* Everything below is released at `done`; free(NULL) is a no-op, so
+     * every exit path can jump there regardless of how far it got. */
+    int status = 1;
+    int n1 = 0, n2 = 0;
+    int *atom_data1 = NULL, *atom_data2 = NULL;
+    double *coords1 = NULL, *coords2 = NULL;
+    double *rmsd_list = NULL, *transform_list = NULL;
+    int *atomperm_list = NULL;
+    int occ_records = 0, error_code = MOLALIGN_SUCCESS;
 
-    /* allocate output buffers - worst case atom count is the larger molecule,
-     * and every buffer must hold up to n_records candidate solutions */
-    int max_atoms = (n1 > n2 ? n1 : n2);
+    if (read_xyz(posargs[0], &n1, &atom_data1, &coords1) != 0) goto done;
+    if (read_xyz(posargs[1], &n2, &atom_data2, &coords2) != 0) goto done;
+
+    /* Output buffers hold up to n_records candidate solutions. Each
+     * permutation has exactly n1 entries (one per atom of molecule 1). */
     rmsd_list      = malloc((size_t)n_records * sizeof(double));
-    atomperm_list  = malloc((size_t)n_records * (size_t)max_atoms * sizeof(int));
+    atomperm_list  = malloc((size_t)n_records * (size_t)n1 * sizeof(int));
     transform_list = malloc((size_t)n_records * 16 * sizeof(double));
     if (!rmsd_list || !atomperm_list || !transform_list) {
         fprintf(stderr, "Error: out of memory\n");
-        free(atom_data1); free(coords1);
-        free(atom_data2); free(coords2);
-        free(rmsd_list); free(atomperm_list); free(transform_list);
-        return 1;
+        goto done;
     }
 
     atormsd_calculate(
@@ -430,38 +384,35 @@ int main(int argc, char **argv)
         print_stats, random_flag,
         prune_flag, prune_tol, conv_freq, max_trials,
         n_records,
-        rmsd_list, &natoms, atomperm_list,
+        rmsd_list, atomperm_list,
         transform_list, &occ_records, &error_code);
 
-    if (error_code != 0) {
+    if (error_code != MOLALIGN_SUCCESS) {
         switch (error_code) {
-        case 1: fprintf(stderr, "Error: molecules are not isomers\n");  break;
-        case 2: fprintf(stderr, "Error: atom types do not match\n");    break;
+        case MOLALIGN_ERROR_NOT_ISOMERS:        fprintf(stderr, "Error: molecules are not isomers\n"); break;
+        case MOLALIGN_ERROR_ATOM_TYPE_MISMATCH: fprintf(stderr, "Error: atom types do not match\n");   break;
+        case MOLALIGN_ERROR_PRUNED_ASSIGNMENT_FAILED:  fprintf(stderr, "Error: assignment failed (pruning tolerance might be too tight)\n"); break;
         default: fprintf(stderr, "Error: error code %d\n", error_code); break;
         }
-        free(atom_data1); free(coords1);
-        free(atom_data2); free(coords2);
-        free(rmsd_list); free(atomperm_list); free(transform_list);
-        return error_code;
+        status = error_code;
+        goto done;
     }
 
     for (int r = 0; r < occ_records; r++) {
         const double *rec_transform = &transform_list[r * 16];
-        const int *rec_perm = &atomperm_list[r * natoms];
+        const int *rec_perm = &atomperm_list[r * n1];
 
         printf("RMSD: %.6f\n", rmsd_list[r]);
 
         if (print_assignment) {
-            int i;
             printf("Mapping:");
-            for (i = 0; i < natoms; i++) printf(" %d", rec_perm[i] + 1); /* 1-based */
+            for (int i = 0; i < n1; i++) printf(" %d", rec_perm[i] + 1); /* 1-based */
             putchar('\n');
         }
 
         if (print_transform) {
-            int i;
             printf("Transform:\n");
-            for (i = 0; i < 4; i++)
+            for (int i = 0; i < 4; i++)
                 printf("  %12.6f %12.6f %12.6f %12.6f\n",
                        rec_transform[i*4], rec_transform[i*4+1],
                        rec_transform[i*4+2], rec_transform[i*4+3]);
@@ -469,9 +420,11 @@ int main(int argc, char **argv)
 
         if (r < occ_records - 1) putchar('\n');
     }
+    status = 0;
 
+done:
     free(atom_data1); free(coords1);
     free(atom_data2); free(coords2);
     free(rmsd_list); free(atomperm_list); free(transform_list);
-    return 0;
+    return status;
 }

@@ -54,6 +54,7 @@ integer(ik), dimension(:), allocatable :: atomset1, atomset2
 integer(ik), dimension(:), allocatable :: atomperm1
 integer(ik) :: num_records, max_trials, conv_freq
 integer(ik) :: in_unit, aligned_unit
+integer(ik) :: error_code
 integer(ik) :: i
 
 ! Set default options
@@ -224,7 +225,8 @@ if (remap_flag) then
 
       call allocate_registry( registry, num_records)
       call optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atomtypes, &
-            coords1w, coords2w, conv_freq, max_trials, registry)
+            coords1w, coords2w, conv_freq, max_trials, registry, error_code)
+      if (error_code /= 0) stop 'These molecules are not conformers'
 
       if (print_stats) call print_records( registry)
 
@@ -250,7 +252,8 @@ if (remap_flag) then
 
    else
 
-      call assign_atomperm_conformer( adjcs1, adjcs2, atomtypes, coords1w, coords2w, atomperm1)
+      call assign_atomperm_conformer( adjcs1, adjcs2, atomtypes, coords1w, coords2w, atomperm1, error_code)
+      if (error_code /= 0) stop 'These molecules are not conformers'
 
       coords2r = coords2
       rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2r))
