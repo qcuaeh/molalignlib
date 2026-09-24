@@ -48,13 +48,16 @@ type(partition_t) :: atomtypes
 type(registry_t) :: registry
 real(rk) :: rmsd
 real(rk) :: center1(3), center2(3), rotquat(4)
-real(rk), dimension(:), allocatable :: weights1, weights2
+real(rk), dimension(:), allocatable :: weights1, weights2, unit_weights
+real(rk) :: transmat2(3,3)
 real(rk), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, coords2r
+real(rk), dimension(:,:), allocatable :: full_coords1, full_coords2, full_coords2r
 integer(ik), dimension(:), allocatable :: atomset1, atomset2
-integer(ik), dimension(:), allocatable :: atomperm1
+integer(ik), dimension(:), allocatable :: atomperm1, full_atomperm1
 integer(ik) :: num_records, max_trials, conv_freq
 integer(ik) :: in_unit, aligned_unit
 integer(ik) :: error_code
+integer(ik) :: n_atoms1, n_atoms2, n_pad
 integer(ik) :: i
 
 ! Set default options
@@ -142,18 +145,32 @@ case default
    stop 'Too many file paths'
 end select
 
+! Pad the smaller molecule with dummy atoms appended at the end. Real atoms
+! keep their indices; padding atoms are recognised by index from here on.
+n_atoms1 = size(atoms1)
+n_atoms2 = size(atoms2)
+n_pad = max(n_atoms1, n_atoms2)
+call pad_atoms( atoms1, n_pad)
+call pad_atoms( atoms2, n_pad)
+
+! Atom sets only ever contain real atoms
 if (heavy_flag) then
    ! Include only heavy atoms
-   call include_heavy_atoms( atoms1, atomset1)
-   call include_heavy_atoms( atoms2, atomset2)
+   call include_heavy_atoms( atoms1(1:n_atoms1), atomset1)
+   call include_heavy_atoms( atoms2(1:n_atoms2), atomset2)
 else
    ! Include all atoms
-   call include_all_atoms( atoms1, atomset1)
-   call include_all_atoms( atoms2, atomset2)
+   call include_all_atoms( atoms1(1:n_atoms1), atomset1)
+   call include_all_atoms( atoms2(1:n_atoms2), atomset2)
 end if
 
+! From here on the comparison works on the included atoms only, numbered
+! 1..size(atomset1) in molecule 1 and 1..size(atomset2) in molecule 2.
+! atomperm1 maps included atoms to included atoms in that compact numbering;
+! complete_atomperm turns it into full_atomperm1 over all (padded) atoms.
+
 ! Collect atom types in a partition
-call collect_atomtypes( atomset1, atomset2, atoms1, atoms2, atomtypes)
+call collect_atomtypes( atoms1(atomset1), atoms2(atomset2), atomtypes)
 
 ! Abort if molecules are not isomers
 if (any(atomtypes%parts%num_items1 /= atomtypes%parts%num_items2)) then
@@ -162,8 +179,8 @@ end if
 
 ! Reset bonds
 if (bond_flag) then
-   call bonds_from_atoms( atoms1, bonds1)
-   call bonds_from_atoms( atoms2, bonds2)
+   call bonds_from_atoms( atoms1(1:n_atoms1), bonds1)
+   call bonds_from_atoms( atoms2(1:n_atoms2), bonds2)
 end if
 
 if (size(bonds1) < 1 .or. size(bonds2) < 1) then
@@ -176,47 +193,64 @@ if (size(bonds1) < 1 .or. size(bonds2) < 1) then
    end if
 end if
 
-! Set adjacency lists
-call adjacency_from_bonds( atomset1, atoms1, bonds1, adjcs1)
-call adjacency_from_bonds( atomset2, atoms2, bonds2, adjcs2)
+! Set adjacency lists of the included atoms (bonds to excluded atoms are
+! dropped)
+call adjacency_from_bonds( atoms1(atomset1), extract_bonds( atomset1, n_pad, bonds1), adjcs1)
+call adjacency_from_bonds( atoms2(atomset2), extract_bonds( atomset2, n_pad, bonds2), adjcs2)
 
-! Get user defined atom weights
+! Weights of the included atoms, normalised to sum 1 over them so both
+! molecules are scaled by the same factor
 if (mass_flag) then
-   weights1 = atomic_masses(atoms1%elnum)
-   weights2 = atomic_masses(atoms2%elnum)
+   weights1 = atomic_masses(atoms1(atomset1)%elnum)
+   weights2 = atomic_masses(atoms2(atomset2)%elnum)
 else
-   allocate (weights1(size(atoms1)), source=1.0_rk)
-   allocate (weights2(size(atoms2)), source=1.0_rk)
+   allocate (weights1(size(atomset1)), source=1.0_rk)
+   allocate (weights2(size(atomset2)), source=1.0_rk)
 end if
+weights1 = weights1/sum(weights1)
+weights2 = weights2/sum(weights2)
 
-! Get mol1 coordinates
-coords1 = get_coords( atoms1)
-
-! Get mol2 coordinates
+! Linear transformation applied to molecule 2
 if (mirror_flag) then
-   coords2 = get_mirrored_coords( atoms2)
+   transmat2 = MIRROR_MATRIX
 else
-   coords2 = get_coords( atoms2)
+   transmat2 = IDENTITY_MATRIX
 end if
 
+! Coordinates of all (padded) atoms, molecule 2 transformed. They are only
+! used to align the whole molecule 2 and to pair the excluded atoms.
+allocate (unit_weights(n_pad), source=1.0_rk)
+full_coords1 = get_coords( atoms1, unit_weights, ORIGIN, IDENTITY_MATRIX)
+full_coords2 = get_coords( atoms2, unit_weights, ORIGIN, transmat2)
+
+! Coordinates of the included atoms, in the compact numbering of atomperm1
+coords1 = full_coords1(:, atomset1)
+coords2 = full_coords2(:, atomset2)
+
+! Centers of the included atoms. They are taken from the coordinates, so
+! center2 is in the transformed (e.g. mirrored) frame of molecule 2.
 if (align_flag) then
 
    if (write_aligned) then
       call open2write( aligned_path, out_format, aligned_unit)
    end if
 
-   center1 = get_centroid( atomset1, atoms1, weights1)
-   center2 = get_centroid( atomset2, atoms2, weights2)
-   call translate_coords( coords2, center1 - center2)
-
-   coords1w = get_weighted_coords( atoms1, weights1, center1)
-   coords2w = get_weighted_coords( atoms2, weights2, center2)
-
+   center1 = get_centroid( coords1, weights1)
+   center2 = get_centroid( coords2, weights2)
 else
+   center1 = ORIGIN
+   center2 = ORIGIN
+end if
 
-   coords1w = get_weighted_coords( atoms1, weights1)
-   coords2w = get_weighted_coords( atoms2, weights2)
+! Weighted coordinates of the included atoms.
+! coords2 is already transformed, hence IDENTITY_MATRIX for both.
+coords1w = get_coords( coords1, weights1, center1, IDENTITY_MATRIX)
+coords2w = get_coords( coords2, weights2, center2, IDENTITY_MATRIX)
 
+! Move molecule 2 onto the center of molecule 1
+if (align_flag) then
+   call translate_coords( full_coords2, center1 - center2)
+   call translate_coords( coords2, center1 - center2)
 end if
 
 if (remap_flag) then
@@ -224,7 +258,7 @@ if (remap_flag) then
    if (align_flag) then
 
       call allocate_registry( registry, num_records)
-      call optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atomtypes, &
+      call optimize_atomperm_conformer( adjcs1, adjcs2, atomtypes, &
             coords1w, coords2w, conv_freq, max_trials, registry, error_code)
       if (error_code /= 0) stop 'These molecules are not conformers'
 
@@ -232,19 +266,24 @@ if (remap_flag) then
 
       do i = 1, registry%occ_records
          atomperm1 = registry%records(i)%atomperm1
-         rotquat = least_rotquat( atomset1, atomperm1, coords1w, coords2w)
+         rotquat = least_rotquat( atomperm1, coords1w, coords2w)
+         full_coords2r = rotated_coords( full_coords2, rotquat, center1)
          coords2r = rotated_coords( coords2, rotquat, center1)
-         rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2r))
+         rmsd = sqrt( sqdistmean( atomperm1, weights1, coords1, coords2r))
+
+         ! Pair the excluded atoms in the aligned frame
+         call complete_atomperm( atomset1, atomset2, atomperm1, atoms1, atoms2, &
+               n_atoms1, n_atoms2, bonds1, bonds2, full_coords1, full_coords2r, full_atomperm1)
 
          if (write_aligned) then
             title2 = 'rmsd=' // str( rmsd)
-            call set_coords( atoms2, coords2r)
-            call write_file( aligned_unit, out_format, title2, atoms2, bonds2, atomperm1)
+            call set_coords( atoms2, full_coords2r)
+            call write_file( aligned_unit, out_format, title2, atoms2, bonds2, full_atomperm1)
          else
             write (stdout,'(A)',advance='no') str( rmsd)
             if (print_assignment) then
                write (stdout,'(1X)',advance='no')
-               call print_permutation(atomperm1)
+               call print_permutation(full_atomperm1)
             end if
             write (stdout,*)
          end if
@@ -255,12 +294,17 @@ if (remap_flag) then
       call assign_atomperm_conformer( adjcs1, adjcs2, atomtypes, coords1w, coords2w, atomperm1, error_code)
       if (error_code /= 0) stop 'These molecules are not conformers'
 
+      full_coords2r = full_coords2
       coords2r = coords2
-      rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2r))
+      rmsd = sqrt( sqdistmean( atomperm1, weights1, coords1, coords2r))
+
+      call complete_atomperm( atomset1, atomset2, atomperm1, atoms1, atoms2, &
+            n_atoms1, n_atoms2, bonds1, bonds2, full_coords1, full_coords2r, full_atomperm1)
+
       write (stdout,'(A)',advance='no') str( rmsd)
       if (print_assignment) then
          write (stdout,'(1X)',advance='no')
-         call print_permutation(atomperm1)
+         call print_permutation(full_atomperm1)
       end if
       write (stdout,*)
 
@@ -268,32 +312,41 @@ if (remap_flag) then
 
 else
 
-   ! Maintain input atom order
-   call init_array( atomperm1, size(atoms1), identity)
-
-   ! Abort if atoms do not match
+   ! Abort if atoms do not match: the same atoms must be included in both
+   ! molecules, with the same types (the isomer check above guarantees
+   ! that both atom sets have the same size)
+   if (any(atomset1 /= atomset2)) then
+      stop 'Atoms do not match'
+   end if
    if (any(atomtypes%itemdir1 /= atomtypes%itemdir2)) then
       stop 'Atoms do not match'
    end if
 
+   ! Maintain input atom order, both among the included atoms and in the
+   ! full (padded) permutation
+   call init_array( atomperm1, size(atomset1), identity)
+   call init_array( full_atomperm1, size(atoms1), identity)
+
    ! Abort if bonds do not match
-   if (adjacencydiff( atomset1, atomperm1, adjcs1, adjcs2) > 0) then
+   if (adjacencydiff( atomperm1, adjcs1, adjcs2) > 0) then
       stop 'Bonds do not match'
    end if
 
    if (align_flag) then
-      rotquat = least_rotquat( atomset1, atomperm1, coords1w, coords2w)
+      rotquat = least_rotquat( atomperm1, coords1w, coords2w)
+      full_coords2r = rotated_coords( full_coords2, rotquat, center1)
       coords2r = rotated_coords( coords2, rotquat, center1)
    else
+      full_coords2r = full_coords2
       coords2r = coords2
    end if
 
-   rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2r))
+   rmsd = sqrt( sqdistmean( atomperm1, weights1, coords1, coords2r))
 
    if (align_flag .and. write_aligned) then
       title2 = 'rmsd=' // str( rmsd)
-      call set_coords( atoms2, coords2r)
-      call write_file( aligned_unit, out_format, title2, atoms2, bonds2, atomperm1)
+      call set_coords( atoms2, full_coords2r)
+      call write_file( aligned_unit, out_format, title2, atoms2, bonds2, full_atomperm1)
    else
       write (stdout,'(A)') str( rmsd)
    end if

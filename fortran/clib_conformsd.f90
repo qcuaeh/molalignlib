@@ -38,10 +38,30 @@ contains
 !   c_occ_records entries of c_rmsd_list, c_atomperm_list, and
 !   c_transform_list are meaningful. All output arrays are flattened and
 !   must be allocated by the caller with at least c_n_records elements per
-!   record (c_n_atoms1 for c_atomperm_list, 16 for c_transform_list).
+!   record (n_pad for c_atomperm_list, 16 for c_transform_list).
+!
+! Transforms:
+!   Each c_transform_list record is a row-major 4x4 homogeneous matrix that
+!   maps the input coordinates of molecule 2 onto molecule 1. It includes the
+!   reflection when c_mirror_flag is true, also without alignment (then it is
+!   just the reflection; otherwise the identity).
+!
+! Atom permutations and padding:
+!   n_pad = max(c_n_atoms1, c_n_atoms2). The smaller molecule is padded with
+!   dummy atoms appended after its real atoms, so each record is a true
+!   permutation of 0..n_pad-1. Entry j (0-based) is the atom of molecule 2
+!   that goes on line j of molecule 1. Values >= c_n_atoms2 denote padding
+!   atoms of molecule 2; entries j >= c_n_atoms1 are padding lines of
+!   molecule 1 and carry the extra atoms of molecule 2. When the molecules
+!   have the same size (always the case unless c_heavy_flag is true)
+!   n_pad = c_n_atoms1 and nothing changes for existing callers.
+!   Atoms excluded from the comparison (hydrogens with c_heavy_flag) are
+!   paired afterwards: bonded to the image of their heavy neighbour first,
+!   then by distance, then with padding atoms.
 !
 ! c_error_code values: see the error_codes module (error_codes.f90) and its
 ! C mirror, error_codes.h. This function can return MOLALIGN_SUCCESS,
+! MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER,
 ! MOLALIGN_ERROR_NOT_ISOMERS, MOLALIGN_ERROR_MISSING_BONDS,
 ! MOLALIGN_ERROR_ATOM_TYPE_MISMATCH and MOLALIGN_ERROR_BOND_MISMATCH (both
 ! only when c_remap_flag is false), and MOLALIGN_ERROR_NOT_CONFORMERS
@@ -99,10 +119,13 @@ subroutine conformsd_calculate(                                              &
    type(partition_t) :: atomtypes
    type(registry_t)  :: registry
    real(rk) :: rmsd, center1(3), center2(3), rotquat(4)
-   real(rk), dimension(:),   allocatable :: weights1, weights2
+   real(rk), dimension(:),   allocatable :: weights1, weights2, unit_weights
+   real(rk) :: transmat2(3,3)
    real(rk), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, coords2r
-   integer(ik), dimension(:), allocatable :: atomset1, atomset2, atomperm1
-   integer(ik) :: num_records
+   real(rk), dimension(:,:), allocatable :: full_coords1, full_coords2, full_coords2r
+   integer(ik), dimension(:), allocatable :: atomset1, atomset2
+   integer(ik), dimension(:), allocatable :: atomperm1, full_atomperm1
+   integer(ik) :: num_records, n_pad
    integer(ik) :: i, j, base
 
    c_error_code = MOLALIGN_SUCCESS
@@ -133,34 +156,53 @@ subroutine conformsd_calculate(                                              &
    adaptive_flag    = .TRUE.
 
    ! Build atom_t and bond_t arrays from flat C arrays
-   call build_atoms(c_n_atoms1, c_atom_data1, c_coords1, atoms1)
-   call build_atoms(c_n_atoms2, c_atom_data2, c_coords2, atoms2)
+   ! (returns MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER for out-of-range elnums)
+   call build_atoms(c_n_atoms1, c_atom_data1, c_coords1, atoms1, c_error_code)
+   if (c_error_code /= MOLALIGN_SUCCESS) return
+   call build_atoms(c_n_atoms2, c_atom_data2, c_coords2, atoms2, c_error_code)
+   if (c_error_code /= MOLALIGN_SUCCESS) return
    call build_bonds(c_n_bonds1, c_bond_data1, bonds1)
    call build_bonds(c_n_bonds2, c_bond_data2, bonds2)
 
+   ! Pad the smaller molecule with dummy atoms appended at the end, so that
+   ! both molecules have n_pad atoms and every atom permutation can be a
+   ! bijection. Real atoms keep their indices; from here on padding atoms
+   ! are recognised by index (> c_n_atoms1 or > c_n_atoms2).
+   n_pad = max(c_n_atoms1, c_n_atoms2)
+   call pad_atoms(atoms1, n_pad)
+   call pad_atoms(atoms2, n_pad)
+
+   ! Atom sets only ever contain real atoms
    if (heavy_flag) then
       ! Include only heavy atoms
-      call include_heavy_atoms(atoms1, atomset1)
-      call include_heavy_atoms(atoms2, atomset2)
+      call include_heavy_atoms(atoms1(1:c_n_atoms1), atomset1)
+      call include_heavy_atoms(atoms2(1:c_n_atoms2), atomset2)
    else
       ! Include all atoms
-      call include_all_atoms(atoms1, atomset1)
-      call include_all_atoms(atoms2, atomset2)
+      call include_all_atoms(atoms1(1:c_n_atoms1), atomset1)
+      call include_all_atoms(atoms2(1:c_n_atoms2), atomset2)
    end if
 
-   ! Collect atom types in a partition
-   call collect_atomtypes(atomset1, atomset2, atoms1, atoms2, atomtypes)
+   ! From here on the comparison works on the included atoms only, numbered
+   ! 1..size(atomset1) in molecule 1 and 1..size(atomset2) in molecule 2.
+   ! atomperm1 maps included atoms to included atoms in that compact
+   ! numbering; complete_atomperm turns it into full_atomperm1 over all
+   ! (padded) atoms, which is what the caller receives.
 
-   ! Abort if molecules are not isomers
+   ! Collect atom types in a partition
+   call collect_atomtypes(atoms1(atomset1), atoms2(atomset2), atomtypes)
+
+   ! Abort if molecules are not isomers. Without heavy_flag the atom sets
+   ! hold all real atoms, so different hydrogen counts are caught here.
    if (any(atomtypes%parts%num_items1 /= atomtypes%parts%num_items2)) then
       c_error_code = MOLALIGN_ERROR_NOT_ISOMERS
       return
    end if
 
-   ! Reset bonds
+   ! Reset bonds (padding atoms never get bonds)
    if (bond_flag) then
-      call bonds_from_atoms(atoms1, bonds1)
-      call bonds_from_atoms(atoms2, bonds2)
+      call bonds_from_atoms(atoms1(1:c_n_atoms1), bonds1)
+      call bonds_from_atoms(atoms2(1:c_n_atoms2), bonds2)
    end if
 
    ! Abort if either molecule has no bonds
@@ -169,43 +211,59 @@ subroutine conformsd_calculate(                                              &
       return
    end if
 
-   ! Set adjacency lists
-   call adjacency_from_bonds(atomset1, atoms1, bonds1, adjcs1)
-   call adjacency_from_bonds(atomset2, atoms2, bonds2, adjcs2)
+   ! Set adjacency lists of the included atoms (bonds to excluded atoms are
+   ! dropped)
+   call adjacency_from_bonds(atoms1(atomset1), extract_bonds(atomset1, n_pad, bonds1), adjcs1)
+   call adjacency_from_bonds(atoms2(atomset2), extract_bonds(atomset2, n_pad, bonds2), adjcs2)
 
-   ! Get user defined atom weights
+   ! Weights of the included atoms, normalised to sum 1 over them so both
+   ! molecules are scaled by the same factor
    if (mass_flag) then
-      weights1 = atomic_masses(atoms1%elnum)
-      weights2 = atomic_masses(atoms2%elnum)
+      weights1 = atomic_masses(atoms1(atomset1)%elnum)
+      weights2 = atomic_masses(atoms2(atomset2)%elnum)
    else
-      allocate (weights1(size(atoms1)), source=1.0_rk)
-      allocate (weights2(size(atoms2)), source=1.0_rk)
+      allocate (weights1(size(atomset1)), source=1.0_rk)
+      allocate (weights2(size(atomset2)), source=1.0_rk)
    end if
+   weights1 = weights1/sum(weights1)
+   weights2 = weights2/sum(weights2)
 
-   ! Get mol1 coordinates
-   coords1 = get_coords(atoms1)
-
-   ! Get mol2 coordinates
+   ! Linear transformation applied to molecule 2
    if (mirror_flag) then
-      coords2 = get_mirrored_coords(atoms2)
+      transmat2 = MIRROR_MATRIX
    else
-      coords2 = get_coords(atoms2)
+      transmat2 = IDENTITY_MATRIX
    end if
 
+   ! Coordinates of all (padded) atoms, molecule 2 transformed. They are only
+   ! used to align the whole molecule 2 and to pair the excluded atoms.
+   allocate (unit_weights(n_pad), source=1.0_rk)
+   full_coords1 = get_coords(atoms1, unit_weights, ORIGIN, IDENTITY_MATRIX)
+   full_coords2 = get_coords(atoms2, unit_weights, ORIGIN, transmat2)
+
+   ! Coordinates of the included atoms, in the compact numbering of atomperm1
+   coords1 = full_coords1(:, atomset1)
+   coords2 = full_coords2(:, atomset2)
+
+   ! Centers of the included atoms. They are taken from the coordinates, so
+   ! center2 is in the transformed (e.g. mirrored) frame of molecule 2.
    if (align_flag) then
-
-      center1 = get_centroid(atomset1, atoms1, weights1)
-      center2 = get_centroid(atomset2, atoms2, weights2)
-      call translate_coords(coords2, center1 - center2)
-
-      coords1w = get_weighted_coords(atoms1, weights1, center1)
-      coords2w = get_weighted_coords(atoms2, weights2, center2)
-
+      center1 = get_centroid(coords1, weights1)
+      center2 = get_centroid(coords2, weights2)
    else
+      center1 = ORIGIN
+      center2 = ORIGIN
+   end if
 
-      coords1w = get_weighted_coords(atoms1, weights1)
-      coords2w = get_weighted_coords(atoms2, weights2)
+   ! Weighted coordinates of the included atoms.
+   ! coords2 is already transformed, hence IDENTITY_MATRIX for both.
+   coords1w = get_coords(coords1, weights1, center1, IDENTITY_MATRIX)
+   coords2w = get_coords(coords2, weights2, center2, IDENTITY_MATRIX)
 
+   ! Move molecule 2 onto the center of molecule 1
+   if (align_flag) then
+      call translate_coords(full_coords2, center1 - center2)
+      call translate_coords(coords2, center1 - center2)
    end if
 
    if (remap_flag) then
@@ -213,7 +271,7 @@ subroutine conformsd_calculate(                                              &
       if (align_flag) then
 
          call allocate_registry(registry, num_records)
-         call optimize_atomperm_conformer(atomset1, atomset2, adjcs1, adjcs2, atomtypes, &
+         call optimize_atomperm_conformer(adjcs1, adjcs2, atomtypes, &
                coords1w, coords2w, c_conv_freq, c_max_trials, registry, c_error_code)
          if (c_error_code /= MOLALIGN_SUCCESS) return
 
@@ -222,16 +280,21 @@ subroutine conformsd_calculate(                                              &
          c_occ_records = registry%occ_records
          do i = 1, registry%occ_records
             atomperm1 = registry%records(i)%atomperm1
-            rotquat = least_rotquat(atomset1, atomperm1, coords1w, coords2w)
+            rotquat = least_rotquat(atomperm1, coords1w, coords2w)
+            full_coords2r = rotated_coords(full_coords2, rotquat, center1)
             coords2r = rotated_coords(coords2, rotquat, center1)
-            rmsd = sqrt(sqdistmean(atomset1, atomperm1, weights1, coords1, coords2r))
-            call build_homogeneous_transform(rotquat, center1, center2, &
+            rmsd = sqrt(sqdistmean(atomperm1, weights1, coords1, coords2r))
+            call build_homogeneous_transform(rotquat, transmat2, center1, center2, &
                   c_transform_list((i-1)*16+1:i*16))
 
+            ! Pair the excluded atoms in the aligned frame
+            call complete_atomperm(atomset1, atomset2, atomperm1, atoms1, atoms2, &
+                  c_n_atoms1, c_n_atoms2, bonds1, bonds2, full_coords1, full_coords2r, full_atomperm1)
+
             c_rmsd_list(i) = rmsd
-            base = (i-1) * c_n_atoms1
-            do j = 1, c_n_atoms1
-               c_atomperm_list(base+j) = atomperm1(j) - 1  ! 0-based for C
+            base = (i-1) * n_pad
+            do j = 1, n_pad
+               c_atomperm_list(base+j) = full_atomperm1(j) - 1  ! 0-based for C
             end do
          end do
 
@@ -240,48 +303,69 @@ subroutine conformsd_calculate(                                              &
          call assign_atomperm_conformer(adjcs1, adjcs2, atomtypes, coords1w, coords2w, atomperm1, c_error_code)
          if (c_error_code /= MOLALIGN_SUCCESS) return
 
+         full_coords2r = full_coords2
          coords2r = coords2
-         rmsd = sqrt(sqdistmean(atomset1, atomperm1, weights1, coords1, coords2r))
+         ! Unaligned: molecule 2 is only transformed (mirrored or not)
+         call build_homogeneous_transform(IDENTITY_QUATERNION, transmat2, ORIGIN, ORIGIN, &
+               c_transform_list(1:16))
+         rmsd = sqrt(sqdistmean(atomperm1, weights1, coords1, coords2r))
+
+         call complete_atomperm(atomset1, atomset2, atomperm1, atoms1, atoms2, &
+               c_n_atoms1, c_n_atoms2, bonds1, bonds2, full_coords1, full_coords2r, full_atomperm1)
 
          c_occ_records = 1
          c_rmsd_list(1) = rmsd
-         do j = 1, c_n_atoms1
-            c_atomperm_list(j) = atomperm1(j) - 1  ! 0-based for C
+         do j = 1, n_pad
+            c_atomperm_list(j) = full_atomperm1(j) - 1  ! 0-based for C
          end do
 
       end if
 
    else
 
-      ! Maintain input atom order
-      call init_array(atomperm1, size(atoms1), identity)
-
-      ! Abort if atoms do not match
+      ! Abort if atoms do not match: the same atoms must be included in
+      ! both molecules, with the same types (the isomer check above
+      ! guarantees that both atom sets have the same size)
+      if (any(atomset1 /= atomset2)) then
+         c_error_code = MOLALIGN_ERROR_ATOM_TYPE_MISMATCH
+         return
+      end if
       if (any(atomtypes%itemdir1 /= atomtypes%itemdir2)) then
          c_error_code = MOLALIGN_ERROR_ATOM_TYPE_MISMATCH
          return
       end if
 
+      ! Maintain input atom order, both among the included atoms and in the
+      ! full (padded) permutation. Identity is meaningful here: it is the
+      ! mapping being tested.
+      call init_array(atomperm1, size(atomset1), identity)
+      call init_array(full_atomperm1, size(atoms1), identity)
+
       ! Abort if bonds do not match
-      if (adjacencydiff(atomset1, atomperm1, adjcs1, adjcs2) > 0) then
+      if (adjacencydiff(atomperm1, adjcs1, adjcs2) > 0) then
          c_error_code = MOLALIGN_ERROR_BOND_MISMATCH
          return
       end if
 
       if (align_flag) then
-         rotquat = least_rotquat(atomset1, atomperm1, coords1w, coords2w)
+         rotquat = least_rotquat(atomperm1, coords1w, coords2w)
+         full_coords2r = rotated_coords(full_coords2, rotquat, center1)
          coords2r = rotated_coords(coords2, rotquat, center1)
-         call build_homogeneous_transform(rotquat, center1, center2, c_transform_list(1:16))
+         call build_homogeneous_transform(rotquat, transmat2, center1, center2, c_transform_list(1:16))
       else
+         full_coords2r = full_coords2
          coords2r = coords2
+         ! Unaligned: molecule 2 is only transformed (mirrored or not)
+         call build_homogeneous_transform(IDENTITY_QUATERNION, transmat2, ORIGIN, ORIGIN, &
+               c_transform_list(1:16))
       end if
 
-      rmsd = sqrt(sqdistmean(atomset1, atomperm1, weights1, coords1, coords2r))
+      rmsd = sqrt(sqdistmean(atomperm1, weights1, coords1, coords2r))
 
       c_occ_records = 1
       c_rmsd_list(1) = rmsd
-      do j = 1, c_n_atoms1
-         c_atomperm_list(j) = atomperm1(j) - 1  ! 0-based for C
+      do j = 1, n_pad
+         c_atomperm_list(j) = full_atomperm1(j) - 1  ! 0-based for C
       end do
 
    end if

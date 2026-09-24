@@ -36,9 +36,10 @@ implicit none
 
 contains
 
-subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atomtypes, &
+subroutine optimize_atomperm_conformer( adjcs1, adjcs2, atomtypes, &
       coords1, coords2, conv_freq, max_trials, registry, error_code)
-   integer(ik), dimension(:), intent(in) :: atomset1, atomset2
+! adjcs, atomtypes and coords hold the included atoms only, in a common
+! numbering; the atom permutations stored in registry use that numbering.
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(partition_t), intent(in) :: atomtypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
@@ -82,7 +83,7 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
          ! Apply random rotation to coords2 copy
          coords2r = coords2
          total_rotation = randrotquat()
-         call rotate_coords( atomset2, coords2r, total_rotation)
+         call rotate_coords( coords2r, total_rotation)
 
          ! Assign atoms with current orientation
          if (PRUNE_ASSIGNMENTS) then
@@ -92,10 +93,10 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
             call assign_atoms_local( coords1, coords2r, cache_arrays, atomperm1, permdist)
          end if
 
-         rotation = least_rotquat( atomset1, atomperm1, coords1, coords2r)
+         rotation = least_rotquat( atomperm1, coords1, coords2r)
          total_rotation = quatmul( total_rotation, rotation)
-         call rotate_coords( atomset2, coords2r, rotation)
-         permdist = sqdistsum( atomset1, atomperm1, coords1, coords2r)
+         call rotate_coords( coords2r, rotation)
+         permdist = sqdistsum( atomperm1, coords1, coords2r)
          steps = 1
 
          do
@@ -108,10 +109,10 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
 !            write (stdout,*) permdist, new_permdist
             if (all(atomperm1 == new_atomperm)) exit
             atomperm1 = new_atomperm
-            rotation = least_rotquat( atomset1, atomperm1, coords1, coords2r)
+            rotation = least_rotquat( atomperm1, coords1, coords2r)
             total_rotation = quatmul( total_rotation, rotation)
-            call rotate_coords( atomset2, coords2r, rotation)
-            permdist = sqdistsum( atomset1, atomperm1, coords1, coords2r)
+            call rotate_coords( coords2r, rotation)
+            permdist = sqdistsum( atomperm1, coords1, coords2r)
             steps = steps + 1
          end do
 
@@ -135,12 +136,12 @@ subroutine optimize_atomperm_conformer( atomset1, atomset2, adjcs1, adjcs2, atom
       call assign_atoms_global( coords1, coords2, cache_arrays, atomperm1)
       
       ! Calculate optimal rotation
-      rotation = least_rotquat( atomset1, atomperm1, coords1, coords2)
+      rotation = least_rotquat( atomperm1, coords1, coords2)
       
       ! Rotate coords2 and calculate permdist
       coords2r = coords2
-      call rotate_coords( atomset2, coords2r, rotation)
-      permdist = sqdistsum( atomset1, atomperm1, coords1, coords2r)
+      call rotate_coords( coords2r, rotation)
+      permdist = sqdistsum( atomperm1, coords1, coords2r)
       
       ! Initialize registry with a single record
       registry%occ_records = 1

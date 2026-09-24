@@ -254,7 +254,10 @@ into the molecule-1 reference frame:
 p_out = R * p_in + t
 ```
 
-A matrix is the identity when `align_flag = false`.
+With `mirror_flag = true`, *R* includes the reflection of molecule 2
+(x → −x) as well as the rotation, so its determinant is −1. When
+`align_flag = false`, *R* is the identity (or just the reflection when
+`mirror_flag = true`) and *t* is zero.
 
 ### Multiple ranked solutions
 
@@ -700,7 +703,7 @@ solution (best/lowest RMSD first). Each `RMSDResult` holds:
 |-----------|------|-------------|
 | **rmsd** | `float` | Root-mean-square deviation in Å |
 | **atom_permutation** | `int32 ndarray (n,)` | 0-based index array mapping *other* atoms onto *self* |
-| **transform** | `float64 ndarray (4, 4)` | Homogeneous rotation + translation matrix (maps *other* to *self* frame) |
+| **transform** | `float64 ndarray (4, 4)` | Homogeneous rotation + translation matrix (maps *other* to *self* frame); includes the reflection when `mirror=True` |
 
 #### Applying the result
 
@@ -749,5 +752,5 @@ Algorithm Notes
 
 - **atoRMSD:** uses a stochastic strategy with distance-based pruning for unstructured clusters where no bond topology is available. Algorithm described in [Vásquez-Pérez et al., *J. Chem. Inf. Model.* (2023)](https://doi.org/10.1021/acs.jcim.2c01187).
 - **confoRMSD:** uses the Hierarchical Neighborhood of Atoms (HNA) partitioning to decompose the assignment problem into independent branches, reducing the number of evaluated combinations from the product of branch possibilities to their sum. For alignment calculations, the algorithm adaptively selects between stochastic orientation sampling (efficient for highly symmetric molecules) and exhaustive enumeration (efficient for molecules with few branches), based on the ratio of total to partial combinations in the assignment tree. Benchmarks show 100% topologically correct assignments across 1.4 million molecular pairs with millisecond-scale mean execution times. Full algorithm description in [Vásquez-Pérez et al., *J. Chem. Theory Comput.* (2026)](https://doi.org/10.1021/acs.jctc.6c00545).
-- **Transform output:** the 4 × 4 homogeneous transformation matrix encodes both the optimal rotation *R* and the translation *t* needed to superimpose molecule 2 on molecule 1.
+- **Transform output:** the 4 × 4 homogeneous transformation matrix encodes both the optimal rotation *R* and the translation *t* needed to superimpose molecule 2 on molecule 1. When mirroring, *R* also includes the reflection, so the matrix maps the original (unmirrored) coordinates of molecule 2.
 - **Default maximum trials:** 10,000 random orientations for alignment. The convergence frequency threshold defaults to 10 for `atormsd` and 100 for `conformsd`; numerical experiments show that values below 100 can produce incorrect assignments for conformers.

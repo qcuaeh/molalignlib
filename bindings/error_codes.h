@@ -39,7 +39,10 @@ enum molalign_error_code {
     MOLALIGN_ERROR_NOT_CONFORMERS     = 5,
     /* No valid assignment under the pruning constraints (pruning tolerance
      * might be too tight). Returned by: atormsd (remap_flag=true only). */
-    MOLALIGN_ERROR_PRUNED_ASSIGNMENT_FAILED  = 6
+    MOLALIGN_ERROR_PRUNED_ASSIGNMENT_FAILED  = 6,
+    /* An atomic number is outside the element tables (0 to 104, where 0
+     * is the dummy atom "X"). Returned by: atormsd, conformsd. */
+    MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER     = 7
 };
 
 #ifdef __cplusplus

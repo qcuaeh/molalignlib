@@ -34,25 +34,50 @@ public rotated_coords
 public translate_coords
 public least_rotquat
 public least_sqdistsum
+public ORIGIN
+public IDENTITY_MATRIX
+public MIRROR_MATRIX
+public IDENTITY_QUATERNION
+
+! Neutral values for coordinate transformations (see get_coords)
+real(rk), parameter :: ORIGIN(3) = [0.0_rk, 0.0_rk, 0.0_rk]
+real(rk), parameter :: IDENTITY_MATRIX(3,3) = reshape( &
+      [1.0_rk, 0.0_rk, 0.0_rk, &
+       0.0_rk, 1.0_rk, 0.0_rk, &
+       0.0_rk, 0.0_rk, 1.0_rk], [3, 3])
+! Reflection on the YZ plane (x -> -x)
+real(rk), parameter :: MIRROR_MATRIX(3,3) = reshape( &
+      [-1.0_rk, 0.0_rk, 0.0_rk, &
+        0.0_rk, 1.0_rk, 0.0_rk, &
+        0.0_rk, 0.0_rk, 1.0_rk], [3, 3])
+! Unit quaternion (w, x, y, z) of the null rotation
+real(rk), parameter :: IDENTITY_QUATERNION(4) = [1.0_rk, 0.0_rk, 0.0_rk, 0.0_rk]
+
+! Atom mappings are complete permutations of the atoms in the coordinate
+! arrays: atom i of coords1 maps to atom atomperm1(i) of coords2. The
+! subset variants are for partial mappings under construction, where only
+! the atoms of molecule 1 listed in subset1 have been assigned.
 
 interface sqdistsum
+   module procedure sqdistsum_all
    module procedure sqdistsum_subset
 end interface
 
 interface sqdistmean
-   module procedure sqdistmean_subset
+   module procedure sqdistmean_all
 end interface
 
 interface least_sqdistsum
+   module procedure least_sqdistsum_all
    module procedure least_sqdistsum_subset
 end interface
 
 interface least_rotquat
-   module procedure least_rotquat_subset
+   module procedure least_rotquat_all
 end interface
 
 interface rotate_coords
-   module procedure rotate_coords_subset
+   module procedure rotate_coords_all
 end interface
 
 interface rotated_coords
@@ -141,8 +166,7 @@ subroutine translate_coords(coords, travec)
    end do
 end subroutine
 
-subroutine rotate_coords_subset(atomset, coords, rotquat)
-   integer(ik), dimension(:), intent(in) :: atomset
+subroutine rotate_coords_all(coords, rotquat)
    real(rk), dimension(:,:), intent(inout) :: coords
    real(rk), dimension(4), intent(in) :: rotquat
    ! Local variables
@@ -153,12 +177,12 @@ subroutine rotate_coords_subset(atomset, coords, rotquat)
    rotmat = quatrotmat(rotquat)
 
    ! Apply rotation
-   do i = 1, size(atomset)
+   do i = 1, size(coords, dim=2)
       auxvec(:) = 0
       do j = 1, 3
-         auxvec(:) = auxvec(:) + rotmat(:,j)*(coords(j,atomset(i)))
+         auxvec(:) = auxvec(:) + rotmat(:,j)*(coords(j,i))
       end do
-      coords(:,atomset(i)) = auxvec(:)
+      coords(:,i) = auxvec(:)
    end do
 end subroutine
 
@@ -220,20 +244,32 @@ subroutine compute_residuals_matrix(coordsp, coordsm, residuals)
    residuals(4, 3) = residuals(3, 4)
 end subroutine
 
-real(rk) function sqdistsum_subset(atomset1, atomperm1, coords1, coords2) result(sqdistsum)
-   integer(ik), dimension(:), intent(in) :: atomset1, atomperm1
+real(rk) function sqdistsum_all(atomperm1, coords1, coords2) result(sqdistsum)
+   integer(ik), dimension(:), intent(in) :: atomperm1
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    ! Local variables
    integer(ik) :: i
 
    sqdistsum = 0
-   do i = 1, size(atomset1)
-      sqdistsum = sqdistsum + sum((coords1(:, atomset1(i)) - coords2(:, atomperm1(atomset1(i))))**2, dim=1)
+   do i = 1, size(atomperm1)
+      sqdistsum = sqdistsum + sum((coords1(:, i) - coords2(:, atomperm1(i)))**2, dim=1)
    end do
 end function
 
-function least_sqdistsum_subset(atomset1, atomperm1, coords1, coords2) result(leastotsqdist)
-   integer(ik), dimension(:), intent(in) :: atomset1, atomperm1
+real(rk) function sqdistsum_subset(subset1, atomperm1, coords1, coords2) result(sqdistsum)
+   integer(ik), dimension(:), intent(in) :: subset1, atomperm1
+   real(rk), dimension(:,:), intent(in) :: coords1, coords2
+   ! Local variables
+   integer(ik) :: i
+
+   sqdistsum = 0
+   do i = 1, size(subset1)
+      sqdistsum = sqdistsum + sum((coords1(:, subset1(i)) - coords2(:, atomperm1(subset1(i))))**2, dim=1)
+   end do
+end function
+
+function least_sqdistsum_all(atomperm1, coords1, coords2) result(leastotsqdist)
+   integer(ik), dimension(:), intent(in) :: atomperm1
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    ! Local variables
    real(rk) :: leastotsqdist
@@ -241,12 +277,12 @@ function least_sqdistsum_subset(atomset1, atomperm1, coords1, coords2) result(le
    real(rk), dimension(:,:), allocatable :: coordsp, coordsm
    integer(ik) :: i
 
-   allocate (coordsp(3, size(atomset1)))
-   allocate (coordsm(3, size(atomset1)))
+   allocate (coordsp(3, size(atomperm1)))
+   allocate (coordsm(3, size(atomperm1)))
 
-   do i = 1, size(atomset1)
-      coordsp(:, i) = coords1(:, atomset1(i)) + coords2(:, atomperm1(atomset1(i)))
-      coordsm(:, i) = coords1(:, atomset1(i)) - coords2(:, atomperm1(atomset1(i)))
+   do i = 1, size(atomperm1)
+      coordsp(:, i) = coords1(:, i) + coords2(:, atomperm1(i))
+      coordsm(:, i) = coords1(:, i) - coords2(:, atomperm1(i))
    end do
 
    ! Compute residuals matrix using the common procedure
@@ -255,8 +291,31 @@ function least_sqdistsum_subset(atomset1, atomperm1, coords1, coords2) result(le
    leastotsqdist = max(leasteigval(residuals), 0.0_rk)
 end function
 
-real(rk) function sqdistmean_subset(atomset1, atomperm1, weights, coords1, coords2) result(sqdistmean)
-   integer(ik), dimension(:), intent(in) :: atomset1, atomperm1
+function least_sqdistsum_subset(subset1, atomperm1, coords1, coords2) result(leastotsqdist)
+   integer(ik), dimension(:), intent(in) :: subset1, atomperm1
+   real(rk), dimension(:,:), intent(in) :: coords1, coords2
+   ! Local variables
+   real(rk) :: leastotsqdist
+   real(rk) :: residuals(4, 4)
+   real(rk), dimension(:,:), allocatable :: coordsp, coordsm
+   integer(ik) :: i
+
+   allocate (coordsp(3, size(subset1)))
+   allocate (coordsm(3, size(subset1)))
+
+   do i = 1, size(subset1)
+      coordsp(:, i) = coords1(:, subset1(i)) + coords2(:, atomperm1(subset1(i)))
+      coordsm(:, i) = coords1(:, subset1(i)) - coords2(:, atomperm1(subset1(i)))
+   end do
+
+   ! Compute residuals matrix using the common procedure
+   call compute_residuals_matrix(coordsp, coordsm, residuals)
+
+   leastotsqdist = max(leasteigval(residuals), 0.0_rk)
+end function
+
+real(rk) function sqdistmean_all(atomperm1, weights, coords1, coords2) result(sqdistmean)
+   integer(ik), dimension(:), intent(in) :: atomperm1
    real(rk), dimension(:), intent(in) :: weights
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    ! Local variables
@@ -265,17 +324,17 @@ real(rk) function sqdistmean_subset(atomset1, atomperm1, weights, coords1, coord
 
    total_weight = 0
    sqdistsum = 0
-   do i = 1, size(atomset1)
-      total_weight = total_weight + weights(atomset1(i))
-      sqdistsum = sqdistsum + weights(atomset1(i))*sum((coords1(:, atomset1(i)) - coords2(:, atomperm1(atomset1(i))))**2, dim=1)
+   do i = 1, size(atomperm1)
+      total_weight = total_weight + weights(i)
+      sqdistsum = sqdistsum + weights(i)*sum((coords1(:, i) - coords2(:, atomperm1(i)))**2, dim=1)
    end do
    sqdistmean = sqdistsum / total_weight
 end function
 
-function least_rotquat_subset(atomset1, atomperm1, coords1, coords2) result(rotquat)
+function least_rotquat_all(atomperm1, coords1, coords2) result(rotquat)
 ! Find the optimal rotation in quaternion representation by least squares minimization
 ! Reference: Acta Cryst. (1989). A45, 208-210
-   integer(ik), dimension(:), intent(in) :: atomset1, atomperm1
+   integer(ik), dimension(:), intent(in) :: atomperm1
    real(rk), dimension(:,:), intent(in) :: coords1
    real(rk), dimension(:,:), intent(in) :: coords2
    ! Local variables
@@ -284,12 +343,12 @@ function least_rotquat_subset(atomset1, atomperm1, coords1, coords2) result(rotq
    real(rk) :: residuals(4, 4)
    integer(ik) :: i
 
-   allocate (coordsp(3, size(atomset1)))
-   allocate (coordsm(3, size(atomset1)))
+   allocate (coordsp(3, size(atomperm1)))
+   allocate (coordsm(3, size(atomperm1)))
 
-   do i = 1, size(atomset1)
-      coordsp(:, i) = coords1(:, atomset1(i)) + coords2(:, atomperm1(atomset1(i)))
-      coordsm(:, i) = coords1(:, atomset1(i)) - coords2(:, atomperm1(atomset1(i)))
+   do i = 1, size(atomperm1)
+      coordsp(:, i) = coords1(:, i) + coords2(:, atomperm1(i))
+      coordsm(:, i) = coords1(:, i) - coords2(:, atomperm1(i))
    end do
 
    ! Compute residuals matrix using the common procedure

@@ -10,6 +10,7 @@ module cbind_utils
    use recording
    use alignment_atoms
    use flags
+   use error_codes
    implicit none
 
 contains
@@ -23,19 +24,35 @@ contains
 ! coords_in is row-major from C: [x0,y0,z0, x1,y1,z1, ...] (length n*3).
 ! Because ik==c_int and rk==c_double, assignments are direct - no real/kind
 ! conversion is required.
+!
+! Every elnum must index the element tables in chemdata, i.e. lie in
+! 0:num_elems (0 is the dummy atom). Each one is checked as it is read; on
+! the first that doesn't, error_code is set to
+! MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER and atoms is deallocated, so no
+! out-of-range value ever reaches a table lookup. On success error_code is
+! MOLALIGN_SUCCESS.
 ! ---------------------------------------------------------------------------
-subroutine build_atoms(n, atomdata, coords_in, atoms)
+subroutine build_atoms(n, atomdata, coords_in, atoms, error_code)
    integer(ik), intent(in), value :: n
    integer(ik), dimension(n*2), intent(in) :: atomdata
    real(rk),    dimension(n*3), intent(in) :: coords_in
    type(atom_t), dimension(:), allocatable, intent(out) :: atoms
-   integer(ik) :: i, abase, cbase
+   integer(ik), intent(out) :: error_code
+   integer(ik) :: i, abase, cbase, elnum
+
+   error_code = MOLALIGN_SUCCESS
 
    allocate(atoms(n))
    do i = 1, n
       abase = (i - 1)*2
       cbase = (i - 1)*3
-      atoms(i)%elnum     = atomdata(abase + 1)
+      elnum = atomdata(abase + 1)
+      if (elnum < 0 .or. elnum > num_elems) then
+         error_code = MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER
+         deallocate(atoms)
+         return
+      end if
+      atoms(i)%elnum     = elnum
       atoms(i)%group     = atomdata(abase + 2)
       atoms(i)%coords(1) = coords_in(cbase + 1)
       atoms(i)%coords(2) = coords_in(cbase + 2)
@@ -67,8 +84,14 @@ end subroutine build_bonds
 
 ! ---------------------------------------------------------------------------
 ! Build a row-major 4x4 homogeneous transformation matrix.
-! Maps a point in molecule-2 frame to molecule-1 frame:
-!   p_out = R * p_in + t,   t = center1 - R * center2
+! Maps a point of molecule 2 (original input coordinates) to the frame of
+! molecule 1:
+!   p_out = R * T * p_in + t,   t = center1 - R * center2
+! R is the rotation of rotquat and T the linear transformation applied to
+! molecule 2 before centering (MIRROR_MATRIX or IDENTITY_MATRIX, as passed
+! to get_coords). center2 must be in the transformed frame, i.e. computed
+! by get_centroid from the transformed coordinates. Without alignment pass
+! IDENTITY_QUATERNION and ORIGIN for both centers, which gives just T.
 !
 ! Layout (row-major, 1-based Fortran indexing):
 !   [1..4]  -> row 0: R(1,*), tx
@@ -76,14 +99,16 @@ end subroutine build_bonds
 !   [9..12] -> row 2: R(3,*), tz
 !   [13..16]-> 0 0 0 1
 ! ---------------------------------------------------------------------------
-subroutine build_homogeneous_transform(rotquat, center1, center2, htrans)
+subroutine build_homogeneous_transform(rotquat, transmat, center1, center2, htrans)
    real(rk), intent(in) :: rotquat(4)
+   real(rk), intent(in) :: transmat(3,3)
    real(rk), intent(in) :: center1(3), center2(3)
    real(rk), intent(out) :: htrans(16)
    real(rk) :: R(3,3), t(3)
 
-   R = quatrotmat(rotquat)
-   t = center1 - matmul(R, center2)
+   ! t uses the rotation alone, because center2 is already transformed
+   t = center1 - matmul(quatrotmat(rotquat), center2)
+   R = matmul(quatrotmat(rotquat), transmat)
 
    ! ik==c_int, rk==c_double - direct assignment, no real() conversion needed
    htrans(1)  = R(1,1);  htrans(2)  = R(1,2);  htrans(3)  = R(1,3);  htrans(4)  = t(1)

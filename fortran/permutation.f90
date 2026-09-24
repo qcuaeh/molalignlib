@@ -18,18 +18,21 @@ module permutation
 use parameters
 implicit none
 
-! Derived type to store permutation subsets
+! Partial atom permutation, built by appending assigned pairs.
+!   atomset(1:atomset_size) lists the assigned atoms of molecule 1, in the
+!   order they were added; atomperm(i1) is the partner of i1 in molecule 2.
+!   Only atomperm(atomset(1:atomset_size)) is defined. Other entries are
+!   stale or uninitialised and must never be read; to export a permutation,
+!   scatter the defined entries into a zeroed array.
+! Both arrays have fixed capacity n_atoms. Pairs are only ever appended and
+! an atom is never re-added, so a subperm can be rolled back to an earlier
+! state by restoring atomset_size, and copied cheaply with subperm_merge
+! (O(assigned pairs)) instead of intrinsic assignment (O(n_atoms)).
 type :: subperm_t
-   integer(ik) :: atomset_size   ! number of assigned pairs
-   integer(ik) :: atomperm_size     ! atom permutation array size
-   integer(ik), pointer :: atomset(:)             ! pointer to active slice of subset_alloc
-   integer(ik), allocatable :: subset_alloc(:)   ! allocated storage for atomset
-   integer(ik), allocatable :: atomperm(:)       ! atom permutation array
+   integer(ik) :: atomset_size = 0
+   integer(ik), allocatable :: atomset(:)
+   integer(ik), allocatable :: atomperm(:)
 end type
-
-interface operator(==)
-   module procedure subperm_equality
-end interface
 
 abstract interface
    integer function int_f(i)
@@ -108,49 +111,19 @@ logical(lk) function is_permutation(perm) result(isperm)
    end do
 end function
 
-elemental function subperm_equality(left, right) result(equality)
-   type(subperm_t), intent(in) :: left, right
-   logical(lk) :: equality
-   integer(ik) :: i, idx
-
-   if (left%atomset_size /= right%atomset_size) then
-      equality = .FALSE.
-      return
-   end if
-
-   ! Check if all assigned pairs match
-   do i = 1, left%atomset_size
-      idx = left%atomset(i)
-      if (left%atomperm(idx) /= right%atomperm(idx)) then
-         equality = .FALSE.
-         return
-      end if
-   end do
-
-   equality = .TRUE.
-end function
-
 subroutine subperm_init(subperm, perm_size)
-   type(subperm_t), target, intent(out) :: subperm
+! Allocate an empty subperm. Call it once per (unallocated) object; to reuse
+! an initialised subperm just set atomset_size = 0. No array is filled:
+! only entries listed in atomset are ever read.
+   type(subperm_t), intent(inout) :: subperm
    integer(ik), intent(in) :: perm_size
-   integer(ik) :: i
 
-   allocate(subperm%subset_alloc(perm_size))
-   allocate(subperm%atomperm(perm_size))
-   subperm%atomperm_size = perm_size
+   allocate (subperm%atomset(perm_size), subperm%atomperm(perm_size))
    subperm%atomset_size = 0
-
-   ! Initialize atomset pointer to empty slice
-   subperm%atomset => subperm%subset_alloc(1:0)
-
-   ! Initialize atomperm as identity permutation
-   do i = 1, perm_size
-      subperm%atomperm(i) = i
-   end do
 end subroutine
 
 subroutine subperm_add(subperm, i1, i2)
-   type(subperm_t), target, intent(inout) :: subperm
+   type(subperm_t), intent(inout) :: subperm
    integer(ik), intent(in) :: i1, i2
    integer(ik) :: n
 
@@ -173,12 +146,9 @@ subroutine subperm_add(subperm, i1, i2)
    end if
 
    n = subperm%atomset_size + 1
-   subperm%subset_alloc(n) = i1
+   subperm%atomset(n) = i1
    subperm%atomperm(i1) = i2
    subperm%atomset_size = n
-
-   ! Update atomset pointer to include the new element
-   subperm%atomset => subperm%subset_alloc(1:n)
 end subroutine
 
 subroutine subperm_merge(subperm, other_subperm)

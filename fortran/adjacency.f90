@@ -40,7 +40,6 @@ end type
 
 interface adjmat_to_adjcs
    module procedure adjmat_to_adjcs_all
-   module procedure adjmat_to_adjcs_subset
 end interface
 
 interface adjacencydiff
@@ -93,45 +92,16 @@ subroutine adjmat_to_adjcs_all(adjmat, adjcs)
    end do
 end subroutine
 
-subroutine adjmat_to_adjcs_subset(atomset, adjmat, adjcs)
-   integer(ik), dimension(:), intent(in) :: atomset
-   logical(lk), dimension(:,:), intent(in) :: adjmat
-   type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs
-   integer(ik) :: i, nadj, atomidx, n_atoms
-
-   n_atoms = size(adjmat, 1)
-   allocate(adjcs(n_atoms))
-
-   ! Populate adjacency lists for all atoms
-   do atomidx = 1, n_atoms
-      nadj = 0
-      ! Only include bonds to atoms in atomset
-      do i = 1, size(atomset)
-         if (adjmat(atomidx, atomset(i))) then
-            nadj = nadj + 1
-            if (nadj > MAX_COORDNUM) then
-               write (stderr, '(A,1X,I0,1X,A,1X,A)') &
-                     'Coordination number of atom', atomidx, &
-                     'exceeds', MAX_COORDNUM
-               stop
-            end if
-            adjcs(atomidx)%list(nadj) = atomset(i)
-         end if
-      end do
-      adjcs(atomidx)%cn = nadj
-   end do
-end subroutine
-
-function adjacencydiff_perm(atomset1, atomperm1, adjcs1, adjcs2) result(diff)
+function adjacencydiff_perm(atomperm1, adjcs1, adjcs2) result(diff)
 !------------------------------------------------------------------------------
 ! Calculate connectivity difference from adjacency lists.
-! Returns the number of differing edges.
+! Returns the number of differing edges. atomperm1 must be a full
+! permutation of the atoms of adjcs1 onto the atoms of adjcs2.
 !------------------------------------------------------------------------------
-   integer(ik), dimension(:), intent(in) :: atomset1
    integer(ik), dimension(:), intent(in) :: atomperm1
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    integer(ik) :: diff
-   integer(ik) :: i, j, idx1, idx2, mapped_idx1, neighbor_idx1, mapped_neighbor_idx1
+   integer(ik) :: j, idx1, idx2, mapped_idx1, neighbor_idx1, mapped_neighbor_idx1
    integer(ik) :: common_edges, nadjs, total_edges1, total_edges2
 
    ! Count common edges and total edges, counting each edge only once
@@ -139,8 +109,7 @@ function adjacencydiff_perm(atomset1, atomperm1, adjcs1, adjcs2) result(diff)
    common_edges = 0
    total_edges1 = 0
 
-   do i = 1, size(atomset1)
-      idx1 = atomset1(i)
+   do idx1 = 1, size(atomperm1)
       mapped_idx1 = atomperm1(idx1)
       nadjs = adjcs1(idx1)%cn
 
@@ -161,11 +130,10 @@ function adjacencydiff_perm(atomset1, atomperm1, adjcs1, adjcs2) result(diff)
       end do
    end do
 
-   ! Calculate total edges in structure 2
-   ! Use atomperm1(atomset1) to get the corresponding atoms in molecule 2
+   ! Calculate total edges in structure 2 (atomperm1 is a permutation, so
+   ! this visits every atom of molecule 2 exactly once)
    total_edges2 = 0
-   do i = 1, size(atomset1)
-      idx2 = atomperm1(atomset1(i))
+   do idx2 = 1, size(atomperm1)
       nadjs = adjcs2(idx2)%cn
 
       do j = 1, nadjs
@@ -223,34 +191,31 @@ function adjacencydelta(adjcs1, adjmat2, atomperm1, k, l) result(delta)
    delta = 2*(nkk + nll - nkl - nlk)
 end function
 
-subroutine find_differing_bonds(atomset1, atomperm1, adjmat1, adjmat2, moldiffs)
+subroutine find_differing_bonds(atomperm1, adjmat1, adjmat2, moldiffs)
 
-   integer(ik), dimension(:), intent(in) :: atomset1
    integer(ik), dimension(:), intent(in) :: atomperm1
    logical(lk), dimension(:,:), intent(in) :: adjmat1, adjmat2
    integer(ik), dimension(:,:), allocatable, intent(out) :: moldiffs
 
    ! Local variables
-   integer(ik) :: i, j, idx1, idx2, mapped_idx1, mapped_idx2
+   integer(ik) :: idx1, idx2, mapped_idx1, mapped_idx2
    integer(ik) :: n_atoms, max_edges, bond_count
    integer(ik), dimension(:,:), allocatable :: temp_bonds
    integer(ik) :: atom1, atom2
    logical(lk) :: bond_in_mol1, bond_in_mol2
 
-   n_atoms = size(atomset1)
+   n_atoms = size(atomperm1)
    ! Maximum possible differing edges
    max_edges = n_atoms * (n_atoms - 1) / 2
 
    allocate(temp_bonds(2, max_edges))
    bond_count = 0
 
-   ! Compare all pairs of atoms in atomset1
-   do i = 1, size(atomset1)
-      idx1 = atomset1(i)
+   ! Compare all pairs of atoms
+   do idx1 = 1, n_atoms
       mapped_idx1 = atomperm1(idx1)
 
-      do j = i + 1, size(atomset1)
-         idx2 = atomset1(j)
+      do idx2 = idx1 + 1, n_atoms
          mapped_idx2 = atomperm1(idx2)
 
          ! Check bond status in both structures

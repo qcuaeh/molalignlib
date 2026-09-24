@@ -31,9 +31,10 @@ implicit none
 
 contains
 
-subroutine optimize_atomperm_atoms(atomset1, atomset2, atomtypes, prunes, coords1, &
+subroutine optimize_atomperm_atoms(atomtypes, prunes, coords1, &
       coords2, conv_freq, max_trials, registry, error_code)
-   integer(ik), dimension(:), intent(in) :: atomset1, atomset2
+! coords1 and coords2 hold the included atoms only, in the numbering of
+! atomtypes; the atom permutations stored in registry use that numbering.
    type(partition_t), intent(in) :: atomtypes
    type(bool_matrix), dimension(:), intent(in) :: prunes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
@@ -63,13 +64,13 @@ subroutine optimize_atomperm_atoms(atomset1, atomset2, atomtypes, prunes, coords
       ! Apply random rotation to coords2 copy
       coords2r = coords2
       total_rotation = randrotquat()
-      call rotate_coords( atomset2, coords2r, total_rotation)
+      call rotate_coords( coords2r, total_rotation)
 
       ! Assign atoms with current orientation
       call assign_atoms_pruned( atomtypes, coords1, coords2r, prunes, atomperm1, error_code)
       if (error_code /= MOLALIGN_SUCCESS) return
-      rotation = least_rotquat( atomset1, atomperm1, coords1, coords2r)
-      call rotate_coords( atomset1, coords2r, rotation)
+      rotation = least_rotquat( atomperm1, coords1, coords2r)
+      call rotate_coords( coords2r, rotation)
       total_rotation = quatmul( total_rotation, rotation)
       steps = 1
 
@@ -78,14 +79,14 @@ subroutine optimize_atomperm_atoms(atomset1, atomset2, atomtypes, prunes, coords
          if (error_code /= MOLALIGN_SUCCESS) return
          if (all(new_atomperm == atomperm1)) exit
          atomperm1 = new_atomperm
-         rotation = least_rotquat( atomset1, atomperm1, coords1, coords2r)
-         call rotate_coords( atomset1, coords2r, rotation)
+         rotation = least_rotquat( atomperm1, coords1, coords2r)
+         call rotate_coords( coords2r, rotation)
          total_rotation = quatmul( total_rotation, rotation)
          steps = steps + 1
       end do
 
       ! Push local minimum to registry
-      permdist = sqrt( sqdistsum( atomset1, atomperm1, coords1, coords2r))
+      permdist = sqrt( sqdistsum( atomperm1, coords1, coords2r))
       call insert_record_atomperm( registry, atomperm1, steps, total_rotation, 0, permdist)
 
    end do

@@ -49,6 +49,7 @@ subroutine assign_atoms( atomtypes, costs, atomperm1)
    allocate (k(n))
    allocate (a(n, m))
 
+   ! Every atom belongs to one block, so atomperm1 is fully assigned
    ! Optimize atomperm1 for each block
    do h = 1, atomtypes%num_parts
       n = atomtypes%parts(h)%num_items1
@@ -75,9 +76,10 @@ subroutine assign_atoms_pruned( atomtypes, coords1, coords2, prunes, atomperm1, 
 
    error_code = MOLALIGN_SUCCESS
    allocate (perm1(maxval(atomtypes%parts%num_items1)))
-   ! atomperm1 is indexed by atom (see items1); atoms outside the atom set
-   ! map to themselves
-   call init_array(atomperm1, size(atomtypes%itemdir1), identity)
+   ! atomperm1 maps the included atoms only (compact numbering, see
+   ! collect_atomtypes). Every atom belongs to one block, so it is fully
+   ! assigned below; complete_atomperm later adds the excluded atoms.
+   allocate (atomperm1(size(atomtypes%itemdir1)))
 
    ! Optimize atomperm1 for each block
    do h = 1, atomtypes%num_parts
@@ -87,6 +89,12 @@ subroutine assign_atoms_pruned( atomtypes, coords1, coords2, prunes, atomperm1, 
       if (error_code /= 0) return
       atomperm1(atomtypes%parts(h)%items1) = atomtypes%parts(h)%items2(perm1(1:n))
    end do
+
+   if (DEBUG_TESTS) then
+      if (.not. is_permutation(atomperm1)) then
+         error stop 'assign_atoms_pruned: atomperm1 is not a permutation'
+      end if
+   end if
 end subroutine
 
 subroutine solve_lap_pruned(n, s1, s2, x1, x2, pruned, perm1, dist, error_code)

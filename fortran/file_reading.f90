@@ -33,7 +33,7 @@ subroutine parse_label( label, elnum, group)
    integer(ik), intent(out) :: elnum, group
    ! Local variables
    character(:), allocatable :: normalized_label, elsym
-   character(symlen), dimension(:), allocatable :: normalized_atomic_symbols
+   character(symlen), dimension(0:num_elems) :: normalized_atomic_symbols
    integer(ik) :: pos, z
 
    normalized_label = lowercase(trim(adjustl(label)))
@@ -53,13 +53,17 @@ subroutine parse_label( label, elnum, group)
       end if
    end if
 
-   elnum = 0
-   do z = 1, num_elems
+   ! atomic_symbols is indexed 0:num_elems, so z is the element number
+   ! directly (0 for the dummy atom 'X')
+   do z = 0, num_elems
       if (elsym == normalized_atomic_symbols(z)) then
          elnum = z
          return
       end if
    end do
+
+   write (stderr, '(A,1X,A)') 'Unknown element symbol:', elsym
+   stop
 end subroutine
 
 subroutine read_file(unit, in_format, title, atoms, bonds)
