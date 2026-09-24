@@ -158,11 +158,14 @@ subroutine write_file_mol2(unit, title, atoms, bonds, atomperm1)
    write (unit, '(A)') '@<TRIPOS>ATOM'
    do i = 1, n_atoms
       iatom = atoms(atomperm1(i))
-      if (iatom%elnum > 1) then
-         atomtype = 'Hev'
-      else
+      select case (iatom%elnum)
+      case (0)
+         atomtype = 'Du'
+      case (1)
          atomtype = 'H'
-      end if
+      case default
+         atomtype = 'Hev'
+      end select
       write (unit, '(I4,2X,A2,3(1X,F12.6),2X,A4,1X,I2,1X,A4,1X,F7.3)') &
          i, atomic_symbols(iatom%elnum), iatom%coords, atomtype, 1, 'MOL1', 0.
    end do

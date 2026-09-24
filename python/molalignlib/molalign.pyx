@@ -29,6 +29,7 @@ cdef extern from "error_codes.h":
     enum: MOLALIGN_ERROR_BOND_MISMATCH
     enum: MOLALIGN_ERROR_NOT_CONFORMERS
     enum: MOLALIGN_ERROR_PRUNED_ASSIGNMENT_FAILED
+    enum: MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER
 
 cdef extern from "molalign.h":
     void c_atormsd_calculate "atormsd_calculate"(
@@ -57,12 +58,14 @@ cdef extern from "molalign.h":
 
 
 _ATORMSD_ERROR_MESSAGES = {
+    MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER: "Atomic number out of range (valid: 0 to 104, where 0 is the dummy atom 'X').",
     MOLALIGN_ERROR_NOT_ISOMERS: "Clusters are not isomers.",
     MOLALIGN_ERROR_ATOM_TYPE_MISMATCH: "Atom types mismatch between the two clusters.",
     MOLALIGN_ERROR_PRUNED_ASSIGNMENT_FAILED: "Assignment failed (pruning tolerance might be too tight).",
 }
 
 _CONFORMSD_ERROR_MESSAGES = {
+    MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER: "Atomic number out of range (valid: 0 to 104, where 0 is the dummy atom 'X').",
     MOLALIGN_ERROR_NOT_ISOMERS: "Molecules are not isomers (different atom counts or compositions).",
     MOLALIGN_ERROR_ATOM_TYPE_MISMATCH: "Atom type mismatch between the two conformers.",
     MOLALIGN_ERROR_MISSING_BONDS: "Missing bond data for one or both conformers.",
@@ -192,7 +195,9 @@ def atormsd_calculate(
     -------
     rmsd : float64 ndarray, shape (occ_records,)
         RMSD of each returned candidate solution, best first.
-    atom_permutation : int32 ndarray, shape (occ_records, n_atoms1) — 0-based
+    atom_permutation : int32 ndarray, shape (occ_records, n_pad) — 0-based
+        ``n_pad = max(n_atoms1, n_atoms2)``; same padding convention as
+        ``conformsd_calculate``. Sizes can only differ when ``heavy_flag=True``.
     transform : float64 ndarray, shape (occ_records, 4, 4)
 
     ``occ_records`` (<= n_records) is however many distinct solutions the
@@ -202,6 +207,7 @@ def atormsd_calculate(
 
     cdef int n1 = atom_data1.shape[0]
     cdef int n2 = atom_data2.shape[0]
+    cdef int n_pad = max(n1, n2)
 
     atom_data1 = np.ascontiguousarray(atom_data1)
     atom_data2 = np.ascontiguousarray(atom_data2)
@@ -223,7 +229,7 @@ def atormsd_calculate(
     cdef double *rmsd_list
     cdef int    *atomperm_list
     cdef double *transform_list
-    _alloc_buffers(n_records, n1, &rmsd_list, &atomperm_list, &transform_list)
+    _alloc_buffers(n_records, n_pad, &rmsd_list, &atomperm_list, &transform_list)
 
     try:
         c_atormsd_calculate(
@@ -248,7 +254,7 @@ def atormsd_calculate(
             )
 
         rmsd, perm, transform = _pack_outputs(
-            rmsd_list, atomperm_list, transform_list, n1, occ_records
+            rmsd_list, atomperm_list, transform_list, n_pad, occ_records
         )
     finally:
         free(rmsd_list)
@@ -316,7 +322,13 @@ def conformsd_calculate(
     -------
     rmsd : float64 ndarray, shape (occ_records,)
         RMSD of each returned candidate solution, best first.
-    atom_permutation : int32 ndarray, shape (occ_records, n_atoms1) — 0-based
+    atom_permutation : int32 ndarray, shape (occ_records, n_pad) — 0-based
+        ``n_pad = max(n_atoms1, n_atoms2)``. Each row is a permutation of
+        ``0..n_pad-1``; entry ``j`` is the atom of molecule 2 placed on line
+        ``j`` of molecule 1. The smaller molecule is padded with dummy atoms
+        appended after its real atoms: values ``>= n_atoms2`` denote dummy
+        atoms of molecule 2, and entries ``j >= n_atoms1`` hold the extra
+        atoms of molecule 2. Sizes can only differ when ``heavy_flag=True``.
     transform : float64 ndarray, shape (occ_records, 4, 4)
 
     ``occ_records`` (<= n_records) is however many distinct solutions the
@@ -326,6 +338,7 @@ def conformsd_calculate(
 
     cdef int n1 = atom_data1.shape[0]
     cdef int n2 = atom_data2.shape[0]
+    cdef int n_pad = max(n1, n2)
 
     atom_data1 = np.ascontiguousarray(atom_data1)
     atom_data2 = np.ascontiguousarray(atom_data2)
@@ -358,7 +371,7 @@ def conformsd_calculate(
     cdef double *rmsd_list
     cdef int    *atomperm_list
     cdef double *transform_list
-    _alloc_buffers(n_records, n1, &rmsd_list, &atomperm_list, &transform_list)
+    _alloc_buffers(n_records, n_pad, &rmsd_list, &atomperm_list, &transform_list)
 
     try:
         c_conformsd_calculate(
@@ -387,7 +400,7 @@ def conformsd_calculate(
             )
 
         rmsd, perm, transform = _pack_outputs(
-            rmsd_list, atomperm_list, transform_list, n1, occ_records
+            rmsd_list, atomperm_list, transform_list, n_pad, occ_records
         )
     finally:
         free(rmsd_list)

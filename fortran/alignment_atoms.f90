@@ -69,7 +69,8 @@ subroutine optimize_atomperm_atoms(atomset1, atomset2, atomtypes, prunes, coords
       call assign_atoms_pruned( atomtypes, coords1, coords2r, prunes, atomperm1, error_code)
       if (error_code /= MOLALIGN_SUCCESS) return
       rotation = least_rotquat( atomset1, atomperm1, coords1, coords2r)
-      call rotate_coords( atomset1, coords2r, rotation)
+      ! coords2r holds molecule-2 coordinates, so rotate molecule 2's atom set
+      call rotate_coords( atomset2, coords2r, rotation)
       total_rotation = quatmul( total_rotation, rotation)
       steps = 1
 
@@ -79,7 +80,7 @@ subroutine optimize_atomperm_atoms(atomset1, atomset2, atomtypes, prunes, coords
          if (all(new_atomperm == atomperm1)) exit
          atomperm1 = new_atomperm
          rotation = least_rotquat( atomset1, atomperm1, coords1, coords2r)
-         call rotate_coords( atomset1, coords2r, rotation)
+         call rotate_coords( atomset2, coords2r, rotation)
          total_rotation = quatmul( total_rotation, rotation)
          steps = steps + 1
       end do

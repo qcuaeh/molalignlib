@@ -86,8 +86,10 @@ type, public :: array_trees_t
    type(partree_item_t), allocatable :: partree(:)
    type(assigntree_item_t), allocatable :: assigntree(:)
    ! Flattened variable-length data - all pure integer arrays!
-   integer(ik), allocatable :: itemdir1_entries(:,:)  ! [link_idx, atom_idx]
-   integer(ik), allocatable :: itemdir2_entries(:,:)  ! [link_idx, atom_idx]
+   ! [atom_idx, link_idx]: each link is one contiguous column, so resetting
+   ! a branch's consecutive links is a single contiguous block
+   integer(ik), allocatable :: itemdir1_entries(:,:)  ! [atom_idx, link_idx]
+   integer(ik), allocatable :: itemdir2_entries(:,:)  ! [atom_idx, link_idx]
    integer(ik), allocatable :: partref_entries(:)     ! Part indices for partrefs
    ! Adjacency information stored directly for fastest access
    integer(ik), allocatable :: adjcs1_cn(:)         ! Count for each adjcs1 atom's adjacency list
@@ -178,8 +180,8 @@ subroutine cache_assignment_tree(assignment_tree, cache_arrays)
    allocate(cache_arrays%chain(cache_arrays%total_links))
    allocate(cache_arrays%assigntree(cache_arrays%total_chains))
    allocate(cache_arrays%partref_entries(cache_arrays%total_partref_entries))
-   allocate(cache_arrays%itemdir1_entries(cache_arrays%total_links, cache_arrays%n_atoms1))
-   allocate(cache_arrays%itemdir2_entries(cache_arrays%total_links, cache_arrays%n_atoms2))
+   allocate(cache_arrays%itemdir1_entries(cache_arrays%n_atoms1, cache_arrays%total_links))
+   allocate(cache_arrays%itemdir2_entries(cache_arrays%n_atoms2, cache_arrays%total_links))
 
    ! Initialize arrays
    cache_arrays%partref_entries = 0

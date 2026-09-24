@@ -49,6 +49,10 @@ subroutine assign_atoms( atomtypes, costs, atomperm1)
    allocate (k(n))
    allocate (a(n, m))
 
+   ! Atoms outside the atom set are unassigned (0); they were left
+   ! undefined before, since atomperm1 is intent(out)
+   atomperm1 = 0
+
    ! Optimize atomperm1 for each block
    do h = 1, atomtypes%num_parts
       n = atomtypes%parts(h)%num_items1
@@ -75,9 +79,11 @@ subroutine assign_atoms_pruned( atomtypes, coords1, coords2, prunes, atomperm1, 
 
    error_code = MOLALIGN_SUCCESS
    allocate (perm1(maxval(atomtypes%parts%num_items1)))
-   ! atomperm1 is indexed by atom (see items1); atoms outside the atom set
-   ! map to themselves
-   call init_array(atomperm1, size(atomtypes%itemdir1), identity)
+   ! atomperm1 is indexed by atom (see items1). Atoms outside the atom set
+   ! are unassigned (0): an identity value would be a molecule-1 index posing
+   ! as a molecule-2 index. complete_atomperm fills them in afterwards.
+   allocate (atomperm1(size(atomtypes%itemdir1)))
+   atomperm1 = 0
 
    ! Optimize atomperm1 for each block
    do h = 1, atomtypes%num_parts

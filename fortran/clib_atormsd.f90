@@ -38,13 +38,24 @@ contains
 !   c_occ_records entries of c_rmsd_list, c_atomperm_list, and
 !   c_transform_list are meaningful. All output arrays are flattened and
 !   must be allocated by the caller with at least c_n_records elements per
-!   record (c_n_atoms1 for c_atomperm_list, 16 for c_transform_list).
+!   record (n_pad for c_atomperm_list, 16 for c_transform_list).
+!
+! Atom permutations and padding:
+!   n_pad = max(c_n_atoms1, c_n_atoms2). The smaller cluster is padded with
+!   dummy atoms appended after its real atoms, so each record is a true
+!   permutation of 0..n_pad-1. Entry j (0-based) is the atom of cluster 2
+!   that goes on line j of cluster 1. Values >= c_n_atoms2 denote padding
+!   atoms of cluster 2; entries j >= c_n_atoms1 carry the extra atoms of
+!   cluster 2. The sizes can only differ when c_heavy_flag is true.
+!   Excluded atoms (hydrogens with c_heavy_flag) are paired afterwards with
+!   the nearest remaining atom of the same element, then with padding atoms.
 !
 ! c_error_code values: see the error_codes module (error_codes.f90) and its
 ! C mirror, error_codes.h. This function can return MOLALIGN_SUCCESS,
-! MOLALIGN_ERROR_NOT_ISOMERS, MOLALIGN_ERROR_ATOM_TYPE_MISMATCH (only
-! when c_remap_flag is false) and MOLALIGN_ERROR_PRUNED_ASSIGNMENT_FAILED (only
-! when c_remap_flag is true; passed through from assign_atoms_pruned).
+! MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER, MOLALIGN_ERROR_NOT_ISOMERS,
+! MOLALIGN_ERROR_ATOM_TYPE_MISMATCH (only when c_remap_flag is false) and
+! MOLALIGN_ERROR_PRUNED_ASSIGNMENT_FAILED (only when c_remap_flag is true;
+! passed through from assign_atoms_pruned).
 subroutine atormsd_calculate(                                        &
       c_n_atoms1,  c_atom_data1,  c_coords1,                            &
       c_n_atoms2,  c_atom_data2,  c_coords2,                            &
@@ -87,6 +98,7 @@ subroutine atormsd_calculate(                                        &
 
    ! Local variables
    type(atom_t), dimension(:), allocatable :: atoms1, atoms2
+   type(bond_t), dimension(0) :: no_bonds   ! clusters carry no bonds
    type(bool_matrix), dimension(:), allocatable :: prunes
    type(partition_t) :: atomtypes
    type(registry_t)  :: registry
@@ -94,7 +106,7 @@ subroutine atormsd_calculate(                                        &
    real(rk), dimension(:),   allocatable :: weights1, weights2
    real(rk), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, coords2r
    integer(ik), dimension(:), allocatable :: atomset1, atomset2, atomperm1
-   integer(ik) :: num_records
+   integer(ik) :: num_records, n_pad
    integer(ik) :: i, j, base
 
    c_error_code = MOLALIGN_SUCCESS
@@ -127,17 +139,27 @@ subroutine atormsd_calculate(                                        &
    end if
 
    ! Build atom_t arrays from packed C arrays
-   call build_atoms(c_n_atoms1, c_atom_data1, c_coords1, atoms1)
-   call build_atoms(c_n_atoms2, c_atom_data2, c_coords2, atoms2)
+   ! (returns MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER for out-of-range elnums)
+   call build_atoms(c_n_atoms1, c_atom_data1, c_coords1, atoms1, c_error_code)
+   if (c_error_code /= MOLALIGN_SUCCESS) return
+   call build_atoms(c_n_atoms2, c_atom_data2, c_coords2, atoms2, c_error_code)
+   if (c_error_code /= MOLALIGN_SUCCESS) return
 
+   ! Pad the smaller cluster with dummy atoms appended at the end. Real atoms
+   ! keep their indices; padding atoms are recognised by index from here on.
+   n_pad = max(c_n_atoms1, c_n_atoms2)
+   call pad_atoms(atoms1, n_pad)
+   call pad_atoms(atoms2, n_pad)
+
+   ! Atom sets only ever contain real atoms
    if (heavy_flag) then
       ! Include only heavy atoms
-      call include_heavy_atoms(atoms1, atomset1)
-      call include_heavy_atoms(atoms2, atomset2)
+      call include_heavy_atoms(atoms1(1:c_n_atoms1), atomset1)
+      call include_heavy_atoms(atoms2(1:c_n_atoms2), atomset2)
    else
       ! Include all atoms
-      call include_all_atoms(atoms1, atomset1)
-      call include_all_atoms(atoms2, atomset2)
+      call include_all_atoms(atoms1(1:c_n_atoms1), atomset1)
+      call include_all_atoms(atoms2(1:c_n_atoms2), atomset2)
    end if
 
    ! Collect atom types in a partition
@@ -149,13 +171,17 @@ subroutine atormsd_calculate(                                        &
       return
    end if
 
-   ! Get user defined atom weights
+   ! Get user defined atom weights. Atoms outside the atom sets (excluded
+   ! hydrogens and padding) get zero weight, so both clusters are
+   ! normalised over the compared atoms only.
+   allocate (weights1(n_pad), source=0.0_rk)
+   allocate (weights2(n_pad), source=0.0_rk)
    if (mass_flag) then
-      weights1 = atomic_masses(atoms1%elnum)
-      weights2 = atomic_masses(atoms2%elnum)
+      weights1(atomset1) = atomic_masses(atoms1(atomset1)%elnum)
+      weights2(atomset2) = atomic_masses(atoms2(atomset2)%elnum)
    else
-      allocate (weights1(size(atoms1)), source=1.0_rk)
-      allocate (weights2(size(atoms2)), source=1.0_rk)
+      weights1(atomset1) = 1.0_rk
+      weights2(atomset2) = 1.0_rk
    end if
 
    ! Get mol1 coordinates
@@ -206,9 +232,13 @@ subroutine atormsd_calculate(                                        &
             call build_homogeneous_transform(rotquat, center1, center2, &
                   c_transform_list((i-1)*16+1:i*16))
 
+            ! Pair the excluded atoms in the aligned frame
+            call complete_atomperm(atomset1, atoms1, atoms2, c_n_atoms1, c_n_atoms2, &
+                  no_bonds, no_bonds, coords1, coords2r, atomperm1)
+
             c_rmsd_list(i) = rmsd
-            base = (i-1) * c_n_atoms1
-            do j = 1, c_n_atoms1
+            base = (i-1) * n_pad
+            do j = 1, n_pad
                c_atomperm_list(base+j) = atomperm1(j) - 1  ! 0-based for C
             end do
          end do
@@ -221,9 +251,12 @@ subroutine atormsd_calculate(                                        &
          coords2r = coords2
          rmsd = sqrt(sqdistmean(atomset1, atomperm1, weights1, coords1, coords2r))
 
+         call complete_atomperm(atomset1, atoms1, atoms2, c_n_atoms1, c_n_atoms2, &
+               no_bonds, no_bonds, coords1, coords2r, atomperm1)
+
          c_occ_records = 1
          c_rmsd_list(1) = rmsd
-         do j = 1, c_n_atoms1
+         do j = 1, n_pad
             c_atomperm_list(j) = atomperm1(j) - 1  ! 0-based for C
          end do
 
@@ -231,7 +264,7 @@ subroutine atormsd_calculate(                                        &
 
    else
 
-      ! Maintain input atom order
+      ! Maintain input atom order (a full permutation of the padded clusters)
       call init_array(atomperm1, size(atoms1), identity)
 
       ! Abort if atoms do not match
@@ -252,7 +285,7 @@ subroutine atormsd_calculate(                                        &
 
       c_occ_records = 1
       c_rmsd_list(1) = rmsd
-      do j = 1, c_n_atoms1
+      do j = 1, n_pad
          c_atomperm_list(j) = atomperm1(j) - 1  ! 0-based for C
       end do
 

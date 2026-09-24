@@ -20,11 +20,15 @@ use str_utils
 implicit none
 
 integer(ik), parameter :: symlen = 3 ! Symbol length
-integer(ik), parameter :: num_elems = 105
+! Element tables are indexed 0:num_elems. Index 0 is the dummy atom 'X'
+! (zero mass, zero radii), so every real element's index equals its atomic
+! number. Dummy atoms, including padding atoms, always have elnum = 0.
+integer(ik), parameter :: num_elems = 104
 real(rk) :: bond_tol
 
 ! Element symbols
-character(symlen), parameter :: atomic_symbols(num_elems) = [ &
+character(symlen), parameter :: atomic_symbols(0:num_elems) = [ &
+'X ', & ! Dummy atom
 'H ', &
 'He', &
 'Li', &
@@ -128,13 +132,13 @@ character(symlen), parameter :: atomic_symbols(num_elems) = [ &
 'Md', &
 'No', &
 'Lr', &
-'X ', & ! Dummy atom
 'LJ'  & ! Lennard-Jones atom
 ]
 
 ! Standard atomic masses
 ! Source: mendeleev Python library
-real(rk), parameter :: atomic_masses(num_elems) = [ &
+real(rk), parameter :: atomic_masses(0:num_elems) = [ &
+0.0, &  ! X
 1.0, &  ! H
 4.0, &  ! He
 6.9, &  ! Li
@@ -238,13 +242,13 @@ real(rk), parameter :: atomic_masses(num_elems) = [ &
 258.0, &  ! Md
 259.0, &  ! No
 262.0, &  ! Lr
-0.0,   &  ! X
 0.0    &  ! LJ
 ]
 
 ! Atomic covalent radii (Angstrom)
 ! Source: mendeleev Python library
-real(rk), parameter :: covalent_radii(num_elems) = [ &
+real(rk), parameter :: covalent_radii(0:num_elems) = [ &
+0.0, &  ! X
 0.32, &  ! H
 0.46, &  ! He
 1.33, &  ! Li
@@ -348,13 +352,13 @@ real(rk), parameter :: covalent_radii(num_elems) = [ &
 1.73, &  ! Md
 1.76, &  ! No
 1.61, &  ! Lr
-0.0,  &  ! X
 0.0   &  ! LJ
 ]
 
 ! Atomic Van der Waals radii (Angstrom)
 ! Source: mendeleev Python library
-real(rk), parameter :: vdw_radii(num_elems) = [ &
+real(rk), parameter :: vdw_radii(0:num_elems) = [ &
+0.0, &  ! X
 1.10, &  ! H
 1.40, &  ! He
 1.82, &  ! Li
@@ -458,7 +462,6 @@ real(rk), parameter :: vdw_radii(num_elems) = [ &
 2.46, &  ! Md
 2.46, &  ! No
 2.46, &  ! Lr
-0.0,  &  ! X
 0.0   &  ! LJ
 ]
 

@@ -55,6 +55,7 @@ integer(ik), dimension(:), allocatable :: atomperm1
 integer(ik) :: num_records, max_trials, conv_freq
 integer(ik) :: in_unit, aligned_unit
 integer(ik) :: error_code
+integer(ik) :: n_atoms1, n_atoms2, n_pad
 integer(ik) :: i
 
 ! Set default options
@@ -132,14 +133,23 @@ case default
    stop 'Too many file paths'
 end select
 
+! Pad the smaller cluster with dummy atoms appended at the end. Real atoms
+! keep their indices; padding atoms are recognised by index from here on.
+n_atoms1 = size(atoms1)
+n_atoms2 = size(atoms2)
+n_pad = max(n_atoms1, n_atoms2)
+call pad_atoms( atoms1, n_pad)
+call pad_atoms( atoms2, n_pad)
+
+! Atom sets only ever contain real atoms
 if (heavy_flag) then
    ! Include only heavy atoms
-   call include_heavy_atoms( atoms1, atomset1)
-   call include_heavy_atoms( atoms2, atomset2)
+   call include_heavy_atoms( atoms1(1:n_atoms1), atomset1)
+   call include_heavy_atoms( atoms2(1:n_atoms2), atomset2)
 else
    ! Include all atoms
-   call include_all_atoms( atoms1, atomset1)
-   call include_all_atoms( atoms2, atomset2)
+   call include_all_atoms( atoms1(1:n_atoms1), atomset1)
+   call include_all_atoms( atoms2(1:n_atoms2), atomset2)
 end if
 
 ! Collect atom types in a partition
@@ -150,12 +160,16 @@ if (any(atomtypes%parts%num_items1 /= atomtypes%parts%num_items2)) then
    stop 'These molecules are not isomers'
 end if
 
+! Atoms outside the atom sets (excluded hydrogens and padding) get zero
+! weight, so both clusters are normalised over the compared atoms only
+allocate (weights1(n_pad), source=0.0_rk)
+allocate (weights2(n_pad), source=0.0_rk)
 if (mass_flag) then
-   weights1 = atomic_masses(atoms1%elnum)
-   weights2 = atomic_masses(atoms2%elnum)
+   weights1(atomset1) = atomic_masses(atoms1(atomset1)%elnum)
+   weights2(atomset2) = atomic_masses(atoms2(atomset2)%elnum)
 else
-   allocate (weights1(size(atoms1)), source=1.0_rk)
-   allocate (weights2(size(atoms2)), source=1.0_rk)
+   weights1(atomset1) = 1.0_rk
+   weights2(atomset2) = 1.0_rk
 end if
 
 ! Get mol1 coordinates
@@ -207,6 +221,11 @@ if (remap_flag) then
          coords2r = rotated_coords( coords2, rotquat, center1)
          rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2r))
 
+         ! Pair the excluded atoms in the aligned frame (bonds, if the input
+         ! format had any, are used as in conformsd)
+         call complete_atomperm( atomset1, atoms1, atoms2, n_atoms1, n_atoms2, &
+               bonds1, bonds2, coords1, coords2r, atomperm1)
+
          if (write_aligned) then
             title2 = 'rmsd=' // str( rmsd)
             call set_coords( atoms2, coords2r)
@@ -228,6 +247,10 @@ if (remap_flag) then
 
       coords2r = coords2
       rmsd = sqrt( sqdistmean( atomset1, atomperm1, weights1, coords1, coords2r))
+
+      call complete_atomperm( atomset1, atoms1, atoms2, n_atoms1, n_atoms2, &
+            bonds1, bonds2, coords1, coords2r, atomperm1)
+
       write (stdout,'(A)',advance='no') str( rmsd)
       if (print_assignment) then
          write (stdout,'(1X)',advance='no')
@@ -239,7 +262,7 @@ if (remap_flag) then
 
 else
 
-   ! Maintain input atom order
+   ! Maintain input atom order (a full permutation of the padded clusters)
    call init_array( atomperm1, size(atoms1), identity)
 
    if (any(atomtypes%itemdir1 /= atomtypes%itemdir2)) then

@@ -35,13 +35,14 @@ from . import molalign as _molalign
 # ---------------------------------------------------------------------------
 # Element symbol <-> atomic number table
 #
-# Mirrors atomic_symbols(:) in chemdata.f90 (index i -> atomic number i+1),
-# so this stays in lock-step with the Fortran core's own numbering. Entries
-# 104/105 ("X", "LJ") are the library's dummy / Lennard-Jones placeholder
-# "elements".
+# Mirrors atomic_symbols(0:num_elems) in chemdata.f90 (index i -> element
+# number i), so this stays in lock-step with the Fortran core's own numbering.
+# Entry 0 ("X") is the dummy atom and entry 104 ("LJ") the Lennard-Jones
+# placeholder; every real element's number equals its atomic number.
 # ---------------------------------------------------------------------------
 
 ATOMIC_SYMBOLS = (
+    "X",
     "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne",
     "Na", "Mg", "Al", "Si", "P", "S", "Cl", "Ar", "K", "Ca",
     "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn",
@@ -52,11 +53,19 @@ ATOMIC_SYMBOLS = (
     "Lu", "Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg",
     "Tl", "Pb", "Bi", "Po", "At", "Rn", "Fr", "Ra", "Ac", "Th",
     "Pa", "U", "Np", "Pu", "Am", "Cm", "Bk", "Cf", "Es", "Fm",
-    "Md", "No", "Lr", "X", "LJ",
+    "Md", "No", "Lr", "LJ",
 )
 
-# Case-insensitive symbol -> atomic number lookup (1-based).
-_SYMBOL_TO_NUMBER = {sym.upper(): i + 1 for i, sym in enumerate(ATOMIC_SYMBOLS)}
+# Element number of the dummy atom ("X"). Used to pad the smaller molecule;
+# dummy atoms are always excluded from the comparison.
+DUMMY_ATOMIC_NUMBER = 0
+
+# Case-insensitive symbol -> element number lookup (0 = dummy atom).
+_SYMBOL_TO_NUMBER = {sym.upper(): i for i, sym in enumerate(ATOMIC_SYMBOLS)}
+
+# Highest element number that is a real element (Lr). Above it, chemfiles'
+# numbering (104 = Rf, ...) and the library's (104 = LJ) disagree.
+_LAST_REAL_ELEMENT = _SYMBOL_TO_NUMBER["LR"]
 
 
 def symbol_to_atomic_number(symbol):
@@ -71,8 +80,8 @@ def symbol_to_atomic_number(symbol):
 def atomic_number_to_symbol(number):
     """Look up the element symbol for an atomic number, if known."""
     number = int(number)
-    if 1 <= number <= len(ATOMIC_SYMBOLS):
-        return ATOMIC_SYMBOLS[number - 1]
+    if 0 <= number < len(ATOMIC_SYMBOLS):
+        return ATOMIC_SYMBOLS[number]
     return str(number)
 
 
@@ -87,7 +96,13 @@ class RMSDResult(object):
         self.rmsd = rmsd
         """Root-mean-square deviation (Angstrom)."""
         self.atom_permutation = atom_permutation
-        """0-based index array mapping other's atoms onto self's atoms."""
+        """0-based index array mapping other's atoms onto self's atoms.
+
+        Entry j is the atom of `other` placed on line j of `self`. Its length
+        is max(len(self), len(other)); the two differ only with
+        heavy_only=True. Values >= len(other) denote dummy atoms ("X") that
+        pad `other`; entries j >= len(self) hold the extra atoms of `other`.
+        """
         self.transform = transform
         """4x4 homogeneous rotation+translation matrix (maps other -> self frame)."""
 
@@ -95,14 +110,33 @@ class RMSDResult(object):
         """
         Apply the stored transform and atom permutation to a cluster or conformer,
         returning a new object aligned and reordered to match the reference.
+
+        The result has len(atom_permutation) atoms, so line j of it corresponds
+        to line j of the reference. If the reference has more atoms (possible
+        only with heavy_only=True), the missing lines are filled with dummy
+        atoms (element "X", atomic number 0) whose coordinates are
+        placeholders. If it has fewer, the extra atoms come last.
         """
         R = self.transform[:3, :3]
         t = self.transform[:3, 3]
-        idx = self.atom_permutation
+        idx = np.asarray(self.atom_permutation)
 
-        new_coords = cluster_or_conformer.coords[idx] @ R.T + t
-        new_atomdata = cluster_or_conformer.atom_data[idx]
-        new_symbols = [cluster_or_conformer.symbols[i] for i in idx]
+        # Pad with dummy atoms (same convention as the Fortran core: appended
+        # after the real atoms, element "X") when the permutation is longer
+        # than the molecule, so that every index is valid.
+        coords = cluster_or_conformer.coords
+        atom_data = cluster_or_conformer.atom_data
+        symbols = list(cluster_or_conformer.symbols)
+        n_dummy = len(idx) - len(coords)
+        if n_dummy > 0:
+            coords = np.vstack([coords, np.zeros((n_dummy, 3), dtype=coords.dtype)])
+            dummy_row = np.array([[DUMMY_ATOMIC_NUMBER, 0]], dtype=atom_data.dtype)
+            atom_data = np.vstack([atom_data, np.repeat(dummy_row, n_dummy, axis=0)])
+            symbols += [ATOMIC_SYMBOLS[DUMMY_ATOMIC_NUMBER]] * n_dummy
+
+        new_coords = coords[idx] @ R.T + t
+        new_atomdata = atom_data[idx]
+        new_symbols = [symbols[i] for i in idx]
 
         if isinstance(cluster_or_conformer, Conformer):
             inv_idx = np.argsort(idx)
@@ -145,7 +179,14 @@ def _extract_frame_data(frame):
     symbols = []
     
     for i, atom in enumerate(frame.atoms):
-        atom_data[i, 0] = atom.atomic_number
+        # chemfiles reports 0 (or None) for types it doesn't know, such as
+        # "X" and "LJ", and uses its own numbering beyond Lr. In those cases
+        # fall back to the library's table, which raises ValueError for
+        # symbols it doesn't know either.
+        elnum = atom.atomic_number
+        if not elnum or elnum > _LAST_REAL_ELEMENT:
+            elnum = symbol_to_atomic_number(atom.type)
+        atom_data[i, 0] = elnum
         atom_data[i, 1] = 0  
         symbols.append(atom.type)
         
@@ -394,6 +435,13 @@ class Atoms(object):
         remap=True; otherwise the returned list always has length 1
         regardless of n_records. The list may be shorter than n_records
         if the library did not find that many distinct solutions.
+
+        With heavy_only=True the two molecules may differ in their number of
+        hydrogens. The smaller one is then padded with dummy atoms, and each
+        atom_permutation has max(len(self), len(other)) entries (see
+        RMSDResult.atom_permutation). Hydrogens are not part of the RMSD;
+        they are paired afterwards, following their heavy neighbour where
+        bonds are known and by distance otherwise.
         """
         if not isinstance(other, Atoms):
             raise TypeError("Expected Atoms, got {}".format(type(other).__name__))
@@ -571,6 +619,13 @@ class Conformer(object):
         remap=True; otherwise the returned list always has length 1
         regardless of n_records. The list may be shorter than n_records
         if the library did not find that many distinct solutions.
+
+        With heavy_only=True the two molecules may differ in their number of
+        hydrogens. The smaller one is then padded with dummy atoms, and each
+        atom_permutation has max(len(self), len(other)) entries (see
+        RMSDResult.atom_permutation). Hydrogens are not part of the RMSD;
+        they are paired afterwards, following their heavy neighbour where
+        bonds are known and by distance otherwise.
 
         bond_tol (default 0.3 Å) is the bond-detection tolerance used when
         infer_bonds=True; it is ignored otherwise.

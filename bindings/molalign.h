@@ -17,6 +17,9 @@ extern "C" {
  * @param n_atoms1      Number of atoms in molecule 1
  * @param atom_data1    Packed atom data, length n_atoms1*2:
  *                       [elnum0, label0, elnum1, label1, ...]
+ *                       elnum is the atomic number, 0 to 104 (0 = dummy
+ *                       atom "X", 104 = Lennard-Jones "LJ"); dummy atoms
+ *                       are always excluded from the comparison.
  *                       label = 0 means unlabelled.
  * @param coords1       Coordinates, row-major [x0,y0,z0,...], length n_atoms1*3
  * @param n_atoms2      Number of atoms in molecule 2
@@ -46,10 +49,13 @@ extern "C" {
  * @param rmsd_list     [out] RMSD of each returned record, length n_records.
  *                            Only the first *occ_records entries are valid.
  * @param atomperm_list [out] Flattened, 0-based atom permutations, length
- *                            n_records*n_atoms1 (each permutation has one
- *                            entry per atom of molecule 1). Record i (0-based)
- *                            occupies atomperm_list[i*n_atoms1 .. i*n_atoms1 + n_atoms1 - 1].
- *                            Caller allocates >= n_records*n_atoms1.
+ *                            n_records*n_pad, n_pad = max(n_atoms1, n_atoms2).
+ *                            Record i (0-based) occupies
+ *                            atomperm_list[i*n_pad .. i*n_pad + n_pad - 1].
+ *                            Same padding convention as conformsd_calculate:
+ *                            values >= n_atoms2 are dummy atoms of cluster 2.
+ *                            Sizes can only differ when heavy_flag=true.
+ *                            Caller allocates >= n_records*n_pad.
  * @param transform_list [out] Flattened row-major 4x4 homogeneous transforms,
  *                            length n_records*16. Record i occupies
  *                            transform_list[i*16 .. i*16 + 15]. Maps
@@ -59,6 +65,7 @@ extern "C" {
  * @param occ_records   [out] Actual number of records written (<= n_records)
  * @param error_code    [out] A value from enum molalign_error_code
  *                            (error_codes.h): MOLALIGN_SUCCESS,
+ *                            MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER,
  *                            MOLALIGN_ERROR_NOT_ISOMERS,
  *                            MOLALIGN_ERROR_ATOM_TYPE_MISMATCH (only when
  *                            remap_flag=false), or
@@ -86,6 +93,9 @@ void atormsd_calculate(
  * @param n_atoms1      Number of atoms in molecule 1
  * @param atom_data1    Packed atom data, length n_atoms1*2:
  *                       [elnum0, label0, elnum1, label1, ...]
+ *                       elnum is the atomic number, 0 to 104 (0 = dummy
+ *                       atom "X", 104 = Lennard-Jones "LJ"); dummy atoms
+ *                       are always excluded from the comparison.
  *                       label = 0 means unlabelled.
  * @param coords1       Coordinates, row-major [x0,y0,z0,...], length n_atoms1*3
  * @param n_bonds1      Number of bonds in molecule 1 (may be 0 when bond_flag=true)
@@ -120,10 +130,19 @@ void atormsd_calculate(
  * @param rmsd_list     [out] RMSD of each returned record, length n_records.
  *                            Only the first *occ_records entries are valid.
  * @param atomperm_list [out] Flattened, 0-based atom permutations, length
- *                            n_records*n_atoms1 (each permutation has one
- *                            entry per atom of molecule 1). Record i (0-based)
- *                            occupies atomperm_list[i*n_atoms1 .. i*n_atoms1 + n_atoms1 - 1].
- *                            Caller allocates >= n_records*n_atoms1.
+ *                            n_records*n_pad, where
+ *                            n_pad = max(n_atoms1, n_atoms2). Record i (0-based)
+ *                            occupies atomperm_list[i*n_pad .. i*n_pad + n_pad - 1]
+ *                            and is a permutation of 0..n_pad-1: entry j is
+ *                            the atom of molecule 2 placed on line j of
+ *                            molecule 1. The smaller molecule is padded with
+ *                            dummy atoms appended after its real atoms, so
+ *                            values >= n_atoms2 denote dummy atoms of
+ *                            molecule 2, and entries j >= n_atoms1 hold the
+ *                            extra atoms of molecule 2. The sizes can only
+ *                            differ when heavy_flag=true; otherwise
+ *                            n_pad == n_atoms1.
+ *                            Caller allocates >= n_records*n_pad.
  * @param transform_list [out] Flattened row-major 4x4 homogeneous transforms,
  *                            length n_records*16. Record i occupies
  *                            transform_list[i*16 .. i*16 + 15]. Maps
@@ -133,6 +152,7 @@ void atormsd_calculate(
  * @param occ_records   [out] Actual number of records written (<= n_records)
  * @param error_code    [out] A value from enum molalign_error_code
  *                            (error_codes.h): MOLALIGN_SUCCESS,
+ *                            MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER,
  *                            MOLALIGN_ERROR_NOT_ISOMERS,
  *                            MOLALIGN_ERROR_MISSING_BONDS,
  *                            MOLALIGN_ERROR_ATOM_TYPE_MISMATCH or

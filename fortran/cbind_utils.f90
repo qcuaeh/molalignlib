@@ -10,6 +10,7 @@ module cbind_utils
    use recording
    use alignment_atoms
    use flags
+   use error_codes
    implicit none
 
 contains
@@ -23,19 +24,35 @@ contains
 ! coords_in is row-major from C: [x0,y0,z0, x1,y1,z1, ...] (length n*3).
 ! Because ik==c_int and rk==c_double, assignments are direct - no real/kind
 ! conversion is required.
+!
+! Every elnum must index the element tables in chemdata, i.e. lie in
+! 0:num_elems (0 is the dummy atom). Each one is checked as it is read; on
+! the first that doesn't, error_code is set to
+! MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER and atoms is deallocated, so no
+! out-of-range value ever reaches a table lookup. On success error_code is
+! MOLALIGN_SUCCESS.
 ! ---------------------------------------------------------------------------
-subroutine build_atoms(n, atomdata, coords_in, atoms)
+subroutine build_atoms(n, atomdata, coords_in, atoms, error_code)
    integer(ik), intent(in), value :: n
    integer(ik), dimension(n*2), intent(in) :: atomdata
    real(rk),    dimension(n*3), intent(in) :: coords_in
    type(atom_t), dimension(:), allocatable, intent(out) :: atoms
-   integer(ik) :: i, abase, cbase
+   integer(ik), intent(out) :: error_code
+   integer(ik) :: i, abase, cbase, elnum
+
+   error_code = MOLALIGN_SUCCESS
 
    allocate(atoms(n))
    do i = 1, n
       abase = (i - 1)*2
       cbase = (i - 1)*3
-      atoms(i)%elnum     = atomdata(abase + 1)
+      elnum = atomdata(abase + 1)
+      if (elnum < 0 .or. elnum > num_elems) then
+         error_code = MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER
+         deallocate(atoms)
+         return
+      end if
+      atoms(i)%elnum     = elnum
       atoms(i)%group     = atomdata(abase + 2)
       atoms(i)%coords(1) = coords_in(cbase + 1)
       atoms(i)%coords(2) = coords_in(cbase + 2)

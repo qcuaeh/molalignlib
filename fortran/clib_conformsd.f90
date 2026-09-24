@@ -38,10 +38,24 @@ contains
 !   c_occ_records entries of c_rmsd_list, c_atomperm_list, and
 !   c_transform_list are meaningful. All output arrays are flattened and
 !   must be allocated by the caller with at least c_n_records elements per
-!   record (c_n_atoms1 for c_atomperm_list, 16 for c_transform_list).
+!   record (n_pad for c_atomperm_list, 16 for c_transform_list).
+!
+! Atom permutations and padding:
+!   n_pad = max(c_n_atoms1, c_n_atoms2). The smaller molecule is padded with
+!   dummy atoms appended after its real atoms, so each record is a true
+!   permutation of 0..n_pad-1. Entry j (0-based) is the atom of molecule 2
+!   that goes on line j of molecule 1. Values >= c_n_atoms2 denote padding
+!   atoms of molecule 2; entries j >= c_n_atoms1 are padding lines of
+!   molecule 1 and carry the extra atoms of molecule 2. When the molecules
+!   have the same size (always the case unless c_heavy_flag is true)
+!   n_pad = c_n_atoms1 and nothing changes for existing callers.
+!   Atoms excluded from the comparison (hydrogens with c_heavy_flag) are
+!   paired afterwards: bonded to the image of their heavy neighbour first,
+!   then by distance, then with padding atoms.
 !
 ! c_error_code values: see the error_codes module (error_codes.f90) and its
 ! C mirror, error_codes.h. This function can return MOLALIGN_SUCCESS,
+! MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER,
 ! MOLALIGN_ERROR_NOT_ISOMERS, MOLALIGN_ERROR_MISSING_BONDS,
 ! MOLALIGN_ERROR_ATOM_TYPE_MISMATCH and MOLALIGN_ERROR_BOND_MISMATCH (both
 ! only when c_remap_flag is false), and MOLALIGN_ERROR_NOT_CONFORMERS
@@ -102,7 +116,7 @@ subroutine conformsd_calculate(                                              &
    real(rk), dimension(:),   allocatable :: weights1, weights2
    real(rk), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, coords2r
    integer(ik), dimension(:), allocatable :: atomset1, atomset2, atomperm1
-   integer(ik) :: num_records
+   integer(ik) :: num_records, n_pad
    integer(ik) :: i, j, base
 
    c_error_code = MOLALIGN_SUCCESS
@@ -133,34 +147,47 @@ subroutine conformsd_calculate(                                              &
    adaptive_flag    = .TRUE.
 
    ! Build atom_t and bond_t arrays from flat C arrays
-   call build_atoms(c_n_atoms1, c_atom_data1, c_coords1, atoms1)
-   call build_atoms(c_n_atoms2, c_atom_data2, c_coords2, atoms2)
+   ! (returns MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER for out-of-range elnums)
+   call build_atoms(c_n_atoms1, c_atom_data1, c_coords1, atoms1, c_error_code)
+   if (c_error_code /= MOLALIGN_SUCCESS) return
+   call build_atoms(c_n_atoms2, c_atom_data2, c_coords2, atoms2, c_error_code)
+   if (c_error_code /= MOLALIGN_SUCCESS) return
    call build_bonds(c_n_bonds1, c_bond_data1, bonds1)
    call build_bonds(c_n_bonds2, c_bond_data2, bonds2)
 
+   ! Pad the smaller molecule with dummy atoms appended at the end, so that
+   ! both molecules have n_pad atoms and every atom permutation can be a
+   ! bijection. Real atoms keep their indices; from here on padding atoms
+   ! are recognised by index (> c_n_atoms1 or > c_n_atoms2).
+   n_pad = max(c_n_atoms1, c_n_atoms2)
+   call pad_atoms(atoms1, n_pad)
+   call pad_atoms(atoms2, n_pad)
+
+   ! Atom sets only ever contain real atoms
    if (heavy_flag) then
       ! Include only heavy atoms
-      call include_heavy_atoms(atoms1, atomset1)
-      call include_heavy_atoms(atoms2, atomset2)
+      call include_heavy_atoms(atoms1(1:c_n_atoms1), atomset1)
+      call include_heavy_atoms(atoms2(1:c_n_atoms2), atomset2)
    else
       ! Include all atoms
-      call include_all_atoms(atoms1, atomset1)
-      call include_all_atoms(atoms2, atomset2)
+      call include_all_atoms(atoms1(1:c_n_atoms1), atomset1)
+      call include_all_atoms(atoms2(1:c_n_atoms2), atomset2)
    end if
 
    ! Collect atom types in a partition
    call collect_atomtypes(atomset1, atomset2, atoms1, atoms2, atomtypes)
 
-   ! Abort if molecules are not isomers
+   ! Abort if molecules are not isomers. Without heavy_flag the atom sets
+   ! hold all real atoms, so different hydrogen counts are caught here.
    if (any(atomtypes%parts%num_items1 /= atomtypes%parts%num_items2)) then
       c_error_code = MOLALIGN_ERROR_NOT_ISOMERS
       return
    end if
 
-   ! Reset bonds
+   ! Reset bonds (padding atoms never get bonds)
    if (bond_flag) then
-      call bonds_from_atoms(atoms1, bonds1)
-      call bonds_from_atoms(atoms2, bonds2)
+      call bonds_from_atoms(atoms1(1:c_n_atoms1), bonds1)
+      call bonds_from_atoms(atoms2(1:c_n_atoms2), bonds2)
    end if
 
    ! Abort if either molecule has no bonds
@@ -173,13 +200,18 @@ subroutine conformsd_calculate(                                              &
    call adjacency_from_bonds(atomset1, atoms1, bonds1, adjcs1)
    call adjacency_from_bonds(atomset2, atoms2, bonds2, adjcs2)
 
-   ! Get user defined atom weights
+   ! Get user defined atom weights. Atoms outside the atom sets (excluded
+   ! hydrogens and padding) get zero weight, so the normalisation in
+   ! get_weighted_coords runs over the compared atoms only and both
+   ! molecules are scaled by the same factor.
+   allocate (weights1(n_pad), source=0.0_rk)
+   allocate (weights2(n_pad), source=0.0_rk)
    if (mass_flag) then
-      weights1 = atomic_masses(atoms1%elnum)
-      weights2 = atomic_masses(atoms2%elnum)
+      weights1(atomset1) = atomic_masses(atoms1(atomset1)%elnum)
+      weights2(atomset2) = atomic_masses(atoms2(atomset2)%elnum)
    else
-      allocate (weights1(size(atoms1)), source=1.0_rk)
-      allocate (weights2(size(atoms2)), source=1.0_rk)
+      weights1(atomset1) = 1.0_rk
+      weights2(atomset2) = 1.0_rk
    end if
 
    ! Get mol1 coordinates
@@ -228,9 +260,13 @@ subroutine conformsd_calculate(                                              &
             call build_homogeneous_transform(rotquat, center1, center2, &
                   c_transform_list((i-1)*16+1:i*16))
 
+            ! Pair the excluded atoms in the aligned frame
+            call complete_atomperm(atomset1, atoms1, atoms2, c_n_atoms1, c_n_atoms2, &
+                  bonds1, bonds2, coords1, coords2r, atomperm1)
+
             c_rmsd_list(i) = rmsd
-            base = (i-1) * c_n_atoms1
-            do j = 1, c_n_atoms1
+            base = (i-1) * n_pad
+            do j = 1, n_pad
                c_atomperm_list(base+j) = atomperm1(j) - 1  ! 0-based for C
             end do
          end do
@@ -243,9 +279,12 @@ subroutine conformsd_calculate(                                              &
          coords2r = coords2
          rmsd = sqrt(sqdistmean(atomset1, atomperm1, weights1, coords1, coords2r))
 
+         call complete_atomperm(atomset1, atoms1, atoms2, c_n_atoms1, c_n_atoms2, &
+               bonds1, bonds2, coords1, coords2r, atomperm1)
+
          c_occ_records = 1
          c_rmsd_list(1) = rmsd
-         do j = 1, c_n_atoms1
+         do j = 1, n_pad
             c_atomperm_list(j) = atomperm1(j) - 1  ! 0-based for C
          end do
 
@@ -253,10 +292,12 @@ subroutine conformsd_calculate(                                              &
 
    else
 
-      ! Maintain input atom order
+      ! Maintain input atom order. Identity is meaningful here: it is the
+      ! mapping being tested, and with padding it is a full permutation.
       call init_array(atomperm1, size(atoms1), identity)
 
-      ! Abort if atoms do not match
+      ! Abort if atoms do not match (both itemdirs now have size n_pad;
+      ! excluded and padding atoms are 0 in both)
       if (any(atomtypes%itemdir1 /= atomtypes%itemdir2)) then
          c_error_code = MOLALIGN_ERROR_ATOM_TYPE_MISMATCH
          return
@@ -280,7 +321,7 @@ subroutine conformsd_calculate(                                              &
 
       c_occ_records = 1
       c_rmsd_list(1) = rmsd
-      do j = 1, c_n_atoms1
+      do j = 1, n_pad
          c_atomperm_list(j) = atomperm1(j) - 1  ! 0-based for C
       end do
 

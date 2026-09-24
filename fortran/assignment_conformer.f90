@@ -98,6 +98,21 @@ function find_child_part_array(cache_arrays, parent_idx, signature_size, signatu
    error stop 'Part signature did not match any child'
 end function
 
+subroutine get_atomperm(subperm, atomperm1)
+! Export a subperm as a permutation array: assigned atoms get their
+! partner, all other atoms 0 (unassigned). Only defined entries are read.
+   type(subperm_t), intent(in) :: subperm
+   integer(ik), dimension(:), allocatable, intent(out) :: atomperm1
+   integer(ik) :: i, i1
+
+   allocate (atomperm1(size(subperm%atomperm)))
+   atomperm1 = 0
+   do i = 1, subperm%atomset_size
+      i1 = subperm%atomset(i)
+      atomperm1(i1) = subperm%atomperm(i1)
+   end do
+end subroutine
+
 subroutine collect_leaf_assignments(cache_arrays, part_idx, subperm)
    ! Collect assignment pairs from leaf parts into assignment
    type(array_trees_t), intent(in) :: cache_arrays
@@ -160,7 +175,7 @@ subroutine update_hna_part(cache_arrays, part_idx, read_link_idx, write_link_idx
       signature_size = 0
       do j = 1, cache_arrays%adjcs1_cn(item_idx)
          adj_atom = cache_arrays%adjcs1_list(item_idx, j)
-         part_ref_idx = cache_arrays%itemdir1_entries(read_link_idx, adj_atom)
+         part_ref_idx = cache_arrays%itemdir1_entries(adj_atom, read_link_idx)
          if (part_ref_idx /= 0) then
             signature_size = signature_size + 1
             signature(signature_size) = part_ref_idx
@@ -180,7 +195,7 @@ subroutine update_hna_part(cache_arrays, part_idx, read_link_idx, write_link_idx
       cache_arrays%atomidcs1(target_idx) = item_idx
 
       ! Update itemdir using 2D array - no offset calculation needed
-      cache_arrays%itemdir1_entries(write_link_idx, item_idx) = target_part_idx
+      cache_arrays%itemdir1_entries(item_idx, write_link_idx) = target_part_idx
    end do
 
    ! Process second molecule items with ULTRA-OPTIMIZED signature generation using direct 2D adjacency
@@ -191,7 +206,7 @@ subroutine update_hna_part(cache_arrays, part_idx, read_link_idx, write_link_idx
       signature_size = 0
       do j = 1, cache_arrays%adjcs2_cn(item_idx)
          adj_atom = cache_arrays%adjcs2_list(item_idx, j)
-         part_ref_idx = cache_arrays%itemdir2_entries(read_link_idx, adj_atom)
+         part_ref_idx = cache_arrays%itemdir2_entries(adj_atom, read_link_idx)
          if (part_ref_idx /= 0) then
             signature_size = signature_size + 1
             signature(signature_size) = part_ref_idx
@@ -211,7 +226,7 @@ subroutine update_hna_part(cache_arrays, part_idx, read_link_idx, write_link_idx
       cache_arrays%atomidcs2(target_idx) = item_idx
 
       ! Update itemdir using 2D array - no offset calculation needed
-      cache_arrays%itemdir2_entries(write_link_idx, item_idx) = target_part_idx
+      cache_arrays%itemdir2_entries(item_idx, write_link_idx) = target_part_idx
    end do
 
    ! Collect assignment pairs from newly created leaf parts into subperm
@@ -246,8 +261,8 @@ subroutine assign_pair_to_children(cache_arrays, split_part_idx, first_link_idx,
    cache_arrays%atomidcs2(cache_arrays%partree(child_part1)%items2_offset + 1) = chosen_item2
 
    ! Update itemdir using 2D arrays - no offset calculation needed
-   cache_arrays%itemdir1_entries(first_link_idx, chosen_item1) = child_part1
-   cache_arrays%itemdir2_entries(first_link_idx, chosen_item2) = child_part1
+   cache_arrays%itemdir1_entries(chosen_item1, first_link_idx) = child_part1
+   cache_arrays%itemdir2_entries(chosen_item2, first_link_idx) = child_part1
 
    ! Copy remaining items1 to second child (skip the chosen item)
    target_idx = cache_arrays%partree(child_part2)%items1_offset
@@ -256,7 +271,7 @@ subroutine assign_pair_to_children(cache_arrays, split_part_idx, first_link_idx,
          item_idx = cache_arrays%atomidcs1(items1_offset + i)
          target_idx = target_idx + 1
          cache_arrays%atomidcs1(target_idx) = item_idx
-         cache_arrays%itemdir1_entries(first_link_idx, item_idx) = child_part2
+         cache_arrays%itemdir1_entries(item_idx, first_link_idx) = child_part2
       end if
    end do
 
@@ -267,7 +282,7 @@ subroutine assign_pair_to_children(cache_arrays, split_part_idx, first_link_idx,
          item_idx = cache_arrays%atomidcs2(items2_offset + i)
          target_idx = target_idx + 1
          cache_arrays%atomidcs2(target_idx) = item_idx
-         cache_arrays%itemdir2_entries(first_link_idx, item_idx) = child_part2
+         cache_arrays%itemdir2_entries(item_idx, first_link_idx) = child_part2
       end if
    end do
 
@@ -295,6 +310,18 @@ subroutine assign_branch_atoms(cache_arrays, split_part_idx, child_branch_idx, &
    ! === HNA chain recomputation ===
    num_links = cache_arrays%assigntree(child_branch_idx)%num_links
    link_offset = cache_arrays%assigntree(child_branch_idx)%link_offset
+
+   if (DEBUG_TESTS) then
+      ! The loop below reads link i and writes link i+1, but the searches only
+      ! reset links link_offset+1 .. link_offset+num_links. The last link must
+      ! therefore have no parts, or its writes would land one link past the
+      ! branch and survive the reset.
+      if (num_links > 0) then
+         if (cache_arrays%chain(link_offset + num_links)%num_parts /= 0) then
+            error stop 'Last link of the branch has parts to update'
+         end if
+      end if
+   end if
 
    do i = 1, num_links
       link_idx = link_offset + i
@@ -353,7 +380,7 @@ recursive subroutine recur_assign_atoms_greedy(coords1, coords2, cache_arrays, &
    type(subperm_t), intent(inout) :: greedy_perm
 
    integer(ik) :: i, idx1, idx2
-   integer(ik) :: link_idx, branch_link_offset, branch_num_links
+   integer(ik) :: branch_link_offset, branch_num_links
    integer(ik) :: child_branch_idx, first_link_idx, split_part_idx
    integer(ik) :: items1_count, items2_count
    real(rk) :: min_dist, current_dist
@@ -409,10 +436,8 @@ recursive subroutine recur_assign_atoms_greedy(coords1, coords2, cache_arrays, &
             greedy_perm)
 
       ! Reset state for next iteration - only reset links used by this branch
-      do link_idx = branch_link_offset + 1, branch_link_offset + branch_num_links
-         cache_arrays%itemdir1_entries(link_idx, :) = 0
-         cache_arrays%itemdir2_entries(link_idx, :) = 0
-      end do
+      cache_arrays%itemdir1_entries(:, branch_link_offset + 1 : branch_link_offset + branch_num_links) = 0
+      cache_arrays%itemdir2_entries(:, branch_link_offset + 1 : branch_link_offset + branch_num_links) = 0
    end do
 end subroutine
 
@@ -436,7 +461,9 @@ subroutine assign_atoms_greedy(coords1, coords2, cache_arrays, atomperm1, permdi
    call recur_assign_atoms_greedy(coords1, coords2, cache_arrays, 1, greedy_perm)
 
    ! Calculate total distance
-   permdist = sqdistsum(greedy_perm%atomset, greedy_perm%atomperm, coords1, coords2)
+   permdist = sqdistsum(greedy_perm%atomset(:greedy_perm%atomset_size), greedy_perm%atomperm, coords1, coords2)
+
+   call get_atomperm(greedy_perm, atomperm1)
 end subroutine
 
 recursive subroutine recur_assign_atoms_global(coords1, coords2, cache_arrays, &
@@ -450,8 +477,8 @@ recursive subroutine recur_assign_atoms_global(coords1, coords2, cache_arrays, &
 
    integer(ik) :: split_part_idx, child_branch_idx, first_link_idx
    integer(ik) :: items2_count, i, j
-   integer(ik) :: link_idx, branch_link_offset, branch_num_links
-   type(subperm_t) :: saved_treeperm
+   integer(ik) :: branch_link_offset, branch_num_links
+   integer(ik) :: saved_size
    real(rk) :: total_dist
 
    ! Base case: we've made assignments for all split parts - evaluate complete permutation
@@ -459,12 +486,13 @@ recursive subroutine recur_assign_atoms_global(coords1, coords2, cache_arrays, &
       combination_count = combination_count + 1
 
       ! Calculate least distance of this permutation
-      total_dist = least_sqdistsum(this_perm%atomset, this_perm%atomperm, coords1, coords2)
+      total_dist = least_sqdistsum(this_perm%atomset(:this_perm%atomset_size), this_perm%atomperm, coords1, coords2)
 
       ! Update global best if this permutation is better
       if (total_dist < min_dist) then
          min_dist = total_dist
-         best_perm = this_perm
+         best_perm%atomset_size = 0
+         call subperm_merge(best_perm, this_perm)
       end if
       return
    end if
@@ -493,8 +521,9 @@ recursive subroutine recur_assign_atoms_global(coords1, coords2, cache_arrays, &
 
    ! Try all possible assignments for this split part (only vary item2, keep item1 at index 1)
    do j = 1, items2_count
-      ! Save current permutation state
-      saved_treeperm = this_perm
+      ! Save current permutation state (pairs are only appended, so the
+      ! size is enough to roll back)
+      saved_size = this_perm%atomset_size
 
       ! Make assignment for this split part (always use first item1, index=1)
       call assign_branch_atoms(cache_arrays, split_part_idx, child_branch_idx, &
@@ -505,13 +534,11 @@ recursive subroutine recur_assign_atoms_global(coords1, coords2, cache_arrays, &
             num_split_parts, current_split_idx + 1, this_perm, best_perm, min_dist)
 
       ! Restore permutation state
-      this_perm = saved_treeperm
+      this_perm%atomset_size = saved_size
 
       ! Reset itemdir state for this branch
-      do link_idx = branch_link_offset + 1, branch_link_offset + branch_num_links
-         cache_arrays%itemdir1_entries(link_idx, :) = 0
-         cache_arrays%itemdir2_entries(link_idx, :) = 0
-      end do
+      cache_arrays%itemdir1_entries(:, branch_link_offset + 1 : branch_link_offset + branch_num_links) = 0
+      cache_arrays%itemdir2_entries(:, branch_link_offset + 1 : branch_link_offset + branch_num_links) = 0
    end do
 end subroutine
 
@@ -553,8 +580,7 @@ subroutine assign_atoms_global(coords1, coords2, cache_arrays, atomperm1)
    deallocate(split_parts)
 
    ! Convert subperm type to permutation array
-   allocate (atomperm1(best_perm%atomperm_size))
-   atomperm1 = best_perm%atomperm
+   call get_atomperm(best_perm, atomperm1)
 end subroutine
 
 recursive subroutine recur_assign_atoms_local(coords1, coords2, cache_arrays, &
@@ -568,7 +594,7 @@ recursive subroutine recur_assign_atoms_local(coords1, coords2, cache_arrays, &
    real(rk), intent(inout) :: accumulated_dist  ! NEW: incrementally track distance
 
    integer(ik) :: child_branch_idx, first_link_idx, split_part_idx, i, items2_count, j
-   integer(ik) :: link_idx, branch_link_offset, branch_num_links
+   integer(ik) :: branch_link_offset, branch_num_links
    type(subperm_t) :: best_branch_perm, branch_perm
    real(rk) :: branch_dist, min_branch_dist
    integer(ik) :: n_atoms
@@ -581,6 +607,10 @@ recursive subroutine recur_assign_atoms_local(coords1, coords2, cache_arrays, &
       return
    end if
 
+   ! Allocate the branch subperms once per call; they are emptied per child
+   call subperm_init(best_branch_perm, n_atoms)
+   call subperm_init(branch_perm, n_atoms)
+
    ! Process each child branch independently
    do i = 1, cache_arrays%assigntree(branch_idx)%num_children
       child_branch_idx = cache_arrays%assigntree(branch_idx)%child_indices(i)
@@ -592,8 +622,8 @@ recursive subroutine recur_assign_atoms_local(coords1, coords2, cache_arrays, &
       items2_count = cache_arrays%partree(split_part_idx)%items2_count
       min_branch_dist = huge(min_branch_dist)
 
-      call subperm_init(best_branch_perm, n_atoms)
-      call subperm_init(branch_perm, n_atoms)
+      best_branch_perm%atomset_size = 0
+      branch_perm%atomset_size = 0
 
       ! Try pairing first item1 with each item2 to find best assignment for this branch
       do j = 1, items2_count
@@ -607,7 +637,7 @@ recursive subroutine recur_assign_atoms_local(coords1, coords2, cache_arrays, &
 
          ! Add new assigned pairs distance to branch distance
          branch_dist = branch_dist + &
-               sqdistsum(branch_perm%atomset, branch_perm%atomperm, coords1, coords2)
+               sqdistsum(branch_perm%atomset(:branch_perm%atomset_size), branch_perm%atomperm, coords1, coords2)
 
          ! Recursively explore subtree - distance is accumulated in branch_dist
          call recur_assign_atoms_local(coords1, coords2, cache_arrays, &
@@ -616,14 +646,13 @@ recursive subroutine recur_assign_atoms_local(coords1, coords2, cache_arrays, &
          ! branch_dist now contains total accumulated distance - no recalculation needed!
          if (branch_dist < min_branch_dist) then
             min_branch_dist = branch_dist
-            best_branch_perm = branch_perm
+            best_branch_perm%atomset_size = 0
+            call subperm_merge(best_branch_perm, branch_perm)
          end if
 
          ! Reset state for next iteration - only reset links used by this branch
-         do link_idx = branch_link_offset + 1, branch_link_offset + branch_num_links
-            cache_arrays%itemdir1_entries(link_idx, :) = 0
-            cache_arrays%itemdir2_entries(link_idx, :) = 0
-         end do
+         cache_arrays%itemdir1_entries(:, branch_link_offset + 1 : branch_link_offset + branch_num_links) = 0
+         cache_arrays%itemdir2_entries(:, branch_link_offset + 1 : branch_link_offset + branch_num_links) = 0
       end do
 
       ! Update the optimal assignment with the best assignment from this branch
@@ -657,14 +686,13 @@ subroutine assign_atoms_local(coords1, coords2, cache_arrays, atomperm1, total_d
    combination_count = 0
 
    ! Initialize distance accumulator with preassigned pairs
-   total_dist = sqdistsum(best_perm%atomset, best_perm%atomperm, coords1, coords2)
+   total_dist = sqdistsum(best_perm%atomset(:best_perm%atomset_size), best_perm%atomperm, coords1, coords2)
 
    ! Perform DFS exploration to find optimal assignment (starting from root chain at index 1)
    call recur_assign_atoms_local(coords1, coords2, cache_arrays, 1, best_perm, total_dist)
 
    ! Convert subperm type to permutation array
-   allocate (atomperm1(best_perm%atomperm_size))
-   atomperm1 = best_perm%atomperm
+   call get_atomperm(best_perm, atomperm1)
 end subroutine
 
 function estimate_unassigned_lower_bound(coords1, coords2, cache_arrays, branch_idx) result(lower_bound)
@@ -723,7 +751,7 @@ recursive subroutine recur_assign_atoms_local_pruned(coords1, coords2, cache_arr
    logical(lk), intent(inout) :: success
 
    integer(ik) :: child_branch_idx, first_link_idx, split_part_idx, i, items2_count, j
-   integer(ik) :: link_idx, branch_link_offset, branch_num_links
+   integer(ik) :: branch_link_offset, branch_num_links
    type(subperm_t) :: best_branch_perm, branch_perm
    real(rk) :: branch_dist, min_branch_dist
    logical(lk) :: branch_success, child_success
@@ -751,6 +779,10 @@ recursive subroutine recur_assign_atoms_local_pruned(coords1, coords2, cache_arr
       return
    end if
 
+   ! Allocate the branch subperms once per call; they are emptied per child
+   call subperm_init(best_branch_perm, n_atoms)
+   call subperm_init(branch_perm, n_atoms)
+
    ! Process each child branch independently
    do i = 1, cache_arrays%assigntree(branch_idx)%num_children
       ! Early exit: if no threshold budget remains, remaining branches cannot succeed
@@ -769,8 +801,8 @@ recursive subroutine recur_assign_atoms_local_pruned(coords1, coords2, cache_arr
       min_branch_dist = huge(min_branch_dist)  ! Best distance for this specific branch
       branch_success = .FALSE.
 
-      call subperm_init(best_branch_perm, n_atoms)
-      call subperm_init(branch_perm, n_atoms)
+      best_branch_perm%atomset_size = 0
+      branch_perm%atomset_size = 0
 
       ! Try pairing first item1 with each item2 to find best assignment for this branch
       do j = 1, items2_count
@@ -783,7 +815,8 @@ recursive subroutine recur_assign_atoms_local_pruned(coords1, coords2, cache_arr
                first_link_idx, 1, j, branch_perm)
 
          ! Add new assigned pairs distance to branch distance
-         branch_dist = branch_dist + sqdistsum(branch_perm%atomset, branch_perm%atomperm, coords1, coords2)
+         branch_dist = branch_dist + &
+               sqdistsum(branch_perm%atomset(:branch_perm%atomset_size), branch_perm%atomperm, coords1, coords2)
 
          ! PRUNING: Early check - only continue if current partial distance is within remaining threshold
          if (branch_dist < remaining_budget) then
@@ -798,17 +831,16 @@ recursive subroutine recur_assign_atoms_local_pruned(coords1, coords2, cache_arr
                ! branch_dist now contains total accumulated distance - no recalculation needed!
                if (branch_dist < min_branch_dist) then
                   min_branch_dist = branch_dist
-                  best_branch_perm = branch_perm
+                  best_branch_perm%atomset_size = 0
+                  call subperm_merge(best_branch_perm, branch_perm)
                   branch_success = .TRUE.
                end if
             end if
          end if
 
          ! Reset state for next iteration - only reset links used by this branch
-         do link_idx = branch_link_offset + 1, branch_link_offset + branch_num_links
-            cache_arrays%itemdir1_entries(link_idx, :) = 0
-            cache_arrays%itemdir2_entries(link_idx, :) = 0
-         end do
+         cache_arrays%itemdir1_entries(:, branch_link_offset + 1 : branch_link_offset + branch_num_links) = 0
+         cache_arrays%itemdir2_entries(:, branch_link_offset + 1 : branch_link_offset + branch_num_links) = 0
       end do
 
       ! If this branch failed to find a solution, the entire recursion fails
@@ -854,7 +886,7 @@ subroutine assign_atoms_local_pruned(coords1, coords2, cache_arrays, atomperm1, 
    call collect_leaf_assignments(cache_arrays, 1, best_perm)
 
    ! Initialize accumulated distance with preassigned pairs
-   permdist = sqdistsum(best_perm%atomset, best_perm%atomperm, coords1, coords2)
+   permdist = sqdistsum(best_perm%atomset(:best_perm%atomset_size), best_perm%atomperm, coords1, coords2)
 
    ! Initialize DFS exploration variables
    success = .FALSE.
@@ -867,8 +899,7 @@ subroutine assign_atoms_local_pruned(coords1, coords2, cache_arrays, atomperm1, 
    if (.not. success) error stop 'Assignment failed'
 
    ! Convert subperm type to permutation array
-   allocate (atomperm1(best_perm%atomperm_size))
-   atomperm1 = best_perm%atomperm
+   call get_atomperm(best_perm, atomperm1)
 end subroutine
 
 end module

@@ -41,6 +41,7 @@ public :: MOLALIGN_ERROR_MISSING_BONDS
 public :: MOLALIGN_ERROR_BOND_MISMATCH
 public :: MOLALIGN_ERROR_NOT_CONFORMERS
 public :: MOLALIGN_ERROR_PRUNED_ASSIGNMENT_FAILED
+public :: MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER
 
 enum, bind(c)
    ! No error. Returned by: all.
@@ -60,6 +61,10 @@ enum, bind(c)
    ! No valid assignment under the pruning constraints (pruning tolerance
    ! might be too tight). Returned by: atormsd (remap_flag=true only).
    enumerator :: MOLALIGN_ERROR_PRUNED_ASSIGNMENT_FAILED  = 6
+   ! An atomic number is outside the element tables in chemdata
+   ! (0:num_elems, where 0 is the dummy atom). Returned by: atormsd,
+   ! conformsd.
+   enumerator :: MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER     = 7
 end enum
 
 end module error_codes
