@@ -53,9 +53,9 @@ end type
 ! Part array
 type, public :: partition_part_t
    integer(ik) :: elnum
-   integer(ik) :: num_items1
-   integer(ik) :: num_items2
-   integer(ik) :: num_children
+   integer(ik) :: n_items1
+   integer(ik) :: n_items2
+   integer(ik) :: n_children
    integer(ik), dimension(:), allocatable :: items1
    integer(ik), dimension(:), allocatable :: items2
    integer(ik), dimension(:), allocatable :: signature
@@ -64,7 +64,7 @@ end type
 
 ! Partition array
 type, public :: partition_t
-   integer(ik) :: num_parts
+   integer(ik) :: n_parts
    type(partition_part_t), dimension(:), allocatable :: parts
    integer(ik), dimension(:), allocatable :: itemdir1
    integer(ik), dimension(:), allocatable :: itemdir2

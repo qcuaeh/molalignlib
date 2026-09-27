@@ -77,16 +77,16 @@ subroutine refine_hna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
    end do
 end subroutine
 
-subroutine refine_hna_partition(adjcs1, adjcs2, hna_chain, num_splits)
+subroutine refine_hna_partition(adjcs1, adjcs2, hna_chain, n_splits)
 ! Compute next level HNAs - always keeps all children (original behavior)
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(chaintree_node_t), pointer, intent(inout) :: hna_chain
-   integer(ik), intent(out) :: num_splits
+   integer(ik), intent(out) :: n_splits
    ! Local variables
    type(chain_node_t), pointer :: link, new_link
    type(partref_node_t), pointer :: partref
 
-   num_splits = 0
+   n_splits = 0
 
    ! Save the last link before creating a new one
    link => hna_chain%last_link
@@ -98,7 +98,7 @@ subroutine refine_hna_partition(adjcs1, adjcs2, hna_chain, num_splits)
       ! Create children based on signatures
       call refine_hna_part(adjcs1, adjcs2, link%itemdir1, link%itemdir2, partref%part, new_link)
       ! Count splits (children beyond the original part)
-      num_splits = num_splits + partref%part%num_children - 1
+      n_splits = n_splits + partref%part%n_children - 1
       partref => partref%nextref
    end do
 end subroutine
@@ -110,7 +110,7 @@ subroutine compute_sc_hna_chain(adjcs1, adjcs2, atomtypes, hna_chain, error_code
    type(chaintree_node_t), pointer, intent(out) :: hna_chain
    integer(ik), intent(out) :: error_code
    ! Local variables
-   integer(ik) :: num_splits
+   integer(ik) :: n_splits
 
    error_code = MOLALIGN_SUCCESS
 
@@ -119,9 +119,9 @@ subroutine compute_sc_hna_chain(adjcs1, adjcs2, atomtypes, hna_chain, error_code
 
    do
       ! Call refine_hna_partition and get the number of splits
-      call refine_hna_partition(adjcs1, adjcs2, hna_chain, num_splits)
+      call refine_hna_partition(adjcs1, adjcs2, hna_chain, n_splits)
       ! Exit loop if no splits occurred
-      if (num_splits == 0) exit
+      if (n_splits == 0) exit
    end do
 
    ! Verify that molecules are conformers
@@ -219,8 +219,8 @@ subroutine assign_branch_atoms(adjcs1, adjcs2, branch)
    type(chain_node_t), pointer :: link
    integer(ik) :: link_idx, rand_idx1, rand_idx2
 
-   rand_idx1 = random_uniform_integer(1, branch%split_part%num_items1)
-   rand_idx2 = random_uniform_integer(1, branch%split_part%num_items2)
+   rand_idx1 = random_uniform_integer(1, branch%split_part%n_items1)
+   rand_idx2 = random_uniform_integer(1, branch%split_part%n_items2)
    call split_part_indexed(branch%split_part, branch%first_link, rand_idx1, rand_idx2)
 !   call split_part_indexed(branch%split_part, branch%first_link, 1, 1)
 
@@ -388,13 +388,13 @@ function would_part_split(adjcs1, adjcs2, itemdir1, itemdir2, part) result(would
    end do
 end function
 
-subroutine refine_branched_hna_partition(adjcs1, adjcs2, hna_chain, branch, branch_parts, num_splits)
+subroutine refine_branched_hna_partition(adjcs1, adjcs2, hna_chain, branch, branch_parts, n_splits)
 ! Compute next level HNAs - only keeps children if real split occurred
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(chaintree_node_t), pointer, intent(inout) :: hna_chain
    type(chaintree_node_t), pointer, intent(inout) :: branch
    type(chain_node_t), pointer, intent(inout) :: branch_parts
-   integer(ik), intent(out) :: num_splits
+   integer(ik), intent(out) :: n_splits
    ! Local variables
    type(chain_node_t), pointer :: level_link, next_level_link, branch_link
    type(partref_node_t), pointer :: partref
@@ -403,18 +403,18 @@ subroutine refine_branched_hna_partition(adjcs1, adjcs2, hna_chain, branch, bran
    logical(lk) :: any_splits
    integer(ik) :: i
 
-   num_splits = 0
+   n_splits = 0
    any_splits = .FALSE.
 
    ! Get the current level link
    level_link => hna_chain%last_link
 
    ! Allocate array to cache split results
-   allocate(will_split(level_link%num_parts))
+   allocate(will_split(level_link%n_parts))
 
    ! Single pass: check which parts would split and cache results
    partref => level_link%first_partref
-   do i = 1, level_link%num_parts
+   do i = 1, level_link%n_parts
       will_split(i) = would_part_split(adjcs1, adjcs2, level_link%itemdir1, level_link%itemdir2, &
             partref%part)
       if (will_split(i)) any_splits = .TRUE.
@@ -428,7 +428,7 @@ subroutine refine_branched_hna_partition(adjcs1, adjcs2, hna_chain, branch, bran
 
       ! Process all parts using cached split results
       partref => level_link%first_partref
-      do i = 1, level_link%num_parts
+      do i = 1, level_link%n_parts
          if (will_split(i)) then
             ! Create children based on signatures
             call refine_hna_part(adjcs1, adjcs2, level_link%itemdir1, level_link%itemdir2, &
@@ -441,7 +441,7 @@ subroutine refine_branched_hna_partition(adjcs1, adjcs2, hna_chain, branch, bran
                call add_branch_part(branch_parts, child_part)
                child_part => child_part%next_sibling_part
             end do
-            num_splits = num_splits + 1
+            n_splits = n_splits + 1
          else
             ! Link original part
             call link_part(next_level_link, partref%part)
@@ -502,7 +502,7 @@ recursive subroutine split_dependent_parts(adjcs1, adjcs2, hna_chain, branch, br
    type(chain_node_t), pointer :: level_link, next_level_link
    type(chain_node_t), pointer :: first_branch_link
    type(partition_node_t), pointer :: child_part
-   integer(ik) :: num_splits
+   integer(ik) :: n_splits
 
    error_code = MOLALIGN_SUCCESS
 
@@ -537,9 +537,9 @@ recursive subroutine split_dependent_parts(adjcs1, adjcs2, hna_chain, branch, br
    ! Compute self-consistent HNAs
    do
       ! Refine HNA partition and get the number of splits
-      call refine_branched_hna_partition(adjcs1, adjcs2, hna_chain, branch, branch_parts, num_splits)
+      call refine_branched_hna_partition(adjcs1, adjcs2, hna_chain, branch, branch_parts, n_splits)
       ! Exit loop if no splits occurred
-      if (num_splits == 0) exit
+      if (n_splits == 0) exit
    end do
 
    ! Verify that molecules are conformers
@@ -552,7 +552,7 @@ recursive subroutine split_dependent_parts(adjcs1, adjcs2, hna_chain, branch, br
    next_part_to_split => null()
    partref => hna_chain%last_link%first_partref
    do while (associated(partref) .and. .not. associated(next_part_to_split))
-      if (partref%part%num_items1 >= 2) then
+      if (partref%part%n_items1 >= 2) then
          if (isdescendant(partref%part, branching_part)) then
             next_part_to_split => partref%part
          end if
@@ -584,7 +584,7 @@ recursive subroutine split_independent_parts(adjcs1, adjcs2, hna_chain, branch, 
    ! Process each part in branch_parts
    partref => branch_parts%first_partref
    do while (associated(partref))
-      if (partref%part%num_children == 0) then
+      if (partref%part%n_children == 0) then
          ! Start leaf chain from current branch chain
          new_branch => branch
          ! Create a new part registry for this branch part

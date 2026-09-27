@@ -48,15 +48,15 @@ subroutine prune_none( atomtypes, coords1, coords2, prunes)
    type(bool_matrix), dimension(:), allocatable, intent(out) :: prunes
    ! Local variables
    integer(ik) :: h, i, j
-   integer(ik) :: num_items1, num_items2
+   integer(ik) :: n_items1, n_items2
 
-   allocate (prunes(atomtypes%num_parts))
-   do h = 1, atomtypes%num_parts
-      num_items1 = atomtypes%parts(h)%num_items1
-      num_items2 = atomtypes%parts(h)%num_items2
-      allocate (prunes(h)%a(num_items1, num_items2))
-      do i = 1, num_items1
-         do j = 1, num_items2
+   allocate (prunes(atomtypes%n_parts))
+   do h = 1, atomtypes%n_parts
+      n_items1 = atomtypes%parts(h)%n_items1
+      n_items2 = atomtypes%parts(h)%n_items2
+      allocate (prunes(h)%a(n_items1, n_items2))
+      do i = 1, n_items1
+         do j = 1, n_items2
             prunes(h)%a(j, i) = .FALSE.
          end do
       end do
@@ -70,25 +70,25 @@ subroutine prune_rd( atomtypes, coords1, coords2, prunes)
    type(bool_matrix), dimension(:), allocatable, intent(out) :: prunes
    ! Local variables
    type(real_listlist), allocatable, dimension(:) :: dists1, dists2
-   integer(ik) :: num_items1, num_items2
+   integer(ik) :: n_items1, n_items2
    integer(ik) :: h, i, j, k, iatom, jatom
 
    allocate (dists1(size(coords1, dim=2)))
    allocate (dists2(size(coords2, dim=2)))
-   allocate (prunes(atomtypes%num_parts))
+   allocate (prunes(atomtypes%n_parts))
 
    do i = 1, size(coords1, dim=2)
-      allocate (dists1(i)%u(atomtypes%num_parts))
-      allocate (dists2(i)%u(atomtypes%num_parts))
-      do h = 1, atomtypes%num_parts
-         allocate (dists1(i)%u(h)%u(atomtypes%parts(h)%num_items1))
-         allocate (dists2(i)%u(h)%u(atomtypes%parts(h)%num_items2))
+      allocate (dists1(i)%u(atomtypes%n_parts))
+      allocate (dists2(i)%u(atomtypes%n_parts))
+      do h = 1, atomtypes%n_parts
+         allocate (dists1(i)%u(h)%u(atomtypes%parts(h)%n_items1))
+         allocate (dists2(i)%u(h)%u(atomtypes%parts(h)%n_items2))
       end do
    end do
 
    do i = 1, size(coords1, dim=2)
-      do h = 1, atomtypes%num_parts
-         do j = 1, atomtypes%parts(h)%num_items1
+      do h = 1, atomtypes%n_parts
+         do j = 1, atomtypes%parts(h)%n_items1
             jatom = atomtypes%parts(h)%items1(j)
             dists1(i)%u(h)%u(j) = sqrt(sum((coords1(:, jatom) - coords1(:, i))**2))
          end do
@@ -97,8 +97,8 @@ subroutine prune_rd( atomtypes, coords1, coords2, prunes)
    end do
 
    do i = 1, size(coords2, dim=2)
-      do h = 1, atomtypes%num_parts
-         do j = 1, atomtypes%parts(h)%num_items2
+      do h = 1, atomtypes%n_parts
+         do j = 1, atomtypes%parts(h)%n_items2
             jatom = atomtypes%parts(h)%items2(j)
             dists2(i)%u(h)%u(j) = sqrt(sum((coords2(:, jatom) - coords2(:, i))**2))
          end do
@@ -106,16 +106,16 @@ subroutine prune_rd( atomtypes, coords1, coords2, prunes)
       end do
    end do
 
-   do h = 1, atomtypes%num_parts
-      num_items1 = atomtypes%parts(h)%num_items1
-      num_items2 = atomtypes%parts(h)%num_items2
-      allocate (prunes(h)%a(num_items1, num_items2))
+   do h = 1, atomtypes%n_parts
+      n_items1 = atomtypes%parts(h)%n_items1
+      n_items2 = atomtypes%parts(h)%n_items2
+      allocate (prunes(h)%a(n_items1, n_items2))
       prunes(h)%a = .FALSE.
-      do i = 1, num_items1
+      do i = 1, n_items1
          iatom = atomtypes%parts(h)%items1(i)
-         do j = 1, num_items2
+         do j = 1, n_items2
             jatom = atomtypes%parts(h)%items2(j)
-            do k = 1, atomtypes%num_parts
+            do k = 1, atomtypes%n_parts
                if (any(abs(dists2(jatom)%u(k)%u - dists1(iatom)%u(k)%u) > EVALFAC*prune_tol)) then
                   prunes(h)%a(j, i) = .TRUE.
                   exit

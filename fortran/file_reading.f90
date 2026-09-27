@@ -33,7 +33,7 @@ subroutine parse_label( label, elnum, group)
    integer(ik), intent(out) :: elnum, group
    ! Local variables
    character(:), allocatable :: normalized_label, elsym
-   character(symlen), dimension(0:num_elems) :: normalized_atomic_symbols
+   character(symlen), dimension(0:n_elems) :: normalized_atomic_symbols
    integer(ik) :: pos, z
 
    normalized_label = lowercase(trim(adjustl(label)))
@@ -53,9 +53,9 @@ subroutine parse_label( label, elnum, group)
       end if
    end if
 
-   ! atomic_symbols is indexed 0:num_elems, so z is the element number
+   ! atomic_symbols is indexed 0:n_elems, so z is the element number
    ! directly (0 for the dummy atom 'X')
-   do z = 0, num_elems
+   do z = 0, n_elems
       if (elsym == normalized_atomic_symbols(z)) then
          elnum = z
          return

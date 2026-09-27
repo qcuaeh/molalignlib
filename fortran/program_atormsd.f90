@@ -53,11 +53,11 @@ real(rk) :: transmat2(3,3)
 real(rk), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, coords2r
 real(rk), dimension(:,:), allocatable :: full_coords1, full_coords2, full_coords2r
 integer(ik), dimension(:), allocatable :: atomset1, atomset2
-integer(ik), dimension(:), allocatable :: atomperm1, full_atomperm1
-integer(ik) :: num_records, max_trials, conv_freq
+integer(ik), dimension(:), allocatable :: mapping1, full_atomperm1
+integer(ik) :: n_records, max_trials, conv_freq
 integer(ik) :: in_unit, aligned_unit
 integer(ik) :: error_code
-integer(ik) :: n_atoms1, n_atoms2, n_pad
+integer(ik) :: n_atoms1, n_atoms2, n_padding
 integer(ik) :: i
 
 ! Set default options
@@ -73,7 +73,7 @@ print_stats = .FALSE.
 print_assignment = .FALSE.
 write_aligned = .FALSE.
 
-num_records = 1
+n_records = 1
 conv_freq = 10
 max_trials = MAX_TRIALS_DEFAULT
 prune_procedure => prune_none
@@ -104,7 +104,7 @@ do while (get_arg(arg))
    case ('-trials')
       call read_optarg( arg, max_trials)
    case ('-records')
-      call read_optarg( arg, num_records)
+      call read_optarg( arg, n_records)
    case ('-aligned')
       write_aligned = .TRUE.
       call read_optarg( arg, aligned_path)
@@ -139,9 +139,9 @@ end select
 ! keep their indices; padding atoms are recognised by index from here on.
 n_atoms1 = size(atoms1)
 n_atoms2 = size(atoms2)
-n_pad = max(n_atoms1, n_atoms2)
-call pad_atoms( atoms1, n_pad)
-call pad_atoms( atoms2, n_pad)
+n_padding = max(n_atoms1, n_atoms2)
+call pad_atoms( atoms1, n_padding)
+call pad_atoms( atoms2, n_padding)
 
 ! Atom sets only ever contain real atoms
 if (heavy_flag) then
@@ -156,14 +156,14 @@ end if
 
 ! From here on the comparison works on the included atoms only, numbered
 ! 1..size(atomset1) in molecule 1 and 1..size(atomset2) in molecule 2.
-! atomperm1 maps included atoms to included atoms in that compact numbering;
-! complete_atomperm turns it into full_atomperm1 over all (padded) atoms.
+! mapping1 maps included atoms to included atoms in that compact numbering;
+! complete_mapping turns it into full_atomperm1 over all (padded) atoms.
 
 ! Collect atom types in a partition
 call collect_atomtypes( atoms1(atomset1), atoms2(atomset2), atomtypes)
 
 ! Abort if molecules are not isomers
-if (any(atomtypes%parts%num_items1 /= atomtypes%parts%num_items2)) then
+if (any(atomtypes%parts%n_items1 /= atomtypes%parts%n_items2)) then
    stop 'These molecules are not isomers'
 end if
 
@@ -188,11 +188,11 @@ end if
 
 ! Coordinates of all (padded) atoms, molecule 2 transformed. They are only
 ! used to align the whole molecule 2 and to pair the excluded atoms.
-allocate (unit_weights(n_pad), source=1.0_rk)
+allocate (unit_weights(n_padding), source=1.0_rk)
 full_coords1 = get_coords( atoms1, unit_weights, ORIGIN, IDENTITY_MATRIX)
 full_coords2 = get_coords( atoms2, unit_weights, ORIGIN, transmat2)
 
-! Coordinates of the included atoms, in the compact numbering of atomperm1
+! Coordinates of the included atoms, in the compact numbering of mapping1
 coords1 = full_coords1(:, atomset1)
 coords2 = full_coords2(:, atomset2)
 
@@ -228,23 +228,23 @@ if (remap_flag) then
 
    if (align_flag) then
 
-      call allocate_registry( registry, num_records)
-      call optimize_atomperm_atoms( atomtypes, prunes, &
+      call allocate_registry( registry, n_records)
+      call optimize_mapping_atoms( atomtypes, prunes, &
             coords1w, coords2w, conv_freq, max_trials, registry, error_code)
       if (error_code /= 0) stop 'Error: Assignment failed'
 
       if (print_stats) call print_records( registry)
 
       do i = 1, registry%occ_records
-         atomperm1 = registry%records(i)%atomperm1
-         rotquat = least_rotquat( atomperm1, coords1w, coords2w)
+         mapping1 = registry%records(i)%mapping1
+         rotquat = least_rotquat( mapping1, coords1w, coords2w)
          full_coords2r = rotated_coords( full_coords2, rotquat, center1)
          coords2r = rotated_coords( coords2, rotquat, center1)
-         rmsd = sqrt( sqdistmean( atomperm1, weights1, coords1, coords2r))
+         rmsd = sqrt( sqdistmean( mapping1, weights1, coords1, coords2r))
 
          ! Pair the excluded atoms in the aligned frame (bonds, if the input
          ! format had any, are used as in conformsd)
-         call complete_atomperm( atomset1, atomset2, atomperm1, atoms1, atoms2, &
+         call complete_mapping( atomset1, atomset2, mapping1, atoms1, atoms2, &
                n_atoms1, n_atoms2, bonds1, bonds2, full_coords1, full_coords2r, full_atomperm1)
 
          if (write_aligned) then
@@ -263,14 +263,14 @@ if (remap_flag) then
 
    else
 
-      call assign_atoms_pruned( atomtypes, coords1w, coords2w, prunes, atomperm1, error_code)
+      call assign_atoms_pruned( atomtypes, coords1w, coords2w, prunes, mapping1, error_code)
       if (error_code /= 0) stop 'Error: Assignment failed'
 
       full_coords2r = full_coords2
       coords2r = coords2
-      rmsd = sqrt( sqdistmean( atomperm1, weights1, coords1, coords2r))
+      rmsd = sqrt( sqdistmean( mapping1, weights1, coords1, coords2r))
 
-      call complete_atomperm( atomset1, atomset2, atomperm1, atoms1, atoms2, &
+      call complete_mapping( atomset1, atomset2, mapping1, atoms1, atoms2, &
             n_atoms1, n_atoms2, bonds1, bonds2, full_coords1, full_coords2r, full_atomperm1)
 
       write (stdout,'(A)',advance='no') str( rmsd)
@@ -296,11 +296,11 @@ else
 
    ! Maintain input atom order, both among the included atoms and in the
    ! full (padded) permutation
-   call init_array( atomperm1, size(atomset1), identity)
+   call init_array( mapping1, size(atomset1), identity)
    call init_array( full_atomperm1, size(atoms1), identity)
 
    if (align_flag) then
-      rotquat = least_rotquat( atomperm1, coords1w, coords2w)
+      rotquat = least_rotquat( mapping1, coords1w, coords2w)
       full_coords2r = rotated_coords( full_coords2, rotquat, center1)
       coords2r = rotated_coords( coords2, rotquat, center1)
    else
@@ -308,7 +308,7 @@ else
       coords2r = coords2
    end if
 
-   rmsd = sqrt( sqdistmean( atomperm1, weights1, coords1, coords2r))
+   rmsd = sqrt( sqdistmean( mapping1, weights1, coords1, coords2r))
 
    if (align_flag .and. write_aligned) then
       title2 = 'rmsd=' // str( rmsd)

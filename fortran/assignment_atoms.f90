@@ -31,80 +31,80 @@ public assign_atoms_pruned
 
 contains
 
-subroutine assign_atoms( atomtypes, costs, atomperm1)
+subroutine assign_atoms( atomtypes, costs, mapping1)
 ! ----------------------------------------------------------------
 ! Finds the optimal mapping between points with fixed orientation
 ! ----------------------------------------------------------------
    type(partition_t), target, intent(in) :: atomtypes
    type(real_matrix), dimension(:), intent(in) :: costs
-   integer(ik), dimension(:), intent(out) :: atomperm1
+   integer(ik), dimension(:), intent(out) :: mapping1
    ! Local variables
    integer(ik), dimension(:), allocatable :: k
    real(rk), dimension(:,:), allocatable :: a
    integer(ik) :: h, i, j, n, m
    real(rk) :: s
 
-   n =  maxval(atomtypes%parts%num_items1)
-   m =  maxval(atomtypes%parts%num_items2)
+   n =  maxval(atomtypes%parts%n_items1)
+   m =  maxval(atomtypes%parts%n_items2)
    allocate (k(n))
    allocate (a(n, m))
 
-   ! Every atom belongs to one block, so atomperm1 is fully assigned
-   ! Optimize atomperm1 for each block
-   do h = 1, atomtypes%num_parts
-      n = atomtypes%parts(h)%num_items1
-      m = atomtypes%parts(h)%num_items2
+   ! Every atom belongs to one block, so mapping1 is fully assigned
+   ! Optimize mapping1 for each block
+   do h = 1, atomtypes%n_parts
+      n = atomtypes%parts(h)%n_items1
+      m = atomtypes%parts(h)%n_items2
       a(1:n, 1:m) = costs(h)%a(1:n, 1:m)
       call assndx(1, a, n, m, k, s)
-      atomperm1(atomtypes%parts(h)%items1) = atomtypes%parts(h)%items2(k(1:n))
+      mapping1(atomtypes%parts(h)%items1) = atomtypes%parts(h)%items2(k(1:n))
    end do
 end subroutine
 
-subroutine assign_atoms_pruned( atomtypes, coords1, coords2, prunes, atomperm1, error_code)
+subroutine assign_atoms_pruned( atomtypes, coords1, coords2, prunes, mapping1, error_code)
 ! ----------------------------------------------------------------
 ! Finds the optimal mapping between points with fixed orientation
 ! ----------------------------------------------------------------
    type(partition_t), target, intent(in) :: atomtypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    type(bool_matrix), dimension(:), intent(in) :: prunes
-   integer(ik), dimension(:), allocatable, intent(out) :: atomperm1
+   integer(ik), dimension(:), allocatable, intent(out) :: mapping1
    integer(ik), intent(out) :: error_code
    ! Local variables
-   integer(ik), dimension(:), allocatable :: perm1
+   integer(ik), dimension(:), allocatable :: submap1
    integer(ik) :: h, n
    real(rk) :: dist
 
    error_code = MOLALIGN_SUCCESS
-   allocate (perm1(maxval(atomtypes%parts%num_items1)))
-   ! atomperm1 maps the included atoms only (compact numbering, see
+   allocate (submap1(maxval(atomtypes%parts%n_items1)))
+   ! mapping1 maps the included atoms only (compact numbering, see
    ! collect_atomtypes). Every atom belongs to one block, so it is fully
-   ! assigned below; complete_atomperm later adds the excluded atoms.
-   allocate (atomperm1(size(atomtypes%itemdir1)))
+   ! assigned below; complete_mapping later adds the excluded atoms.
+   allocate (mapping1(size(atomtypes%itemdir1)))
 
-   ! Optimize atomperm1 for each block
-   do h = 1, atomtypes%num_parts
-      n = atomtypes%parts(h)%num_items1
+   ! Optimize mapping1 for each block
+   do h = 1, atomtypes%n_parts
+      n = atomtypes%parts(h)%n_items1
       call solve_lap_pruned(n, atomtypes%parts(h)%items1, atomtypes%parts(h)%items2, &
-            coords1, coords2, prunes(h)%a, perm1, dist, error_code)
+            coords1, coords2, prunes(h)%a, submap1, dist, error_code)
       if (error_code /= 0) return
-      atomperm1(atomtypes%parts(h)%items1) = atomtypes%parts(h)%items2(perm1(1:n))
+      mapping1(atomtypes%parts(h)%items1) = atomtypes%parts(h)%items2(submap1(1:n))
    end do
 
    if (DEBUG_TESTS) then
-      if (.not. is_permutation(atomperm1)) then
-         error stop 'assign_atoms_pruned: atomperm1 is not a permutation'
+      if (.not. is_permutation(mapping1)) then
+         error stop 'assign_atoms_pruned: mapping1 is not a permutation'
       end if
    end if
 end subroutine
 
-subroutine solve_lap_pruned(n, s1, s2, x1, x2, pruned, perm1, dist, error_code)
+subroutine solve_lap_pruned(n, s1, s2, x1, x2, pruned, submap1, dist, error_code)
 ! Adapted from GMIN: A program for finding global minima
 ! Copyright (C) 1999-2006 David J. Wales
 
 !   Interface to spjv.f for calculating minimum distance
 !   of two atomic configurations with respect to
 !   particle permutations.
-!   The function permdist determines the distance or weight function,
+!   The function mapdist determines the distance or weight function,
 !
 !       Tomas Oppelstrup, Jul 10, 2003
 !       tomaso@nada.kth.se
@@ -112,11 +112,11 @@ subroutine solve_lap_pruned(n, s1, s2, x1, x2, pruned, perm1, dist, error_code)
 
 !   This is the main routine for minimum distance calculation.
 !   Given two coordinate vectors x1,x2 of particles each, return
-!   the minimum distance in dist, and the permutation in perm1.
-!   perm1 is an integer vector such that
-!     x1(i) <--> x2(perm1(i))
+!   the minimum distance in dist, and the permutation in submap1.
+!   submap1 is an integer vector such that
+!     x1(i) <--> x2(submap1(i))
 !   i.e.
-!     sum(i=1,n) permdist(x1(i), x2(perm1(i))) == dist
+!     sum(i=1,n) mapdist(x1(i), x2(submap1(i))) == dist
 
 !   Input
 !     n  : System size
@@ -129,10 +129,10 @@ subroutine solve_lap_pruned(n, s1, s2, x1, x2, pruned, perm1, dist, error_code)
    real(rk), parameter :: scale = 1.0e6_rk ! Precision
 
 !   Output
-!     perm1: Permutation so that x1(i) <--> x2(perm1(i))
+!     submap1: Permutation so that x1(i) <--> x2(submap1(i))
 !     dist: Minimum attainable distance
 !   We have
-   integer(ik), intent(out) :: perm1(n)
+   integer(ik), intent(out) :: submap1(n)
    real(rk), intent(out) :: dist
    integer(ik), intent(out) :: error_code
 
@@ -177,7 +177,7 @@ subroutine solve_lap_pruned(n, s1, s2, x1, x2, pruned, perm1, dist, error_code)
    end do
 
 !   Call bipartite matching routine
-   call jovosap(n, sz, cc, kk, first, perm1, y, u, v, h)
+   call jovosap(n, sz, cc, kk, first, submap1, y, u, v, h)
 
    if (h < 0) then
 !   If initial guess correct, deduce solution distance
@@ -191,7 +191,7 @@ subroutine solve_lap_pruned(n, s1, s2, x1, x2, pruned, perm1, dist, error_code)
             error_code = MOLALIGN_ERROR_PRUNED_ASSIGNMENT_FAILED
             return
          end if
-         if (kk(j) /= perm1(i)) then
+         if (kk(j) /= submap1(i)) then
             j = j + 1
             goto 30
          end if
@@ -200,7 +200,7 @@ subroutine solve_lap_pruned(n, s1, s2, x1, x2, pruned, perm1, dist, error_code)
    end if
 
    if (DEBUG_TESTS) then
-      if (.not. is_permutation(perm1)) then
+      if (.not. is_permutation(submap1)) then
          error stop 'Assignment is not a permutation'
       end if
    end if

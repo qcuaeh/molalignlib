@@ -92,10 +92,10 @@ def atomic_number_to_symbol(number):
 class RMSDResult(object):
     """Return value of .rmsd_to()."""
 
-    def __init__(self, rmsd, atom_permutation, transform):
+    def __init__(self, rmsd, mapping, transform):
         self.rmsd = rmsd
         """Root-mean-square deviation (Angstrom)."""
-        self.atom_permutation = atom_permutation
+        self.mapping = mapping
         """0-based index array mapping other's atoms onto self's atoms.
 
         Entry j is the atom of `other` placed on line j of `self`. Its length
@@ -116,7 +116,7 @@ class RMSDResult(object):
         Apply the stored transform and atom permutation to a cluster or conformer,
         returning a new object aligned and reordered to match the reference.
 
-        The result has len(atom_permutation) atoms, so line j of it corresponds
+        The result has len(mapping) atoms, so line j of it corresponds
         to line j of the reference. If the reference has more atoms (possible
         only with heavy_only=True), the missing lines are filled with dummy
         atoms (element "X", atomic number 0) whose coordinates are
@@ -124,7 +124,7 @@ class RMSDResult(object):
         """
         R = self.transform[:3, :3]
         t = self.transform[:3, 3]
-        idx = np.asarray(self.atom_permutation)
+        idx = np.asarray(self.mapping)
 
         # Pad with dummy atoms (same convention as the Fortran core: appended
         # after the real atoms, element "X") when the permutation is longer
@@ -443,8 +443,8 @@ class Atoms(object):
 
         With heavy_only=True the two molecules may differ in their number of
         hydrogens. The smaller one is then padded with dummy atoms, and each
-        atom_permutation has max(len(self), len(other)) entries (see
-        RMSDResult.atom_permutation). Hydrogens are not part of the RMSD;
+        mapping has max(len(self), len(other)) entries (see
+        RMSDResult.mapping). Hydrogens are not part of the RMSD;
         they are paired afterwards, following their heavy neighbour where
         bonds are known and by distance otherwise.
         """
@@ -455,7 +455,7 @@ class Atoms(object):
         if prune and prune_tol is None:
             raise ValueError("prune_tol is required when prune=True")
 
-        rmsd_vals, perms, tfs = _molalign.atormsd_calculate(
+        rmsd_vals, maps, tfs = _molalign.atormsd_calculate(
             self._atom_data, self._coords,
             other._atom_data, other._coords,
             align_flag=align,
@@ -473,7 +473,7 @@ class Atoms(object):
             n_records=n_records,
         )
         return [
-            RMSDResult(rmsd=rmsd_vals[i], atom_permutation=perms[i], transform=tfs[i])
+            RMSDResult(rmsd=rmsd_vals[i], mapping=maps[i], transform=tfs[i])
             for i in range(len(rmsd_vals))
         ]
 
@@ -627,8 +627,8 @@ class Conformer(object):
 
         With heavy_only=True the two molecules may differ in their number of
         hydrogens. The smaller one is then padded with dummy atoms, and each
-        atom_permutation has max(len(self), len(other)) entries (see
-        RMSDResult.atom_permutation). Hydrogens are not part of the RMSD;
+        mapping has max(len(self), len(other)) entries (see
+        RMSDResult.mapping). Hydrogens are not part of the RMSD;
         they are paired afterwards, following their heavy neighbour where
         bonds are known and by distance otherwise.
 
@@ -638,7 +638,7 @@ class Conformer(object):
         if not isinstance(other, Conformer):
             raise TypeError("Expected Conformer, got {}".format(type(other).__name__))
 
-        rmsd_vals, perms, tfs = _molalign.conformsd_calculate(
+        rmsd_vals, maps, tfs = _molalign.conformsd_calculate(
             self._atom_data, self._coords,
             other._atom_data, other._coords,
             bond_data1=self._bond_data if not infer_bonds else None,
@@ -658,7 +658,7 @@ class Conformer(object):
             n_records=n_records,
         )
         return [
-            RMSDResult(rmsd=rmsd_vals[i], atom_permutation=perms[i], transform=tfs[i])
+            RMSDResult(rmsd=rmsd_vals[i], mapping=maps[i], transform=tfs[i])
             for i in range(len(rmsd_vals))
         ]
 

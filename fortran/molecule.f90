@@ -26,7 +26,7 @@ public get_centroid
 public include_all_atoms
 public include_heavy_atoms
 public pad_atoms
-public complete_atomperm
+public complete_mapping
 public extract_bonds
 public bonds_from_atoms
 public adjacency_from_bonds
@@ -91,23 +91,23 @@ subroutine include_heavy_atoms(atoms, atomset)
    end do
 end subroutine
 
-subroutine pad_atoms(atoms, n_pad)
-! Append dummy atoms (elnum = 0) until the molecule has n_pad atoms. The
+subroutine pad_atoms(atoms, n_padding)
+! Append dummy atoms (elnum = 0) until the molecule has n_padding atoms. The
 ! original atoms keep their indices, so bond tables and file line numbers
 ! stay valid. Padding atoms are recognised by index (i > original size)
 ! everywhere else.
    type(atom_t), dimension(:), allocatable, intent(inout) :: atoms
-   integer(ik), intent(in) :: n_pad
+   integer(ik), intent(in) :: n_padding
    ! Local variables
    type(atom_t), dimension(:), allocatable :: padded
    integer(ik) :: n_real, i
 
    n_real = size(atoms)
-   if (n_real >= n_pad) return
+   if (n_real >= n_padding) return
 
-   allocate (padded(n_pad))
+   allocate (padded(n_padding))
    padded(1:n_real) = atoms
-   do i = n_real + 1, n_pad
+   do i = n_real + 1, n_padding
       padded(i)%elnum = 0
       padded(i)%group = 0
       padded(i)%coords = 0.0_rk
@@ -155,13 +155,13 @@ subroutine neighbor_table(n_atoms, bonds, nbr_start, nbr_list)
    end do
 end subroutine
 
-subroutine complete_atomperm(atomset1, atomset2, atomperm1, atoms1, atoms2, &
+subroutine complete_mapping(atomset1, atomset2, mapping1, atoms1, atoms2, &
       n_real1, n_real2, bonds1, bonds2, coords1, coords2, full_atomperm1)
 ! Build a full permutation of 1..size(atoms1) from the atom mapping of the
-! included atoms. atomperm1 is a permutation of 1..size(atomset1) in the
+! included atoms. mapping1 is a permutation of 1..size(atomset1) in the
 ! compact numbering of the included atoms: included atom i of molecule 1
-! (atom atomset1(i)) maps to included atom atomperm1(i) of molecule 2 (atom
-! atomset2(atomperm1(i))). Both molecules must already be padded to the same
+! (atom atomset1(i)) maps to included atom mapping1(i) of molecule 2 (atom
+! atomset2(mapping1(i))). Both molecules must already be padded to the same
 ! size. Excluded atoms are paired in this order of preference:
 !   1. Same element, bonded to the image of one of its included neighbours
 !      (e.g. an H follows its heavy atom), closest first.
@@ -171,7 +171,7 @@ subroutine complete_atomperm(atomset1, atomset2, atomperm1, atoms1, atoms2, &
 ! atoms, bonds and coords are full (padded) arrays; coords1 and coords2 must
 ! be in the same (aligned) frame.
    integer(ik), dimension(:), intent(in) :: atomset1, atomset2
-   integer(ik), dimension(:), intent(in) :: atomperm1
+   integer(ik), dimension(:), intent(in) :: mapping1
    type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
    integer(ik), intent(in) :: n_real1, n_real2
    type(bond_t), dimension(:), intent(in) :: bonds1, bonds2
@@ -187,11 +187,11 @@ subroutine complete_atomperm(atomset1, atomset2, atomperm1, atoms1, atoms2, &
    n_incl = size(atomset1)
 
    if (size(atoms2) /= n_atoms) then
-      error stop 'complete_atomperm: molecules must have the padded size'
+      error stop 'complete_mapping: molecules must have the padded size'
    end if
 
-   if (size(atomset2) /= n_incl .or. size(atomperm1) /= n_incl) then
-      error stop 'complete_atomperm: atom sets and mapping must have the same size'
+   if (size(atomset2) /= n_incl .or. size(mapping1) /= n_incl) then
+      error stop 'complete_mapping: atom sets and mapping must have the same size'
    end if
 
    allocate (full_atomperm1(n_atoms))
@@ -203,13 +203,13 @@ subroutine complete_atomperm(atomset1, atomset2, atomperm1, atoms1, atoms2, &
    ! Translate the mapping of the included atoms to full indices, checking
    ! that it is a valid permutation of the included atoms
    do i = 1, n_incl
-      j = atomperm1(i)
+      j = mapping1(i)
       if (j < 1 .or. j > n_incl) then
-         error stop 'complete_atomperm: included atom mapped out of range'
+         error stop 'complete_mapping: included atom mapped out of range'
       end if
       k = atomset2(j)
       if (used2(k)) then
-         error stop 'complete_atomperm: atom of molecule 2 assigned twice'
+         error stop 'complete_mapping: atom of molecule 2 assigned twice'
       end if
       full_atomperm1(atomset1(i)) = k
       in_set1(atomset1(i)) = .TRUE.

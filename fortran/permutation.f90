@@ -19,19 +19,19 @@ use parameters
 implicit none
 
 ! Partial atom permutation, built by appending assigned pairs.
-!   atomset(1:atomset_size) lists the assigned atoms of molecule 1, in the
-!   order they were added; atomperm(i1) is the partner of i1 in molecule 2.
-!   Only atomperm(atomset(1:atomset_size)) is defined. Other entries are
+!   subset(1:subset_size) lists the assigned atoms of molecule 1, in the
+!   order they were added; mapping(i1) is the partner of i1 in molecule 2.
+!   Only mapping(subset(1:subset_size)) is defined. Other entries are
 !   stale or uninitialised and must never be read; to export a permutation,
 !   scatter the defined entries into a zeroed array.
 ! Both arrays have fixed capacity n_atoms. Pairs are only ever appended and
-! an atom is never re-added, so a subperm can be rolled back to an earlier
-! state by restoring atomset_size, and copied cheaply with subperm_merge
+! an atom is never re-added, so a submap can be rolled back to an earlier
+! state by restoring subset_size, and copied cheaply with submap_merge
 ! (O(assigned pairs)) instead of intrinsic assignment (O(n_atoms)).
-type :: subperm_t
-   integer(ik) :: atomset_size = 0
-   integer(ik), allocatable :: atomset(:)
-   integer(ik), allocatable :: atomperm(:)
+type :: partmap_t
+   integer(ik) :: subset_size = 0
+   integer(ik), allocatable :: subset(:)
+   integer(ik), allocatable :: mapping(:)
 end type
 
 abstract interface
@@ -111,59 +111,59 @@ logical(lk) function is_permutation(perm) result(isperm)
    end do
 end function
 
-subroutine subperm_init(subperm, perm_size)
-! Allocate an empty subperm. Call it once per (unallocated) object; to reuse
-! an initialised subperm just set atomset_size = 0. No array is filled:
-! only entries listed in atomset are ever read.
-   type(subperm_t), intent(inout) :: subperm
-   integer(ik), intent(in) :: perm_size
+subroutine submap_init(submap, full_size)
+! Allocate an empty submap. Call it once per (unallocated) object; to reuse
+! an initialised submap just set subset_size = 0. No array is filled:
+! only entries listed in subset are ever read.
+   type(partmap_t), intent(inout) :: submap
+   integer(ik), intent(in) :: full_size
 
-   allocate (subperm%atomset(perm_size), subperm%atomperm(perm_size))
-   subperm%atomset_size = 0
+   allocate (submap%subset(full_size), submap%mapping(full_size))
+   submap%subset_size = 0
 end subroutine
 
-subroutine subperm_add(subperm, i1, i2)
-   type(subperm_t), intent(inout) :: subperm
+subroutine submap_add(submap, i1, i2)
+   type(partmap_t), intent(inout) :: submap
    integer(ik), intent(in) :: i1, i2
    integer(ik) :: n
 
    if (DEBUG_TESTS) then
    block
       integer(ik) :: i
-      ! Check if i1 is already in atomset
-      do i = 1, subperm%atomset_size
-         if (subperm%atomset(i) == i1) then
-            error stop 'Index i1 is already in atomset'
+      ! Check if i1 is already in subset
+      do i = 1, submap%subset_size
+         if (submap%subset(i) == i1) then
+            error stop 'Index i1 is already in subset'
          end if
       end do
-      ! Check if i2 is already assigned to something in atomset
-      do i = 1, subperm%atomset_size
-         if (subperm%atomperm(subperm%atomset(i)) == i2) then
+      ! Check if i2 is already assigned to something in subset
+      do i = 1, submap%subset_size
+         if (submap%mapping(submap%subset(i)) == i2) then
             error stop 'Index i2 is already assigned'
          end if
       end do
    end block
    end if
 
-   n = subperm%atomset_size + 1
-   subperm%atomset(n) = i1
-   subperm%atomperm(i1) = i2
-   subperm%atomset_size = n
+   n = submap%subset_size + 1
+   submap%subset(n) = i1
+   submap%mapping(i1) = i2
+   submap%subset_size = n
 end subroutine
 
-subroutine subperm_merge(subperm, other_subperm)
-   type(subperm_t), intent(inout) :: subperm
-   type(subperm_t), intent(in) :: other_subperm
+subroutine submap_merge(submap, other_subperm)
+   type(partmap_t), intent(inout) :: submap
+   type(partmap_t), intent(in) :: other_subperm
    integer(ik) :: i, i1, i2
 
-   do i = 1, other_subperm%atomset_size
-      i1 = other_subperm%atomset(i)
-      i2 = other_subperm%atomperm(i1)
-      call subperm_add(subperm, i1, i2)
+   do i = 1, other_subperm%subset_size
+      i1 = other_subperm%subset(i)
+      i2 = other_subperm%mapping(i1)
+      call submap_add(submap, i1, i2)
    end do
 end subroutine
 
-! Original at https://people.sc.fsu.edu/~jburkardt/f_src/atomset/atomset.f90
+! Original at https://people.sc.fsu.edu/~jburkardt/f_src/subset/subset.f90
 subroutine perm1_next3 ( n, p, more, rank )
 
 !*****************************************************************************80

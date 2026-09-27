@@ -26,7 +26,7 @@ contains
 ! conversion is required.
 !
 ! Every elnum must index the element tables in chemdata, i.e. lie in
-! 0:num_elems (0 is the dummy atom). Each one is checked as it is read; on
+! 0:n_elems (0 is the dummy atom). Each one is checked as it is read; on
 ! the first that doesn't, error_code is set to
 ! MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER and atoms is deallocated, so no
 ! out-of-range value ever reaches a table lookup. On success error_code is
@@ -47,7 +47,7 @@ subroutine build_atoms(n, atomdata, coords_in, atoms, error_code)
       abase = (i - 1)*2
       cbase = (i - 1)*3
       elnum = atomdata(abase + 1)
-      if (elnum < 0 .or. elnum > num_elems) then
+      if (elnum < 0 .or. elnum > n_elems) then
          error_code = MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER
          deallocate(atoms)
          return

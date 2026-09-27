@@ -62,7 +62,7 @@ enum, bind(c)
    ! might be too tight). Returned by: atormsd (remap_flag=true only).
    enumerator :: MOLALIGN_ERROR_PRUNED_ASSIGNMENT_FAILED  = 6
    ! An atomic number is outside the element tables in chemdata
-   ! (0:num_elems, where 0 is the dummy atom). Returned by: atormsd,
+   ! (0:n_elems, where 0 is the dummy atom). Returned by: atormsd,
    ! conformsd.
    enumerator :: MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER     = 7
 end enum

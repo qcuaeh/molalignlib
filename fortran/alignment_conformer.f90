@@ -36,7 +36,7 @@ implicit none
 
 contains
 
-subroutine optimize_atomperm_conformer( adjcs1, adjcs2, atomtypes, &
+subroutine optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
       coords1, coords2, conv_freq, max_trials, registry, error_code)
 ! adjcs, atomtypes and coords hold the included atoms only, in a common
 ! numbering; the atom permutations stored in registry use that numbering.
@@ -48,10 +48,10 @@ subroutine optimize_atomperm_conformer( adjcs1, adjcs2, atomtypes, &
    integer(ik), intent(out) :: error_code
 
    ! Local variables
-   integer(ik), dimension(:), allocatable :: atomperm1, new_atomperm
+   integer(ik), dimension(:), allocatable :: mapping1, new_mapping
    real(rk), dimension(:,:), allocatable :: coords2r
    real(rk), dimension(4) :: rotation, total_rotation
-   real(rk) :: steps, permdist, new_permdist
+   real(rk) :: steps, mapdist, new_mapdist
    type(chaintree_node_t), pointer :: hna_chain
    type(array_trees_t) :: cache_arrays
 
@@ -87,44 +87,44 @@ subroutine optimize_atomperm_conformer( adjcs1, adjcs2, atomtypes, &
 
          ! Assign atoms with current orientation
          if (PRUNE_ASSIGNMENTS) then
-            call assign_atoms_greedy( coords1, coords2r, cache_arrays, atomperm1, permdist)
-            call assign_atoms_local_pruned( coords1, coords2r, cache_arrays, atomperm1, permdist)
+            call assign_atoms_greedy( coords1, coords2r, cache_arrays, mapping1, mapdist)
+            call assign_atoms_local_pruned( coords1, coords2r, cache_arrays, mapping1, mapdist)
          else
-            call assign_atoms_local( coords1, coords2r, cache_arrays, atomperm1, permdist)
+            call assign_atoms_local( coords1, coords2r, cache_arrays, mapping1, mapdist)
          end if
 
-         rotation = least_rotquat( atomperm1, coords1, coords2r)
+         rotation = least_rotquat( mapping1, coords1, coords2r)
          total_rotation = quatmul( total_rotation, rotation)
          call rotate_coords( coords2r, rotation)
-         permdist = sqdistsum( atomperm1, coords1, coords2r)
+         mapdist = sqdistsum( mapping1, coords1, coords2r)
          steps = 1
 
          do
             if (PRUNE_ASSIGNMENTS) then
-               new_permdist = permdist
-               call assign_atoms_local_pruned( coords1, coords2r, cache_arrays, new_atomperm, new_permdist)
+               new_mapdist = mapdist
+               call assign_atoms_local_pruned( coords1, coords2r, cache_arrays, new_mapping, new_mapdist)
             else
-               call assign_atoms_local( coords1, coords2r, cache_arrays, new_atomperm, new_permdist)
+               call assign_atoms_local( coords1, coords2r, cache_arrays, new_mapping, new_mapdist)
             end if
-!            write (stdout,*) permdist, new_permdist
-            if (all(atomperm1 == new_atomperm)) exit
-            atomperm1 = new_atomperm
-            rotation = least_rotquat( atomperm1, coords1, coords2r)
+!            write (stdout,*) mapdist, new_mapdist
+            if (all(mapping1 == new_mapping)) exit
+            mapping1 = new_mapping
+            rotation = least_rotquat( mapping1, coords1, coords2r)
             total_rotation = quatmul( total_rotation, rotation)
             call rotate_coords( coords2r, rotation)
-            permdist = sqdistsum( atomperm1, coords1, coords2r)
+            mapdist = sqdistsum( mapping1, coords1, coords2r)
             steps = steps + 1
          end do
 
          ! Update results
-         call insert_record_atomperm( registry, atomperm1, steps, total_rotation, 0, permdist)
+         call insert_record_mapping( registry, mapping1, steps, total_rotation, 0, mapdist)
 
          if (registry%records(1)%freq > conv_freq) then
             exit
          end if
 
          if (MAX_TRIALS_EXIT) then
-            if (registry%num_trials > max_trials) then
+            if (registry%n_trials > max_trials) then
                exit
             end if
          end if
@@ -133,21 +133,21 @@ subroutine optimize_atomperm_conformer( adjcs1, adjcs2, atomtypes, &
    else
 
       ! Assign atoms using global assignment
-      call assign_atoms_global( coords1, coords2, cache_arrays, atomperm1)
+      call assign_atoms_global( coords1, coords2, cache_arrays, mapping1)
       
       ! Calculate optimal rotation
-      rotation = least_rotquat( atomperm1, coords1, coords2)
+      rotation = least_rotquat( mapping1, coords1, coords2)
       
-      ! Rotate coords2 and calculate permdist
+      ! Rotate coords2 and calculate mapdist
       coords2r = coords2
       call rotate_coords( coords2r, rotation)
-      permdist = sqdistsum( atomperm1, coords1, coords2r)
+      mapdist = sqdistsum( mapping1, coords1, coords2r)
       
       ! Initialize registry with a single record
       registry%occ_records = 1
-      registry%records(1)%atomperm1 = atomperm1
-      registry%records(1)%permdiff = 0
-      registry%records(1)%permdist = permdist
+      registry%records(1)%mapping1 = mapping1
+      registry%records(1)%mapdiff = 0
+      registry%records(1)%mapdist = mapdist
       registry%records(1)%freq = 1
       registry%records(1)%steps = 1
       registry%records(1)%rotation = rotation
@@ -155,17 +155,17 @@ subroutine optimize_atomperm_conformer( adjcs1, adjcs2, atomtypes, &
    end if
 end subroutine
 
-subroutine assign_atomperm_conformer( adjcs1, adjcs2, atomtypes, coords1, coords2, atomperm1, error_code)
+subroutine assign_mapping_conformer( adjcs1, adjcs2, atomtypes, coords1, coords2, mapping1, error_code)
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(partition_t), intent(in) :: atomtypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
-   integer(ik), dimension(:), allocatable, intent(out) :: atomperm1
+   integer(ik), dimension(:), allocatable, intent(out) :: mapping1
    integer(ik), intent(out) :: error_code
 
    ! Local variables
    type(chaintree_node_t), pointer :: hna_chain
    type(array_trees_t) :: cache_arrays
-   real(rk) :: permdist
+   real(rk) :: mapdist
 
    ! Pre-compute assignment tree
    call compute_sc_hna_chain( adjcs1, adjcs2, atomtypes, hna_chain, error_code)
@@ -177,9 +177,9 @@ subroutine assign_atomperm_conformer( adjcs1, adjcs2, atomtypes, coords1, coords
       call print_chain_tree_array( atomtypes, cache_arrays)
    end if
 
-   call assign_atoms_local( coords1, coords2, cache_arrays, atomperm1, permdist)
-!   call assign_atoms_greedy( coords1, coords2, cache_arrays, atomperm1, permdist)
-!   call assign_atoms_local_pruned( coords1, coords2, cache_arrays, atomperm1, permdist)
+   call assign_atoms_local( coords1, coords2, cache_arrays, mapping1, mapdist)
+!   call assign_atoms_greedy( coords1, coords2, cache_arrays, mapping1, mapdist)
+!   call assign_atoms_local_pruned( coords1, coords2, cache_arrays, mapping1, mapdist)
 end subroutine
 
 end module

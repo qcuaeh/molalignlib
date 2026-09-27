@@ -25,7 +25,7 @@ private
 
 public record_t
 public registry_t
-public insert_record_atomperm
+public insert_record_mapping
 public insert_record_moldiff
 public print_records
 public allocate_registry
@@ -33,81 +33,81 @@ public reset_registry
 
 type :: record_t
    integer(ik) :: freq
-   integer(ik) :: permdiff
-   real(rk) :: permdist
+   integer(ik) :: mapdiff
+   real(rk) :: mapdist
    real(rk) :: steps
    real(rk) :: rotation(4)
-   integer(ik), dimension(:), allocatable :: atomperm1
+   integer(ik), dimension(:), allocatable :: mapping1
    integer(ik), dimension(:,:), allocatable :: moldiffs    ! List of differing bond pairs [2, nbonds]
 end type
 
 type :: registry_t
    logical(lk) :: overflow
    integer(ik) :: total_steps
-   integer(ik) :: num_trials
+   integer(ik) :: n_trials
    integer(ik) :: occ_records
    type(record_t), dimension(:), allocatable :: records
 end type
 
 contains
 
-subroutine allocate_registry(registry, num_records)
+subroutine allocate_registry(registry, n_records)
    type(registry_t), intent(inout) :: registry
-   integer(ik), intent(in) :: num_records
+   integer(ik), intent(in) :: n_records
 
-   if (num_records < 1) then
-      error stop 'num_records is less than 1'
+   if (n_records < 1) then
+      error stop 'n_records is less than 1'
    end if
 
-   allocate (registry%records(num_records))
+   allocate (registry%records(n_records))
 end subroutine
 
 subroutine reset_registry(registry)
    type(registry_t), intent(inout) :: registry
 
    registry%occ_records = 0
-   registry%num_trials = 0
+   registry%n_trials = 0
    registry%total_steps = 0
    registry%overflow = .FALSE.
    registry%records%freq = 0
    registry%records%steps = 0
-   registry%records%permdiff = huge(registry%records(1)%permdiff)
-   registry%records%permdist = huge(registry%records(1)%permdist)
+   registry%records%mapdiff = huge(registry%records(1)%mapdiff)
+   registry%records%mapdist = huge(registry%records(1)%mapdist)
 end subroutine
 
-subroutine insert_record_atomperm(registry, atomperm1, steps, rotation, permdiff, permdist)
-   ! Group by atomperm1, sort by permdist
+subroutine insert_record_mapping(registry, mapping1, steps, rotation, mapdiff, mapdist)
+   ! Group by mapping1, sort by mapdist
    type(registry_t), target, intent(inout) :: registry
-   integer(ik), dimension(:), intent(in) :: atomperm1
+   integer(ik), dimension(:), intent(in) :: mapping1
    real(rk), intent(in) :: steps, rotation(4)
-   integer(ik), intent(in) :: permdiff
-   real(rk), intent(in) :: permdist
+   integer(ik), intent(in) :: mapdiff
+   real(rk), intent(in) :: mapdist
    ! Local variables
    type(record_t), pointer :: record
    integer(ik) :: i, j, insert_pos
 
-   registry%num_trials = registry%num_trials + 1
+   registry%n_trials = registry%n_trials + 1
    registry%total_steps = registry%total_steps + steps
 
    ! Check for existing record with same permutation
    do i = 1, registry%occ_records
       record => registry%records(i)
-      if (all(atomperm1 == record%atomperm1)) then
+      if (all(mapping1 == record%mapping1)) then
          record%freq = record%freq + 1
          record%steps = record%steps + (steps - record%steps)/record%freq
          return
       end if
    end do
 
-   ! Find insertion point: sort by permdist
+   ! Find insertion point: sort by mapdist
    insert_pos = registry%occ_records + 1
    do i = 1, registry%occ_records
       record => registry%records(i)
-      if (permdiff < record%permdiff) then
+      if (mapdiff < record%mapdiff) then
          insert_pos = i
          exit
-      else if (permdiff == record%permdiff) then
-         if (permdist < record%permdist) then
+      else if (mapdiff == record%mapdiff) then
+         if (mapdist < record%mapdist) then
             insert_pos = i
             exit
          end if
@@ -123,10 +123,10 @@ subroutine insert_record_atomperm(registry, atomperm1, steps, rotation, permdiff
 
       ! Initialize new record (no moldiffs for permutation grouping)
       record => registry%records(insert_pos)
-      record%atomperm1 = atomperm1
+      record%mapping1 = mapping1
       record%freq = 1
-      record%permdiff = permdiff
-      record%permdist = permdist
+      record%mapdiff = mapdiff
+      record%mapdist = mapdist
       record%rotation = rotation
       record%steps = steps
 
@@ -141,29 +141,29 @@ subroutine insert_record_atomperm(registry, atomperm1, steps, rotation, permdiff
    end if
 end subroutine
 
-subroutine insert_record_moldiff(registry, moldiffs, atomperm1, steps, rotation, permdist)
+subroutine insert_record_moldiff(registry, moldiffs, mapping1, steps, rotation, mapdist)
    type(registry_t), target, intent(inout) :: registry
    integer(ik), dimension(:,:), intent(in) :: moldiffs
-   integer(ik), dimension(:), intent(in) :: atomperm1
+   integer(ik), dimension(:), intent(in) :: mapping1
    integer(ik), intent(in) :: steps
    real(rk), intent(in) :: rotation(4)
-   real(rk), intent(in) :: permdist
+   real(rk), intent(in) :: mapdist
    type(record_t), pointer :: record
    type(record_t) :: temp_record
-   integer(ik) :: i, j, insert_pos, permdiff, match_pos
+   integer(ik) :: i, j, insert_pos, mapdiff, match_pos
    logical(lk) :: bonds_match, found_match
 
-   registry%num_trials = registry%num_trials + 1
+   registry%n_trials = registry%n_trials + 1
    registry%total_steps = registry%total_steps + steps
 
-   permdiff = size(moldiffs, 2)
+   mapdiff = size(moldiffs, 2)
    found_match = .FALSE.
    match_pos = 0
 
    do i = 1, registry%occ_records
       record => registry%records(i)
 
-      if (permdiff == record%permdiff) then
+      if (mapdiff == record%mapdiff) then
          bonds_match = all(moldiffs(1, :) == record%moldiffs(1, :)) .and. &
                        all(moldiffs(2, :) == record%moldiffs(2, :))
 
@@ -173,10 +173,10 @@ subroutine insert_record_moldiff(registry, moldiffs, atomperm1, steps, rotation,
             record%freq = record%freq + 1
             record%steps = record%steps + (steps - record%steps)/record%freq
 
-            if (permdist < record%permdist) then
+            if (mapdist < record%mapdist) then
                temp_record = record
-               temp_record%atomperm1 = atomperm1
-               temp_record%permdist = permdist
+               temp_record%mapping1 = mapping1
+               temp_record%mapdist = mapdist
                temp_record%rotation = rotation
 
                do j = i, registry%occ_records - 1
@@ -186,9 +186,9 @@ subroutine insert_record_moldiff(registry, moldiffs, atomperm1, steps, rotation,
 
                insert_pos = registry%occ_records + 1
                do j = 1, registry%occ_records
-                  if (permdiff < registry%records(j)%permdiff .or. &
-                      (permdiff == registry%records(j)%permdiff .and. &
-                       permdist < registry%records(j)%permdist)) then
+                  if (mapdiff < registry%records(j)%mapdiff .or. &
+                      (mapdiff == registry%records(j)%mapdiff .and. &
+                       mapdist < registry%records(j)%mapdist)) then
                      insert_pos = j
                      exit
                   end if
@@ -217,9 +217,9 @@ subroutine insert_record_moldiff(registry, moldiffs, atomperm1, steps, rotation,
 
    insert_pos = registry%occ_records + 1
    do i = 1, registry%occ_records
-      if (permdiff < registry%records(i)%permdiff .or. &
-          (permdiff == registry%records(i)%permdiff .and. &
-           permdist < registry%records(i)%permdist)) then
+      if (mapdiff < registry%records(i)%mapdiff .or. &
+          (mapdiff == registry%records(i)%mapdiff .and. &
+           mapdist < registry%records(i)%mapdist)) then
          insert_pos = i
          exit
       end if
@@ -231,11 +231,11 @@ subroutine insert_record_moldiff(registry, moldiffs, atomperm1, steps, rotation,
       end do
 
       record => registry%records(insert_pos)
-      record%atomperm1 = atomperm1
+      record%mapping1 = mapping1
       record%freq = 1
       record%moldiffs = moldiffs
-      record%permdiff = permdiff
-      record%permdist = permdist
+      record%mapdiff = mapdiff
+      record%mapdist = mapdist
       record%rotation = rotation
       record%steps = steps
 
@@ -261,12 +261,12 @@ subroutine print_records(registry)
    do i = 1, registry%occ_records
       record = registry%records(i)
       write (stdout, '(i3,4x,i4,4x,f5.1,3x,i4,4x,f8.4)') &
-         i, record%freq, record%steps, record%permdiff, record%permdist
+         i, record%freq, record%steps, record%mapdiff, record%mapdist
    end do
    write (stdout, '(a)') line
 
    write (stdout, *)
-   write (stdout, '(a,1x,i0)') 'Random trials:', registry%num_trials
+   write (stdout, '(a,1x,i0)') 'Random trials:', registry%n_trials
    write (stdout, '(a,1x,i0)') 'Minimization steps:', registry%total_steps
 
    if (registry%overflow) then

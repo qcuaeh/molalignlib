@@ -31,7 +31,7 @@ type :: atomtype_item_t
 end type
 
 type :: atomtype_table_t
-   integer(ik) :: num_items
+   integer(ik) :: n_items
    type(atomtype_item_t), dimension(:), allocatable :: items
 end type
 
@@ -73,10 +73,10 @@ subroutine add_atomtype(atomtypetable, elnum, group, partidx)
    type(atomtype_table_t), intent(inout) :: atomtypetable
    integer(ik), intent(in) :: elnum, group, partidx
 
-   atomtypetable%num_items = atomtypetable%num_items + 1
-   atomtypetable%items(atomtypetable%num_items)%elnum = elnum
-   atomtypetable%items(atomtypetable%num_items)%group = group
-   atomtypetable%items(atomtypetable%num_items)%partidx = partidx
+   atomtypetable%n_items = atomtypetable%n_items + 1
+   atomtypetable%items(atomtypetable%n_items)%elnum = elnum
+   atomtypetable%items(atomtypetable%n_items)%group = group
+   atomtypetable%items(atomtypetable%n_items)%partidx = partidx
 end subroutine
 
 function find_atomtype(atomtypetable, elnum, group) result(partidx)
@@ -85,7 +85,7 @@ function find_atomtype(atomtypetable, elnum, group) result(partidx)
    integer(ik) :: partidx
    integer(ik) :: i
 
-   do i = 1, atomtypetable%num_items
+   do i = 1, atomtypetable%n_items
       if (compare_atoms(atomtypetable%items(i), elnum, group)) then
          partidx = atomtypetable%items(i)%partidx
          return
@@ -132,7 +132,7 @@ subroutine collect_atomtypes(atoms1, atoms2, atomtypes)
    ! Initialize counters
    part_count1 = 0
    part_count2 = 0
-   atomtypetable%num_items = 0
+   atomtypetable%n_items = 0
    current_part = 0
 
    ! SINGLE PASS: Process all atoms, build assignments AND count sizes
@@ -161,15 +161,15 @@ subroutine collect_atomtypes(atoms1, atoms2, atomtypes)
    end do
 
    ! Now allocate final structure with exact sizes (no waste!)
-   atomtypes%num_parts = current_part
-   allocate(atomtypes%parts(atomtypes%num_parts))
+   atomtypes%n_parts = current_part
+   allocate(atomtypes%parts(atomtypes%n_parts))
 
    ! Allocate each partition with exact size
-   do i = 1, atomtypes%num_parts
+   do i = 1, atomtypes%n_parts
       atomtypes%parts(i)%elnum = atomtypetable%items(i)%elnum
-      atomtypes%parts(i)%num_items1 = part_count1(i)
-      atomtypes%parts(i)%num_items2 = part_count2(i)
-      atomtypes%parts(i)%num_children = 0
+      atomtypes%parts(i)%n_items1 = part_count1(i)
+      atomtypes%parts(i)%n_items2 = part_count2(i)
+      atomtypes%parts(i)%n_children = 0
 
       allocate(atomtypes%parts(i)%items1(part_count1(i)))
       allocate(atomtypes%parts(i)%items2(part_count2(i)))

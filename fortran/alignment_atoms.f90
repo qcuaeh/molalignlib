@@ -31,7 +31,7 @@ implicit none
 
 contains
 
-subroutine optimize_atomperm_atoms(atomtypes, prunes, coords1, &
+subroutine optimize_mapping_atoms(atomtypes, prunes, coords1, &
       coords2, conv_freq, max_trials, registry, error_code)
 ! coords1 and coords2 hold the included atoms only, in the numbering of
 ! atomtypes; the atom permutations stored in registry use that numbering.
@@ -43,9 +43,9 @@ subroutine optimize_atomperm_atoms(atomtypes, prunes, coords1, &
    integer(ik), intent(out) :: error_code
 
    ! Local variables
-   integer(ik), dimension(:), allocatable :: atomperm1, new_atomperm
+   integer(ik), dimension(:), allocatable :: mapping1, new_mapping
    real(rk), dimension(:,:), allocatable :: coords2r
-   real(rk) :: permdist, steps, rotation(4), total_rotation(4)
+   real(rk) :: mapdist, steps, rotation(4), total_rotation(4)
 
    ! Allocations
    allocate (coords2r, mold=coords2)
@@ -59,7 +59,7 @@ subroutine optimize_atomperm_atoms(atomtypes, prunes, coords1, &
    call random_initialize()
 
    ! Optimize atom permutation
-   do while (registry%records(1)%freq < conv_freq .and. registry%num_trials < max_trials)
+   do while (registry%records(1)%freq < conv_freq .and. registry%n_trials < max_trials)
 
       ! Apply random rotation to coords2 copy
       coords2r = coords2
@@ -67,27 +67,27 @@ subroutine optimize_atomperm_atoms(atomtypes, prunes, coords1, &
       call rotate_coords( coords2r, total_rotation)
 
       ! Assign atoms with current orientation
-      call assign_atoms_pruned( atomtypes, coords1, coords2r, prunes, atomperm1, error_code)
+      call assign_atoms_pruned( atomtypes, coords1, coords2r, prunes, mapping1, error_code)
       if (error_code /= MOLALIGN_SUCCESS) return
-      rotation = least_rotquat( atomperm1, coords1, coords2r)
+      rotation = least_rotquat( mapping1, coords1, coords2r)
       call rotate_coords( coords2r, rotation)
       total_rotation = quatmul( total_rotation, rotation)
       steps = 1
 
       do
-         call assign_atoms_pruned( atomtypes, coords1, coords2r, prunes, new_atomperm, error_code)
+         call assign_atoms_pruned( atomtypes, coords1, coords2r, prunes, new_mapping, error_code)
          if (error_code /= MOLALIGN_SUCCESS) return
-         if (all(new_atomperm == atomperm1)) exit
-         atomperm1 = new_atomperm
-         rotation = least_rotquat( atomperm1, coords1, coords2r)
+         if (all(new_mapping == mapping1)) exit
+         mapping1 = new_mapping
+         rotation = least_rotquat( mapping1, coords1, coords2r)
          call rotate_coords( coords2r, rotation)
          total_rotation = quatmul( total_rotation, rotation)
          steps = steps + 1
       end do
 
       ! Push local minimum to registry
-      permdist = sqrt( sqdistsum( atomperm1, coords1, coords2r))
-      call insert_record_atomperm( registry, atomperm1, steps, total_rotation, 0, permdist)
+      mapdist = sqrt( sqdistsum( mapping1, coords1, coords2r))
+      call insert_record_mapping( registry, mapping1, steps, total_rotation, 0, mapdist)
 
    end do
 

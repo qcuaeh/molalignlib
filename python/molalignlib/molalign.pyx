@@ -40,7 +40,7 @@ cdef extern from "molalign.h":
         bint print_stats, bint random_flag,
         bint prune_flag, double prune_tol, int conv_freq, int max_trials,
         int n_records,
-        double *rmsd_list, int *atomperm_list,
+        double *rmsd_list, int *mapping_list,
         double *transform_list, int *occ_records, int *error_code)
 
     void c_conformsd_calculate "conformsd_calculate"(
@@ -53,7 +53,7 @@ cdef extern from "molalign.h":
         bint print_stats, bint print_assigntree, bint random_flag,
         int conv_freq, int max_trials,
         int n_records,
-        double *rmsd_list, int *atomperm_list,
+        double *rmsd_list, int *mapping_list,
         double *transform_list, int *occ_records, int *error_code)
 
 
@@ -113,40 +113,40 @@ cdef _validate_bonds(np.ndarray[np.int32_t, ndim=2] bd1,
 
 
 cdef int _alloc_buffers(int n_records, int n_atoms,
-                         double **rmsd_list, int **atomperm_list,
+                         double **rmsd_list, int **mapping_list,
                          double **transform_list) except -1:
     """
     Malloc the three output buffers. Returns 0 on success; raises
     MemoryError (after freeing any partially-allocated buffers) on failure.
     """
     rmsd_list[0]      = <double *>malloc(n_records * sizeof(double))
-    atomperm_list[0]  = <int *>malloc(n_records * n_atoms * sizeof(int))
+    mapping_list[0]  = <int *>malloc(n_records * n_atoms * sizeof(int))
     transform_list[0] = <double *>malloc(n_records * 16 * sizeof(double))
 
-    if rmsd_list[0] == NULL or atomperm_list[0] == NULL or transform_list[0] == NULL:
+    if rmsd_list[0] == NULL or mapping_list[0] == NULL or transform_list[0] == NULL:
         if rmsd_list[0] != NULL: free(rmsd_list[0])
-        if atomperm_list[0] != NULL: free(atomperm_list[0])
+        if mapping_list[0] != NULL: free(mapping_list[0])
         if transform_list[0] != NULL: free(transform_list[0])
         raise MemoryError("Could not allocate output buffers.")
     return 0
 
 
-cdef _pack_outputs(double *rmsd_list, int *atomperm_list, double *transform_list,
+cdef _pack_outputs(double *rmsd_list, int *mapping_list, double *transform_list,
                     int n_atoms, int occ_records):
     """Copy the raw C output buffers into numpy arrays."""
     rmsd = np.array([rmsd_list[i] for i in range(occ_records)], dtype=np.float64)
 
-    perm = np.empty((occ_records, n_atoms), dtype=np.int32)
+    mapping = np.empty((occ_records, n_atoms), dtype=np.int32)
     for r in range(occ_records):
         for a in range(n_atoms):
-            perm[r, a] = atomperm_list[r * n_atoms + a]
+            mapping[r, a] = mapping_list[r * n_atoms + a]
 
     transform = np.empty((occ_records, 4, 4), dtype=np.float64)
     for r in range(occ_records):
         for a in range(16):
             transform[r, a // 4, a % 4] = transform_list[r * 16 + a]
 
-    return rmsd, perm, transform
+    return rmsd, mapping, transform
 
 
 # --------------------------------------------------------------------------- #
@@ -195,8 +195,8 @@ def atormsd_calculate(
     -------
     rmsd : float64 ndarray, shape (occ_records,)
         RMSD of each returned candidate solution, best first.
-    atom_permutation : int32 ndarray, shape (occ_records, n_pad) — 0-based
-        ``n_pad = max(n_atoms1, n_atoms2)``; same padding convention as
+    mapping : int32 ndarray, shape (occ_records, n_padding) — 0-based
+        ``n_padding = max(n_atoms1, n_atoms2)``; same padding convention as
         ``conformsd_calculate``. Sizes can only differ when ``heavy_flag=True``.
     transform : float64 ndarray, shape (occ_records, 4, 4)
         Homogeneous matrices mapping the input coordinates of molecule 2 to
@@ -211,7 +211,7 @@ def atormsd_calculate(
 
     cdef int n1 = atom_data1.shape[0]
     cdef int n2 = atom_data2.shape[0]
-    cdef int n_pad = max(n1, n2)
+    cdef int n_padding = max(n1, n2)
 
     atom_data1 = np.ascontiguousarray(atom_data1)
     atom_data2 = np.ascontiguousarray(atom_data2)
@@ -231,9 +231,9 @@ def atormsd_calculate(
     cdef int    err         = 0
 
     cdef double *rmsd_list
-    cdef int    *atomperm_list
+    cdef int    *mapping_list
     cdef double *transform_list
-    _alloc_buffers(n_records, n_pad, &rmsd_list, &atomperm_list, &transform_list)
+    _alloc_buffers(n_records, n_padding, &rmsd_list, &mapping_list, &transform_list)
 
     try:
         c_atormsd_calculate(
@@ -248,7 +248,7 @@ def atormsd_calculate(
             print_stats, random_flag,
             prune_flag, c_prune_tol, conv_freq, max_trials,
             n_records,
-            rmsd_list, atomperm_list,
+            rmsd_list, mapping_list,
             transform_list, &occ_records, &err,
         )
 
@@ -257,15 +257,15 @@ def atormsd_calculate(
                 _ATORMSD_ERROR_MESSAGES.get(err, "atormsd_calculate error code {}.".format(err))
             )
 
-        rmsd, perm, transform = _pack_outputs(
-            rmsd_list, atomperm_list, transform_list, n_pad, occ_records
+        rmsd, mapping, transform = _pack_outputs(
+            rmsd_list, mapping_list, transform_list, n_padding, occ_records
         )
     finally:
         free(rmsd_list)
-        free(atomperm_list)
+        free(mapping_list)
         free(transform_list)
 
-    return rmsd, perm, transform
+    return rmsd, mapping, transform
 
 
 # --------------------------------------------------------------------------- #
@@ -326,9 +326,9 @@ def conformsd_calculate(
     -------
     rmsd : float64 ndarray, shape (occ_records,)
         RMSD of each returned candidate solution, best first.
-    atom_permutation : int32 ndarray, shape (occ_records, n_pad) — 0-based
-        ``n_pad = max(n_atoms1, n_atoms2)``. Each row is a permutation of
-        ``0..n_pad-1``; entry ``j`` is the atom of molecule 2 placed on line
+    mapping : int32 ndarray, shape (occ_records, n_padding) — 0-based
+        ``n_padding = max(n_atoms1, n_atoms2)``. Each row is a permutation of
+        ``0..n_padding-1``; entry ``j`` is the atom of molecule 2 placed on line
         ``j`` of molecule 1. The smaller molecule is padded with dummy atoms
         appended after its real atoms: values ``>= n_atoms2`` denote dummy
         atoms of molecule 2, and entries ``j >= n_atoms1`` hold the extra
@@ -346,7 +346,7 @@ def conformsd_calculate(
 
     cdef int n1 = atom_data1.shape[0]
     cdef int n2 = atom_data2.shape[0]
-    cdef int n_pad = max(n1, n2)
+    cdef int n_padding = max(n1, n2)
 
     atom_data1 = np.ascontiguousarray(atom_data1)
     atom_data2 = np.ascontiguousarray(atom_data2)
@@ -377,9 +377,9 @@ def conformsd_calculate(
     cdef int    err         = 0
 
     cdef double *rmsd_list
-    cdef int    *atomperm_list
+    cdef int    *mapping_list
     cdef double *transform_list
-    _alloc_buffers(n_records, n_pad, &rmsd_list, &atomperm_list, &transform_list)
+    _alloc_buffers(n_records, n_padding, &rmsd_list, &mapping_list, &transform_list)
 
     try:
         c_conformsd_calculate(
@@ -398,7 +398,7 @@ def conformsd_calculate(
             print_stats, print_assigntree, random_flag,
             conv_freq, max_trials,
             n_records,
-            rmsd_list, atomperm_list,
+            rmsd_list, mapping_list,
             transform_list, &occ_records, &err,
         )
 
@@ -407,12 +407,12 @@ def conformsd_calculate(
                 _CONFORMSD_ERROR_MESSAGES.get(err, "conformsd_calculate error code {}.".format(err))
             )
 
-        rmsd, perm, transform = _pack_outputs(
-            rmsd_list, atomperm_list, transform_list, n_pad, occ_records
+        rmsd, mapping, transform = _pack_outputs(
+            rmsd_list, mapping_list, transform_list, n_padding, occ_records
         )
     finally:
         free(rmsd_list)
-        free(atomperm_list)
+        free(mapping_list)
         free(transform_list)
 
-    return rmsd, perm, transform
+    return rmsd, mapping, transform

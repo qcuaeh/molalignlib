@@ -38,14 +38,6 @@ type, public :: adjc_t
    integer(ik) :: list(MAX_COORDNUM)
 end type
 
-interface adjmat_to_adjcs
-   module procedure adjmat_to_adjcs_all
-end interface
-
-interface adjacencydiff
-   module procedure adjacencydiff_perm
-end interface
-
 contains
 
 function adjcs_to_adjmat(adjcs) result(adjmat)
@@ -66,7 +58,7 @@ function adjcs_to_adjmat(adjcs) result(adjmat)
    end do
 end function
 
-subroutine adjmat_to_adjcs_all(adjmat, adjcs)
+subroutine adjmat_to_adjcs(adjmat, adjcs)
    logical(lk), dimension(:,:), intent(in) :: adjmat
    type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs
    integer(ik) :: i, j, n_atoms, nadj
@@ -92,13 +84,13 @@ subroutine adjmat_to_adjcs_all(adjmat, adjcs)
    end do
 end subroutine
 
-function adjacencydiff_perm(atomperm1, adjcs1, adjcs2) result(diff)
+function adjacencydiff(mapping1, adjcs1, adjcs2) result(diff)
 !------------------------------------------------------------------------------
 ! Calculate connectivity difference from adjacency lists.
-! Returns the number of differing edges. atomperm1 must be a full
+! Returns the number of differing edges. mapping1 must be a full
 ! permutation of the atoms of adjcs1 onto the atoms of adjcs2.
 !------------------------------------------------------------------------------
-   integer(ik), dimension(:), intent(in) :: atomperm1
+   integer(ik), dimension(:), intent(in) :: mapping1
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    integer(ik) :: diff
    integer(ik) :: j, idx1, idx2, mapped_idx1, neighbor_idx1, mapped_neighbor_idx1
@@ -109,8 +101,8 @@ function adjacencydiff_perm(atomperm1, adjcs1, adjcs2) result(diff)
    common_edges = 0
    total_edges1 = 0
 
-   do idx1 = 1, size(atomperm1)
-      mapped_idx1 = atomperm1(idx1)
+   do idx1 = 1, size(mapping1)
+      mapped_idx1 = mapping1(idx1)
       nadjs = adjcs1(idx1)%cn
 
       do j = 1, nadjs
@@ -120,7 +112,7 @@ function adjacencydiff_perm(atomperm1, adjcs1, adjcs2) result(diff)
          if (idx1 < neighbor_idx1) then
             total_edges1 = total_edges1 + 1
 
-            mapped_neighbor_idx1 = atomperm1(neighbor_idx1)
+            mapped_neighbor_idx1 = mapping1(neighbor_idx1)
 
             ! Check if edge (mapped_idx1, mapped_neighbor_idx1) exists in structure 2
             if (any(adjcs2(mapped_idx1)%list(1:adjcs2(mapped_idx1)%cn) == mapped_neighbor_idx1)) then
@@ -130,10 +122,10 @@ function adjacencydiff_perm(atomperm1, adjcs1, adjcs2) result(diff)
       end do
    end do
 
-   ! Calculate total edges in structure 2 (atomperm1 is a permutation, so
+   ! Calculate total edges in structure 2 (mapping1 is a permutation, so
    ! this visits every atom of molecule 2 exactly once)
    total_edges2 = 0
-   do idx2 = 1, size(atomperm1)
+   do idx2 = 1, size(mapping1)
       nadjs = adjcs2(idx2)%cn
 
       do j = 1, nadjs
@@ -150,7 +142,7 @@ function adjacencydiff_perm(atomperm1, adjcs1, adjcs2) result(diff)
    diff = total_edges1 + total_edges2 - 2*common_edges
 end function
 
-function adjacencydelta(adjcs1, adjmat2, atomperm1, k, l) result(delta)
+function adjacencydelta(adjcs1, adjmat2, mapping1, k, l) result(delta)
 !------------------------------------------------------------------------------
 ! Efficiently compute the change in adjacency difference when swapping
 ! atoms k and l in the permutation. Uses adjacency lists for structure 1 and
@@ -158,7 +150,7 @@ function adjacencydelta(adjcs1, adjmat2, atomperm1, k, l) result(delta)
 !------------------------------------------------------------------------------
    type(adjc_t), dimension(:), intent(in) :: adjcs1
    logical(lk), dimension(:,:), intent(in) :: adjmat2
-   integer(ik), dimension(:), intent(in) :: atomperm1
+   integer(ik), dimension(:), intent(in) :: mapping1
    integer(ik), intent(in) :: k, l
    integer(ik) :: i, nkk, nkl, nll, nlk, delta, nadjs_k, nadjs_l
 
@@ -170,8 +162,8 @@ function adjacencydelta(adjcs1, adjmat2, atomperm1, k, l) result(delta)
 
    do i = 1, nadjs_k
       if (adjcs1(k)%list(i) /= l) then
-         if (adjmat2(atomperm1(k), atomperm1(adjcs1(k)%list(i)))) nkk = nkk + 1
-         if (adjmat2(atomperm1(l), atomperm1(adjcs1(k)%list(i)))) nkl = nkl + 1
+         if (adjmat2(mapping1(k), mapping1(adjcs1(k)%list(i)))) nkk = nkk + 1
+         if (adjmat2(mapping1(l), mapping1(adjcs1(k)%list(i)))) nkl = nkl + 1
       end if
    end do
 
@@ -180,8 +172,8 @@ function adjacencydelta(adjcs1, adjmat2, atomperm1, k, l) result(delta)
 
    do i = 1, nadjs_l
       if (adjcs1(l)%list(i) /= k) then
-         if (adjmat2(atomperm1(l), atomperm1(adjcs1(l)%list(i)))) nll = nll + 1
-         if (adjmat2(atomperm1(k), atomperm1(adjcs1(l)%list(i)))) nlk = nlk + 1
+         if (adjmat2(mapping1(l), mapping1(adjcs1(l)%list(i)))) nll = nll + 1
+         if (adjmat2(mapping1(k), mapping1(adjcs1(l)%list(i)))) nlk = nlk + 1
       end if
    end do
 
@@ -191,32 +183,32 @@ function adjacencydelta(adjcs1, adjmat2, atomperm1, k, l) result(delta)
    delta = 2*(nkk + nll - nkl - nlk)
 end function
 
-subroutine find_differing_bonds(atomperm1, adjmat1, adjmat2, moldiffs)
+subroutine find_differing_bonds(mapping1, adjmat1, adjmat2, moldiffs)
 
-   integer(ik), dimension(:), intent(in) :: atomperm1
+   integer(ik), dimension(:), intent(in) :: mapping1
    logical(lk), dimension(:,:), intent(in) :: adjmat1, adjmat2
    integer(ik), dimension(:,:), allocatable, intent(out) :: moldiffs
 
    ! Local variables
    integer(ik) :: idx1, idx2, mapped_idx1, mapped_idx2
-   integer(ik) :: n_atoms, max_edges, bond_count
+   integer(ik) :: n_atoms, n_bonds, max_edges
    integer(ik), dimension(:,:), allocatable :: temp_bonds
    integer(ik) :: atom1, atom2
    logical(lk) :: bond_in_mol1, bond_in_mol2
 
-   n_atoms = size(atomperm1)
+   n_atoms = size(mapping1)
    ! Maximum possible differing edges
    max_edges = n_atoms * (n_atoms - 1) / 2
 
    allocate(temp_bonds(2, max_edges))
-   bond_count = 0
+   n_bonds = 0
 
    ! Compare all pairs of atoms
    do idx1 = 1, n_atoms
-      mapped_idx1 = atomperm1(idx1)
+      mapped_idx1 = mapping1(idx1)
 
       do idx2 = idx1 + 1, n_atoms
-         mapped_idx2 = atomperm1(idx2)
+         mapped_idx2 = mapping1(idx2)
 
          ! Check bond status in both structures
          bond_in_mol1 = adjmat1(idx1, idx2)
@@ -228,31 +220,31 @@ subroutine find_differing_bonds(atomperm1, adjmat1, adjmat2, moldiffs)
             atom1 = min(mapped_idx1, mapped_idx2)
             atom2 = max(mapped_idx1, mapped_idx2)
 
-            bond_count = bond_count + 1
-            temp_bonds(1, bond_count) = atom1
-            temp_bonds(2, bond_count) = atom2
+            n_bonds = n_bonds + 1
+            temp_bonds(1, n_bonds) = atom1
+            temp_bonds(2, n_bonds) = atom2
          end if
       end do
    end do
 
    ! Allocate final array with exact size
-   allocate(moldiffs(2, bond_count))
-   moldiffs = temp_bonds(:, 1:bond_count)
+   allocate(moldiffs(2, n_bonds))
+   moldiffs = temp_bonds(:, 1:n_bonds)
 
    ! Sort the bonds for efficient comparison
-   if (bond_count > 0) then
+   if (n_bonds > 0) then
       call sort_pairs(moldiffs)
    end if
 
    deallocate(temp_bonds)
 end subroutine
 
-subroutine toggle_bonds1(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, adjcs2_mod)
+subroutine toggle_bonds1(adjcs1, adjcs2, mapping1, moldiffs, adjcs1_mod, adjcs2_mod)
    ! Modify mol1's bonds to match mol2's connectivity
    ! If bond exists in mol1: remove it (exists in mol1 but not mol2)
    ! If bond doesn't exist in mol1: add it (exists in mol2 but not mol1)
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
-   integer(ik), dimension(:), intent(in) :: atomperm1
+   integer(ik), dimension(:), intent(in) :: mapping1
    integer(ik), dimension(:,:), intent(in) :: moldiffs
    type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs1_mod, adjcs2_mod
    logical(lk), dimension(:,:), allocatable :: adjmat1
@@ -263,7 +255,7 @@ subroutine toggle_bonds1(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, adjcs2
    adjmat1 = adjcs_to_adjmat(adjcs1)
    
    ! Get inverse permutation to map molecule 2 indices back to molecule 1
-   inv_perm = inverse_permutation(atomperm1)
+   inv_perm = inverse_permutation(mapping1)
 
    ! For each differing bond
    do i = 1, size(moldiffs, 2)
@@ -290,13 +282,13 @@ subroutine toggle_bonds1(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, adjcs2
    end do
 end subroutine
 
-subroutine toggle_bonds2(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, adjcs2_mod)
+subroutine toggle_bonds2(adjcs1, adjcs2, mapping1, moldiffs, adjcs1_mod, adjcs2_mod)
    ! Modify mol2's bonds to match mol1's connectivity
    ! If bond exists in mol2: remove it (exists in mol2 but not mol1)
    ! If bond doesn't exist in mol2: add it (exists in mol1 but not mol2)
-   ! Note: adjcs1 and atomperm1 are not used but present for interface compatibility
+   ! Note: adjcs1 and mapping1 are not used but present for interface compatibility
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
-   integer(ik), dimension(:), intent(in) :: atomperm1
+   integer(ik), dimension(:), intent(in) :: mapping1
    integer(ik), dimension(:,:), intent(in) :: moldiffs
    type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs1_mod, adjcs2_mod
    logical(lk), dimension(:,:), allocatable :: adjmat2
@@ -327,9 +319,9 @@ subroutine toggle_bonds2(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, adjcs2
    call adjmat_to_adjcs(adjmat2, adjcs2_mod)
 end subroutine
 
-subroutine add_missing_bonds(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, adjcs2_mod)
+subroutine add_missing_bonds(adjcs1, adjcs2, mapping1, moldiffs, adjcs1_mod, adjcs2_mod)
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
-   integer(ik), dimension(:), intent(in) :: atomperm1
+   integer(ik), dimension(:), intent(in) :: mapping1
    integer(ik), dimension(:,:), intent(in) :: moldiffs
    type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs1_mod, adjcs2_mod
    logical(lk), dimension(:,:), allocatable :: adjmat1, adjmat2
@@ -341,7 +333,7 @@ subroutine add_missing_bonds(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, ad
    adjmat2 = adjcs_to_adjmat(adjcs2)
 
    ! Get inverse permutation to map molecule 2 indices back to molecule 1
-   inv_perm = inverse_permutation(atomperm1)
+   inv_perm = inverse_permutation(mapping1)
 
    do i = 1, size(moldiffs, 2)
       atom1_mol2 = moldiffs(1, i)
@@ -363,9 +355,9 @@ subroutine add_missing_bonds(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, ad
    call adjmat_to_adjcs(adjmat2, adjcs2_mod)
 end subroutine
 
-subroutine delete_extra_bonds(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, adjcs2_mod)
+subroutine delete_extra_bonds(adjcs1, adjcs2, mapping1, moldiffs, adjcs1_mod, adjcs2_mod)
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
-   integer(ik), dimension(:), intent(in) :: atomperm1
+   integer(ik), dimension(:), intent(in) :: mapping1
    integer(ik), dimension(:,:), intent(in) :: moldiffs
    type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs1_mod, adjcs2_mod
    logical(lk), dimension(:,:), allocatable :: adjmat1, adjmat2
@@ -377,7 +369,7 @@ subroutine delete_extra_bonds(adjcs1, adjcs2, atomperm1, moldiffs, adjcs1_mod, a
    adjmat2 = adjcs_to_adjmat(adjcs2)
 
    ! Get inverse permutation to map molecule 2 indices back to molecule 1
-   inv_perm = inverse_permutation(atomperm1)
+   inv_perm = inverse_permutation(mapping1)
 
    do i = 1, size(moldiffs, 2)
       atom1_mol2 = moldiffs(1, i)

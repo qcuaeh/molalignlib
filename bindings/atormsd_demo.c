@@ -360,7 +360,7 @@ int main(int argc, char **argv)
     int *atom_data1 = NULL, *atom_data2 = NULL;
     double *coords1 = NULL, *coords2 = NULL;
     double *rmsd_list = NULL, *transform_list = NULL;
-    int *atomperm_list = NULL;
+    int *mapping_list = NULL;
     int occ_records = 0, error_code = MOLALIGN_SUCCESS;
 
     if (read_xyz(posargs[0], &n1, &atom_data1, &coords1) != 0) goto done;
@@ -369,9 +369,9 @@ int main(int argc, char **argv)
     /* Output buffers hold up to n_records candidate solutions. Each
      * permutation has exactly n1 entries (one per atom of molecule 1). */
     rmsd_list      = malloc((size_t)n_records * sizeof(double));
-    atomperm_list  = malloc((size_t)n_records * (size_t)n1 * sizeof(int));
+    mapping_list  = malloc((size_t)n_records * (size_t)n1 * sizeof(int));
     transform_list = malloc((size_t)n_records * 16 * sizeof(double));
-    if (!rmsd_list || !atomperm_list || !transform_list) {
+    if (!rmsd_list || !mapping_list || !transform_list) {
         fprintf(stderr, "Error: out of memory\n");
         goto done;
     }
@@ -384,7 +384,7 @@ int main(int argc, char **argv)
         print_stats, random_flag,
         prune_flag, prune_tol, conv_freq, max_trials,
         n_records,
-        rmsd_list, atomperm_list,
+        rmsd_list, mapping_list,
         transform_list, &occ_records, &error_code);
 
     if (error_code != MOLALIGN_SUCCESS) {
@@ -400,13 +400,13 @@ int main(int argc, char **argv)
 
     for (int r = 0; r < occ_records; r++) {
         const double *rec_transform = &transform_list[r * 16];
-        const int *rec_perm = &atomperm_list[r * n1];
+        const int *rec_mapping = &mapping_list[r * n1];
 
         printf("RMSD: %.6f\n", rmsd_list[r]);
 
         if (print_assignment) {
             printf("Mapping:");
-            for (int i = 0; i < n1; i++) printf(" %d", rec_perm[i] + 1); /* 1-based */
+            for (int i = 0; i < n1; i++) printf(" %d", rec_mapping[i] + 1); /* 1-based */
             putchar('\n');
         }
 
@@ -425,6 +425,6 @@ int main(int argc, char **argv)
 done:
     free(atom_data1); free(coords1);
     free(atom_data2); free(coords2);
-    free(rmsd_list); free(atomperm_list); free(transform_list);
+    free(rmsd_list); free(mapping_list); free(transform_list);
     return status;
 }

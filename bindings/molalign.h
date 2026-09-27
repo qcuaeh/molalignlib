@@ -50,14 +50,14 @@ extern "C" {
  *
  * @param rmsd_list     [out] RMSD of each returned record, length n_records.
  *                            Only the first *occ_records entries are valid.
- * @param atomperm_list [out] Flattened, 0-based atom permutations, length
- *                            n_records*n_pad, n_pad = max(n_atoms1, n_atoms2).
+ * @param mapping_list [out] Flattened, 0-based atom permutations, length
+ *                            n_records*n_padding, n_padding = max(n_atoms1, n_atoms2).
  *                            Record i (0-based) occupies
- *                            atomperm_list[i*n_pad .. i*n_pad + n_pad - 1].
+ *                            mapping_list[i*n_padding .. i*n_padding + n_padding - 1].
  *                            Same padding convention as conformsd_calculate:
  *                            values >= n_atoms2 are dummy atoms of cluster 2.
  *                            Sizes can only differ when heavy_flag=true.
- *                            Caller allocates >= n_records*n_pad.
+ *                            Caller allocates >= n_records*n_padding.
  * @param transform_list [out] Flattened row-major 4x4 homogeneous transforms,
  *                            length n_records*16. Record i occupies
  *                            transform_list[i*16 .. i*16 + 15]. Maps
@@ -85,7 +85,7 @@ void atormsd_calculate(
     bool print_stats, bool random_flag,
     bool prune_flag, double prune_tol, int conv_freq, int max_trials,
     int n_records,
-    double *rmsd_list, int *atomperm_list,
+    double *rmsd_list, int *mapping_list,
     double *transform_list, int *occ_records, int *error_code);
 
 /**
@@ -136,11 +136,11 @@ void atormsd_calculate(
  *
  * @param rmsd_list     [out] RMSD of each returned record, length n_records.
  *                            Only the first *occ_records entries are valid.
- * @param atomperm_list [out] Flattened, 0-based atom permutations, length
- *                            n_records*n_pad, where
- *                            n_pad = max(n_atoms1, n_atoms2). Record i (0-based)
- *                            occupies atomperm_list[i*n_pad .. i*n_pad + n_pad - 1]
- *                            and is a permutation of 0..n_pad-1: entry j is
+ * @param mapping_list [out] Flattened, 0-based atom permutations, length
+ *                            n_records*n_padding, where
+ *                            n_padding = max(n_atoms1, n_atoms2). Record i (0-based)
+ *                            occupies mapping_list[i*n_padding .. i*n_padding + n_padding - 1]
+ *                            and is a permutation of 0..n_padding-1: entry j is
  *                            the atom of molecule 2 placed on line j of
  *                            molecule 1. The smaller molecule is padded with
  *                            dummy atoms appended after its real atoms, so
@@ -148,8 +148,8 @@ void atormsd_calculate(
  *                            molecule 2, and entries j >= n_atoms1 hold the
  *                            extra atoms of molecule 2. The sizes can only
  *                            differ when heavy_flag=true; otherwise
- *                            n_pad == n_atoms1.
- *                            Caller allocates >= n_records*n_pad.
+ *                            n_padding == n_atoms1.
+ *                            Caller allocates >= n_records*n_padding.
  * @param transform_list [out] Flattened row-major 4x4 homogeneous transforms,
  *                            length n_records*16. Record i occupies
  *                            transform_list[i*16 .. i*16 + 15]. Maps
@@ -181,7 +181,7 @@ void conformsd_calculate(
     bool print_stats, bool print_assigntree, bool random_flag,
     int conv_freq, int max_trials,
     int n_records,
-    double *rmsd_list, int *atomperm_list,
+    double *rmsd_list, int *mapping_list,
     double *transform_list, int *occ_records, int *error_code);
 
 #ifdef __cplusplus

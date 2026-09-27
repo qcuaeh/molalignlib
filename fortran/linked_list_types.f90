@@ -67,7 +67,7 @@ end type
 
 ! Chain node
 type, public :: chain_node_t
-   integer(ik) :: num_parts
+   integer(ik) :: n_parts
    integer(ik) :: global_idx
    integer(ik), pointer :: total_partrefs => null()
    type(chain_node_t), pointer :: next_link
@@ -79,8 +79,8 @@ end type
 
 ! Assignment tree node
 type, public :: chaintree_node_t
-   integer(ik) :: num_links
-   integer(ik) :: num_children
+   integer(ik) :: n_links
+   integer(ik) :: n_children
    integer(ik) :: global_idx
    integer(ik), pointer :: n_atoms1 => null()
    integer(ik), pointer :: n_atoms2 => null()
@@ -100,9 +100,9 @@ end type
 type, public :: partition_node_t
    integer(ik) :: depth
    integer(ik) :: global_idx
-   integer(ik) :: num_items1
-   integer(ik) :: num_items2
-   integer(ik) :: num_children
+   integer(ik) :: n_items1
+   integer(ik) :: n_items2
+   integer(ik) :: n_children
    integer(ik), pointer :: total_parts => null()
    integer(ik), pointer :: total_items1 => null()
    integer(ik), pointer :: total_items2 => null()
@@ -218,9 +218,9 @@ function new_bare_part() result(part)
    allocate (part)
 
    part%global_idx = 0  ! Will be set when added to tree
-   part%num_items1 = 0
-   part%num_items2 = 0
-   part%num_children = 0
+   part%n_items1 = 0
+   part%n_items2 = 0
+   part%n_children = 0
    part%total_parts => null()
    part%total_items1 => null()
    part%total_items2 => null()
@@ -280,7 +280,7 @@ function new_child_part(parent_part) result(child_part)
       parent_part%last_child_part%next_sibling_part => child_part
    end if
    parent_part%last_child_part => child_part
-   parent_part%num_children = parent_part%num_children + 1
+   parent_part%n_children = parent_part%n_children + 1
 end function
 
 subroutine link_part(link, part)
@@ -302,7 +302,7 @@ subroutine link_part(link, part)
       link%last_partref%nextref => newref
    end if
    link%last_partref => newref
-   link%num_parts = link%num_parts + 1
+   link%n_parts = link%n_parts + 1
 end subroutine
 
 subroutine add_new_item1(part, idx)
@@ -325,7 +325,7 @@ subroutine add_new_item1(part, idx)
       part%last_item1%next_item => new_item
    end if
    part%last_item1 => new_item
-   part%num_items1 = part%num_items1 + 1
+   part%n_items1 = part%n_items1 + 1
 end subroutine
 
 subroutine add_new_item2(part, idx)
@@ -348,7 +348,7 @@ subroutine add_new_item2(part, idx)
       part%last_item2%next_item => new_item
    end if
    part%last_item2 => new_item
-   part%num_items2 = part%num_items2 + 1
+   part%n_items2 = part%n_items2 + 1
 end subroutine
 
 subroutine copy_part_items(orig, dest)
@@ -383,7 +383,7 @@ subroutine move_first_item1(orig, dest)
    if (.not. associated(orig%first_item1)) then
       orig%last_item1 => null()
    end if
-   orig%num_items1 = orig%num_items1 - 1
+   orig%n_items1 = orig%n_items1 - 1
 
    ! Add to destination
    item_to_move%next_item => null()
@@ -394,7 +394,7 @@ subroutine move_first_item1(orig, dest)
       dest%last_item1%next_item => item_to_move
    end if
    dest%last_item1 => item_to_move
-   dest%num_items1 = dest%num_items1 + 1
+   dest%n_items1 = dest%n_items1 + 1
 end subroutine
 
 subroutine move_first_item2(orig, dest)
@@ -411,7 +411,7 @@ subroutine move_first_item2(orig, dest)
    if (.not. associated(orig%first_item2)) then
       orig%last_item2 => null()
    end if
-   orig%num_items2 = orig%num_items2 - 1
+   orig%n_items2 = orig%n_items2 - 1
 
    ! Add to destination
    item_to_move%next_item => null()
@@ -422,7 +422,7 @@ subroutine move_first_item2(orig, dest)
       dest%last_item2%next_item => item_to_move
    end if
    dest%last_item2 => item_to_move
-   dest%num_items2 = dest%num_items2 + 1
+   dest%n_items2 = dest%n_items2 + 1
 end subroutine
 
 subroutine move_part_items(orig, dest)
@@ -561,8 +561,8 @@ subroutine link_to_partition(link, partition)
    type(item_node_t), pointer :: item
    integer(ik) :: i, j
 
-   partition%num_parts = link%num_parts
-   allocate(partition%parts(partition%num_parts))
+   partition%n_parts = link%n_parts
+   allocate(partition%parts(partition%n_parts))
    allocate(partition%itemdir1(size(link%itemdir1)))
    allocate(partition%itemdir2(size(link%itemdir2)))
 
@@ -571,20 +571,20 @@ subroutine link_to_partition(link, partition)
    do while (associated(partref))
       if (.not. associated(partref%part)) error stop
 
-      partition%parts(i)%num_items1 = partref%part%num_items1
-      partition%parts(i)%num_items2 = partref%part%num_items2
-      allocate(partition%parts(i)%items1(partref%part%num_items1))
-      allocate(partition%parts(i)%items2(partref%part%num_items2))
+      partition%parts(i)%n_items1 = partref%part%n_items1
+      partition%parts(i)%n_items2 = partref%part%n_items2
+      allocate(partition%parts(i)%items1(partref%part%n_items1))
+      allocate(partition%parts(i)%items2(partref%part%n_items2))
 
       item => partref%part%first_item1
-      do j = 1, partref%part%num_items1
+      do j = 1, partref%part%n_items1
          partition%parts(i)%items1(j) = item%idx
          partition%itemdir1(item%idx) = i
          item => item%next_item
       end do
 
       item => partref%part%first_item2
-      do j = 1, partref%part%num_items2
+      do j = 1, partref%part%n_items2
          partition%parts(i)%items2(j) = item%idx
          partition%itemdir2(item%idx) = i
          item => item%next_item
@@ -639,8 +639,8 @@ function new_bare_chain() result(chain)
    allocate(chain)
 
    ! Counters will be set when added to tree
-   chain%num_links = 0
-   chain%num_children = 0
+   chain%n_links = 0
+   chain%n_children = 0
    chain%global_idx = 0
    chain%n_atoms1 => null()
    chain%n_atoms2 => null()
@@ -680,7 +680,7 @@ function new_bare_link() result(link)
    type(chain_node_t), pointer :: link
 
    allocate(link)
-   link%num_parts = 0
+   link%n_parts = 0
    link%global_idx = 0  ! Will be set when added to chain
    link%total_partrefs => null()
    link%first_partref => null()
@@ -722,7 +722,7 @@ function new_chain_link(chain) result(link)
       chain%last_link%next_link => link
    end if
    chain%last_link => link
-   chain%num_links = chain%num_links + 1
+   chain%n_links = chain%n_links + 1
 end function
 
 function find_child_part(part, signature) result(child_part)
@@ -788,16 +788,16 @@ function chain_from_partition(partition) result(chain)
    first_link => new_chain_link(chain)
 
    ! Create parts as children of partition_tree and add them to the first link
-   do i = 1, partition%num_parts
+   do i = 1, partition%n_parts
       ! Create new part as child of partition_tree
       new_part => new_child_part(partition_tree)
 
       ! Add items to the child part using cached approach
-      do j = 1, partition%parts(i)%num_items1
+      do j = 1, partition%parts(i)%n_items1
          call add_new_item1(new_part, partition%parts(i)%items1(j))
       end do
 
-      do j = 1, partition%parts(i)%num_items2
+      do j = 1, partition%parts(i)%n_items2
          call add_new_item2(new_part, partition%parts(i)%items2(j))
       end do
 
@@ -841,17 +841,17 @@ function new_child_chain(chain, split_part) result(new_chain)
       chain%last_child_chain => new_chain
    end if
 
-   chain%num_children = chain%num_children + 1
+   chain%n_children = chain%n_children + 1
 end function
 
 subroutine add_branch_part(link, part)
-! Adds parts in sorted order by num_items1
+! Adds parts in sorted order by n_items1
    type(chain_node_t), target, intent(inout) :: link
    type(partition_node_t), target, intent(in) :: part
    type(partref_node_t), pointer :: partref, prevref, newref
 
    ! Do not add assigned parts
-   if (part%num_items1 < 2) return
+   if (part%n_items1 < 2) return
 
    ! Create new part reference
    allocate(newref)
@@ -862,17 +862,17 @@ subroutine add_branch_part(link, part)
    if (.not. associated(link%first_partref)) then
       link%first_partref => newref
       link%last_partref => newref
-      link%num_parts = link%num_parts + 1
+      link%n_parts = link%n_parts + 1
       return
    end if
 
-   ! Find correct insertion position (sorted by increasing num_items1)
+   ! Find correct insertion position (sorted by increasing n_items1)
    partref => link%first_partref
    prevref => null()
 
    do while (associated(partref))
       ! If new part has fewer or equal items1, insert before partref
-      if (part%num_items1 <= partref%part%num_items1) then
+      if (part%n_items1 <= partref%part%n_items1) then
          exit
       end if
       prevref => partref
@@ -898,7 +898,7 @@ subroutine add_branch_part(link, part)
       end if
    end if
 
-   link%num_parts = link%num_parts + 1
+   link%n_parts = link%n_parts + 1
 end subroutine
 
 subroutine update_itemdir(link, part)
@@ -1061,7 +1061,7 @@ recursive subroutine print_leaf_items_recurse(part)
    child_part => part%first_child_part
    do while (associated(child_part))
       ! Only print items if this is a leaf part (no children)
-      if (child_part%num_children == 0) then
+      if (child_part%n_children == 0) then
          write(stderr, '(A)', advance='no') address(child_part) // ':'
          call print_part_items(child_part)
       end if
@@ -1167,7 +1167,7 @@ recursive subroutine print_chain_indices_recurse(chain)
    ! Print links in this chain
    link => chain%first_link
    do while (associated(link))
-      write(stderr, '(A,I0,A,I0,A)') "  Link ", link%global_idx, " (", link%num_parts, " parts)"
+      write(stderr, '(A,I0,A,I0,A)') "  Link ", link%global_idx, " (", link%n_parts, " parts)"
 
       ! Print partrefs in this link
       partref => link%first_partref
@@ -1226,7 +1226,7 @@ recursive subroutine print_part_recurse(part, depth, is_last_child)
 
       ! Print part address with item counts
       write(stderr, '(A,1X,A,I0,A,I0,A)') address(child_part), &
-         '(', child_part%num_items1, '/', child_part%num_items2, ')'
+         '(', child_part%n_items1, '/', child_part%n_items2, ')'
 
       ! Recursively print this child's children
       call print_part_recurse(child_part, depth + 1, is_last_child)
@@ -1269,7 +1269,7 @@ recursive subroutine print_chain_recurse(chain, depth, is_last_child)
 
       ! Print the child address with item counts
       write(stderr, '(A,1X,A,I0,A,I0,A)') address(child_chain%split_part), &
-         '(', child_chain%split_part%num_items1, '/', child_chain%split_part%num_items2, ')'
+         '(', child_chain%split_part%n_items1, '/', child_chain%split_part%n_items2, ')'
 
       ! Recursively print this child's children
       call print_chain_recurse(child_chain, depth + 1, is_last_child)
@@ -1287,7 +1287,7 @@ function is_partition_uneven(link) result(uneven)
    uneven = .FALSE.
    partref => link%first_partref
    do while (associated(partref))
-      if (partref%part%num_items1 /= partref%part%num_items2) then
+      if (partref%part%n_items1 /= partref%part%n_items2) then
          uneven = .TRUE.
          return
       end if
@@ -1301,33 +1301,33 @@ subroutine print_partition_details(link, link_number)
    type(chain_node_t), pointer, intent(in) :: link
    integer(ik), intent(in) :: link_number
    type(partref_node_t), pointer :: partref
-   integer(ik) :: even_count, uneven_count
+   integer(ik) :: n_even, n_uneven
 
    write(stderr, '(A)') repeat("=", 70)
-   write(stderr, '(A,I0,A,I0,A)') "PARTITION LINK ", link_number, " (", link%num_parts, " parts)"
+   write(stderr, '(A,I0,A,I0,A)') "PARTITION LINK ", link_number, " (", link%n_parts, " parts)"
    write(stderr, '(A)') repeat("=", 70)
 
    ! First pass: count even and uneven parts
-   even_count = 0
-   uneven_count = 0
+   n_even = 0
+   n_uneven = 0
    partref => link%first_partref
    do while (associated(partref))
-      if (partref%part%num_items1 == partref%part%num_items2) then
-         even_count = even_count + 1
+      if (partref%part%n_items1 == partref%part%n_items2) then
+         n_even = n_even + 1
       else
-         uneven_count = uneven_count + 1
+         n_uneven = n_uneven + 1
       end if
       partref => partref%nextref
    end do
 
    ! Print even parts
    write(stderr, '(A)') "Even parts:"
-   if (even_count == 0) then
+   if (n_even == 0) then
       write(stderr, '(A)') "  (none)"
    else
       partref => link%first_partref
       do while (associated(partref))
-         if (partref%part%num_items1 == partref%part%num_items2) then
+         if (partref%part%n_items1 == partref%part%n_items2) then
             call print_part_line(partref%part)
          end if
          partref => partref%nextref
@@ -1335,12 +1335,12 @@ subroutine print_partition_details(link, link_number)
    end if
 
    ! Print uneven parts only if they exist
-   if (uneven_count > 0) then
+   if (n_uneven > 0) then
       write(stderr, *)
       write(stderr, '(A)') "Uneven parts:"
       partref => link%first_partref
       do while (associated(partref))
-         if (partref%part%num_items1 /= partref%part%num_items2) then
+         if (partref%part%n_items1 /= partref%part%n_items2) then
             call print_part_line(partref%part)
          end if
          partref => partref%nextref
@@ -1358,7 +1358,7 @@ subroutine print_part_line(part)
 
    ! Print part address and counts
    write(stderr, '(A,A,I0,A,I0,A)', advance='no') &
-      address(part), " (", part%num_items1, "/", part%num_items2, "): ["
+      address(part), " (", part%n_items1, "/", part%n_items2, "): ["
 
    ! Print molecule 1 atoms
    item => part%first_item1
