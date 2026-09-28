@@ -23,11 +23,16 @@ contains
 !                    [elnum0, label0, elnum1, label1, ...]
 !                    label = 0 means unlabelled.
 !   c_coords1/2    : XYZ coordinates, row-major (c_n_atoms x 3), length c_n_atoms*3
-!   c_n_bonds1/2   : number of bonds (may be 0 when c_bond_flag is true, i.e. derive from geometry)
+!   c_n_bonds1/2   : number of bonds (may be 0 when c_bondtol_flag is true, i.e. derive from geometry)
 !   c_bond_data1/2 : flat bond array, length c_n_bonds*3, layout: [atom1, atom2, type, ...]
 !                    (1-based atom indices as in the original file)
 !   c_bond_tol     : bond detection tolerance (only used, and required, when
-!                    c_bond_flag is true; no default)
+!                    c_bondtol_flag is true; no default)
+!   c_bondtype_flag: use the bond types in the HNA refinement. Types
+!                    are compared, never interpreted, so both molecules
+!                    must use the same convention (read from the same
+!                    file format with the same parser). Ignored
+!                    when c_bondtol_flag is true (perceived bonds are untyped).
 !
 ! Multiple ranked candidate solutions:
 !   c_n_records requests up to that many ranked candidate solutions. Records
@@ -73,7 +78,8 @@ subroutine conformsd_calculate(                                              &
       c_n_atoms2,  c_atom_data2,  c_coords2,                                    &
       c_n_bonds2,  c_bond_data2,                                                  &
       c_align_flag, c_remap_flag, c_heavy_flag, c_mass_flag,                &
-      c_mirror_flag, c_label_flag, c_bond_flag, c_bond_tol,                 &
+      c_mirror_flag, c_atomlabel_flag, c_bondtol_flag, c_bond_tol,          &
+      c_bondtype_flag,                                                      &
       c_print_stats, c_print_assigntree, c_random_flag,                      &
       c_conv_freq, c_max_trials,                                           &
       c_n_records,                                                          &
@@ -97,8 +103,9 @@ subroutine conformsd_calculate(                                              &
 
    ! Flags
    logical(lk), intent(in), value :: c_align_flag, c_remap_flag, c_heavy_flag, c_mass_flag
-   logical(lk), intent(in), value :: c_mirror_flag, c_label_flag, c_bond_flag
+   logical(lk), intent(in), value :: c_mirror_flag, c_atomlabel_flag, c_bondtol_flag
    real(rk),    intent(in), value :: c_bond_tol
+   logical(lk), intent(in), value :: c_bondtype_flag
    logical(lk), intent(in), value :: c_print_stats, c_print_assigntree, c_random_flag
    integer(ik), intent(in), value :: c_conv_freq, c_max_trials
 
@@ -124,6 +131,7 @@ subroutine conformsd_calculate(                                              &
    real(rk), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, coords2r
    real(rk), dimension(:,:), allocatable :: full_coords1, full_coords2, full_coords2r
    integer(ik), dimension(:), allocatable :: atomset1, atomset2
+   integer(ik), dimension(:), allocatable :: bondtypes
    integer(ik), dimension(:), allocatable :: mapping1, full_atomperm1
    integer(ik) :: n_records, n_padding
    integer(ik) :: i, j, base
@@ -146,14 +154,13 @@ subroutine conformsd_calculate(                                              &
    heavy_flag       = c_heavy_flag
    mass_flag        = c_mass_flag
    mirror_flag      = c_mirror_flag
-   label_flag       = c_label_flag
-   bond_flag        = c_bond_flag
+   atomlabel_flag   = c_atomlabel_flag
+   bondtol_flag     = c_bondtol_flag
    bond_tol         = c_bond_tol
+   bondtype_flag    = c_bondtype_flag .and. .not. c_bondtol_flag
    random_flag      = c_random_flag
    print_stats      = c_print_stats
    print_assigntree = c_print_assigntree
-   stochastic_flag  = .TRUE.
-   adaptive_flag    = .TRUE.
 
    ! Build atom_t and bond_t arrays from flat C arrays
    ! (returns MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER for out-of-range elnums)
@@ -200,7 +207,7 @@ subroutine conformsd_calculate(                                              &
    end if
 
    ! Reset bonds (padding atoms never get bonds)
-   if (bond_flag) then
+   if (bondtol_flag) then
       call bonds_from_atoms(atoms1(1:c_n_atoms1), bonds1)
       call bonds_from_atoms(atoms2(1:c_n_atoms2), bonds2)
    end if
@@ -212,9 +219,16 @@ subroutine conformsd_calculate(                                              &
    end if
 
    ! Set adjacency lists of the included atoms (bonds to excluded atoms are
-   ! dropped)
-   call adjacency_from_bonds(atoms1(atomset1), extract_bonds(atomset1, n_padding, bonds1), adjcs1)
-   call adjacency_from_bonds(atoms2(atomset2), extract_bonds(atomset2, n_padding, bonds2), adjcs2)
+   ! dropped). With bondtype_flag, the edges used by the refinement carry
+   ! the bond types, compacted jointly for both molecules.
+   if (bondtype_flag) then
+      bondtypes = distinct_bondtypes(bonds1, bonds2)
+      call adjacency_from_bonds(atoms1(atomset1), extract_bonds(atomset1, n_padding, bonds1), adjcs1, bondtypes)
+      call adjacency_from_bonds(atoms2(atomset2), extract_bonds(atomset2, n_padding, bonds2), adjcs2, bondtypes)
+   else
+      call adjacency_from_bonds(atoms1(atomset1), extract_bonds(atomset1, n_padding, bonds1), adjcs1)
+      call adjacency_from_bonds(atoms2(atomset2), extract_bonds(atomset2, n_padding, bonds2), adjcs2)
+   end if
 
    ! Weights of the included atoms, normalised to sum 1 over them so both
    ! molecules are scaled by the same factor

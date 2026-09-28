@@ -185,7 +185,9 @@ subroutine update_hna_part(cache_arrays, part_idx, read_link_idx, write_link_idx
          part_ref_idx = cache_arrays%itemdir1_entries(adj_atom, read_link_idx)
          if (part_ref_idx /= 0) then
             signature_size = signature_size + 1
-            signature(signature_size) = part_ref_idx
+            ! Inlined edge_code(part_ref_idx, bond type) from module adjacency
+            signature(signature_size) = part_ref_idx*BOND_TYPE_RADIX &
+                                      + cache_arrays%adjcs1_bondtype(item_idx, j)
          end if
       end do
 
@@ -216,7 +218,9 @@ subroutine update_hna_part(cache_arrays, part_idx, read_link_idx, write_link_idx
          part_ref_idx = cache_arrays%itemdir2_entries(adj_atom, read_link_idx)
          if (part_ref_idx /= 0) then
             signature_size = signature_size + 1
-            signature(signature_size) = part_ref_idx
+            ! Inlined edge_code(part_ref_idx, bond type) from module adjacency
+            signature(signature_size) = part_ref_idx*BOND_TYPE_RADIX &
+                                      + cache_arrays%adjcs2_bondtype(item_idx, j)
          end if
       end do
 

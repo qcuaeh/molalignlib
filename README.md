@@ -128,8 +128,8 @@ atormsd file1 file2 [options]
 |--------|----------|-------------|
 | -align | | Align atoms to minimise the RMSD |
 | -remap | | Remap atoms to minimise the RMSD |
-| -label | | Use atom labels to distinguish atom types |
-| -prune | TOL | Enable pruning: discard assignments with pair distances exceeding *TOL* Å |
+| -atomlabel | | Use atom labels to distinguish atom types |
+| -prunetol | TOL | Enable pruning: discard assignments with pair distances exceeding *TOL* Å |
 | -freq | N | Stop if the best solution is found *N* consecutive times |
 | -trials | N | Stop after at most *N* optimisation trials |
 | -records | N | Record the *N* lowest RMSDs found (default: 1) |
@@ -151,7 +151,7 @@ atormsd mol1.xyz mol2.xyz
 atormsd mol1.xyz mol2.xyz -align -remap -assignment
 
 # Remap with distance pruning, keep the 3 best solutions
-atormsd mol1.xyz mol2.xyz -align -remap -prune 0.5 -records 3
+atormsd mol1.xyz mol2.xyz -align -remap -prunetol 0.5 -records 3
 
 # Heavy-atom, mass-weighted RMSD with alignment
 atormsd mol1.sdf mol2.sdf -align -remap -heavy -mass
@@ -177,7 +177,7 @@ conformsd file1 file2 [options]
 |--------|----------|-------------|
 | -align | | Align atoms to minimise the RMSD |
 | -remap | | Remap atoms to minimise the RMSD |
-| -label | | Use atom labels to distinguish atom types |
+| -atomlabel | | Use atom labels to distinguish atom types |
 | -freq | N | Stop if the best solution is found *N* consecutive times |
 | -trials | N | Stop after at most *N* optimisation trials |
 | -records | N | Record the *N* lowest RMSDs found (default: 1) |
@@ -187,13 +187,12 @@ conformsd file1 file2 [options]
 | -heavy | | Ignore hydrogen atoms |
 | -mass | | Use mass-weighted coordinates |
 | -mirror | | Reflect molecule 2 before comparison |
-| -bond | TOL | Derive bond connectivity from interatomic distances instead of the file's bond table, using detection tolerance *TOL* |
-| -exhaustive | | Force exhaustive orientation-independent search regardless of assignment tree topology |
-| -stochastic | | Force stochastic fixed-orientation search regardless of assignment tree topology |
+| -bondtol | TOL | Derive bond connectivity from interatomic distances instead of the file's bond table, using detection tolerance *TOL* |
+| -bondtype | | Use bond types from the files to guide atom matching. Both files must have the same format; no effect with `-bondtol` |
 | -stats | | Print detailed optimisation statistics |
 | -random | | Seed the random-number generator from the system clock |
 
-`-exhaustive` and `-stochastic` are mutually exclusive. If neither is given, the strategy is chosen automatically based on the ratio of total to partial assignment combinations in the tree: stochastic fixed-orientation search is used when the ratio is high, and exhaustive orientation-independent search when it is low.
+The search strategy is chosen automatically based on the ratio of total to partial assignment combinations in the tree: stochastic fixed-orientation search is used when the ratio is high, and exhaustive orientation-independent search when it is low. Either strategy can be forced at compile time with the `FORCE_STOCHASTIC` and `FORCE_EXHAUSTIVE` parameters in `fortran/parameters.f90`.
 
 #### Examples
 
@@ -202,10 +201,13 @@ conformsd file1 file2 [options]
 conformsd conf1.sdf conf2.sdf -align -remap
 
 # Derive connectivity from geometry (useful for XYZ input)
-conformsd conf1.xyz conf2.xyz -align -remap -bond 0.3
+conformsd conf1.xyz conf2.xyz -align -remap -bondtol 0.3
 
-# Heavy atoms only, exhaustive search
-conformsd conf1.sdf conf2.sdf -align -remap -heavy -exhaustive
+# Also distinguish bond types (both files must have the same format)
+conformsd conf1.sdf conf2.sdf -align -remap -bondtype
+
+# Heavy atoms only
+conformsd conf1.sdf conf2.sdf -align -remap -heavy
 
 # Print the atom permutation that maps conf2 onto conf1
 conformsd conf1.sdf conf2.sdf -align -remap -assignment
@@ -278,18 +280,18 @@ void atormsd_calculate(
     int n_atoms1, const int *atom_data1, const double *coords1,
     int n_atoms2, const int *atom_data2, const double *coords2,
     bool align_flag, bool remap_flag, bool heavy_flag, bool mass_flag,
-    bool mirror_flag, bool label_flag,
+    bool mirror_flag, bool atomlabel_flag,
     bool print_stats, bool random_flag,
-    bool prune_flag, double prune_tol, int conv_freq, int max_trials,
+    bool prunetol_flag, double prune_tol, int conv_freq, int max_trials,
     int n_records,
     double *rmsd_list, int *atomperm_list,
     double *transform_list, int *occ_records, int *error_code);
 ```
 
 Pruning discards candidate atom pairings whose interatomic distance differs
-by more than `prune_tol`, speeding up the search. When `prune_flag = true`,
+by more than `prune_tol`, speeding up the search. When `prunetol_flag = true`,
 `prune_tol` (Å) has no default and must be supplied; it is ignored when
-`prune_flag = false`.
+`prunetol_flag = false`.
 
 #### Parameters
 
@@ -306,11 +308,11 @@ by more than `prune_tol`, speeding up the search. When `prune_flag = true`,
 | **heavy_flag** | in | Use only heavy (non-hydrogen) atoms |
 | **mass_flag** | in | Weight atoms by atomic mass |
 | **mirror_flag** | in | Mirror molecule 2 before comparison |
-| **label_flag** | in | Use atom labels for type matching |
+| **atomlabel_flag** | in | Use atom labels for type matching |
 | **print_stats** | in | Print optimisation statistics to stdout |
 | **random_flag** | in | Seed RNG from system clock |
-| **prune_flag** | in | Enable pruning (discard candidate pairings by distance) |
-| **prune_tol** | in | Pruning distance tolerance (Å); required when `prune_flag = true`, ignored otherwise (no default) |
+| **prunetol_flag** | in | Enable pruning (discard candidate pairings by distance) |
+| **prune_tol** | in | Pruning distance tolerance (Å); required when `prunetol_flag = true`, ignored otherwise (no default) |
 | **conv_freq** | in | Convergence frequency threshold |
 | **max_trials** | in | Maximum number of optimisation trials |
 | **n_records** | in | Maximum number of ranked candidate solutions to return (≥ 1). Values > 1 only take effect when `align_flag` and `remap_flag` are both true |
@@ -353,7 +355,7 @@ int main(void)
         /*heavy=*/false, /*mass=*/false,
         /*mirror=*/false, /*label=*/false,
         /*stats=*/false, /*random=*/false,
-        /*prune_flag=*/false, /*prune_tol=*/0.0, /*conv_freq=*/10, /*max_trials=*/10000,
+        /*prunetol_flag=*/false, /*prune_tol=*/0.0, /*conv_freq=*/10, /*max_trials=*/10000,
         /*n_records=*/1,
         rmsd_list, atomperm_list,
         transform_list, &occ_records, &error_code);
@@ -381,7 +383,7 @@ atormsd_calculate(
     /*heavy=*/false, /*mass=*/false,
     /*mirror=*/false, /*label=*/false,
     /*stats=*/false, /*random=*/false,
-    /*prune_flag=*/false, /*prune_tol=*/0.0, /*conv_freq=*/10, /*max_trials=*/10000,
+    /*prunetol_flag=*/false, /*prune_tol=*/0.0, /*conv_freq=*/10, /*max_trials=*/10000,
     /*n_records=*/N_RECORDS,
     rmsd_list, atomperm_list,
     transform_list, &occ_records, &error_code);
@@ -407,7 +409,8 @@ void conformsd_calculate(
     int n_atoms2, const int *atom_data2, const double *coords2,
     int n_bonds2, const int *bond_data2,
     bool align_flag, bool remap_flag, bool heavy_flag, bool mass_flag,
-    bool mirror_flag, bool label_flag, bool bond_flag, double bond_tol,
+    bool mirror_flag, bool atomlabel_flag, bool bondtol_flag, double bond_tol,
+    bool bondtype_flag,
     bool print_stats, bool print_assigntree, bool random_flag,
     int conv_freq, int max_trials,
     int n_records,
@@ -421,11 +424,18 @@ Bond data is passed as a flat `int` array of length `n_bonds * 3`, packed as:
 [ atom1_0, atom2_0, type_0, atom1_1, atom2_1, type_1, ... ]
 ```
 
-Atom indices are **1-based**. When `bond_flag = true` the library derives
+Atom indices are **1-based**. When `bondtol_flag = true` the library derives
 connectivity from atomic geometry and the bond arrays may be empty
 (`n_bonds = 0`, `bond_data = NULL`). In that case `bond_tol` (bond detection
 tolerance) has no default and must be supplied; it is ignored when
-`bond_flag = false`.
+`bondtol_flag = false`.
+
+The bond `type` is any integer code. It is only used when `bondtype_flag = true`,
+and then only compared for equality between bonds, never interpreted: both
+molecules must therefore use the same bond-type convention (for example,
+read from the same file format with the same parser). Note that the same
+molecule encoded with different Kekulé or aromatic bond types is then
+reported as `MOLALIGN_ERROR_NOT_CONFORMERS`.
 
 #### Parameters
 
@@ -446,9 +456,10 @@ tolerance) has no default and must be supplied; it is ignored when
 | **heavy_flag** | in | Use only heavy (non-hydrogen) atoms |
 | **mass_flag** | in | Weight atoms by atomic mass |
 | **mirror_flag** | in | Mirror molecule 2 before comparison |
-| **label_flag** | in | Use atom labels for type matching |
-| **bond_flag** | in | Derive connectivity from geometry (ignores bond arrays) |
-| **bond_tol** | in | Bond detection tolerance; required when `bond_flag = true`, ignored otherwise (no default) |
+| **atomlabel_flag** | in | Use atom labels for type matching |
+| **bondtol_flag** | in | Derive connectivity from geometry (ignores bond arrays) |
+| **bond_tol** | in | Bond detection tolerance; required when `bondtol_flag = true`, ignored otherwise (no default) |
+| **bondtype_flag** | in | Use bond types to guide atom matching (types compared, not interpreted; see above). Ignored when `bondtol_flag = true` |
 | **print_stats** | in | Print optimisation statistics to stdout |
 | **print_assigntree** | in | Print the internal assignment tree |
 | **random_flag** | in | Seed RNG from system clock |
@@ -494,7 +505,8 @@ int main(void)
         /*align=*/true, /*remap=*/true,
         /*heavy=*/false, /*mass=*/false,
         /*mirror=*/false, /*label=*/false,
-        /*bond_flag=*/false, /*bond_tol=*/0.0,
+        /*bondtol_flag=*/false, /*bond_tol=*/0.0,
+        /*bondtype_flag=*/false,
         /*stats=*/false, /*print_assigntree=*/false, /*random=*/false,
         /*conv_freq=*/100, /*max_trials=*/10000,
         /*n_records=*/1,
@@ -592,11 +604,10 @@ print(result.rmsd)
 | **heavy_only** | `bool` | `False` | Exclude hydrogen atoms from the calculation |
 | **mass_weighted** | `bool` | `False` | Weight each atom by its atomic mass |
 | **mirror** | `bool` | `False` | Reflect `other` before comparison |
-| **use_labels** | `bool` | `False` | Use atom labels to distinguish atom types |
+| **use_atom_label** | `bool` | `False` | Use atom labels to distinguish atom types |
 | **stats** | `bool` | `False` | Print detailed optimisation statistics |
 | **random** | `bool` | `False` | Seed the random-number generator from the system clock |
-| **prune** | `bool` | `False` | Enable pruning: discard assignments with pair distances exceeding `prune_tol` |
-| **prune_tol** | `float` | `None` | Pruning distance tolerance (Å); **required** when `prune=True` |
+| **prune_tol** | `float` | `None` | Pruning distance tolerance (Å): discard assignments with pair distances exceeding `prune_tol`. `None` disables pruning |
 | **conv_freq** | `int` | `10` | Stop searching once the best solution has been found this many consecutive times |
 | **max_trials** | `int` | `10000` | Stop after at most this many optimisation trials |
 | **n_records** | `int` | `1` | Request up to this many ranked solutions (see below) |
@@ -639,6 +650,12 @@ conf = Conformer.from_symbols(symbols, coords, bond_data=bond_data)
 conf = Conformer.from_numbers([6, 8, 1, 1], coords, bond_data=bond_data)
 ```
 
+Conformers read from files record the file format as their `bond_source`;
+conformers built from arrays have `bond_source=None` unless you pass one.
+`rmsd_to(use_bond_type=True)` only accepts pairs with the same
+`bond_source`, because bond types are compared as plain integers and are
+only meaningful within one convention.
+
 #### Reading multiple frames
 
 ```python
@@ -669,9 +686,9 @@ print(result.transform)         # 4×4 float64 array
 | **heavy_only** | `bool` | `False` | Exclude hydrogen atoms from the calculation |
 | **mass_weighted** | `bool` | `False` | Weight each atom by its atomic mass |
 | **mirror** | `bool` | `False` | Reflect `other` before comparison |
-| **use_labels** | `bool` | `False` | Use atom labels to distinguish atom types |
-| **infer_bonds** | `bool` | `False` | Infer bond connectivity from geometry instead of using each structure's bond table |
-| **bond_tol** | `float` | `0.3` | Bond-detection tolerance (Å); used only when `infer_bonds=True` |
+| **use_atom_label** | `bool` | `False` | Use atom labels to distinguish atom types |
+| **bond_tol** | `float` | `None` | Bond-detection tolerance (Å): infer bond connectivity from geometry instead of using each structure's bond table. `None` disables bond detection |
+| **use_bond_type** | `bool` | `False` | Use bond types to guide atom matching. Both conformers must have the same `bond_source` (e.g. read from files of the same format), otherwise `ValueError` is raised; no effect when `bond_tol` is given |
 | **stats** | `bool` | `False` | Print detailed optimisation statistics |
 | **random** | `bool` | `False` | Seed the random-number generator from the system clock |
 | **conv_freq** | `int` | `100` | Stop searching once the best solution has been found this many consecutive times |
@@ -685,7 +702,7 @@ ranked candidate solutions in one call.
 
 Like `Atoms.write()`, the output format is inferred from the file
 extension. Bond connectivity is written too (when the target format
-supports it, e.g. SDF/MOL2); bond *orders* are not currently preserved,
+supports it, e.g. SDF/MOL2); bond *types* are not currently preserved,
 only which atoms are bonded. Writing to a format with no bond table
 (e.g. XYZ) simply omits connectivity:
 

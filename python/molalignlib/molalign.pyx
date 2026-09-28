@@ -36,9 +36,9 @@ cdef extern from "molalign.h":
         int n_atoms1, const int *atom_data1, const double *coords1,
         int n_atoms2, const int *atom_data2, const double *coords2,
         bint align_flag, bint remap_flag, bint heavy_flag, bint mass_flag,
-        bint mirror_flag, bint label_flag,
+        bint mirror_flag, bint atomlabel_flag,
         bint print_stats, bint random_flag,
-        bint prune_flag, double prune_tol, int conv_freq, int max_trials,
+        bint prunetol_flag, double prune_tol, int conv_freq, int max_trials,
         int n_records,
         double *rmsd_list, int *mapping_list,
         double *transform_list, int *occ_records, int *error_code)
@@ -49,7 +49,8 @@ cdef extern from "molalign.h":
         int n_atoms2, const int *atom_data2, const double *coords2,
         int n_bonds2, const int *bond_data2,
         bint align_flag, bint remap_flag, bint heavy_flag, bint mass_flag,
-        bint mirror_flag, bint label_flag, bint bond_flag, double bond_tol,
+        bint mirror_flag, bint atomlabel_flag, bint bondtol_flag, double bond_tol,
+        bint bondtype_flag,
         bint print_stats, bint print_assigntree, bint random_flag,
         int conv_freq, int max_trials,
         int n_records,
@@ -69,13 +70,14 @@ _CONFORMSD_ERROR_MESSAGES = {
     MOLALIGN_ERROR_NOT_ISOMERS: "Molecules are not isomers (different atom counts or compositions).",
     MOLALIGN_ERROR_ATOM_TYPE_MISMATCH: "Atom type mismatch between the two conformers.",
     MOLALIGN_ERROR_MISSING_BONDS: "Missing bond data for one or both conformers.",
-    MOLALIGN_ERROR_BOND_MISMATCH: "Bond connectivity mismatch between the two conformers (only raised "
-       "when remap_flag=False).",
+    MOLALIGN_ERROR_BOND_MISMATCH: "Bond connectivity mismatch between the two conformers, or bond "
+       "type mismatch when bondtype_flag=True (only raised when remap_flag=False).",
     MOLALIGN_ERROR_NOT_CONFORMERS: "Molecules are not conformers (same composition but different "
-       "bond graphs; only raised when remap_flag=True).",
+       "bond graphs, or different bond types when bondtype_flag=True; only raised when "
+       "remap_flag=True).",
 }
 
-# Sentinel used by rmsd.py when bond_flag=True (geometry-derived connectivity).
+# Sentinel used by rmsd.py when bondtol_flag=True (geometry-derived connectivity).
 _EMPTY_BONDS = np.empty((0, 3), dtype=np.int32)
 
 
@@ -163,10 +165,10 @@ def atormsd_calculate(
     bint   heavy_flag,
     bint   mass_flag,
     bint   mirror_flag,
-    bint   label_flag,
+    bint   atomlabel_flag,
     bint   print_stats,
     bint   random_flag,
-    bint   prune_flag,
+    bint   prunetol_flag,
     prune_tol,
     int    conv_freq,
     int    max_trials,
@@ -187,7 +189,7 @@ def atormsd_calculate(
         and ``remap_flag`` are true; otherwise exactly one solution is
         returned regardless of this value.
     prune_tol : float or None
-        Pruning tolerance. Required (no default) when ``prune_flag`` is
+        Pruning tolerance. Required (no default) when ``prunetol_flag`` is
         true; unused otherwise.
     (remaining keyword arguments map 1-to-1 onto the C flags)
 
@@ -219,12 +221,12 @@ def atormsd_calculate(
     coords2    = np.ascontiguousarray(coords2)
 
     # prune_tol has no default: it is required (and only used) when
-    # prune_flag=True, since that is what enables pruning inside the
+    # prunetol_flag=True, since that is what enables pruning inside the
     # library.
     cdef double c_prune_tol = 0.0
-    if prune_flag:
+    if prunetol_flag:
         if prune_tol is None:
-            raise ValueError("prune_tol is required when prune_flag=True")
+            raise ValueError("prune_tol is required when prunetol_flag=True")
         c_prune_tol = <double>prune_tol
 
     cdef int    occ_records = 0
@@ -244,9 +246,9 @@ def atormsd_calculate(
             <const int    *>atom_data2.data,
             <const double *>coords2.data,
             align_flag, remap_flag, heavy_flag, mass_flag,
-            mirror_flag, label_flag,
+            mirror_flag, atomlabel_flag,
             print_stats, random_flag,
-            prune_flag, c_prune_tol, conv_freq, max_trials,
+            prunetol_flag, c_prune_tol, conv_freq, max_trials,
             n_records,
             rmsd_list, mapping_list,
             transform_list, &occ_records, &err,
@@ -284,9 +286,10 @@ def conformsd_calculate(
     bint heavy_flag    = False,
     bint mass_flag     = False,
     bint mirror_flag   = False,
-    bint label_flag    = False,
-    bint bond_flag     = False,
+    bint atomlabel_flag = False,
+    bint bondtol_flag  = False,
     bond_tol                          = None,
+    bint bondtype_flag = False,
     bint print_stats    = False,
     bint print_assigntree = False,
     bint random_flag   = False,
@@ -305,11 +308,17 @@ def conformsd_calculate(
         Cartesian coordinates in Angstrom.
     bond_data1, bond_data2 : int32 array, shape (b, 3), or None
         ``[[a1, a2, bond_type], ...]`` (1-based atom indices).
-        Pass ``None`` (or omit) when ``bond_flag=True``; in that case the
+        Pass ``None`` (or omit) when ``bondtol_flag=True``; in that case the
         library derives connectivity from geometry.
-    bond_tol : float, required when bond_flag=True
+    bond_tol : float, required when bondtol_flag=True
         Bond detection tolerance for geometry-based connectivity. Has no
-        default and is ignored when bond_flag=False.
+        default and is ignored when bondtol_flag=False.
+    bondtype_flag : bool, default False
+        Use the bond types (third column of ``bond_data``) to guide atom
+        matching. Types are compared for equality, never interpreted, so
+        both molecules must use the same bond-type convention (read from
+        the same file format with the same parser). Ignored when
+        ``bondtol_flag=True``.
     align_flag, remap_flag : bool
         Both default to ``False``: by default no structural alignment or
         atom remapping is performed.
@@ -365,12 +374,12 @@ def conformsd_calculate(
     cdef int nb2 = bd2.shape[0]
 
     # bond_tol has no default: it is required (and only used) when
-    # bond_flag=True, since that is what triggers geometry-based bond
+    # bondtol_flag=True, since that is what triggers geometry-based bond
     # perception inside the library.
     cdef double c_bond_tol = 0.0
-    if bond_flag:
+    if bondtol_flag:
         if bond_tol is None:
-            raise ValueError("bond_tol is required when bond_flag=True")
+            raise ValueError("bond_tol is required when bondtol_flag=True")
         c_bond_tol = <double>bond_tol
 
     cdef int    occ_records = 0
@@ -394,7 +403,8 @@ def conformsd_calculate(
             nb2,
             <const int    *>bd2.data,
             align_flag, remap_flag, heavy_flag, mass_flag,
-            mirror_flag, label_flag, bond_flag, c_bond_tol,
+            mirror_flag, atomlabel_flag, bondtol_flag, c_bond_tol,
+            bondtype_flag,
             print_stats, print_assigntree, random_flag,
             conv_freq, max_trials,
             n_records,

@@ -39,7 +39,7 @@ logical(lk) :: print_assignment
 logical(lk) :: write_aligned
 character(:), allocatable :: title1, title2
 character(:), allocatable :: arg, aligned_path
-character(:), allocatable :: in_format, out_format
+character(:), allocatable :: in_format1, in_format2, out_format
 type(strlist_type) :: posargs(2)
 type(atom_t), dimension(:), allocatable :: atoms1, atoms2
 type(bond_t), dimension(:), allocatable :: bonds1, bonds2
@@ -53,6 +53,7 @@ real(rk) :: transmat2(3,3)
 real(rk), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, coords2r
 real(rk), dimension(:,:), allocatable :: full_coords1, full_coords2, full_coords2r
 integer(ik), dimension(:), allocatable :: atomset1, atomset2
+integer(ik), dimension(:), allocatable :: bondtypes
 integer(ik), dimension(:), allocatable :: mapping1, full_atomperm1
 integer(ik) :: n_records, max_trials, conv_freq
 integer(ik) :: in_unit, aligned_unit
@@ -67,10 +68,9 @@ mirror_flag = .FALSE.
 align_flag = .FALSE.
 remap_flag = .FALSE.
 mass_flag = .FALSE.
-stochastic_flag = .TRUE.
-adaptive_flag = .TRUE.
-bond_flag = .FALSE.
-label_flag = .FALSE.
+bondtol_flag = .FALSE.
+bondtype_flag = .FALSE.
+atomlabel_flag = .FALSE.
 random_flag = .FALSE.
 print_stats = .FALSE.
 print_assigntree = .FALSE.
@@ -91,16 +91,13 @@ do while (get_arg(arg))
       align_flag = .TRUE.
    case ('-remap')
       remap_flag = .TRUE.
-   case ('-exhaustive')
-      stochastic_flag = .FALSE.
-   case ('-stochastic')
-      stochastic_flag = .TRUE.
-      adaptive_flag = .FALSE.
-   case ('-bond')
-      bond_flag = .TRUE.
+   case ('-bondtol')
+      bondtol_flag = .TRUE.
       call read_optarg(arg, bond_tol)
-   case ('-label')
-      label_flag = .TRUE.
+   case ('-bondtype')
+      bondtype_flag = .TRUE.
+   case ('-atomlabel')
+      atomlabel_flag = .TRUE.
    case ('-heavy')
       heavy_flag = .TRUE.
    case ('-mass')
@@ -135,15 +132,21 @@ case (0)
 case (1)
    stop 'Too few file paths'
 case (2)
-   call open2read( posargs(1)%arg, in_format, in_unit)
-   call read_file( in_unit, in_format, title1, atoms1, bonds1)
+   call open2read( posargs(1)%arg, in_format1, in_unit)
+   call read_file( in_unit, in_format1, title1, atoms1, bonds1)
    close (in_unit)
-   call open2read( posargs(2)%arg, in_format, in_unit)
-   call read_file( in_unit, in_format, title2, atoms2, bonds2)
+   call open2read( posargs(2)%arg, in_format2, in_unit)
+   call read_file( in_unit, in_format2, title2, atoms2, bonds2)
    close (in_unit)
 case default
    stop 'Too many file paths'
 end select
+
+! Bond types are compared, not interpreted, so they must come from the
+! same parser: both files must have the same format
+if (bondtype_flag .and. in_format1 /= in_format2) then
+   stop 'Bond types can only be compared between files of the same format'
+end if
 
 ! Pad the smaller molecule with dummy atoms appended at the end. Real atoms
 ! keep their indices; padding atoms are recognised by index from here on.
@@ -178,7 +181,7 @@ if (any(atomtypes%parts%n_items1 /= atomtypes%parts%n_items2)) then
 end if
 
 ! Reset bonds
-if (bond_flag) then
+if (bondtol_flag) then
    call bonds_from_atoms( atoms1(1:n_atoms1), bonds1)
    call bonds_from_atoms( atoms2(1:n_atoms2), bonds2)
 end if
@@ -194,9 +197,16 @@ if (size(bonds1) < 1 .or. size(bonds2) < 1) then
 end if
 
 ! Set adjacency lists of the included atoms (bonds to excluded atoms are
-! dropped)
-call adjacency_from_bonds( atoms1(atomset1), extract_bonds( atomset1, n_padding, bonds1), adjcs1)
-call adjacency_from_bonds( atoms2(atomset2), extract_bonds( atomset2, n_padding, bonds2), adjcs2)
+! dropped). With -bondtype, the edges used by the refinement carry the bond
+! types, compacted jointly for both molecules.
+if (bondtype_flag) then
+   bondtypes = distinct_bondtypes( bonds1, bonds2)
+   call adjacency_from_bonds( atoms1(atomset1), extract_bonds( atomset1, n_padding, bonds1), adjcs1, bondtypes)
+   call adjacency_from_bonds( atoms2(atomset2), extract_bonds( atomset2, n_padding, bonds2), adjcs2, bondtypes)
+else
+   call adjacency_from_bonds( atoms1(atomset1), extract_bonds( atomset1, n_padding, bonds1), adjcs1)
+   call adjacency_from_bonds( atoms2(atomset2), extract_bonds( atomset2, n_padding, bonds2), adjcs2)
+end if
 
 ! Weights of the included atoms, normalised to sum 1 over them so both
 ! molecules are scaled by the same factor

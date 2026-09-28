@@ -114,7 +114,9 @@ type, public :: partition_node_t
    type(partition_node_t), pointer :: first_child_part
    type(partition_node_t), pointer :: last_child_part
    type(partition_node_t), pointer :: next_sibling_part
-   type(part_nodeptr_t), dimension(:), pointer :: signature
+   ! Bond-typed signature: one edge_code(part global_idx, bond type)
+   ! per neighbor with a known part, compared as a multiset
+   integer(ik), dimension(:), pointer :: signature
 end type
 
 ! Part reference node
@@ -160,7 +162,8 @@ elemental function part_nodeptr_equality(left, right) result(equality)
 end function
 
 function signature_equivalence(signature1, signature2) result(equiv)
-   type(part_nodeptr_t), dimension(:), intent(in) :: signature1, signature2
+! Multiset equality of two integer-encoded signatures
+   integer(ik), dimension(:), intent(in) :: signature1, signature2
    logical(lk) :: equiv
    integer(ik) :: matches1, matches2
    integer(ik) :: i, j
@@ -174,12 +177,8 @@ function signature_equivalence(signature1, signature2) result(equiv)
       matches1 = 0
       matches2 = 0
       do j = 1, size(signature1)
-         if (associated(signature1(i)%ptr, signature2(j)%ptr)) then
-            matches1 = matches1 + 1
-         end if
-         if (associated(signature1(i)%ptr, signature1(j)%ptr)) then
-            matches2 = matches2 + 1
-         end if
+         if (signature1(i) == signature2(j)) matches1 = matches1 + 1
+         if (signature1(i) == signature1(j)) matches2 = matches2 + 1
       end do
       if (matches1 /= matches2) then
          equiv = .FALSE.
@@ -727,7 +726,7 @@ end function
 
 function find_child_part(part, signature) result(child_part)
    type(partition_node_t), intent(in) :: part
-   type(part_nodeptr_t), dimension(:), intent(in) :: signature
+   integer(ik), dimension(:), intent(in) :: signature
    type(partition_node_t), pointer :: child_part
 
    child_part => part%first_child_part
@@ -946,11 +945,13 @@ subroutine print_chain_tree(assignment_tree)
 end subroutine
 
 subroutine print_part_signature(signature)
-   type(part_nodeptr_t), dimension(:), intent(in) :: signature
+! Print each entry as part_index:bond_type
+   integer(ik), dimension(:), intent(in) :: signature
    integer(ik) :: i
 
    do i = 1, size(signature)
-      write(stderr,'(*(1X,A))',advance='no') address(signature(i)%ptr)
+      write(stderr,'(1X,I0,A,I0)',advance='no') signature(i)/BOND_TYPE_RADIX, ':', &
+            modulo(signature(i), BOND_TYPE_RADIX)
    end do
    write(stderr,*)
 end subroutine
@@ -985,7 +986,7 @@ recursive subroutine print_signature_recurse(part)
    child_part => part%first_child_part
    do while (associated(child_part))
       ! Print the child signature
-      write(stderr,'(A)',advance='no') address(child_part) // ':'
+      write(stderr,'(A,I0,A)',advance='no') 'Part ', child_part%global_idx, ':'
       call print_part_signature(child_part%signature)
 
       ! Recursively print this child's children

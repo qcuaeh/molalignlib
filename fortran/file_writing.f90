@@ -174,11 +174,14 @@ subroutine write_file_mol2(unit, title, atoms, bonds, mapping1)
    do i = 1, n_bonds
       atomidx1 = mapping2(bonds(i)%atomidx1)
       atomidx2 = mapping2(bonds(i)%atomidx2)
-      if (bonds(i)%bondtype > 0) then
+      select case (bonds(i)%bondtype)
+      case (1:3)
          bondtype = str(bonds(i)%bondtype)
-      else
+      case (4)
+         bondtype = 'ar'
+      case default
          bondtype = 'un'
-      end if
+      end select
       write (unit, '(I4,1X,2(1X,I4),1X,A2)') i, atomidx1, atomidx2, bondtype
    end do
 end subroutine

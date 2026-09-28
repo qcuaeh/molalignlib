@@ -67,7 +67,7 @@ mirror_flag = .FALSE.
 align_flag = .FALSE.
 remap_flag = .FALSE.
 mass_flag = .FALSE.
-label_flag = .FALSE.
+atomlabel_flag = .FALSE.
 random_flag = .FALSE.
 print_stats = .FALSE.
 print_assignment = .FALSE.
@@ -88,11 +88,11 @@ do while (get_arg(arg))
       align_flag = .TRUE.
    case ('-remap')
       remap_flag = .TRUE.
-   case ('-prune')
+   case ('-prunetol')
       prune_procedure => prune_rd
       call read_optarg(arg, prune_tol)
-   case ('-label')
-      label_flag = .TRUE.
+   case ('-atomlabel')
+      atomlabel_flag = .TRUE.
    case ('-heavy')
       heavy_flag = .TRUE.
    case ('-mass')

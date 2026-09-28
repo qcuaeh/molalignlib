@@ -34,6 +34,31 @@ public build_assignment_tree
 
 contains
 
+function hna_signature(adjc, itemdir) result(signature)
+! Bond-typed signature of an atom: one edge_code per neighbor whose part
+! is known in itemdir, combining the neighbor's part index and the type
+! of the bond to it. Neighbors with no part in itemdir are left out, as in
+! the cached refinement of assignment_conformer.
+   type(adjc_t), intent(in) :: adjc
+   type(part_nodeptr_t), dimension(:), intent(in) :: itemdir
+   integer(ik), dimension(:), allocatable :: signature
+   ! Local variables
+   integer(ik) :: codes(MAX_COORDNUM)
+   integer(ik) :: n_codes, j
+   type(partition_node_t), pointer :: neighbor_part
+
+   n_codes = 0
+   do j = 1, adjc%cn
+      neighbor_part => itemdir(adjc%list(j))%ptr
+      if (associated(neighbor_part)) then
+         n_codes = n_codes + 1
+         codes(n_codes) = edge_code(neighbor_part%global_idx, adjc%bondtype(j))
+      end if
+   end do
+
+   signature = codes(:n_codes)
+end function
+
 subroutine refine_hna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
 ! Create children for different signatures - caller decides what to do with them
 ! Note: part is always a leaf part with no existing children
@@ -44,12 +69,12 @@ subroutine refine_hna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
    ! Local variables
    type(item_node_t), pointer :: item
    type(partition_node_t), pointer :: child_part
-   type(part_nodeptr_t), dimension(:), allocatable :: signature
+   integer(ik), dimension(:), allocatable :: signature
 
    ! Process first molecule items - create children for each unique signature
    item => part%first_item1
    do while (associated(item))
-      signature = itemdir1(adjcs1(item%idx)%list(:adjcs1(item%idx)%cn))
+      signature = hna_signature(adjcs1(item%idx), itemdir1)
       child_part => find_child_part(part, signature)
       if (.not. associated(child_part)) then
          child_part => new_child_part(part)
@@ -64,7 +89,7 @@ subroutine refine_hna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
    ! Process second molecule items - create children for each unique signature
    item => part%first_item2
    do while (associated(item))
-      signature = itemdir2(adjcs2(item%idx)%list(:adjcs2(item%idx)%cn))
+      signature = hna_signature(adjcs2(item%idx), itemdir2)
       child_part => find_child_part(part, signature)
       if (.not. associated(child_part)) then
          child_part => new_child_part(part)
@@ -139,7 +164,7 @@ subroutine update_hna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
    type(chain_node_t), pointer, intent(inout) :: link
    ! Local variables
    type(item_node_t), pointer :: item
-   type(part_nodeptr_t), dimension(:), allocatable :: signature
+   integer(ik), dimension(:), allocatable :: signature
    type(partition_node_t), pointer :: child_part
 
    ! Reset last item pointers for all children
@@ -153,7 +178,7 @@ subroutine update_hna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
    ! Process first molecule items - update existing item nodes
    item => part%first_item1
    do while (associated(item))
-      signature = itemdir1(adjcs1(item%idx)%list(:adjcs1(item%idx)%cn))
+      signature = hna_signature(adjcs1(item%idx), itemdir1)
       child_part => find_child_part(part, signature)
       if (DEBUG_TESTS) then
          if (.not. associated(child_part)) then
@@ -174,7 +199,7 @@ subroutine update_hna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
    ! Process second molecule items - update existing item nodes
    item => part%first_item2
    do while (associated(item))
-      signature = itemdir2(adjcs2(item%idx)%list(:adjcs2(item%idx)%cn))
+      signature = hna_signature(adjcs2(item%idx), itemdir2)
       child_part => find_child_part(part, signature)
       if (DEBUG_TESTS) then
          if (.not. associated(child_part)) then
@@ -350,7 +375,7 @@ function would_part_split(adjcs1, adjcs2, itemdir1, itemdir2, part) result(would
    ! Local variables
    logical(lk) :: would_split
    type(item_node_t), pointer :: item1, item2
-   type(part_nodeptr_t), dimension(:), allocatable :: signature, reference
+   integer(ik), dimension(:), allocatable :: signature, reference
 
    would_split = .FALSE.
    item1 => part%first_item1
@@ -358,10 +383,10 @@ function would_part_split(adjcs1, adjcs2, itemdir1, itemdir2, part) result(would
 
    ! Set first signature from first available item
    if (associated(item1)) then
-      reference = itemdir1(adjcs1(item1%idx)%list(:adjcs1(item1%idx)%cn))
+      reference = hna_signature(adjcs1(item1%idx), itemdir1)
       item1 => item1%next_item
    else if (associated(item2)) then
-      reference = itemdir2(adjcs2(item2%idx)%list(:adjcs2(item2%idx)%cn))
+      reference = hna_signature(adjcs2(item2%idx), itemdir2)
       item2 => item2%next_item
    else
       return  ! No items to process
@@ -369,7 +394,7 @@ function would_part_split(adjcs1, adjcs2, itemdir1, itemdir2, part) result(would
 
    ! Check remaining items in first molecule
    do while (associated(item1))
-      signature = itemdir1(adjcs1(item1%idx)%list(:adjcs1(item1%idx)%cn))
+      signature = hna_signature(adjcs1(item1%idx), itemdir1)
       if (.not. (signature .equiv. reference)) then
          would_split = .TRUE.
          return
@@ -379,7 +404,7 @@ function would_part_split(adjcs1, adjcs2, itemdir1, itemdir2, part) result(would
 
    ! Check remaining items in second molecule
    do while (associated(item2))
-      signature = itemdir2(adjcs2(item2%idx)%list(:adjcs2(item2%idx)%cn))
+      signature = hna_signature(adjcs2(item2%idx), itemdir2)
       if (.not. (signature .equiv. reference)) then
          would_split = .TRUE.
          return

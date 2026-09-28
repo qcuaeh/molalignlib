@@ -71,7 +71,8 @@ subroutine optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
    ! Reset registry for new conformer
    call reset_registry( registry)
 
-   if ((stochastic_flag .and. .not. adaptive_flag) .or. (stochastic_flag .and. adaptive_flag .and. &
+   ! Choose the search strategy (see FORCE_EXHAUSTIVE and FORCE_STOCHASTIC)
+   if (.not. FORCE_EXHAUSTIVE .and. (FORCE_STOCHASTIC .or. &
          cache_arrays%total_combinations > conv_freq*cache_arrays%partial_combinations)) then
 
       ! Initialize random number generator

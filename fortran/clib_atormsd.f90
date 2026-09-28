@@ -27,7 +27,7 @@ contains
 ! No bond data is needed for the atom-RMSD calculation.
 !
 !   c_prune_tol    : pruning tolerance (only used, and required, when
-!                     c_prune_flag is true; no default)
+!                     c_prunetol_flag is true; no default)
 !
 ! Multiple ranked candidate solutions:
 !   c_n_records requests up to that many ranked candidate solutions. Records
@@ -66,9 +66,9 @@ subroutine atormsd_calculate(                                        &
       c_n_atoms1,  c_atom_data1,  c_coords1,                            &
       c_n_atoms2,  c_atom_data2,  c_coords2,                            &
       c_align_flag, c_remap_flag, c_heavy_flag, c_mass_flag,         &
-      c_mirror_flag, c_label_flag,                                   &
+      c_mirror_flag, c_atomlabel_flag,                               &
       c_print_stats, c_random_flag,                                   &
-      c_prune_flag, c_prune_tol, c_conv_freq, c_max_trials,          &
+      c_prunetol_flag, c_prune_tol, c_conv_freq, c_max_trials,       &
       c_n_records,                                                   &
       c_rmsd_list, c_mapping_list,                                       &
       c_transform_list, c_occ_records, c_error_code)                  &
@@ -86,9 +86,9 @@ subroutine atormsd_calculate(                                        &
 
    ! Flags
    logical(lk), intent(in), value :: c_align_flag, c_remap_flag, c_heavy_flag, c_mass_flag
-   logical(lk), intent(in), value :: c_mirror_flag, c_label_flag
+   logical(lk), intent(in), value :: c_mirror_flag, c_atomlabel_flag
    logical(lk), intent(in), value :: c_print_stats, c_random_flag
-   logical(lk), intent(in), value :: c_prune_flag
+   logical(lk), intent(in), value :: c_prunetol_flag
    real(rk),    intent(in), value :: c_prune_tol
    integer(ik), intent(in), value :: c_conv_freq, c_max_trials
 
@@ -131,16 +131,16 @@ subroutine atormsd_calculate(                                        &
    end do
 
    ! Set options
-   align_flag  = c_align_flag
-   remap_flag  = c_remap_flag
-   heavy_flag  = c_heavy_flag
-   mass_flag   = c_mass_flag
-   mirror_flag = c_mirror_flag
-   label_flag  = c_label_flag
-   random_flag = c_random_flag
-   print_stats = c_print_stats
+   align_flag     = c_align_flag
+   remap_flag     = c_remap_flag
+   heavy_flag     = c_heavy_flag
+   mass_flag      = c_mass_flag
+   mirror_flag    = c_mirror_flag
+   atomlabel_flag = c_atomlabel_flag
+   random_flag    = c_random_flag
+   print_stats    = c_print_stats
 
-   if (c_prune_flag) then
+   if (c_prunetol_flag) then
       prune_procedure => prune_rd
       prune_tol = c_prune_tol
    else

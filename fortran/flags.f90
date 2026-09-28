@@ -19,16 +19,15 @@ use parameters
 implicit none
 
 ! Flags
-logical(lk) :: bond_flag
+logical(lk) :: bondtol_flag
+logical(lk) :: bondtype_flag
 logical(lk) :: random_flag
 logical(lk) :: mirror_flag
-logical(lk) :: label_flag
+logical(lk) :: atomlabel_flag
 logical(lk) :: heavy_flag
 logical(lk) :: mass_flag
 logical(lk) :: align_flag
 logical(lk) :: remap_flag
-logical(lk) :: stochastic_flag
-logical(lk) :: adaptive_flag
 logical(lk) :: print_stats
 logical(lk) :: print_assigntree
 

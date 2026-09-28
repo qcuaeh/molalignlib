@@ -33,12 +33,12 @@ extern "C" {
  * @param mirror_flag   Mirror second molecule (reflect it on the yz plane,
  *                      x -> -x) before comparing; transform_list includes
  *                      the reflection
- * @param label_flag    Use atom type labels for matching
+ * @param atomlabel_flag Use atom type labels for matching
  * @param print_stats    Print optimisation statistics
  * @param random_flag   Use random algorithm
- * @param prune_flag    Enable pruning
+ * @param prunetol_flag Enable pruning
  * @param prune_tol     Pruning tolerance. Required (no default) when
- *                      prune_flag=true; unused otherwise.
+ *                      prunetol_flag=true; unused otherwise.
  * @param conv_freq     Convergence frequency
  * @param max_trials    Maximum number of trials
  *
@@ -81,9 +81,9 @@ void atormsd_calculate(
     int n_atoms1, const int *atom_data1, const double *coords1,
     int n_atoms2, const int *atom_data2, const double *coords2,
     bool align_flag, bool remap_flag, bool heavy_flag, bool mass_flag,
-    bool mirror_flag, bool label_flag,
+    bool mirror_flag, bool atomlabel_flag,
     bool print_stats, bool random_flag,
-    bool prune_flag, double prune_tol, int conv_freq, int max_trials,
+    bool prunetol_flag, double prune_tol, int conv_freq, int max_trials,
     int n_records,
     double *rmsd_list, int *mapping_list,
     double *transform_list, int *occ_records, int *error_code);
@@ -103,12 +103,15 @@ void atormsd_calculate(
  *                       are always excluded from the comparison.
  *                       label = 0 means unlabelled.
  * @param coords1       Coordinates, row-major [x0,y0,z0,...], length n_atoms1*3
- * @param n_bonds1      Number of bonds in molecule 1 (may be 0 when bond_flag=true)
- * @param bond_data1    Flat bond array [a1,a2,type,...], 1-based, length n_bonds1*3
+ * @param n_bonds1      Number of bonds in molecule 1 (may be 0 when bondtol_flag=true)
+ * @param bond_data1    Flat bond array [a1,a2,type,...], 1-based, length n_bonds1*3.
+ *                      type is any integer bond-type code; it is only used
+ *                      when bondtype_flag=true, and then only compared for
+ *                      equality, never interpreted.
  * @param n_atoms2      Number of atoms in molecule 2
  * @param atom_data2    Packed atom data, length n_atoms2*2 (same layout)
  * @param coords2       Coordinates, row-major [x0,y0,z0,...], length n_atoms2*3
- * @param n_bonds2      Number of bonds in molecule 2 (may be 0 when bond_flag=true)
+ * @param n_bonds2      Number of bonds in molecule 2 (may be 0 when bondtol_flag=true)
  * @param bond_data2    Flat bond array [a1,a2,type,...], 1-based, length n_bonds2*3
  *
  * @param align_flag    Enable structural alignment
@@ -118,10 +121,20 @@ void atormsd_calculate(
  * @param mirror_flag   Mirror second molecule (reflect it on the yz plane,
  *                      x -> -x) before comparing; transform_list includes
  *                      the reflection
- * @param label_flag    Use atom type labels for matching
- * @param bond_flag     Derive connectivity from geometry, not bond table
+ * @param atomlabel_flag Use atom type labels for matching
+ * @param bondtol_flag  Derive connectivity from geometry, not bond table
  * @param bond_tol      Bond detection tolerance for geometry-based connectivity.
- *                      Required (no default) when bond_flag=true; unused otherwise.
+ *                      Required (no default) when bondtol_flag=true; unused otherwise.
+ * @param bondtype_flag Use bond types to guide atom matching: bonds of
+ *                      different type are distinguished in the HNA
+ *                      partition. Types are compared, not interpreted, so
+ *                      both molecules must use the same bond-type
+ *                      convention (e.g. read from the same file format with
+ *                      the same parser). Differing Kekule/aromatic encodings
+ *                      of the same molecule yield
+ *                      MOLALIGN_ERROR_NOT_CONFORMERS, or
+ *                      MOLALIGN_ERROR_BOND_MISMATCH when remap_flag=false.
+ *                      Ignored when bondtol_flag=true.
  * @param print_stats    Print optimisation statistics
  * @param print_assigntree Print the atom-assignment search tree
  * @param random_flag   Use random algorithm
@@ -177,7 +190,8 @@ void conformsd_calculate(
     int n_atoms2, const int *atom_data2, const double *coords2,
     int n_bonds2, const int *bond_data2,
     bool align_flag, bool remap_flag, bool heavy_flag, bool mass_flag,
-    bool mirror_flag, bool label_flag, bool bond_flag, double bond_tol,
+    bool mirror_flag, bool atomlabel_flag, bool bondtol_flag, double bond_tol,
+    bool bondtype_flag,
     bool print_stats, bool print_assigntree, bool random_flag,
     int conv_freq, int max_trials,
     int n_records,

@@ -156,7 +156,8 @@ class RMSDResult(object):
                 coords=new_coords,
                 bond_data=new_bonddata,
                 name=cluster_or_conformer.name,
-                symbols=new_symbols
+                symbols=new_symbols,
+                bond_source=cluster_or_conformer.bond_source
             )
         else:
             c = Atoms(
@@ -174,6 +175,16 @@ class RMSDResult(object):
 # ---------------------------------------------------------------------------
 # Chemfiles helpers
 # ---------------------------------------------------------------------------
+
+def _file_format(path):
+    """
+    Format tag of a file, taken from its extension (the same way chemfiles
+    infers the format). Conformers read from files with the same tag were
+    parsed by the same chemfiles reader, so their bond types follow the same
+    convention.
+    """
+    return Path(path).suffix.lower().lstrip(".")
+
 
 def _extract_frame_data(frame):
     """
@@ -302,7 +313,7 @@ def read_conformers(path, frames=None):
                 name = "{}_{}".format(stem, idx)
                 conformers.append(Conformer(
                     atom_data=atom_data, coords=coords, bond_data=bond_data, 
-                    name=name, symbols=symbols
+                    name=name, symbols=symbols, bond_source=_file_format(path)
                 ))
             return tuple(conformers)
         else:
@@ -311,7 +322,7 @@ def read_conformers(path, frames=None):
                 name = "{}_{}".format(stem, idx)
                 conformers.append(Conformer(
                     atom_data=atom_data, coords=coords, bond_data=bond_data, 
-                    name=name, symbols=symbols
+                    name=name, symbols=symbols, bond_source=_file_format(path)
                 ))
             return conformers
 
@@ -423,10 +434,9 @@ class Atoms(object):
         heavy_only=False,
         mass_weighted=False,
         mirror=False,
-        use_labels=False,
+        use_atom_label=False,
         stats=False,
         random=False,
-        prune=False,
         prune_tol=None,
         conv_freq=10,
         max_trials=10000,
@@ -447,13 +457,16 @@ class Atoms(object):
         RMSDResult.mapping). Hydrogens are not part of the RMSD;
         they are paired afterwards, following their heavy neighbour where
         bonds are known and by distance otherwise.
+
+        prune_tol (Å) enables pruning: assignments with pair distances
+        exceeding prune_tol are discarded. Defaults to None, which
+        disables pruning.
         """
         if not isinstance(other, Atoms):
             raise TypeError("Expected Atoms, got {}".format(type(other).__name__))
 
-        # prune_tol has no default: it is required whenever prune=True.
-        if prune and prune_tol is None:
-            raise ValueError("prune_tol is required when prune=True")
+        # Pruning is enabled by giving a tolerance
+        prunetol_flag = prune_tol is not None
 
         rmsd_vals, maps, tfs = _molalign.atormsd_calculate(
             self._atom_data, self._coords,
@@ -463,10 +476,10 @@ class Atoms(object):
             heavy_flag=heavy_only,
             mass_flag=mass_weighted,
             mirror_flag=mirror,
-            label_flag=use_labels,
+            atomlabel_flag=use_atom_label,
             print_stats=stats,
             random_flag=random,
-            prune_flag=prune,
+            prunetol_flag=prunetol_flag,
             prune_tol=prune_tol,
             conv_freq=conv_freq,
             max_trials=max_trials,
@@ -491,7 +504,7 @@ class Conformer(object):
     """
 
     def __init__(self, atom_data=None, coords=None, bond_data=None, name="conformer",
-                 symbols=None, labels=None):
+                 symbols=None, labels=None, bond_source=None):
         """
         Either ``atom_data`` (atomic numbers, as before) or ``symbols``
         (element symbols, e.g. ["C", "H", "H", "H"]) must be provided; the
@@ -503,6 +516,13 @@ class Conformer(object):
             Per-atom labels (see molalign.h); only used when building
             ``atom_data`` from ``symbols``. Defaults to all-zero
             (unlabelled). Ignored if ``atom_data`` is given directly.
+
+        bond_source : str, optional
+            Tag naming the convention of the bond types in ``bond_data``
+            (the file format for conformers read from files). Bond types are
+            only compared when both conformers share the same tag; see
+            ``rmsd_to(use_bond_type=True)``. Defaults to None, which is
+            the tag of all conformers built directly from arrays.
         """
         self._coords = np.asarray(coords, dtype=np.float64)
 
@@ -532,6 +552,7 @@ class Conformer(object):
             self._bond_data = np.empty((0, 3), dtype=np.int32)
 
         self._name = name
+        self._bond_source = bond_source
 
     @classmethod
     def from_file(cls, path, frame_idx=0):
@@ -540,15 +561,19 @@ class Conformer(object):
             frame = trajectory.read_step(frame_idx)
             atom_data, coords, bond_data, symbols = _extract_frame_data(frame)
             name = Path(path).stem
-            return cls(atom_data=atom_data, coords=coords, bond_data=bond_data, name=name, symbols=symbols)
+            return cls(atom_data=atom_data, coords=coords, bond_data=bond_data, name=name,
+                       symbols=symbols, bond_source=_file_format(path))
 
     @classmethod
-    def from_symbols(cls, symbols, coords, bond_data=None, name="conformer", labels=None):
+    def from_symbols(cls, symbols, coords, bond_data=None, name="conformer", labels=None,
+                     bond_source=None):
         """Build a Conformer directly from element symbols, coordinates, and bonds."""
-        return cls(coords=coords, bond_data=bond_data, name=name, symbols=symbols, labels=labels)
+        return cls(coords=coords, bond_data=bond_data, name=name, symbols=symbols, labels=labels,
+                   bond_source=bond_source)
 
     @classmethod
-    def from_numbers(cls, atomic_numbers, coords, bond_data=None, name="conformer", labels=None):
+    def from_numbers(cls, atomic_numbers, coords, bond_data=None, name="conformer", labels=None,
+                     bond_source=None):
         """Build a Conformer directly from atomic numbers, coordinates, and bonds."""
         atomic_numbers = list(atomic_numbers)
         if labels is None:
@@ -556,7 +581,8 @@ class Conformer(object):
         elif len(labels) != len(atomic_numbers):
             raise ValueError("labels must have the same length as atomic_numbers")
         atom_data = np.array(list(zip(atomic_numbers, labels)), dtype=np.int32)
-        return cls(atom_data=atom_data, coords=coords, bond_data=bond_data, name=name)
+        return cls(atom_data=atom_data, coords=coords, bond_data=bond_data, name=name,
+                   bond_source=bond_source)
 
     @property
     def name(self):
@@ -586,12 +612,17 @@ class Conformer(object):
     def symbols(self):
         return self._symbols
 
+    @property
+    def bond_source(self):
+        """Tag of the bond-type convention (file format, or None)."""
+        return self._bond_source
+
     def write(self, path, comment=None):
         """
         Write this conformer, including bond connectivity, using chemfiles.
         The output format is inferred from the file extension (e.g. .sdf,
         .mol2, .pdb, .xyz, ...), the same way read_conformers()/from_file()
-        infer the input format. Bond orders are not currently preserved on
+        infer the input format. Bond types are not currently preserved on
         write, only connectivity.
         """
         frame = _build_frame(
@@ -607,9 +638,9 @@ class Conformer(object):
         heavy_only=False,
         mass_weighted=False,
         mirror=False,
-        use_labels=False,
-        infer_bonds=False,
-        bond_tol=0.3,
+        use_atom_label=False,
+        bond_tol=None,
+        use_bond_type=False,
         stats=False,
         random=False,
         conv_freq=100,
@@ -632,25 +663,42 @@ class Conformer(object):
         they are paired afterwards, following their heavy neighbour where
         bonds are known and by distance otherwise.
 
-        bond_tol (default 0.3 Å) is the bond-detection tolerance used when
-        infer_bonds=True; it is ignored otherwise.
+        bond_tol (Å) enables bond detection: connectivity is inferred from
+        geometry with this tolerance instead of using each structure's bond
+        table. Defaults to None, which disables bond detection.
+
+        use_bond_type=True also uses the bond types to guide atom
+        matching. Types are compared, never interpreted, so both conformers
+        must have the same bond_source (e.g. both read from files of the
+        same format); otherwise a ValueError is raised. It has no effect
+        when bond_tol is given, since inferred bonds are untyped.
         """
         if not isinstance(other, Conformer):
             raise TypeError("Expected Conformer, got {}".format(type(other).__name__))
 
+        # Bond detection is enabled by giving a tolerance
+        bondtol_flag = bond_tol is not None
+
+        if use_bond_type and not bondtol_flag and self._bond_source != other._bond_source:
+            raise ValueError(
+                "use_bond_type=True requires both conformers to have the same bond "
+                "source (got {!r} and {!r})".format(self._bond_source, other._bond_source)
+            )
+
         rmsd_vals, maps, tfs = _molalign.conformsd_calculate(
             self._atom_data, self._coords,
             other._atom_data, other._coords,
-            bond_data1=self._bond_data if not infer_bonds else None,
-            bond_data2=other._bond_data if not infer_bonds else None,
+            bond_data1=self._bond_data if not bondtol_flag else None,
+            bond_data2=other._bond_data if not bondtol_flag else None,
             align_flag=align,
             remap_flag=remap,
             heavy_flag=heavy_only,
             mass_flag=mass_weighted,
             mirror_flag=mirror,
-            label_flag=use_labels,
-            bond_flag=infer_bonds,
+            atomlabel_flag=use_atom_label,
+            bondtol_flag=bondtol_flag,
             bond_tol=bond_tol,
+            bondtype_flag=use_bond_type,
             print_stats=stats,
             random_flag=random,
             conv_freq=conv_freq,

@@ -112,7 +112,7 @@ subroutine collect_atomtypes(atoms1, atoms2, atomtypes)
    integer(ik) :: current_part, max_parts
    integer(ik) :: atomidx, partidx, i
 
-   if (label_flag) then
+   if (atomlabel_flag) then
       compare_atoms => compare_atoms_labeled
    else
       compare_atoms => compare_atoms_simple

@@ -30,11 +30,10 @@ public complete_mapping
 public extract_bonds
 public bonds_from_atoms
 public adjacency_from_bonds
+public distinct_bondtypes
+public mol2_bondtype
 public print_atoms
 public print_bonds
-!public get_adjmat
-!public add_bond
-!public remove_bond
 
 type, public :: atom_t
    integer(ik) :: elnum
@@ -378,34 +377,101 @@ subroutine bonds_from_atoms(atoms, bonds)
    deallocate (is_bonded)
 end subroutine
 
-subroutine adjacency_from_bonds(atoms, bonds, adjcs)
+subroutine adjacency_from_bonds(atoms, bonds, adjcs, bondtypes)
 ! Adjacency lists of all atoms in atoms. To restrict them to a set of
 ! atoms, pass the atoms of the set and the bonds from extract_bonds.
+! If bondtypes (see distinct_bondtypes) is present, each neighbor carries
+! the compacted type of its bond: the position of the bond's type in
+! bondtypes. Bond types are not interpreted, only compared, so both
+! molecules must come from the same source (file format and parser).
+! Without bondtypes all bonds are ANY_BOND and only connectivity is
+! compared.
    type(atom_t), dimension(:), intent(in) :: atoms
    type(bond_t), dimension(:), intent(in) :: bonds
    type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs
+   integer(ik), dimension(:), intent(in), optional :: bondtypes
    ! Local variables
-   logical(lk), dimension(:,:), allocatable :: adjmat
-   integer(ik) :: n_atoms, atomidx1, atomidx2, i
+   integer(ik), dimension(:,:), allocatable :: adjmat
+   integer(ik) :: n_atoms, atomidx1, atomidx2, bondtype, i, j
 
    n_atoms = size(atoms)
 
+   ! Adjacency matrix of the bonds (bond type of each bond, NO_BOND where
+   ! there is none). A pair listed more than once keeps the type of its
+   ! last occurrence.
    allocate (adjmat(n_atoms, n_atoms))
-   adjmat = .FALSE.
-
-   ! Build adjacency matrix from bonds
+   adjmat = NO_BOND
    do i = 1, size(bonds)
+      bondtype = ANY_BOND
+      if (present(bondtypes)) then
+         do j = 1, size(bondtypes)
+            if (bondtypes(j) == bonds(i)%bondtype) then
+               bondtype = min(j, MAX_BOND_TYPE)
+               exit
+            end if
+         end do
+      end if
       atomidx1 = bonds(i)%atomidx1
       atomidx2 = bonds(i)%atomidx2
-      adjmat(atomidx1, atomidx2) = .TRUE.
-      adjmat(atomidx2, atomidx1) = .TRUE.
+      adjmat(atomidx1, atomidx2) = bondtype
+      adjmat(atomidx2, atomidx1) = bondtype
    end do
 
-   ! Convert to adjacency lists
    call adjmat_to_adjcs(adjmat, adjcs)
-
-   deallocate (adjmat)
 end subroutine
+
+function distinct_bondtypes(bonds1, bonds2) result(bondtypes)
+! Distinct bond types found in either molecule, in ascending order. Bond
+! type bondtypes(k) is compacted to k in adjacency_from_bonds, so the bond
+! types of both molecules are consistent when they share this array.
+   type(bond_t), dimension(:), intent(in) :: bonds1, bonds2
+   integer(ik), dimension(:), allocatable :: bondtypes
+   ! Local variables
+   integer(ik), dimension(:), allocatable :: alltypes
+   integer(ik) :: n_types, i, j, value
+
+   alltypes = [bonds1%bondtype, bonds2%bondtype]
+   allocate (bondtypes(size(alltypes)))
+
+   ! Insertion into a sorted list of unique values
+   n_types = 0
+   do i = 1, size(alltypes)
+      value = alltypes(i)
+      j = n_types
+      do while (j > 0)
+         if (bondtypes(j) <= value) exit
+         j = j - 1
+      end do
+      if (j > 0) then
+         if (bondtypes(j) == value) cycle
+      end if
+      bondtypes(j+2:n_types+1) = bondtypes(j+1:n_types)
+      bondtypes(j+1) = value
+      n_types = n_types + 1
+   end do
+
+   bondtypes = bondtypes(:n_types)
+end function
+
+function mol2_bondtype(typestr) result(bondtype)
+! Integer bond type (MOL convention) of a MOL2 bond type string. Amide
+! bonds are single bonds; dummy, unknown and not connected are 0.
+   character(*), intent(in) :: typestr
+   integer(ik) :: bondtype
+
+   select case (trim(adjustl(typestr)))
+   case ('1', 'am', 'AM', 'Am')
+      bondtype = 1
+   case ('2')
+      bondtype = 2
+   case ('3')
+      bondtype = 3
+   case ('ar', 'AR', 'Ar')
+      bondtype = 4
+   case default
+      bondtype = 0
+   end select
+end function
 
 function get_coords_atoms(atoms, weights, center, transmat) result(coords)
 ! Coordinates of all the atoms passed in, as a 3 x size(atoms) array. Pass

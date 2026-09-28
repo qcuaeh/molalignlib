@@ -16,7 +16,7 @@ test_binary() {
 run_tests_jcim2c01187() {
    rmsdbin=./atormsd
    testdir=jcim.2c01187/$1
-   options=(-align -remap -stats -records 10 -prune "$1" -aligned xyz)
+   options=(-align -remap -stats -records 10 -prunetol "$1" -aligned xyz)
    test_binary "$rmsdbin"
    while read name; do
       echo -n "Running test $testdir/$name... "

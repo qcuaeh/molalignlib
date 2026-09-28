@@ -253,8 +253,8 @@ fail:
 /* option value constants */
 enum {
     OPT_ALIGN = 1, OPT_REMAP, OPT_HEAVY, OPT_MASS,
-    OPT_MIRROR, OPT_LABEL, OPT_ASSIGNMENT, OPT_PRINTTRANS,
-    OPT_STATS, OPT_RANDOM, OPT_PRUNE, OPT_FREQ,
+    OPT_MIRROR, OPT_ATOMLABEL, OPT_ASSIGNMENT, OPT_PRINTTRANS,
+    OPT_STATS, OPT_RANDOM, OPT_PRUNETOL, OPT_FREQ,
     OPT_TRIALS, OPT_RECORDS, OPT_HELP
 };
 
@@ -264,10 +264,10 @@ static const long_opt_t long_options[] = {
     {"heavy",           0, OPT_HEAVY},
     {"mass",            0, OPT_MASS},
     {"mirror",          0, OPT_MIRROR},
-    {"label",           0, OPT_LABEL},
+    {"atomlabel",       0, OPT_ATOMLABEL},
     {"stats",           0, OPT_STATS},
     {"random",          0, OPT_RANDOM},
-    {"prune",           1, OPT_PRUNE},
+    {"prunetol",        1, OPT_PRUNETOL},
     {"freq",            1, OPT_FREQ},
     {"trials",          1, OPT_TRIALS},
     {"records",         1, OPT_RECORDS},
@@ -283,10 +283,10 @@ static const opt_info_t opt_info[] = {
     [OPT_HEAVY]           = {"Use only heavy (non-hydrogen) atoms",                NULL   },
     [OPT_MASS]            = {"Weight atoms by their atomic masses",                NULL   },
     [OPT_MIRROR]          = {"Mirror the second molecule",                         NULL   },
-    [OPT_LABEL]           = {"Use atom labels for matching",                       NULL   },
+    [OPT_ATOMLABEL]       = {"Use atom labels for matching",                       NULL   },
     [OPT_STATS]           = {"Print optimisation statistics",                      NULL   },
     [OPT_RANDOM]          = {"Use random algorithm",                               NULL   },
-    [OPT_PRUNE]           = {"Set pruning tolerance",                              "TOL"  },
+    [OPT_PRUNETOL]        = {"Set pruning tolerance",                              "TOL"  },
     [OPT_FREQ]            = {"Set convergence frequency (default: 10)",            "N"    },
     [OPT_TRIALS]          = {"Set maximum number of trials (default: 10000)",      "N"    },
     [OPT_RECORDS]         = {"Return up to N ranked solutions (default: 1)",       "N"    },
@@ -308,10 +308,10 @@ int main(int argc, char **argv)
 {
     const char *optarg = NULL;
     bool align_flag = false, remap_flag = false, heavy_flag = false, mass_flag = false;
-    bool mirror_flag = false, label_flag = false;
+    bool mirror_flag = false, atomlabel_flag = false;
     bool print_assignment = false, print_transform = false;
     bool print_stats = false, random_flag = false;
-    bool prune_flag = false;
+    bool prunetol_flag = false;
     double prune_tol = 0.0;
     int conv_freq = 10, max_trials = 10000;
     int n_records = 1;
@@ -329,10 +329,10 @@ int main(int argc, char **argv)
         case OPT_HEAVY:           heavy_flag    = true;         break;
         case OPT_MASS:            mass_flag     = true;         break;
         case OPT_MIRROR:          mirror_flag   = true;         break;
-        case OPT_LABEL:           label_flag    = true;         break;
+        case OPT_ATOMLABEL:       atomlabel_flag = true;        break;
         case OPT_STATS:           print_stats   = true;         break;
         case OPT_RANDOM:          random_flag   = true;         break;
-        case OPT_PRUNE:           prune_flag = true; prune_tol = atof(optarg); break;
+        case OPT_PRUNETOL:        prunetol_flag = true; prune_tol = atof(optarg); break;
         case OPT_FREQ:            conv_freq     = atoi(optarg); break;
         case OPT_TRIALS:          max_trials    = atoi(optarg); break;
         case OPT_RECORDS:         n_records     = atoi(optarg); break;
@@ -380,9 +380,9 @@ int main(int argc, char **argv)
         n1, atom_data1, coords1,
         n2, atom_data2, coords2,
         align_flag, remap_flag, heavy_flag, mass_flag,
-        mirror_flag, label_flag,
+        mirror_flag, atomlabel_flag,
         print_stats, random_flag,
-        prune_flag, prune_tol, conv_freq, max_trials,
+        prunetol_flag, prune_tol, conv_freq, max_trials,
         n_records,
         rmsd_list, mapping_list,
         transform_list, &occ_records, &error_code);

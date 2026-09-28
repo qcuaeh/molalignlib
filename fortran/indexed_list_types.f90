@@ -96,6 +96,8 @@ type, public :: array_trees_t
    integer(ik), allocatable :: adjcs2_cn(:)         ! Count for each adjcs2 atom's adjacency list
    integer(ik), allocatable :: adjcs1_list(:,:)     ! Direct 2D adjacency lists for adjcs1 [atom_idx, neighbor_idx]
    integer(ik), allocatable :: adjcs2_list(:,:)     ! Direct 2D adjacency lists for adjcs2 [atom_idx, neighbor_idx]
+   integer(ik), allocatable :: adjcs1_bondtype(:,:) ! Bond types matching adjcs1_list [atom_idx, neighbor_idx]
+   integer(ik), allocatable :: adjcs2_bondtype(:,:) ! Bond types matching adjcs2_list [atom_idx, neighbor_idx]
    ! Metadata
    integer(ik) :: n_atoms1, n_atoms2  ! number of atoms in each molecule
    integer(ik) :: total_items1, total_items2, total_parts
@@ -121,21 +123,27 @@ subroutine cache_adjacency_lists(adjcs1, adjcs2, cache_arrays)
    allocate(cache_arrays%adjcs2_cn(n_atoms2))
    allocate(cache_arrays%adjcs1_list(n_atoms1, MAX_COORDNUM))
    allocate(cache_arrays%adjcs2_list(n_atoms2, MAX_COORDNUM))
+   allocate(cache_arrays%adjcs1_bondtype(n_atoms1, MAX_COORDNUM))
+   allocate(cache_arrays%adjcs2_bondtype(n_atoms2, MAX_COORDNUM))
 
    ! Initialize adjacency lists to zero
    cache_arrays%adjcs1_list = 0
    cache_arrays%adjcs2_list = 0
+   cache_arrays%adjcs1_bondtype = NO_BOND
+   cache_arrays%adjcs2_bondtype = NO_BOND
 
    ! Copy adjacency data for molecule 1
    do i = 1, n_atoms1
       cache_arrays%adjcs1_cn(i) = adjcs1(i)%cn
       cache_arrays%adjcs1_list(i, 1:adjcs1(i)%cn) = adjcs1(i)%list(1:adjcs1(i)%cn)
+      cache_arrays%adjcs1_bondtype(i, 1:adjcs1(i)%cn) = adjcs1(i)%bondtype(1:adjcs1(i)%cn)
    end do
 
    ! Copy adjacency data for molecule 2
    do i = 1, n_atoms2
       cache_arrays%adjcs2_cn(i) = adjcs2(i)%cn
       cache_arrays%adjcs2_list(i, 1:adjcs2(i)%cn) = adjcs2(i)%list(1:adjcs2(i)%cn)
+      cache_arrays%adjcs2_bondtype(i, 1:adjcs2(i)%cn) = adjcs2(i)%bondtype(1:adjcs2(i)%cn)
    end do
 end subroutine
 
@@ -203,14 +211,11 @@ subroutine convert_signature(part, cache_arrays, part_idx)
    integer(ik) :: temp_count, i, j, value
    logical(lk) :: found
 
-   ! First pass: collect all non-null signature values
-   temp_count = 0
-   do i = 1, size(part%signature)
-      if (associated(part%signature(i)%ptr)) then
-         temp_count = temp_count + 1
-         temp_values(temp_count) = part%signature(i)%ptr%global_idx
-      end if
-   end do
+   ! First pass: collect the signature codes. They are already integer
+   ! encoded edge codes (part global_idx and bond type) and neighbors
+   ! without a part were left out when the signature was built.
+   temp_count = size(part%signature)
+   temp_values(:temp_count) = part%signature
 
    ! Store total signature length
    cache_arrays%partree(part_idx)%signature_size = temp_count
@@ -584,8 +589,10 @@ recursive subroutine print_signatures_recursive_array(cache_arrays, part_idx)
          write(stderr, '(A)', advance='no') ' ['
          do j = 1, cache_arrays%partree(child_idx)%signature_unique_count
             if (j > 1) write(stderr, '(A)', advance='no') ', '
-            write(stderr, '(I0,A,I0)', advance='no') &
-               cache_arrays%partree(child_idx)%signature_values(j), '×', &
+            ! Decode edge code as part_index:bond_type
+            write(stderr, '(I0,A,I0,A,I0)', advance='no') &
+               cache_arrays%partree(child_idx)%signature_values(j)/BOND_TYPE_RADIX, ':', &
+               modulo(cache_arrays%partree(child_idx)%signature_values(j), BOND_TYPE_RADIX), '×', &
                cache_arrays%partree(child_idx)%signature_frequencies(j)
          end do
          write(stderr, '(A)') ']'
