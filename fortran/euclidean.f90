@@ -15,6 +15,8 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module euclidean
+! Rotations (as unit quaternions) and squared-distance measures between
+! mapped coordinate sets
 use parameters
 use common_types
 use permutation
@@ -87,18 +89,18 @@ end interface
 contains
 
 function angle(q)
+! Rotation angle of the unit quaternion q, in degrees, in [0, 180]
    real(rk), dimension(4), intent(in) :: q
    real(rk) :: angle
 
-!   angle = (180./asin(1.))*atan2(sqrt(sum(q(2:4)**2)), q(1))
    angle = (180./asin(1.))*atan2(sqrt(sum(q(2:4)**2)), abs(q(1)))
 end function
 
 function quatmul(p, q) result(pq)
+! Quaternion product p*q
    real(rk), dimension(4), intent(in) :: p, q
    real(rk) :: pq(4)
 
-   ! Quaternion multiplication
    pq(1) = p(1)*q(1) - p(2)*q(2) - p(3)*q(3) - p(4)*q(4)
    pq(2) = p(1)*q(2) + p(2)*q(1) + p(3)*q(4) - p(4)*q(3)
    pq(3) = p(1)*q(3) - p(2)*q(4) + p(3)*q(1) + p(4)*q(2)
@@ -106,12 +108,9 @@ function quatmul(p, q) result(pq)
 end function
 
 function quatrotmat(q) result(rotmat)
-! Convert rotation quaternion to rotation matrix
-
+! Rotation matrix of a unit quaternion (w, x, y, z)
    real(rk), intent(in) :: q(4)
    real(rk) :: rotmat(3, 3)
-
-! Calculate the rotation matrix
 
    rotmat(1, 1) = 1.0_rk - 2*(q(3)**2 + q(4)**2)
    rotmat(2, 1) = 2*(q(2)*q(3) - q(1)*q(4))
@@ -125,20 +124,13 @@ function quatrotmat(q) result(rotmat)
 end function
 
 function randrotquat() result(rotquat)
-! Description:
-!    This function generates a random unit quaternion.
-! References:
-!    Academic Press Graphics Gems Series archive Graphics
-!    Gems III archive. Pages: 129 - 132.
+! Uniformly distributed random rotation, as a unit quaternion (w, x, y, z)
+! (Shoemake, Graphics Gems III, pp. 129-132)
    real(rk) :: x(3)
    real(rk) :: rotquat(4)
    real(rk) :: pi, a1, a2, r1, r2, s1, s2, c1, c2
 
-! Generate a random vector
-
    x = randvec()
-
-! Calculate auxiliar vectors and constants
 
    pi = 2*asin(1.)
    a1 = 2*pi*x(1)
@@ -151,11 +143,11 @@ function randrotquat() result(rotquat)
    s2 = sin(a2)
    c2 = cos(a2)
 
-   ! Unit quaternion (w, x, y, z)
    rotquat = [ c2*r2, s1*r1, c1*r1, s2*r2 ]
 end function
 
 subroutine translate_coords(coords, travec)
+! Add travec to every point
    real(rk), dimension(:,:), intent(inout) :: coords
    real(rk), dimension(3), intent(in) :: travec
    ! Local variables
@@ -167,16 +159,15 @@ subroutine translate_coords(coords, travec)
 end subroutine
 
 subroutine rotate_coords_all(coords, rotquat)
+! Rotate every point about the origin
    real(rk), dimension(:,:), intent(inout) :: coords
    real(rk), dimension(4), intent(in) :: rotquat
    ! Local variables
    real(rk) :: rotmat(3, 3), auxvec(3)
    integer(ik) :: i, j
 
-   ! Convert quaternion to rotation matrix
    rotmat = quatrotmat(rotquat)
 
-   ! Apply rotation
    do i = 1, size(coords, dim=2)
       auxvec(:) = 0
       do j = 1, 3
@@ -187,6 +178,7 @@ subroutine rotate_coords_all(coords, rotquat)
 end subroutine
 
 function rotated_coords_center_all(coords, rotquat, center) result(rotated_coords)
+! Copy of coords rotated about center
    real(rk), dimension(:,:), intent(in) :: coords
    real(rk), dimension(4), intent(in) :: rotquat
    real(rk), intent(in) :: center(3)
@@ -197,10 +189,8 @@ function rotated_coords_center_all(coords, rotquat, center) result(rotated_coord
 
    allocate (rotated_coords, mold=coords)
 
-   ! Convert quaternion to rotation matrix
    rotmat = quatrotmat(rotquat)
 
-   ! Apply rotation
    do i = 1, size(coords, dim=2)
       rotated_coords(:,i) = center(:)
       do j = 1, 3
@@ -210,18 +200,19 @@ function rotated_coords_center_all(coords, rotquat, center) result(rotated_coord
 end function
 
 subroutine compute_residuals_matrix(coordsp, coordsm, residuals)
-! Compute the 4x4 residuals matrix for optimal rotation calculation
-! Reference: Acta Cryst. (1989). A45, 208-210
+! Kearsley's 4x4 residual matrix (Acta Cryst. 1989, A45, 208-210) from the
+! sums coordsp and differences coordsm of the mapped points. Its smallest
+! eigenvalue is the least sum of squared distances over rotations about the
+! origin and the corresponding eigenvector is the optimal rotation.
    real(rk), dimension(:,:), intent(in) :: coordsp, coordsm
    real(rk), dimension(4,4), intent(out) :: residuals
    integer(ik) :: i, n_atoms
 
    n_atoms = size(coordsp, dim=2)
 
-   ! Initialize residuals matrix
    residuals = 0.0_rk
 
-   ! Calculate upper matrix elements
+   ! Upper triangle
    do i = 1, n_atoms
       residuals(1, 1) = residuals(1, 1) + (coordsm(1, i)**2 + coordsm(2, i)**2 + coordsm(3, i)**2)
       residuals(1, 2) = residuals(1, 2) + (coordsp(2, i)*coordsm(3, i) - coordsm(2, i)*coordsp(3, i))
@@ -235,7 +226,6 @@ subroutine compute_residuals_matrix(coordsp, coordsm, residuals)
       residuals(4, 4) = residuals(4, 4) + (coordsp(1, i)**2 + coordsp(2, i)**2 + coordsm(3, i)**2)
    end do
 
-   ! Symmetrize matrix
    residuals(2, 1) = residuals(1, 2)
    residuals(3, 1) = residuals(1, 3)
    residuals(4, 1) = residuals(1, 4)
@@ -245,6 +235,8 @@ subroutine compute_residuals_matrix(coordsp, coordsm, residuals)
 end subroutine
 
 real(rk) function sqdistsum_all(mapping1, coords1, coords2) result(sqdistsum)
+! Sum of squared distances between atom i of coords1 and atom mapping1(i)
+! of coords2
    integer(ik), dimension(:), intent(in) :: mapping1
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    ! Local variables
@@ -257,6 +249,7 @@ real(rk) function sqdistsum_all(mapping1, coords1, coords2) result(sqdistsum)
 end function
 
 real(rk) function sqdistsum_subset(subset1, mapping1, coords1, coords2) result(sqdistsum)
+! As sqdistsum_all, over the atoms of coords1 listed in subset1
    integer(ik), dimension(:), intent(in) :: subset1, mapping1
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    ! Local variables
@@ -269,6 +262,8 @@ real(rk) function sqdistsum_subset(subset1, mapping1, coords1, coords2) result(s
 end function
 
 function least_sqdistsum_all(mapping1, coords1, coords2) result(leastotsqdist)
+! Least sum of squared distances over all rotations about the origin
+! (coordinates are expected to be centered)
    integer(ik), dimension(:), intent(in) :: mapping1
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    ! Local variables
@@ -285,13 +280,13 @@ function least_sqdistsum_all(mapping1, coords1, coords2) result(leastotsqdist)
       coordsm(:, i) = coords1(:, i) - coords2(:, mapping1(i))
    end do
 
-   ! Compute residuals matrix using the common procedure
    call compute_residuals_matrix(coordsp, coordsm, residuals)
 
    leastotsqdist = max(leasteigval(residuals), 0.0_rk)
 end function
 
 function least_sqdistsum_subset(subset1, mapping1, coords1, coords2) result(leastotsqdist)
+! As least_sqdistsum_all, over the atoms of coords1 listed in subset1
    integer(ik), dimension(:), intent(in) :: subset1, mapping1
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    ! Local variables
@@ -308,13 +303,13 @@ function least_sqdistsum_subset(subset1, mapping1, coords1, coords2) result(leas
       coordsm(:, i) = coords1(:, subset1(i)) - coords2(:, mapping1(subset1(i)))
    end do
 
-   ! Compute residuals matrix using the common procedure
    call compute_residuals_matrix(coordsp, coordsm, residuals)
 
    leastotsqdist = max(leasteigval(residuals), 0.0_rk)
 end function
 
 real(rk) function sqdistmean_all(mapping1, weights, coords1, coords2) result(sqdistmean)
+! Weighted mean of the squared distances between mapped atoms
    integer(ik), dimension(:), intent(in) :: mapping1
    real(rk), dimension(:), intent(in) :: weights
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
@@ -332,8 +327,8 @@ real(rk) function sqdistmean_all(mapping1, weights, coords1, coords2) result(sqd
 end function
 
 function least_rotquat_all(mapping1, coords1, coords2) result(rotquat)
-! Find the optimal rotation in quaternion representation by least squares minimization
-! Reference: Acta Cryst. (1989). A45, 208-210
+! Rotation about the origin that minimizes the sum of squared distances
+! between mapped atoms when applied to coords2 (Kearsley's method)
    integer(ik), dimension(:), intent(in) :: mapping1
    real(rk), dimension(:,:), intent(in) :: coords1
    real(rk), dimension(:,:), intent(in) :: coords2
@@ -351,9 +346,7 @@ function least_rotquat_all(mapping1, coords1, coords2) result(rotquat)
       coordsm(:, i) = coords1(:, i) - coords2(:, mapping1(i))
    end do
 
-   ! Compute residuals matrix using the common procedure
    call compute_residuals_matrix(coordsp, coordsm, residuals)
-!   sqdistsum = max(leasteigval(residuals), 0.0_rk)
    rotquat = leasteigvec(residuals)
 end function
 

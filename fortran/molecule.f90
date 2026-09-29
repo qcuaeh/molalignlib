@@ -15,6 +15,7 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module molecule
+! Atoms and bonds of a molecule, atom selection and coordinate transforms
 use parameters
 use chemdata
 use adjacency
@@ -55,6 +56,7 @@ end interface
 contains
 
 subroutine include_all_atoms(atoms, atomset)
+! Indices of all real (non-dummy) atoms
    type(atom_t), dimension(:), intent(inout) :: atoms
    integer(ik), dimension(:), allocatable, intent(out) :: atomset
    ! Local variables
@@ -73,6 +75,7 @@ subroutine include_all_atoms(atoms, atomset)
 end subroutine
 
 subroutine include_heavy_atoms(atoms, atomset)
+! Indices of all heavy atoms
    type(atom_t), dimension(:), intent(inout) :: atoms
    integer(ik), dimension(:), allocatable, intent(out) :: atomset
    ! Local variables
@@ -321,6 +324,7 @@ function extract_bonds(atomset, n_atoms, bonds) result(subbonds)
 end function
 
 subroutine set_coords(atoms, coords)
+! Copy a 3 x n coordinate array into atoms
    type(atom_t), dimension(:), intent(inout) :: atoms
    real(rk), dimension(:,:), intent(in) :: coords
    ! Local variables
@@ -332,6 +336,8 @@ subroutine set_coords(atoms, coords)
 end subroutine
 
 subroutine bonds_from_atoms(atoms, bonds)
+! Bonds perceived from geometry: two atoms are bonded when their distance is
+! below the sum of their covalent radii plus bond_tol. All bonds get type 1.
    type(atom_t), dimension(:), intent(in) :: atoms
    type(bond_t), dimension(:), allocatable, intent(out) :: bonds
    ! Local variables
@@ -344,10 +350,8 @@ subroutine bonds_from_atoms(atoms, bonds)
    allocate (is_bonded(n_atoms, n_atoms))
    is_bonded = .FALSE.
 
-   ! Set atom radii
    atom_radii = covalent_radii(atoms%elnum)
 
-   ! Single pass: compute distances once, cache result in matrix
    do i = 1, n_atoms
       do j = i + 1, n_atoms
          atom_dist = sqrt(sum((atoms(i)%coords - atoms(j)%coords)**2))
@@ -355,13 +359,9 @@ subroutine bonds_from_atoms(atoms, bonds)
       end do
    end do
 
-   ! Count bonds from cached matrix (cheap, no distance calc)
    n_bonds = count(is_bonded)
-
-   ! Allocate bonds array with exact size
    allocate (bonds(n_bonds))
 
-   ! Populate bonds from cached matrix
    n_bonds = 0
    do i = 1, n_atoms
       do j = i + 1, n_atoms
@@ -548,6 +548,7 @@ function get_centroid(coords, weights) result(centroid)
 end function
 
 subroutine print_atoms(atoms)
+! Debugging output
    type(atom_t), dimension(:), intent(in) :: atoms
    ! Local variables
    integer(ik) :: i
@@ -565,6 +566,7 @@ subroutine print_atoms(atoms)
 end subroutine
 
 subroutine print_bonds(bonds)
+! Debugging output
    type(bond_t), dimension(:), intent(in) :: bonds
    ! Local variables
    integer(ik) :: i

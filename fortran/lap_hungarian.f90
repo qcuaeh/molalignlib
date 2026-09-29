@@ -20,20 +20,11 @@ implicit none
 contains
 
 subroutine assndx(mode, a, n, m, k, s)
-!https://wp.csiro.au/alanmiller/assndx.f90
-! Code converted using TO_F90 by Alan Miller
-! Date: 2002-03-06  Time: 08:36:31
-
-! Converted with permission, from the F77 code in the CERN MATHLIB library.
-! $Id: assndx.F,v 1.1.1.1 1996/04/01 15:02:49 mclareni Exp $
-
-! $Log: assndx.F,v $
-! Revision 1.1.1.1  1996/04/01 15:02:49  mclareni
-! Mathlib gen/H (H301)
-! Author: F. Bourgeois, 15 February 1994
-
-! N.B. Arguments IDA, IW & IDW have been removed.
-
+! Hungarian algorithm for the linear assignment problem.
+! CERN MATHLIB H301 by F. Bourgeois (1994), converted to Fortran 90 with
+! permission by Alan Miller (https://wp.csiro.au/alanmiller/assndx.f90).
+! The cost matrix a is overwritten.
+!
 ! If MODE = 1, then it finds k(1), k(2), ..., k(n) to minimize
 !        S = Sum(i=1, .., n) a(i, k(i))
 ! If MODE = 2,  then it finds k(1), k(2), ..., k(m) to minimize

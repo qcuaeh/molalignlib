@@ -16,18 +16,26 @@ module clib_atormsd
 
 contains
 
-! C callable wrapper for atormsd functionality.
+subroutine atormsd_calculate(                                        &
+      c_n_atoms1,  c_atom_data1,  c_coords1,                            &
+      c_n_atoms2,  c_atom_data2,  c_coords2,                            &
+      c_align_flag, c_remap_flag, c_heavy_flag, c_mass_flag,         &
+      c_mirror_flag, c_atomlabel_flag,                               &
+      c_print_stats, c_random_flag,                                   &
+      c_prunetol_flag, c_prune_tol, c_conv_freq, c_max_trials,       &
+      c_n_records,                                                   &
+      c_rmsd_list, c_mapping_list,                                       &
+      c_transform_list, c_occ_records, c_error_code)                  &
+      bind(C, name="atormsd_calculate")
+! C-callable RMSD between atom clusters (see the atormsd program).
 !
-! Caller supplies pre-read molecular data as flat C arrays:
+! Inputs, as flat C arrays:
 !   c_atom_data1/2 : packed atom data, length c_n_atoms*2:
 !                    [elnum0, label0, elnum1, label1, ...]
 !                    label = 0 means unlabelled.
 !   c_coords1/2    : XYZ coordinates, row-major (c_n_atoms x 3), length c_n_atoms*3
-!
-! No bond data is needed for the atom-RMSD calculation.
-!
 !   c_prune_tol    : pruning tolerance (only used, and required, when
-!                     c_prunetol_flag is true; no default)
+!                    c_prunetol_flag is true; no default)
 !
 ! Multiple ranked candidate solutions:
 !   c_n_records requests up to that many ranked candidate solutions. Records
@@ -62,17 +70,6 @@ contains
 ! MOLALIGN_ERROR_ATOM_TYPE_MISMATCH (only when c_remap_flag is false) and
 ! MOLALIGN_ERROR_PRUNED_ASSIGNMENT_FAILED (only when c_remap_flag is true;
 ! passed through from assign_atoms_pruned).
-subroutine atormsd_calculate(                                        &
-      c_n_atoms1,  c_atom_data1,  c_coords1,                            &
-      c_n_atoms2,  c_atom_data2,  c_coords2,                            &
-      c_align_flag, c_remap_flag, c_heavy_flag, c_mass_flag,         &
-      c_mirror_flag, c_atomlabel_flag,                               &
-      c_print_stats, c_random_flag,                                   &
-      c_prunetol_flag, c_prune_tol, c_conv_freq, c_max_trials,       &
-      c_n_records,                                                   &
-      c_rmsd_list, c_mapping_list,                                       &
-      c_transform_list, c_occ_records, c_error_code)                  &
-      bind(C, name="atormsd_calculate")
 
    ! Molecule 1
    integer(ik), intent(in), value :: c_n_atoms1
@@ -104,7 +101,7 @@ subroutine atormsd_calculate(                                        &
 
    ! Local variables
    type(atom_t), dimension(:), allocatable :: atoms1, atoms2
-   type(bond_t), dimension(0) :: no_bonds   ! clusters carry no bonds
+   type(bond_t), dimension(0) :: no_bonds   ! clusters have no bonds
    type(bool_matrix), dimension(:), allocatable :: prunes
    type(partition_t) :: atomtypes
    type(registry_t)  :: registry

@@ -38,6 +38,18 @@ contains
 
 subroutine optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
       coords1, coords2, conv_freq, max_trials, registry, error_code)
+! Symmetry-corrected alignment of two conformers (Figure S1 of the paper).
+! The assignment tree is built once and the strategy is chosen from its
+! shape: when the total number of assignments exceeds conv_freq times the
+! sum of partial combinations, the stochastic search is used; otherwise
+! every assignment is enumerated and scored after optimal superposition.
+!
+! Stochastic search: coords2 is given a random orientation, the optimal
+! assignment at that orientation is found and the pair is iterated
+! (superposition, reassignment) until the assignment no longer changes.
+! Each local minimum is recorded, and the search stops when the best one
+! has been found more than conv_freq times or after max_trials trials.
+!
 ! adjcs, atomtypes and coords hold the included atoms only, in a common
 ! numbering; the atom permutations stored in registry use that numbering.
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
@@ -55,10 +67,9 @@ subroutine optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
    type(chaintree_node_t), pointer :: hna_chain
    type(array_trees_t) :: cache_arrays
 
-   ! Allocations
    allocate (coords2r, mold=coords2)
 
-   ! Pre-compute assignment tree for decision making
+   ! Self-consistent HNA partition and assignment tree
    call compute_sc_hna_chain( adjcs1, adjcs2, atomtypes, hna_chain, error_code)
    if (error_code /= MOLALIGN_SUCCESS) return
    call build_assignment_tree( adjcs1, adjcs2, hna_chain%last_link, cache_arrays, error_code)
@@ -68,25 +79,23 @@ subroutine optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
       call print_chain_tree_array( atomtypes, cache_arrays)
    end if
 
-   ! Reset registry for new conformer
    call reset_registry( registry)
 
-   ! Choose the search strategy (see FORCE_EXHAUSTIVE and FORCE_STOCHASTIC)
+   ! Adaptive choice of strategy (see FORCE_EXHAUSTIVE and FORCE_STOCHASTIC)
    if (.not. FORCE_EXHAUSTIVE .and. (FORCE_STOCHASTIC .or. &
          cache_arrays%total_combinations > conv_freq*cache_arrays%partial_combinations)) then
 
-      ! Initialize random number generator
       call random_initialize()
 
-      ! Optimize atom permutation
       do
 
-         ! Apply random rotation to coords2 copy
+         ! Random orientation of molecule 2
          coords2r = coords2
          total_rotation = randrotquat()
          call rotate_coords( coords2r, total_rotation)
 
-         ! Assign atoms with current orientation
+         ! Optimal assignment at this orientation. With pruning, the greedy
+         ! assignment provides the initial distance budget.
          if (PRUNE_ASSIGNMENTS) then
             call assign_atoms_greedy( coords1, coords2r, cache_arrays, mapping1, mapdist)
             call assign_atoms_local_pruned( coords1, coords2r, cache_arrays, mapping1, mapdist)
@@ -100,6 +109,9 @@ subroutine optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
          mapdist = sqdistsum( mapping1, coords1, coords2r)
          steps = 1
 
+         ! Alternate superposition and assignment until the assignment is
+         ! stable. The distance of the current assignment after
+         ! superposition bounds the pruned search.
          do
             if (PRUNE_ASSIGNMENTS) then
                new_mapdist = mapdist
@@ -107,7 +119,6 @@ subroutine optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
             else
                call assign_atoms_local( coords1, coords2r, cache_arrays, new_mapping, new_mapdist)
             end if
-!            write (stdout,*) mapdist, new_mapdist
             if (all(mapping1 == new_mapping)) exit
             mapping1 = new_mapping
             rotation = least_rotquat( mapping1, coords1, coords2r)
@@ -117,7 +128,6 @@ subroutine optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
             steps = steps + 1
          end do
 
-         ! Update results
          call insert_record_mapping( registry, mapping1, steps, total_rotation, 0, mapdist)
 
          if (registry%records(1)%freq > conv_freq) then
@@ -133,18 +143,16 @@ subroutine optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
 
    else
 
-      ! Assign atoms using global assignment
+      ! Exhaustive search: the best assignment after superposition
       call assign_atoms_global( coords1, coords2, cache_arrays, mapping1)
       
-      ! Calculate optimal rotation
       rotation = least_rotquat( mapping1, coords1, coords2)
       
-      ! Rotate coords2 and calculate mapdist
       coords2r = coords2
       call rotate_coords( coords2r, rotation)
       mapdist = sqdistsum( mapping1, coords1, coords2r)
       
-      ! Initialize registry with a single record
+      ! Single record
       registry%occ_records = 1
       registry%records(1)%mapping1 = mapping1
       registry%records(1)%mapdiff = 0
@@ -157,6 +165,8 @@ subroutine optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
 end subroutine
 
 subroutine assign_mapping_conformer( adjcs1, adjcs2, atomtypes, coords1, coords2, mapping1, error_code)
+! Symmetry-corrected assignment of two conformers at their current relative
+! orientation (no alignment)
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(partition_t), intent(in) :: atomtypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
@@ -168,7 +178,7 @@ subroutine assign_mapping_conformer( adjcs1, adjcs2, atomtypes, coords1, coords2
    type(array_trees_t) :: cache_arrays
    real(rk) :: mapdist
 
-   ! Pre-compute assignment tree
+   ! Self-consistent HNA partition and assignment tree
    call compute_sc_hna_chain( adjcs1, adjcs2, atomtypes, hna_chain, error_code)
    if (error_code /= MOLALIGN_SUCCESS) return
    call build_assignment_tree( adjcs1, adjcs2, hna_chain%last_link, cache_arrays, error_code)
@@ -179,8 +189,6 @@ subroutine assign_mapping_conformer( adjcs1, adjcs2, atomtypes, coords1, coords2
    end if
 
    call assign_atoms_local( coords1, coords2, cache_arrays, mapping1, mapdist)
-!   call assign_atoms_greedy( coords1, coords2, cache_arrays, mapping1, mapdist)
-!   call assign_atoms_local_pruned( coords1, coords2, cache_arrays, mapping1, mapdist)
 end subroutine
 
 end module

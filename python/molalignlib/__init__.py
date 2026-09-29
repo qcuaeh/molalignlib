@@ -1,5 +1,6 @@
 """
-High-level Python wrappers around the molalign Cython extension.
+High-level Python interface of MolAlignLib, built on the molalign Cython
+extension.
 
 Supported file formats (via chemfiles):
   - XYZ        (.xyz)
@@ -10,12 +11,12 @@ Supported file formats (via chemfiles):
 Classes
 -------
 Atoms
-    Represents an unstructured set of atoms (no bond topology).
-    Uses atormsd_calculate under the hood.
+    An unstructured set of atoms (no bond topology), compared with
+    atormsd_calculate.
 
 Conformer
-    Represents a molecule with bond topology (a conformer).
-    Uses conformsd_calculate under the hood.
+    A molecule with bond topology, compared with conformsd_calculate, whose
+    atom assignments always respect the bonds (HNA partitioning).
 
 Both expose a .rmsd_to(other, n_records=1, **kwargs) method that returns a
 list of RMSDResult objects, best (lowest RMSD) first. By default only the
@@ -35,10 +36,10 @@ from . import molalign as _molalign
 # ---------------------------------------------------------------------------
 # Element symbol <-> atomic number table
 #
-# Mirrors atomic_symbols(0:num_elems) in chemdata.f90 (index i -> element
-# number i), so this stays in lock-step with the Fortran core's own numbering.
-# Entry 0 ("X") is the dummy atom and entry 104 ("LJ") the Lennard-Jones
-# placeholder; every real element's number equals its atomic number.
+# Mirrors atomic_symbols(0:n_elems) in chemdata.f90, so index i is element
+# number i of the Fortran core. Entry 0 ("X") is the dummy atom and entry
+# 104 ("LJ") the Lennard-Jones placeholder; every real element's number
+# equals its atomic number.
 # ---------------------------------------------------------------------------
 
 ATOMIC_SYMBOLS = (
@@ -78,7 +79,7 @@ def symbol_to_atomic_number(symbol):
 
 
 def atomic_number_to_symbol(number):
-    """Look up the element symbol for an atomic number, if known."""
+    """Element symbol of an element number, or the number as a string if unknown."""
     number = int(number)
     if 0 <= number < len(ATOMIC_SYMBOLS):
         return ATOMIC_SYMBOLS[number]
@@ -126,9 +127,9 @@ class RMSDResult(object):
         t = self.transform[:3, 3]
         idx = np.asarray(self.mapping)
 
-        # Pad with dummy atoms (same convention as the Fortran core: appended
-        # after the real atoms, element "X") when the permutation is longer
-        # than the molecule, so that every index is valid.
+        # When the permutation is longer than the molecule, pad it with dummy
+        # atoms ("X") appended after the real atoms, as the Fortran core does,
+        # so that every index is valid.
         coords = cluster_or_conformer.coords
         atom_data = cluster_or_conformer.atom_data
         symbols = list(cluster_or_conformer.symbols)
@@ -144,6 +145,7 @@ class RMSDResult(object):
         new_symbols = [symbols[i] for i in idx]
 
         if isinstance(cluster_or_conformer, Conformer):
+            # Renumber the bond atoms to the new atom order
             inv_idx = np.argsort(idx)
             new_bonddata = cluster_or_conformer.bond_data.copy()
             
@@ -188,7 +190,8 @@ def _file_format(path):
 
 def _extract_frame_data(frame):
     """
-    Extract atom_data, coords, bond_data, and symbols from a chemfiles Frame.
+    Extract atom_data, coords, bond_data and symbols from a chemfiles Frame.
+    Atoms are unlabelled; bonds without a known order get type 1.
     """
     n_atoms = len(frame.atoms)
     atom_data = np.zeros((n_atoms, 2), dtype=np.int32)
@@ -268,10 +271,9 @@ def _write_frame(path, frame):
 
 def read_clusters(path, frames=None):
     """
-    Read frames from a molecular file and return Atoms objects.
-    If 'frames' is provided (e.g., a tuple of indices), it returns a tuple 
-    of only those specific frames. Otherwise, it returns a list of all frames.
-    Bond information is ignored.
+    Read the frames of a file as Atoms objects: a tuple with the frames of
+    the given indices, or a list of all frames if frames is None. Bond
+    information is ignored.
     """
     stem = Path(path).stem
     clusters = []
@@ -297,10 +299,9 @@ def read_clusters(path, frames=None):
 
 def read_conformers(path, frames=None):
     """
-    Read frames from a molecular file and return Conformer objects.
-    If 'frames' is provided (e.g., a tuple of indices), it returns a tuple 
-    of only those specific frames. Otherwise, it returns a list of all frames.
-    Bond information is parsed and used.
+    Read the frames of a file as Conformer objects: a tuple with the frames
+    of the given indices, or a list of all frames if frames is None. Bonds
+    are read, and bond_source is set to the file format.
     """
     stem = Path(path).stem
     conformers = []
@@ -338,16 +339,16 @@ class Atoms(object):
 
     def __init__(self, atom_data=None, coords=None, name="cluster", symbols=None, labels=None):
         """
-        Either ``atom_data`` (atomic numbers, as before) or ``symbols``
-        (element symbols, e.g. ["C", "H", "H", "H"]) must be provided; the
-        other is derived automatically. Providing both is fine too -- in
-        that case ``atom_data`` wins and ``symbols`` is only used for
-        display/labelling.
+        Either ``atom_data`` (an (n, 2) array of element numbers and labels)
+        or ``symbols`` (element symbols, e.g. ["C", "H", "H", "H"]) must be
+        provided; the other is derived. If both are given, ``atom_data`` is
+        used for the calculations and ``symbols`` only for output.
 
         labels : sequence of int, optional
-            Per-atom labels (see molalign.h); only used when building
-            ``atom_data`` from ``symbols``. Defaults to all-zero
-            (unlabelled). Ignored if ``atom_data`` is given directly.
+            Per-atom labels, which restrict matching to atoms with the same
+            label when ``use_atom_label=True``. Only used when building
+            ``atom_data`` from ``symbols``; defaults to all zero
+            (unlabelled).
         """
         self._coords = np.asarray(coords, dtype=np.float64)
         self._name = name
@@ -419,9 +420,8 @@ class Atoms(object):
 
     def write(self, path, comment=None):
         """
-        Write this cluster using chemfiles. The output format is inferred
-        from the file extension (e.g. .xyz, .pdb, .sdf, .mol2, ...), the
-        same way read_clusters()/from_file() infer the input format.
+        Write this cluster with chemfiles. The format is inferred from the
+        file extension (e.g. .xyz, .pdb, .sdf, .mol2), as when reading.
         """
         frame = _build_frame(self._coords, self._symbols, comment=comment)
         _write_frame(path, frame)
@@ -451,21 +451,24 @@ class Atoms(object):
         regardless of n_records. The list may be shorter than n_records
         if the library did not find that many distinct solutions.
 
-        With heavy_only=True the two molecules may differ in their number of
+        With heavy_only=True the two clusters may differ in their number of
         hydrogens. The smaller one is then padded with dummy atoms, and each
         mapping has max(len(self), len(other)) entries (see
-        RMSDResult.mapping). Hydrogens are not part of the RMSD;
-        they are paired afterwards, following their heavy neighbour where
-        bonds are known and by distance otherwise.
+        RMSDResult.mapping). Hydrogens are not part of the RMSD; they are
+        paired afterwards by distance.
 
-        prune_tol (Å) enables pruning: assignments with pair distances
-        exceeding prune_tol are discarded. Defaults to None, which
-        disables pruning.
+        prune_tol (Å) enables pruning: two atoms are never paired if their
+        sorted distances to the atoms of some atom type differ by more than
+        2*sqrt(3)*prune_tol. Defaults to None, which disables pruning.
+
+        The search over random orientations stops once the best solution
+        has been found conv_freq times, or after max_trials orientations.
+        random=True seeds it from the clock (otherwise results are
+        reproducible), and stats=True prints its statistics.
         """
         if not isinstance(other, Atoms):
             raise TypeError("Expected Atoms, got {}".format(type(other).__name__))
 
-        # Pruning is enabled by giving a tolerance
         prunetol_flag = prune_tol is not None
 
         rmsd_vals, maps, tfs = _molalign.atormsd_calculate(
@@ -506,16 +509,16 @@ class Conformer(object):
     def __init__(self, atom_data=None, coords=None, bond_data=None, name="conformer",
                  symbols=None, labels=None, bond_source=None):
         """
-        Either ``atom_data`` (atomic numbers, as before) or ``symbols``
-        (element symbols, e.g. ["C", "H", "H", "H"]) must be provided; the
-        other is derived automatically. Providing both is fine too -- in
-        that case ``atom_data`` wins and ``symbols`` is only used for
-        display/labelling.
+        Either ``atom_data`` (an (n, 2) array of element numbers and labels)
+        or ``symbols`` (element symbols, e.g. ["C", "H", "H", "H"]) must be
+        provided; the other is derived. If both are given, ``atom_data`` is
+        used for the calculations and ``symbols`` only for output.
 
         labels : sequence of int, optional
-            Per-atom labels (see molalign.h); only used when building
-            ``atom_data`` from ``symbols``. Defaults to all-zero
-            (unlabelled). Ignored if ``atom_data`` is given directly.
+            Per-atom labels, which restrict matching to atoms with the same
+            label when ``use_atom_label=True``. Only used when building
+            ``atom_data`` from ``symbols``; defaults to all zero
+            (unlabelled).
 
         bond_source : str, optional
             Tag naming the convention of the bond types in ``bond_data``
@@ -619,11 +622,9 @@ class Conformer(object):
 
     def write(self, path, comment=None):
         """
-        Write this conformer, including bond connectivity, using chemfiles.
-        The output format is inferred from the file extension (e.g. .sdf,
-        .mol2, .pdb, .xyz, ...), the same way read_conformers()/from_file()
-        infer the input format. Bond types are not currently preserved on
-        write, only connectivity.
+        Write this conformer, with its bond connectivity, using chemfiles.
+        The format is inferred from the file extension (e.g. .sdf, .mol2,
+        .pdb, .xyz), as when reading. Bond types are not written.
         """
         frame = _build_frame(
             self._coords, self._symbols, comment=comment, bond_data=self._bond_data
@@ -672,11 +673,20 @@ class Conformer(object):
         must have the same bond_source (e.g. both read from files of the
         same format); otherwise a ValueError is raised. It has no effect
         when bond_tol is given, since inferred bonds are untyped.
+
+        With align=True, the search strategy is chosen from the assignment
+        tree: random orientations when the total number of assignments
+        exceeds conv_freq times the sum of partial combinations, exhaustive
+        enumeration otherwise. The random search stops once the best
+        solution has been found more than conv_freq times, or after
+        max_trials orientations. The default conv_freq=100 is the value
+        validated on the CCD and BIRD benchmarks. random=True seeds the
+        search from the clock (otherwise results are reproducible), and
+        stats=True prints its statistics.
         """
         if not isinstance(other, Conformer):
             raise TypeError("Expected Conformer, got {}".format(type(other).__name__))
 
-        # Bond detection is enabled by giving a tolerance
         bondtol_flag = bond_tol is not None
 
         if use_bond_type and not bondtol_flag and self._bond_source != other._bond_source:

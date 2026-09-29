@@ -15,24 +15,13 @@ module cbind_utils
 
 contains
 
-! ---------------------------------------------------------------------------
-! Build an atom_t array from a packed C atomdata array and a coords array.
-!
-! atomdata layout (length n*2):
-!   [elnum0, label0, elnum1, label1, ...]
-!
-! coords_in is row-major from C: [x0,y0,z0, x1,y1,z1, ...] (length n*3).
-! Because ik==c_int and rk==c_double, assignments are direct - no real/kind
-! conversion is required.
-!
-! Every elnum must index the element tables in chemdata, i.e. lie in
-! 0:n_elems (0 is the dummy atom). Each one is checked as it is read; on
-! the first that doesn't, error_code is set to
-! MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER and atoms is deallocated, so no
-! out-of-range value ever reaches a table lookup. On success error_code is
-! MOLALIGN_SUCCESS.
-! ---------------------------------------------------------------------------
 subroutine build_atoms(n, atomdata, coords_in, atoms, error_code)
+! Build an atom_t array from packed C arrays:
+!   atomdata  = [elnum0, label0, elnum1, label1, ...]   (length n*2)
+!   coords_in = [x0, y0, z0, x1, y1, z1, ...]           (length n*3)
+! Every elnum must lie in 0:n_elems (0 is the dummy atom); otherwise
+! error_code is MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER and atoms is
+! deallocated, so no out-of-range value reaches the element tables.
    integer(ik), intent(in), value :: n
    integer(ik), dimension(n*2), intent(in) :: atomdata
    real(rk),    dimension(n*3), intent(in) :: coords_in
@@ -60,14 +49,10 @@ subroutine build_atoms(n, atomdata, coords_in, atoms, error_code)
    end do
 end subroutine build_atoms
 
-! ---------------------------------------------------------------------------
-! Build a bond_t array from a flat C array.
-!
-! bonddata layout (length n_bonds*3):
-!   [atom1_0, atom2_0, type_0,  atom1_1, atom2_1, type_1, ...]
-! Atom indices are 1-based (as stored in mol/sdf files).
-! ---------------------------------------------------------------------------
 subroutine build_bonds(n, bonddata, bonds)
+! Build a bond_t array from a flat C array:
+!   bonddata = [atom1_0, atom2_0, type_0, atom1_1, ...]  (length n*3)
+! Atom indices are 1-based, as in MOL/SDF files.
    integer(ik), intent(in), value :: n
    integer(ik), dimension(n*3), intent(in) :: bonddata
    type(bond_t), dimension(:), allocatable, intent(out) :: bonds
@@ -82,9 +67,9 @@ subroutine build_bonds(n, bonddata, bonds)
    end do
 end subroutine build_bonds
 
-! ---------------------------------------------------------------------------
-! Build a row-major 4x4 homogeneous transformation matrix.
-! Maps a point of molecule 2 (original input coordinates) to the frame of
+subroutine build_homogeneous_transform(rotquat, transmat, center1, center2, htrans)
+! Row-major 4x4 homogeneous transformation matrix that maps a point of
+! molecule 2 (original input coordinates) to the frame of
 ! molecule 1:
 !   p_out = R * T * p_in + t,   t = center1 - R * center2
 ! R is the rotation of rotquat and T the linear transformation applied to
@@ -98,8 +83,6 @@ end subroutine build_bonds
 !   [5..8]  -> row 1: R(2,*), ty
 !   [9..12] -> row 2: R(3,*), tz
 !   [13..16]-> 0 0 0 1
-! ---------------------------------------------------------------------------
-subroutine build_homogeneous_transform(rotquat, transmat, center1, center2, htrans)
    real(rk), intent(in) :: rotquat(4)
    real(rk), intent(in) :: transmat(3,3)
    real(rk), intent(in) :: center1(3), center2(3)
@@ -110,17 +93,14 @@ subroutine build_homogeneous_transform(rotquat, transmat, center1, center2, htra
    t = center1 - matmul(quatrotmat(rotquat), center2)
    R = matmul(quatrotmat(rotquat), transmat)
 
-   ! ik==c_int, rk==c_double - direct assignment, no real() conversion needed
    htrans(1)  = R(1,1);  htrans(2)  = R(1,2);  htrans(3)  = R(1,3);  htrans(4)  = t(1)
    htrans(5)  = R(2,1);  htrans(6)  = R(2,2);  htrans(7)  = R(2,3);  htrans(8)  = t(2)
    htrans(9)  = R(3,1);  htrans(10) = R(3,2);  htrans(11) = R(3,3);  htrans(12) = t(3)
    htrans(13) = 0.0_rk;  htrans(14) = 0.0_rk;  htrans(15) = 0.0_rk;  htrans(16) = 1.0_rk
 end subroutine build_homogeneous_transform
 
-! ---------------------------------------------------------------------------
-! Return the 4x4 identity matrix.
-! ---------------------------------------------------------------------------
 subroutine set_identity_transform(htrans)
+! Row-major 4x4 identity matrix
    real(rk), intent(out) :: htrans(16)
    htrans     = 0.0_rk
    htrans(1)  = 1.0_rk;  htrans(6)  = 1.0_rk

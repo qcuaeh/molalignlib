@@ -22,34 +22,32 @@ use kinds
 
 implicit none
 
-! Do debug tests
+! Enable internal consistency checks
 logical(lk), parameter :: DEBUG_TESTS = .FALSE.
 
-! Exit if random trials exceeds MAX_TRIALS
+! Stop the stochastic conformer alignment after max_trials trials
 logical(lk), parameter :: MAX_TRIALS_EXIT = .TRUE.
 
-! Prune unfeasible atom assignments
+! Branch-and-bound pruning in the conformer assignment search
 logical(lk), parameter :: PRUNE_ASSIGNMENTS = .TRUE.
 
-! Search strategy for conformer alignment. If neither is set, the strategy
-! is chosen automatically from the ratio of total to partial assignment
-! combinations in the assignment tree: stochastic fixed-orientation search
-! when the ratio is high, exhaustive orientation-independent search when it
-! is low. Setting one of them forces that strategy regardless of the tree
-! topology. They are mutually exclusive; if both are set, the exhaustive
-! search takes precedence.
+! Search strategy for conformer alignment. By default it is chosen from the
+! ratio of total to partial assignment combinations of the assignment tree:
+! stochastic fixed-orientation search when the ratio is high, exhaustive
+! orientation-independent search when it is low. Setting one of these
+! forces that strategy; if both are set, the exhaustive search wins.
 logical(lk), parameter :: FORCE_EXHAUSTIVE = .FALSE.
 logical(lk), parameter :: FORCE_STOCHASTIC = .FALSE.
 
-! Convergence tolerance
-!real(rk), parameter :: CONV_TOL = 1E-6 ! Single precision
-real(rk), parameter :: CONV_TOL = 1E-10 ! Double precision
+! Convergence tolerance of the Jacobi eigensolver (use 1E-6 in single
+! precision)
+real(rk), parameter :: CONV_TOL = 1E-10
 
-! Squared distance tolerance
+! Slack added to the distance budget of the pruned assignment search
 real(rk), parameter :: SQDIST_TOL = 1E-6
 
-! Common character lengths
-integer(ik), parameter :: ll = 256 ! Line length
+! Line length
+integer(ik), parameter :: ll = 256
 
 ! Maximum coordination number
 integer(ik), parameter :: MAX_COORDNUM = 10
@@ -69,7 +67,7 @@ integer(ik), parameter :: ANY_BOND = 1
 integer(ik), parameter :: BOND_TYPE_RADIX = 256
 integer(ik), parameter :: MAX_BOND_TYPE = BOND_TYPE_RADIX - 1
 
-! Default number of random trials to exit early
+! Default maximum number of random trials
 integer(ik), parameter :: MAX_TRIALS_DEFAULT = 10000
 
 ! Displayed decimal places

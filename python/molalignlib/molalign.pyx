@@ -1,14 +1,9 @@
 # cython: language_level=3
 """
-Cython wrapper around the atormsd_calculate / conformsd_calculate C functions.
-
-Both wrappers share nearly identical boilerplate (input validation,
-output-buffer allocation, result packing); that logic lives once, in the
-private helpers below. The two public entry points, atormsd_calculate(...)
-and conformsd_calculate(...), match the underlying C functions declared in
-molalign.h; the extern declarations below are aliased to
-c_atormsd_calculate / c_conformsd_calculate internally to avoid colliding
-with the Python-level wrapper names.
+Cython wrappers of the C functions atormsd_calculate and conformsd_calculate
+(molalign.h). The C functions are imported as c_atormsd_calculate and
+c_conformsd_calculate so that the Python wrappers can keep their names;
+validation, buffer allocation and result packing are shared helpers.
 """
 
 import numpy as np
@@ -18,10 +13,8 @@ from libc.stdlib cimport malloc, free
 np.import_array()
 
 cdef extern from "error_codes.h":
-    # Error codes returned via each function's error_code output argument.
-    # Declared once in error_codes.h (itself kept in sync by hand with
-    # the Fortran error_codes module, error_codes.f90) and reused here
-    # instead of hardcoding the numbers a third time.
+    # Error codes of the error_code argument, taken from error_codes.h so
+    # their values are not repeated here
     enum: MOLALIGN_SUCCESS
     enum: MOLALIGN_ERROR_NOT_ISOMERS
     enum: MOLALIGN_ERROR_ATOM_TYPE_MISMATCH
@@ -77,7 +70,7 @@ _CONFORMSD_ERROR_MESSAGES = {
        "remap_flag=True).",
 }
 
-# Sentinel used by rmsd.py when bondtol_flag=True (geometry-derived connectivity).
+# Bond array passed when no bonds are given (bond_data=None)
 _EMPTY_BONDS = np.empty((0, 3), dtype=np.int32)
 
 
@@ -118,8 +111,9 @@ cdef int _alloc_buffers(int n_records, int n_atoms,
                          double **rmsd_list, int **mapping_list,
                          double **transform_list) except -1:
     """
-    Malloc the three output buffers. Returns 0 on success; raises
-    MemoryError (after freeing any partially-allocated buffers) on failure.
+    Allocate the three output buffers for n_records records of n_atoms
+    mapping entries. Returns 0; on failure frees any allocated buffer and
+    raises MemoryError.
     """
     rmsd_list[0]      = <double *>malloc(n_records * sizeof(double))
     mapping_list[0]  = <int *>malloc(n_records * n_atoms * sizeof(int))
@@ -135,7 +129,7 @@ cdef int _alloc_buffers(int n_records, int n_atoms,
 
 cdef _pack_outputs(double *rmsd_list, int *mapping_list, double *transform_list,
                     int n_atoms, int occ_records):
-    """Copy the raw C output buffers into numpy arrays."""
+    """Copy the first occ_records records of the C buffers into numpy arrays."""
     rmsd = np.array([rmsd_list[i] for i in range(occ_records)], dtype=np.float64)
 
     mapping = np.empty((occ_records, n_atoms), dtype=np.int32)
@@ -175,7 +169,8 @@ def atormsd_calculate(
     int    n_records = 1,
 ):
     """
-    Thin wrapper around the C ``atormsd_calculate`` function.
+    Thin wrapper around the C ``atormsd_calculate`` function (see molalign.h
+    for the meaning of the flags).
 
     Parameters
     ----------
@@ -189,9 +184,9 @@ def atormsd_calculate(
         and ``remap_flag`` are true; otherwise exactly one solution is
         returned regardless of this value.
     prune_tol : float or None
-        Pruning tolerance. Required (no default) when ``prunetol_flag`` is
-        true; unused otherwise.
-    (remaining keyword arguments map 1-to-1 onto the C flags)
+        Pruning tolerance (Angstrom). Required (no default) when
+        ``prunetol_flag`` is true; unused otherwise.
+    (the remaining arguments map one-to-one onto the C arguments)
 
     Returns
     -------
@@ -220,9 +215,7 @@ def atormsd_calculate(
     coords1    = np.ascontiguousarray(coords1)
     coords2    = np.ascontiguousarray(coords2)
 
-    # prune_tol has no default: it is required (and only used) when
-    # prunetol_flag=True, since that is what enables pruning inside the
-    # library.
+    # prune_tol is required, and only used, when prunetol_flag=True
     cdef double c_prune_tol = 0.0
     if prunetol_flag:
         if prune_tol is None:
@@ -298,7 +291,8 @@ def conformsd_calculate(
     int  n_records     = 1,
 ):
     """
-    Thin wrapper around the C ``conformsd_calculate`` function.
+    Thin wrapper around the C ``conformsd_calculate`` function (see
+    molalign.h for the meaning of the flags).
 
     Parameters
     ----------
@@ -311,25 +305,30 @@ def conformsd_calculate(
         Pass ``None`` (or omit) when ``bondtol_flag=True``; in that case the
         library derives connectivity from geometry.
     bond_tol : float, required when bondtol_flag=True
-        Bond detection tolerance for geometry-based connectivity. Has no
-        default and is ignored when bondtol_flag=False.
+        Bond detection tolerance (Angstrom) for geometry-based connectivity.
+        Has no default and is ignored when bondtol_flag=False.
     bondtype_flag : bool, default False
         Use the bond types (third column of ``bond_data``) to guide atom
         matching. Types are compared for equality, never interpreted, so
         both molecules must use the same bond-type convention (read from
         the same file format with the same parser). Ignored when
         ``bondtol_flag=True``.
-    align_flag, remap_flag : bool
-        Both default to ``False``: by default no structural alignment or
-        atom remapping is performed.
+    align_flag, remap_flag : bool, default False
+        Optimally superpose molecule 2, and search the atom permutation
+        that minimises the RMSD.
     print_assigntree : bool
-        Print the atom-assignment search tree during optimisation.
+        Print the assignment tree and its combination counts to stdout.
+    conv_freq : int, default 100
+        Stop the random orientation search once the best solution has been
+        found more than this many times; also the threshold on the ratio of
+        total to partial assignment combinations above which that search is
+        used instead of exhaustive enumeration.
     n_records : int, default 1
         Maximum number of ranked candidate solutions to return. Records
         beyond the first are only ever produced when both ``align_flag``
         and ``remap_flag`` are true; otherwise exactly one solution is
         returned regardless of this value.
-    (remaining keyword arguments map 1-to-1 onto the C flags)
+    (the remaining keyword arguments map one-to-one onto the C arguments)
 
     Returns
     -------
@@ -362,7 +361,7 @@ def conformsd_calculate(
     coords1    = np.ascontiguousarray(coords1)
     coords2    = np.ascontiguousarray(coords2)
 
-    # Resolve bond arrays (None → empty placeholder).
+    # None means no bonds
     cdef np.ndarray[np.int32_t, ndim=2] bd1, bd2
     bd1 = np.ascontiguousarray(bond_data1 if bond_data1 is not None else _EMPTY_BONDS,
                                 dtype=np.int32)
@@ -373,9 +372,7 @@ def conformsd_calculate(
     cdef int nb1 = bd1.shape[0]
     cdef int nb2 = bd2.shape[0]
 
-    # bond_tol has no default: it is required (and only used) when
-    # bondtol_flag=True, since that is what triggers geometry-based bond
-    # perception inside the library.
+    # bond_tol is required, and only used, when bondtol_flag=True
     cdef double c_bond_tol = 0.0
     if bondtol_flag:
         if bond_tol is None:

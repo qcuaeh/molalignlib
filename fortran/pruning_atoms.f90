@@ -15,6 +15,7 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module pruning_atoms
+! Distance-based pruning of atom pairs for the cluster assignment
 use parameters
 use common_types
 use sorting
@@ -23,9 +24,11 @@ use linked_list_types
 use flags
 implicit none
 
+! Pruning tolerance (Angstrom)
 real(rk) :: prune_tol
-! Expected value factor = 2*SQRT(3) ≈ 3.4641
+! Expected value factor = 2*sqrt(3)
 real(rk), parameter :: EVALFAC = 3.4641
+! Selected pruning method (prune_none or prune_rd)
 procedure(prune_proc), pointer :: prune_procedure
 
 abstract interface
@@ -43,6 +46,7 @@ end interface
 contains
 
 subroutine prune_none( atomtypes, coords1, coords2, prunes)
+! No pair is pruned
    type(partition_t), intent(in) :: atomtypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    type(bool_matrix), dimension(:), allocatable, intent(out) :: prunes
@@ -65,6 +69,10 @@ subroutine prune_none( atomtypes, coords1, coords2, prunes)
 end subroutine
 
 subroutine prune_rd( atomtypes, coords1, coords2, prunes)
+! Prune the pairs whose atoms have incompatible environments: atoms i and j
+! are not paired if, for some atom type, their sorted distances to the
+! atoms of that type differ by more than EVALFAC*prune_tol. The test is
+! orientation independent, so it holds for all trials.
    type(partition_t), intent(in) :: atomtypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    type(bool_matrix), dimension(:), allocatable, intent(out) :: prunes

@@ -15,6 +15,17 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module refinement
+! Hierarchical Neighborhood of Atoms (HNA) partitioning of two molecules and
+! construction of the assignment tree (Pseudocodes S1 and S2 of
+! J. Chem. Theory Comput., doi:10.1021/acs.jctc.6c00545).
+!
+! The partition is kept as a part tree: refining a leaf part turns it into
+! a branch whose children group its atoms by signature. Refinement levels
+! are recorded as the links of a chain; each link lists the parts of that
+! level and holds the vertex directory (itemdir) of the atoms placed at
+! that level. Assignment tree nodes are chains too: their links list the
+! parts refined at each level after the individualization of their split
+! part, so the search can replay the refinement.
 use parameters
 use common_types
 use random
@@ -35,10 +46,10 @@ public build_assignment_tree
 contains
 
 function hna_signature(adjc, itemdir) result(signature)
-! Bond-typed signature of an atom: one edge_code per neighbor whose part
-! is known in itemdir, combining the neighbor's part index and the type
-! of the bond to it. Neighbors with no part in itemdir are left out, as in
-! the cached refinement of assignment_conformer.
+! Signature of an atom (SIG in the paper): one edge_code per neighbor with a
+! part in itemdir, combining the part index and the bond type, compared as
+! a multiset. Neighbors without a part in itemdir are left out, as in
+! assignment_conformer::update_hna_part.
    type(adjc_t), intent(in) :: adjc
    type(part_nodeptr_t), dimension(:), intent(in) :: itemdir
    integer(ik), dimension(:), allocatable :: signature
@@ -60,8 +71,10 @@ function hna_signature(adjc, itemdir) result(signature)
 end function
 
 subroutine refine_hna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
-! Create children for different signatures - caller decides what to do with them
-! Note: part is always a leaf part with no existing children
+! Subdivide the leaf part `part` by signature (Pseudocode S1): one child per
+! distinct signature, added to link, and every atom placed in its child and
+! in the vertex directory of link. A part whose atoms share one signature
+! gets a single child.
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(part_nodeptr_t), dimension(:), intent(in) :: itemdir1, itemdir2
    type(partition_node_t), pointer, intent(inout) :: part
@@ -71,7 +84,7 @@ subroutine refine_hna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
    type(partition_node_t), pointer :: child_part
    integer(ik), dimension(:), allocatable :: signature
 
-   ! Process first molecule items - create children for each unique signature
+   ! Atoms of molecule 1
    item => part%first_item1
    do while (associated(item))
       signature = hna_signature(adjcs1(item%idx), itemdir1)
@@ -86,7 +99,7 @@ subroutine refine_hna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
       item => item%next_item
    end do
 
-   ! Process second molecule items - create children for each unique signature
+   ! Atoms of molecule 2
    item => part%first_item2
    do while (associated(item))
       signature = hna_signature(adjcs2(item%idx), itemdir2)
@@ -103,7 +116,9 @@ subroutine refine_hna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
 end subroutine
 
 subroutine refine_hna_partition(adjcs1, adjcs2, hna_chain, n_splits)
-! Compute next level HNAs - always keeps all children (original behavior)
+! One refinement step of the whole partition: every part of the last link of
+! hna_chain is subdivided into a new link. n_splits is the number of parts
+! gained, zero once the partition is self-consistent.
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(chaintree_node_t), pointer, intent(inout) :: hna_chain
    integer(ik), intent(out) :: n_splits
@@ -113,23 +128,22 @@ subroutine refine_hna_partition(adjcs1, adjcs2, hna_chain, n_splits)
 
    n_splits = 0
 
-   ! Save the last link before creating a new one
    link => hna_chain%last_link
    new_link => new_chain_link(hna_chain)
 
-   ! Process all parts in the current partition
    partref => link%first_partref
    do while (associated(partref))
-      ! Create children based on signatures
       call refine_hna_part(adjcs1, adjcs2, link%itemdir1, link%itemdir2, partref%part, new_link)
-      ! Count splits (children beyond the original part)
       n_splits = n_splits + partref%part%n_children - 1
       partref => partref%nextref
    end do
 end subroutine
 
 subroutine compute_sc_hna_chain(adjcs1, adjcs2, atomtypes, hna_chain, error_code)
-! Iteratively refine HNA partition until self-consistency
+! Self-consistent HNA partition of both molecules: starting from the atom
+! types, refine until no part splits. The result is the last link of
+! hna_chain. Fails with MOLALIGN_ERROR_NOT_CONFORMERS when a part holds
+! different numbers of atoms of each molecule (non-isomorphic graphs).
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(partition_t), intent(in) :: atomtypes
    type(chaintree_node_t), pointer, intent(out) :: hna_chain
@@ -139,17 +153,13 @@ subroutine compute_sc_hna_chain(adjcs1, adjcs2, atomtypes, hna_chain, error_code
 
    error_code = MOLALIGN_SUCCESS
 
-!   hna_chain => collect_atomtypes_linked( adjcs1, adjcs2)
    hna_chain => chain_from_partition( atomtypes)
 
    do
-      ! Call refine_hna_partition and get the number of splits
       call refine_hna_partition(adjcs1, adjcs2, hna_chain, n_splits)
-      ! Exit loop if no splits occurred
       if (n_splits == 0) exit
    end do
 
-   ! Verify that molecules are conformers
    if (is_partition_uneven(hna_chain%last_link)) then
       error_code = MOLALIGN_ERROR_NOT_CONFORMERS
       return
@@ -157,7 +167,9 @@ subroutine compute_sc_hna_chain(adjcs1, adjcs2, atomtypes, hna_chain, error_code
 end subroutine
 
 subroutine update_hna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
-! Update item values of existing item nodes instead of adding new item nodes
+! Linked-list counterpart of assignment_conformer::update_hna_part:
+! redistribute the atoms of part among its existing children by signature,
+! overwriting their item nodes instead of allocating new ones
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(part_nodeptr_t), dimension(:), intent(in) :: itemdir1, itemdir2
    type(partition_node_t), pointer, intent(inout) :: part
@@ -167,7 +179,7 @@ subroutine update_hna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
    integer(ik), dimension(:), allocatable :: signature
    type(partition_node_t), pointer :: child_part
 
-   ! Reset last item pointers for all children
+   ! last_item is used as the write cursor of each child
    child_part => part%first_child_part
    do while (associated(child_part))
       child_part%last_item1 => null()
@@ -175,7 +187,7 @@ subroutine update_hna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
       child_part => child_part%next_sibling_part
    end do
 
-   ! Process first molecule items - update existing item nodes
+   ! Atoms of molecule 1
    item => part%first_item1
    do while (associated(item))
       signature = hna_signature(adjcs1(item%idx), itemdir1)
@@ -196,7 +208,7 @@ subroutine update_hna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
       item => item%next_item
    end do
 
-   ! Process second molecule items - update existing item nodes
+   ! Atoms of molecule 2
    item => part%first_item2
    do while (associated(item))
       signature = hna_signature(adjcs2(item%idx), itemdir2)
@@ -219,17 +231,14 @@ subroutine update_hna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
 end subroutine
 
 subroutine update_hna_partition(adjcs1, adjcs2, link)
-! Compute next level HNAs - always keeps all children (original behavior)
+! Redistribute the atoms of all parts of link into the next link
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(chain_node_t), pointer, intent(inout) :: link
    ! Local variables
    type(partref_node_t), pointer :: partref
 
-   ! Process all parts in the current partition
    partref => link%first_partref
    do while (associated(partref))
-!      write (stderr,'(A,1X,A)') 'Part', address(partref%part)
-      ! Distribute items based on signatures
       call update_hna_part(adjcs1, adjcs2, link%itemdir1, link%itemdir2, partref%part, &
             link%next_link)
       partref => partref%nextref
@@ -237,7 +246,8 @@ subroutine update_hna_partition(adjcs1, adjcs2, link)
 end subroutine
 
 subroutine assign_branch_atoms(adjcs1, adjcs2, branch)
-! Iteratively compute HNAs until convergence
+! Individualize a random pair of the split part of branch and replay the
+! refinement recorded in its links
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(chaintree_node_t), pointer, intent(inout) :: branch
    ! Local variables
@@ -247,14 +257,10 @@ subroutine assign_branch_atoms(adjcs1, adjcs2, branch)
    rand_idx1 = random_uniform_integer(1, branch%split_part%n_items1)
    rand_idx2 = random_uniform_integer(1, branch%split_part%n_items2)
    call split_part_indexed(branch%split_part, branch%first_link, rand_idx1, rand_idx2)
-!   call split_part_indexed(branch%split_part, branch%first_link, 1, 1)
 
    link_idx = 1
    link => branch%first_link
    do while (associated(link))
-      ! Recompute next level HNAs
-!      write (stderr,'(A,1X,I0)') 'Link', link_idx
-!      call print_link_itemdir(link)
       call update_hna_partition(adjcs1, adjcs2, link)
       link_idx = link_idx + 1
       link => link%next_link
@@ -262,6 +268,9 @@ subroutine assign_branch_atoms(adjcs1, adjcs2, branch)
 end subroutine
 
 subroutine split_part_indexed(part, link, index1, index2)
+! Linked-list counterpart of assignment_conformer::assign_pair_to_children:
+! the atoms at positions index1 and index2 of part go to its first child
+! and the rest to its second child, overwriting their item nodes
    type(partition_node_t), pointer, intent(inout) :: part
    type(chain_node_t), pointer, intent(inout) :: link
    integer(ik), intent(in) :: index1, index2
@@ -270,11 +279,10 @@ subroutine split_part_indexed(part, link, index1, index2)
    type(item_node_t), pointer :: item1, item2
    integer(ik) :: current_index
 
-   ! Get pointers to first and second child parts
    child_part1 => part%first_child_part
    child_part2 => part%first_child_part%next_sibling_part
 
-   ! Find and assign the item at index1 from items1 to first child
+   ! Chosen atom of molecule 1 to the first child
    item1 => part%first_item1
    current_index = 1
    do while (current_index < index1)
@@ -284,7 +292,7 @@ subroutine split_part_indexed(part, link, index1, index2)
    child_part1%first_item1%idx = item1%idx
    link%itemdir1(item1%idx)%ptr => child_part1
 
-   ! Find and assign the item at index2 from items2 to first child
+   ! Chosen atom of molecule 2 to the first child
    item2 => part%first_item2
    current_index = 1
    do while (current_index < index2)
@@ -294,81 +302,66 @@ subroutine split_part_indexed(part, link, index1, index2)
    child_part1%first_item2%idx = item2%idx
    link%itemdir2(item2%idx)%ptr => child_part1
 
-   ! Now assign all other items from items1 to second child
+   ! Remaining atoms of molecule 1 to the second child
    item1 => part%first_item1
    current_index = 1
    child_part2%last_item1 => null()
 
    do while (associated(item1))
       if (current_index /= index1) then
-         ! Move to next position in second child
          if (.not. associated(child_part2%last_item1)) then
             child_part2%last_item1 => child_part2%first_item1
          else
             child_part2%last_item1 => child_part2%last_item1%next_item
          end if
-         ! This is not the selected item, assign to second child
          child_part2%last_item1%idx = item1%idx
          link%itemdir1(item1%idx)%ptr => child_part2
       end if
 
-      ! Move to next item in parent
       item1 => item1%next_item
       current_index = current_index + 1
    end do
 
-   ! Now assign all other items from items2 to second child
+   ! Remaining atoms of molecule 2 to the second child
    item2 => part%first_item2
    current_index = 1
    child_part2%last_item2 => null()
 
    do while (associated(item2))
       if (current_index /= index2) then
-         ! Move to next position in second child
          if (.not. associated(child_part2%last_item2)) then
             child_part2%last_item2 => child_part2%first_item2
          else
             child_part2%last_item2 => child_part2%last_item2%next_item
          end if
-         ! This is not the selected item, assign to second child
          child_part2%last_item2%idx = item2%idx
          link%itemdir2(item2%idx)%ptr => child_part2
       end if
 
-      ! Move to next item in parent
       item2 => item2%next_item
       current_index = current_index + 1
    end do
 end subroutine
 
 recursive subroutine distribute_items(adjcs1, adjcs2, branch)
+! Assign a random pair at every node of the assignment tree, depth first.
+! Not used by the searches, which work on the array representation.
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(chaintree_node_t), pointer, intent(inout) :: branch
    type(chaintree_node_t), pointer :: child_branch
    type(partition_node_t), pointer :: child_part
 
-!   call random_init(.TRUE., .TRUE.)
-
-   ! Process all children of this branch
    child_branch => branch%first_child_chain
    do while (associated(child_branch))
-      ! Process this child branch's split_part
-!      write (stderr,*)
-!      write (stderr,'(A,1X,A)') 'Split Part', address(child_branch%split_part)
-      ! Add target part children to links
       child_part => child_branch%split_part%first_child_part
       call assign_branch_atoms(adjcs1, adjcs2, child_branch)
-
-      ! Recursively process this child's descendants (depth-first)
       call distribute_items(adjcs1, adjcs2, child_branch)
-
-      ! Move to next sibling
       child_branch => child_branch%next_sibling_chain
    end do
 end subroutine
 
 function would_part_split(adjcs1, adjcs2, itemdir1, itemdir2, part) result(would_split)
-! Check if a part would split by comparing signatures
+! Whether the atoms of part have more than one signature under itemdir
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(part_nodeptr_t), dimension(:), intent(in) :: itemdir1, itemdir2
    type(partition_node_t), pointer, intent(inout) :: part
@@ -381,7 +374,7 @@ function would_part_split(adjcs1, adjcs2, itemdir1, itemdir2, part) result(would
    item1 => part%first_item1
    item2 => part%first_item2
 
-   ! Set first signature from first available item
+   ! Reference signature from the first atom
    if (associated(item1)) then
       reference = hna_signature(adjcs1(item1%idx), itemdir1)
       item1 => item1%next_item
@@ -392,7 +385,7 @@ function would_part_split(adjcs1, adjcs2, itemdir1, itemdir2, part) result(would
       return  ! No items to process
    end if
 
-   ! Check remaining items in first molecule
+   ! Compare the remaining atoms of both molecules
    do while (associated(item1))
       signature = hna_signature(adjcs1(item1%idx), itemdir1)
       if (.not. (signature .equiv. reference)) then
@@ -402,7 +395,6 @@ function would_part_split(adjcs1, adjcs2, itemdir1, itemdir2, part) result(would
       item1 => item1%next_item
    end do
 
-   ! Check remaining items in second molecule
    do while (associated(item2))
       signature = hna_signature(adjcs2(item2%idx), itemdir2)
       if (.not. (signature .equiv. reference)) then
@@ -414,7 +406,13 @@ function would_part_split(adjcs1, adjcs2, itemdir1, itemdir2, part) result(would
 end function
 
 subroutine refine_branched_hna_partition(adjcs1, adjcs2, hna_chain, branch, branch_parts, n_splits)
-! Compute next level HNAs - only keeps children if real split occurred
+! Refinement step during assignment tree construction (Pseudocode S2, lines
+! 10-12). Unlike refine_hna_partition, only parts that actually split are
+! subdivided; the others are carried over to the new level link without
+! entering its vertex directory. Each part that splits is recorded in the
+! current link of the node `branch`, so the search can replay the step, and
+! its children are added to branch_parts as candidates for later
+! individualization. n_splits is the number of parts that split.
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(chaintree_node_t), pointer, intent(inout) :: hna_chain
    type(chaintree_node_t), pointer, intent(inout) :: branch
@@ -431,13 +429,10 @@ subroutine refine_branched_hna_partition(adjcs1, adjcs2, hna_chain, branch, bran
    n_splits = 0
    any_splits = .FALSE.
 
-   ! Get the current level link
    level_link => hna_chain%last_link
-
-   ! Allocate array to cache split results
    allocate(will_split(level_link%n_parts))
 
-   ! Single pass: check which parts would split and cache results
+   ! Find the parts that split
    partref => level_link%first_partref
    do i = 1, level_link%n_parts
       will_split(i) = would_part_split(adjcs1, adjcs2, level_link%itemdir1, level_link%itemdir2, &
@@ -446,21 +441,16 @@ subroutine refine_branched_hna_partition(adjcs1, adjcs2, hna_chain, branch, bran
       partref => partref%nextref
    end do
 
-   ! Only create new links if splits will occur
+   ! New links are only created when some part splits
    if (any_splits) then
-      ! Create new level link for hna_chain
       next_level_link => new_chain_link(hna_chain)
 
-      ! Process all parts using cached split results
       partref => level_link%first_partref
       do i = 1, level_link%n_parts
          if (will_split(i)) then
-            ! Create children based on signatures
             call refine_hna_part(adjcs1, adjcs2, level_link%itemdir1, level_link%itemdir2, &
                   partref%part, next_level_link)
-            ! Link part to branch link
             call link_part(branch%last_link, partref%part)
-            ! Add part children to branch part list
             child_part => partref%part%first_child_part
             do while (associated(child_part))
                call add_branch_part(branch_parts, child_part)
@@ -468,7 +458,6 @@ subroutine refine_branched_hna_partition(adjcs1, adjcs2, hna_chain, branch, bran
             end do
             n_splits = n_splits + 1
          else
-            ! Link original part
             call link_part(next_level_link, partref%part)
          end if
 
@@ -477,18 +466,20 @@ subroutine refine_branched_hna_partition(adjcs1, adjcs2, hna_chain, branch, bran
       branch_link => new_chain_link(branch)
    end if
 
-   ! Clean up
    deallocate(will_split)
 end subroutine
 
 subroutine split_part_first(part, link)
+! Individualize the first pair of part (Pseudocode S2, lines 8-9): its first
+! atoms go to a new first child and the rest to a second child, both added
+! to link and to its vertex directory
    type(partition_node_t), pointer, intent(inout) :: part
    type(chain_node_t), pointer, intent(inout) :: link
    ! Local variables
    type(partition_node_t), pointer :: child_part
    type(item_node_t), pointer :: item1, item2
 
-   ! Create first child and add first item from each molecule
+   ! Individualized pair
    child_part => new_child_part(part)
    call link_part(link, child_part)
    call add_new_item1(child_part, part%first_item1%idx)
@@ -496,7 +487,7 @@ subroutine split_part_first(part, link)
    link%itemdir1(part%first_item1%idx)%ptr => child_part
    link%itemdir2(part%first_item2%idx)%ptr => child_part
 
-   ! Create second child and add remaining items
+   ! Remaining atoms
    child_part => new_child_part(part)
    call link_part(link, child_part)
    item1 => part%first_item1%next_item
@@ -511,9 +502,15 @@ subroutine split_part_first(part, link)
    end do
 end subroutine
 
-! Modified split_dependent_parts incorporating split_single_part functionality
 recursive subroutine split_dependent_parts(adjcs1, adjcs2, hna_chain, branch, branch_parts, &
       branching_part, part_to_split, error_code)
+! Create a child node of branch for part_to_split, individualize its first
+! pair and refine to self-consistency (Pseudocode S2, lines 6-14). While a
+! part with several pairs descending from branching_part remains, it is
+! split in turn under a new nested node, so the degeneracy of branching_part
+! is resolved along a single path of nodes. On return branch points to the
+! deepest node of that path, and branch_parts holds the children of all
+! parts that split on the way.
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(chaintree_node_t), pointer, intent(inout) :: hna_chain
    type(chaintree_node_t), pointer, intent(inout) :: branch
@@ -531,16 +528,14 @@ recursive subroutine split_dependent_parts(adjcs1, adjcs2, hna_chain, branch, br
 
    error_code = MOLALIGN_SUCCESS
 
-   ! Incorporate split_single_part logic
-   ! Save the last link before creating a new one
    level_link => hna_chain%last_link
    next_level_link => new_chain_link(hna_chain)
 
-   ! Create a new child branch for this splitting part
+   ! New assignment tree node for this split part
    branch => new_child_chain(branch, part_to_split)
    first_branch_link => new_chain_link(branch)
 
-   ! Add non splitting parts to new link
+   ! Carry the other parts over to the new level
    partref => level_link%first_partref
    do while (associated(partref))
       if (.not. associated(partref%part, part_to_split)) then
@@ -549,31 +544,26 @@ recursive subroutine split_dependent_parts(adjcs1, adjcs2, hna_chain, branch, br
       partref => partref%nextref
    end do
 
-   ! Split splitting part
    call split_part_first(part_to_split, next_level_link)
 
-   ! Add part children to branch part list
    child_part => part_to_split%first_child_part
    do while (associated(child_part))
       call add_branch_part(branch_parts, child_part)
       child_part => child_part%next_sibling_part
    end do
 
-   ! Compute self-consistent HNAs
+   ! Refine to self-consistency
    do
-      ! Refine HNA partition and get the number of splits
       call refine_branched_hna_partition(adjcs1, adjcs2, hna_chain, branch, branch_parts, n_splits)
-      ! Exit loop if no splits occurred
       if (n_splits == 0) exit
    end do
 
-   ! Verify that molecules are conformers
    if (is_partition_uneven(hna_chain%last_link)) then
       error_code = MOLALIGN_ERROR_NOT_CONFORMERS
       return
    end if
 
-   ! Find a degenerate descendant part to split
+   ! Next degenerate part descending from branching_part
    next_part_to_split => null()
    partref => hna_chain%last_link%first_partref
    do while (associated(partref) .and. .not. associated(next_part_to_split))
@@ -585,16 +575,19 @@ recursive subroutine split_dependent_parts(adjcs1, adjcs2, hna_chain, branch, br
       partref => partref%nextref
    end do
 
-   ! Perform split if target found
    if (associated(next_part_to_split)) then
-      ! Call itself again to split the next degenerate descendant part
       call split_dependent_parts(adjcs1, adjcs2, hna_chain, branch, branch_parts, branching_part, &
             next_part_to_split, error_code)
    end if
 end subroutine
 
-! Updated split_independent_parts to use the merged function signature
 recursive subroutine split_independent_parts(adjcs1, adjcs2, hna_chain, branch, branch_parts, error_code)
+! Build the subtrees of the independent parts in branch_parts (outer loop
+! and recursion of Pseudocode S2). Each part that is still a leaf (not
+! subdivided by earlier individualizations) starts a path of nodes below
+! branch; the parts split along that path are then processed recursively
+! below its deepest node. branch_parts is sorted by part size, so the
+! smallest parts are individualized first.
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(chaintree_node_t), pointer, intent(inout) :: hna_chain, branch
    type(chain_node_t), pointer, intent(in) :: branch_parts
@@ -606,19 +599,14 @@ recursive subroutine split_independent_parts(adjcs1, adjcs2, hna_chain, branch, 
 
    error_code = MOLALIGN_SUCCESS
 
-   ! Process each part in branch_parts
    partref => branch_parts%first_partref
    do while (associated(partref))
       if (partref%part%n_children == 0) then
-         ! Start leaf chain from current branch chain
          new_branch => branch
-         ! Create a new part registry for this branch part
          new_branch_parts => new_bare_link()
-         ! Split the target part and continue splitting descendants until convergence
          call split_dependent_parts(adjcs1, adjcs2, hna_chain, new_branch, new_branch_parts, &
                partref%part, partref%part, error_code)
          if (error_code /= MOLALIGN_SUCCESS) return
-         ! Recursively process the resulting branch parts
          call split_independent_parts(adjcs1, adjcs2, hna_chain, new_branch, new_branch_parts, error_code)
          if (error_code /= MOLALIGN_SUCCESS) return
       end if
@@ -627,6 +615,12 @@ recursive subroutine split_independent_parts(adjcs1, adjcs2, hna_chain, branch, 
 end subroutine
 
 subroutine build_assignment_tree( adjcs1, adjcs2, hna_link, cache_arrays, error_code)
+! Build the assignment tree from the self-consistent HNA partition hna_link
+! (Pseudocode S2) and store it, together with the partition tree and the
+! adjacency lists, in the fixed-size arrays used by the searches. The
+! partition is rebuilt under a fresh root with one child per part of
+! hna_link; all parts with several pairs are the initial candidates for
+! individualization.
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(chain_node_t), pointer, intent(in) :: hna_link
    type(array_trees_t), intent(out) :: cache_arrays
@@ -659,9 +653,8 @@ subroutine build_assignment_tree( adjcs1, adjcs2, hna_link, cache_arrays, error_
 
    call split_independent_parts( adjcs1, adjcs2, hna_chain, assignment_tree, branch_parts, error_code)
    if (error_code /= MOLALIGN_SUCCESS) return
-!   call distribute_items( adjcs1, adjcs2, assignment_tree)
 
-   ! Cache required data for DFS in fixed size arrays
+   ! Array representation for the searches
    call cache_partition_tree( partition_tree, cache_arrays)
    call cache_assignment_tree( assignment_tree, cache_arrays)
    call cache_adjacency_lists( adjcs1, adjcs2, cache_arrays)

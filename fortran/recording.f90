@@ -15,6 +15,8 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module recording
+! Registry of the distinct local minima found by the stochastic searches,
+! ranked by adjacency difference and then by squared distance
 use parameters
 use permutation
 use adjacency
@@ -32,20 +34,20 @@ public allocate_registry
 public reset_registry
 
 type :: record_t
-   integer(ik) :: freq
-   integer(ik) :: mapdiff
-   real(rk) :: mapdist
-   real(rk) :: steps
+   integer(ik) :: freq         ! times the minimum was found
+   integer(ik) :: mapdiff      ! adjacency difference
+   real(rk) :: mapdist         ! sum of squared distances
+   real(rk) :: steps           ! mean number of minimization steps
    real(rk) :: rotation(4)
    integer(ik), dimension(:), allocatable :: mapping1
-   integer(ik), dimension(:,:), allocatable :: moldiffs    ! List of differing bond pairs [2, nbonds]
+   integer(ik), dimension(:,:), allocatable :: moldiffs  ! differing bonds [2, n]
 end type
 
 type :: registry_t
-   logical(lk) :: overflow
+   logical(lk) :: overflow     ! some minimum did not fit in records
    integer(ik) :: total_steps
    integer(ik) :: n_trials
-   integer(ik) :: occ_records
+   integer(ik) :: occ_records  ! occupied records
    type(record_t), dimension(:), allocatable :: records
 end type
 
@@ -76,7 +78,9 @@ subroutine reset_registry(registry)
 end subroutine
 
 subroutine insert_record_mapping(registry, mapping1, steps, rotation, mapdiff, mapdist)
-   ! Group by mapping1, sort by mapdist
+! Count a trial that ended at mapping1. A known permutation only updates its
+! frequency and mean steps; a new one is inserted in rank order (mapdiff,
+! then mapdist), dropping the last record if the registry is full.
    type(registry_t), target, intent(inout) :: registry
    integer(ik), dimension(:), intent(in) :: mapping1
    real(rk), intent(in) :: steps, rotation(4)
@@ -89,7 +93,7 @@ subroutine insert_record_mapping(registry, mapping1, steps, rotation, mapdiff, m
    registry%n_trials = registry%n_trials + 1
    registry%total_steps = registry%total_steps + steps
 
-   ! Check for existing record with same permutation
+   ! Known permutation
    do i = 1, registry%occ_records
       record => registry%records(i)
       if (all(mapping1 == record%mapping1)) then
@@ -99,7 +103,7 @@ subroutine insert_record_mapping(registry, mapping1, steps, rotation, mapdiff, m
       end if
    end do
 
-   ! Find insertion point: sort by mapdist
+   ! Rank of the new permutation
    insert_pos = registry%occ_records + 1
    do i = 1, registry%occ_records
       record => registry%records(i)
@@ -114,14 +118,12 @@ subroutine insert_record_mapping(registry, mapping1, steps, rotation, mapdiff, m
       end if
    end do
 
-   ! Only insert if position is within bounds
    if (insert_pos <= size(registry%records)) then
-      ! Shift records to make room (if full, last one gets dropped)
+      ! Make room (if full, the last record is dropped)
       do j = min(registry%occ_records, size(registry%records) - 1), insert_pos, -1
          registry%records(j + 1) = registry%records(j)
       end do
 
-      ! Initialize new record (no moldiffs for permutation grouping)
       record => registry%records(insert_pos)
       record%mapping1 = mapping1
       record%freq = 1
@@ -130,7 +132,6 @@ subroutine insert_record_mapping(registry, mapping1, steps, rotation, mapdiff, m
       record%rotation = rotation
       record%steps = steps
 
-      ! Update record freq and overflow status
       if (registry%occ_records < size(registry%records)) then
          registry%occ_records = registry%occ_records + 1
       else
@@ -142,6 +143,9 @@ subroutine insert_record_mapping(registry, mapping1, steps, rotation, mapdiff, m
 end subroutine
 
 subroutine insert_record_moldiff(registry, moldiffs, mapping1, steps, rotation, mapdist)
+! As insert_record_mapping, but minima are grouped by the set of differing
+! bonds moldiffs instead of by permutation. A group keeps the permutation
+! with the lowest mapdist, and is moved to its new rank when it improves.
    type(registry_t), target, intent(inout) :: registry
    integer(ik), dimension(:,:), intent(in) :: moldiffs
    integer(ik), dimension(:), intent(in) :: mapping1
@@ -250,6 +254,7 @@ subroutine insert_record_moldiff(registry, moldiffs, mapping1, steps, rotation, 
 end subroutine
 
 subroutine print_records(registry)
+! Print the ranked minima and the search statistics
    type(registry_t), intent(in) :: registry
    type(record_t) :: record
    character(:), allocatable :: line

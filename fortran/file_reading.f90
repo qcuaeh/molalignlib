@@ -29,6 +29,8 @@ public read_file
 contains
 
 subroutine parse_label( label, elnum, group)
+! Element number and group of an atom label: an element symbol optionally
+! followed by digits (the group, 0 if absent)
    character(*), intent(in) :: label
    integer(ik), intent(out) :: elnum, group
    ! Local variables

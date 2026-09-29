@@ -33,6 +33,10 @@ contains
 
 subroutine optimize_mapping_atoms(atomtypes, prunes, coords1, &
       coords2, conv_freq, max_trials, registry, error_code)
+! Alignment of two atom clusters by random orientations followed by
+! alternating assignment and superposition until the assignment is stable
+! (J. Chem. Inf. Model. 2023, 63, 1157). The search stops when the best
+! local minimum has been found conv_freq times or after max_trials trials.
 ! coords1 and coords2 hold the included atoms only, in the numbering of
 ! atomtypes; the atom permutations stored in registry use that numbering.
    type(partition_t), intent(in) :: atomtypes
@@ -47,28 +51,23 @@ subroutine optimize_mapping_atoms(atomtypes, prunes, coords1, &
    real(rk), dimension(:,:), allocatable :: coords2r
    real(rk) :: mapdist, steps, rotation(4), total_rotation(4)
 
-   ! Allocations
    allocate (coords2r, mold=coords2)
    allocate (mapping1(size(atomtypes%itemdir1)))
    allocate (new_mapping(size(atomtypes%itemdir1)))
 
    error_code = MOLALIGN_SUCCESS
 
-   ! Initialize local minima registry
    call reset_registry( registry)
-
-   ! Initialize random number generator
    call random_initialize()
 
-   ! Optimize atom permutation
    do while (registry%records(1)%freq < conv_freq .and. registry%n_trials < max_trials)
 
-      ! Apply random rotation to coords2 copy
+      ! Random orientation of molecule 2
       coords2r = coords2
       total_rotation = randrotquat()
       call rotate_coords( coords2r, total_rotation)
 
-      ! Assign atoms with current orientation
+      ! Optimal assignment at this orientation
       call assign_atoms_pruned( atomtypes, coords1, coords2r, prunes, mapping1, error_code)
       if (error_code /= MOLALIGN_SUCCESS) return
       rotation = least_rotquat( mapping1, coords1, coords2r)
@@ -76,6 +75,7 @@ subroutine optimize_mapping_atoms(atomtypes, prunes, coords1, &
       total_rotation = quatmul( total_rotation, rotation)
       steps = 1
 
+      ! Alternate superposition and assignment until the assignment is stable
       do
          call assign_atoms_pruned( atomtypes, coords1, coords2r, prunes, new_mapping, error_code)
          if (error_code /= MOLALIGN_SUCCESS) return
@@ -87,7 +87,7 @@ subroutine optimize_mapping_atoms(atomtypes, prunes, coords1, &
          steps = steps + 1
       end do
 
-      ! Push local minimum to registry
+      ! Record the local minimum
       mapdist = sqrt( sqdistsum( mapping1, coords1, coords2r))
       call insert_record_mapping( registry, mapping1, steps, total_rotation, 0, mapdist)
 

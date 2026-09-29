@@ -64,6 +64,8 @@ subroutine split_filename(filename, basename, extension)
 end subroutine
 
 subroutine open2read(path, extension, unit)
+! Open path for reading and return its extension. A path without a base
+! name (e.g. 'xyz') returns the stdout unit.
    character(*), intent(in) :: path
    character(:), allocatable, intent(out) :: extension
    integer(ik), intent(out) :: unit
@@ -87,6 +89,8 @@ subroutine open2read(path, extension, unit)
 end subroutine
 
 subroutine open2write(path, extension, unit)
+! Open path for writing and return its extension. A bare extension (e.g.
+! 'xyz') selects standard output.
    character(*), intent(in) :: path
    character(:), allocatable, intent(out) :: extension
    integer(ik), intent(out) :: unit

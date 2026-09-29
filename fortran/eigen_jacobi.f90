@@ -15,6 +15,8 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module eigen
+! Smallest eigenvalue and eigenvector of a symmetric 4x4 matrix (Kearsley's
+! residual matrix) by cyclic Jacobi rotations. Alternative to eigen_lapack.
 use parameters
 
 implicit none
@@ -28,13 +30,14 @@ integer(ik), parameter :: max_iter = 100  ! Maximum number of Jacobi iterations
 contains
 
 function leasteigval(A)
+! Smallest eigenvalue; A is diagonalized in place
    real(rk), intent(inout) :: A(4,4)
    integer(ik) :: i, j, iter
    real(rk) :: leasteigval
    real(rk) :: V(4,4)
    real(rk) :: threshold, off_diag_norm
 
-  ! Initialize V as identity matrix
+   ! Initialize V as identity matrix
    V = 0.0_rk
    do i = 1, 4
       V(i,i) = 1.0_rk
@@ -73,6 +76,8 @@ function leasteigval(A)
 end function
 
 function leasteigvec(A)
+! Normalized eigenvector of the smallest eigenvalue; A is diagonalized in
+! place
    real(rk), intent(inout) :: A(4,4)
    integer(ik) :: i, j, iter, leastindex
    real(rk) :: leasteigvec(4)
@@ -126,6 +131,7 @@ function leasteigvec(A)
 end function
 
 subroutine jacobi_rotation(A, V, p, q)
+! Rotation that zeroes A(p,q), accumulated in V
    real(rk), intent(inout) :: A(4,4), V(4,4)
    integer(ik), intent(in) :: p, q
    integer(ik) :: i

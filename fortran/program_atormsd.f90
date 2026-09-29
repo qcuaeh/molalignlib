@@ -78,7 +78,7 @@ conv_freq = 10
 max_trials = MAX_TRIALS_DEFAULT
 prune_procedure => prune_none
 
-! Get user options
+! Read command line options
 
 call init_args()
 
@@ -145,11 +145,9 @@ call pad_atoms( atoms2, n_padding)
 
 ! Atom sets only ever contain real atoms
 if (heavy_flag) then
-   ! Include only heavy atoms
    call include_heavy_atoms( atoms1(1:n_atoms1), atomset1)
    call include_heavy_atoms( atoms2(1:n_atoms2), atomset2)
 else
-   ! Include all atoms
    call include_all_atoms( atoms1(1:n_atoms1), atomset1)
    call include_all_atoms( atoms2(1:n_atoms2), atomset2)
 end if

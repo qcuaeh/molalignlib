@@ -15,6 +15,7 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module permutation
+! Atom permutations and partial permutations
 use parameters
 implicit none
 
@@ -48,11 +49,13 @@ end interface
 contains
 
 integer function identity(i)
+! Identity function, for init_array
    integer(ik), intent(in) :: i
    identity = i
 end function
 
 subroutine init_array_integer(array, n, f)
+! array(i) = f(i), i = 1..n
    integer(ik), dimension(:), allocatable, intent(out) :: array
    integer, intent(in) :: n
    procedure(int_f) :: f
@@ -66,6 +69,7 @@ subroutine init_array_integer(array, n, f)
 end subroutine
 
 subroutine print_permutation(permutation)
+! Write a permutation as a comma-separated list (no line break)
    integer(ik), dimension(:), intent(in) :: permutation
    integer(ik) :: i
 
@@ -123,6 +127,7 @@ subroutine submap_init(submap, full_size)
 end subroutine
 
 subroutine submap_add(submap, i1, i2)
+! Append the pair (i1, i2)
    type(partmap_t), intent(inout) :: submap
    integer(ik), intent(in) :: i1, i2
    integer(ik) :: n
@@ -130,13 +135,11 @@ subroutine submap_add(submap, i1, i2)
    if (DEBUG_TESTS) then
    block
       integer(ik) :: i
-      ! Check if i1 is already in subset
       do i = 1, submap%subset_size
          if (submap%subset(i) == i1) then
             error stop 'Index i1 is already in subset'
          end if
       end do
-      ! Check if i2 is already assigned to something in subset
       do i = 1, submap%subset_size
          if (submap%mapping(submap%subset(i)) == i2) then
             error stop 'Index i2 is already assigned'
@@ -152,6 +155,7 @@ subroutine submap_add(submap, i1, i2)
 end subroutine
 
 subroutine submap_merge(submap, other_subperm)
+! Append all pairs of other_subperm to submap
    type(partmap_t), intent(inout) :: submap
    type(partmap_t), intent(in) :: other_subperm
    integer(ik) :: i, i1, i2

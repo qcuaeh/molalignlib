@@ -23,7 +23,7 @@ implicit none
 contains
 
 subroutine random_initialize()
-
+! Seed from the clock with random_flag, otherwise with the default seeds
    if (random_flag) then
       call time_set_seeds()
    else
@@ -33,6 +33,7 @@ subroutine random_initialize()
 end subroutine
 
 function randvec() result(x)
+! Three uniform random numbers in (0, 1)
    real(rk) :: x(3)
    x(1) = random_standard_real()
    x(2) = random_standard_real()
@@ -44,7 +45,6 @@ subroutine shuffle(a)
    integer(ik), dimension(:), intent(inout) :: a
    integer(ik) :: i, j, temp
    do i = size(a), 2, -1
-!      j = int(random_standard_real() * i) + 1
       j = random_uniform_integer(1, i)
       temp = a(j)
       a(j) = a(i)

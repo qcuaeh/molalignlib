@@ -128,10 +128,10 @@ atormsd file1 file2 [options]
 |--------|----------|-------------|
 | -align | | Align atoms to minimise the RMSD |
 | -remap | | Remap atoms to minimise the RMSD |
-| -atomlabel | | Use atom labels to distinguish atom types |
-| -prunetol | TOL | Enable pruning: discard assignments with pair distances exceeding *TOL* Å |
-| -freq | N | Stop if the best solution is found *N* consecutive times |
-| -trials | N | Stop after at most *N* optimisation trials |
+| -atomlabel | | Only match atoms with the same label (e.g. `C1`, `C2`) |
+| -prunetol | TOL | Prune atom pairs: two atoms are never paired if their sorted distances to the atoms of some atom type differ by more than 2√3 × *TOL* Å |
+| -freq | N | Stop once the best solution has been found *N* times (default: 10) |
+| -trials | N | Stop after at most *N* random orientations (default: 10000) |
 | -records | N | Record the *N* lowest RMSDs found (default: 1) |
 | -assignment | | Print the optimised atom mapping to stdout |
 | -aligned | FILE | Write aligned coordinates of molecule 2 to *FILE* |
@@ -177,22 +177,22 @@ conformsd file1 file2 [options]
 |--------|----------|-------------|
 | -align | | Align atoms to minimise the RMSD |
 | -remap | | Remap atoms to minimise the RMSD |
-| -atomlabel | | Use atom labels to distinguish atom types |
-| -freq | N | Stop if the best solution is found *N* consecutive times |
-| -trials | N | Stop after at most *N* optimisation trials |
+| -atomlabel | | Only match atoms with the same label (e.g. `C1`, `C2`) |
+| -freq | N | Stop the random orientation search once the best solution has been found more than *N* times; also the strategy threshold (see below) (default: 100) |
+| -trials | N | Stop after at most *N* random orientations (default: 10000) |
 | -records | N | Record the *N* lowest RMSDs found (default: 1) |
 | -assignment | | Print the optimised atom mapping to stdout |
-| -assigntree | | Print the internal assignment tree |
+| -assigntree | | Print the assignment tree (one node per branch point, labelled element × number of equivalent atoms) and its total and partial combination counts |
 | -aligned | FILE | Write aligned coordinates of molecule 2 to *FILE* |
 | -heavy | | Ignore hydrogen atoms |
 | -mass | | Use mass-weighted coordinates |
 | -mirror | | Reflect molecule 2 before comparison |
-| -bondtol | TOL | Derive bond connectivity from interatomic distances instead of the file's bond table, using detection tolerance *TOL* |
+| -bondtol | TOL | Derive bond connectivity from interatomic distances instead of the file's bond table: atoms are bonded when closer than the sum of their covalent radii plus *TOL* Å |
 | -bondtype | | Use bond types from the files to guide atom matching. Both files must have the same format; no effect with `-bondtol` |
 | -stats | | Print detailed optimisation statistics |
 | -random | | Seed the random-number generator from the system clock |
 
-The search strategy is chosen automatically based on the ratio of total to partial assignment combinations in the tree: stochastic fixed-orientation search is used when the ratio is high, and exhaustive orientation-independent search when it is low. Either strategy can be forced at compile time with the `FORCE_STOCHASTIC` and `FORCE_EXHAUSTIVE` parameters in `fortran/parameters.f90`.
+With `-align -remap`, the search strategy is chosen automatically from the assignment tree: stochastic fixed-orientation search is used when the total number of complete assignments exceeds `-freq` times the sum of partial combinations, and exhaustive orientation-independent search otherwise. The default of 100 reproduced the reference assignments on the full CCD and BIRD benchmarks, whereas 25 produced some incorrect ones. Either strategy can be forced at compile time with the `FORCE_STOCHASTIC` and `FORCE_EXHAUSTIVE` parameters in `fortran/parameters.f90`.
 
 #### Examples
 
@@ -238,8 +238,12 @@ Both functions receive atom information as a flat `int` array of length
 [ elnum_0, label_0, elnum_1, label_1, ... ]
 ```
 
-- `elnum`: atomic number (e.g. 6 for carbon, 8 for oxygen).
-- `label`: user-defined integer label; pass `0` for unlabelled atoms.
+- `elnum`: atomic number, 0 to 104 (e.g. 6 for carbon, 8 for oxygen). 0 is
+  the dummy atom "X", which is always excluded from the comparison, and 104
+  is the Lennard-Jones pseudo-element "LJ"; other values give
+  `MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER`.
+- `label`: user-defined integer label; pass `0` for unlabelled atoms. With
+  `atomlabel_flag = true`, only atoms with the same label are matched.
 
 Coordinates are passed as a flat `double` array of length `n_atoms * 3`,
 in row-major (C) order: `[x_0, y_0, z_0, x_1, y_1, z_1, ...]`.
@@ -267,11 +271,23 @@ Both functions accept an `n_records` parameter requesting up to that many
 ranked candidate solutions (best RMSD first) instead of just the single
 best one. `occ_records` reports how many were actually found; it can be
 smaller than `n_records`, and it is always `1` unless both `align_flag`
-and `remap_flag` are true. All output arrays (`rmsd_list`, `atomperm_list`,
+and `remap_flag` are true. All output arrays (`rmsd_list`, `mapping_list`,
 `transform_list`) are flattened and must be pre-allocated by the caller
 for `n_records` records; only the first `occ_records` entries are
-meaningful. Each permutation has `n_atoms1` entries, so `atomperm_list`
-needs `n_records*n_atoms1` elements.
+meaningful.
+
+### Atom permutations and padding
+
+Each permutation has `n_padding = max(n_atoms1, n_atoms2)` entries, so
+`mapping_list` needs `n_records*n_padding` elements, and record `i`
+occupies `mapping_list[i*n_padding .. i*n_padding+n_padding-1]`. Entry `j`
+(0-based) is the atom of molecule 2 placed on line `j` of molecule 1. The
+sizes can only differ when `heavy_flag = true`: the smaller molecule is then
+padded with dummy atoms appended after its real atoms, so values
+`>= n_atoms2` denote dummy atoms of molecule 2 and entries `j >= n_atoms1`
+hold the extra atoms of molecule 2. Hydrogens are not part of the RMSD with
+`heavy_flag = true`; they are paired afterwards (following their bonded
+heavy atom in `conformsd_calculate`, and by distance otherwise).
 
 ### atormsd_calculate
 
@@ -284,12 +300,17 @@ void atormsd_calculate(
     bool print_stats, bool random_flag,
     bool prunetol_flag, double prune_tol, int conv_freq, int max_trials,
     int n_records,
-    double *rmsd_list, int *atomperm_list,
+    double *rmsd_list, int *mapping_list,
     double *transform_list, int *occ_records, int *error_code);
 ```
 
-Pruning discards candidate atom pairings whose interatomic distance differs
-by more than `prune_tol`, speeding up the search. When `prunetol_flag = true`,
+With alignment and remapping, random orientations of molecule 2 are each
+refined by alternating atom assignment (within atom types) and optimal
+superposition, and the distinct local minima are ranked.
+
+Pruning speeds up the search by never pairing two atoms whose environments
+are incompatible: their sorted distances to the atoms of some atom type
+differ by more than 2√3 × `prune_tol`. When `prunetol_flag = true`,
 `prune_tol` (Å) has no default and must be supplied; it is ignored when
 `prunetol_flag = false`.
 
@@ -303,24 +324,24 @@ by more than `prune_tol`, speeding up the search. When `prunetol_flag = true`,
 | **n_atoms2** | in | Number of atoms in molecule 2 |
 | **atom_data2** | in | Packed atom data for molecule 2, length `n_atoms2*2` |
 | **coords2** | in | Coordinates for molecule 2, length `n_atoms2*3` |
-| **align_flag** | in | Enable structural alignment |
-| **remap_flag** | in | Enable atom remapping |
-| **heavy_flag** | in | Use only heavy (non-hydrogen) atoms |
+| **align_flag** | in | Optimally rotate and translate molecule 2 onto molecule 1 |
+| **remap_flag** | in | Find the atom permutation that minimises the RMSD (otherwise the input order is kept) |
+| **heavy_flag** | in | Exclude hydrogen atoms from the RMSD |
 | **mass_flag** | in | Weight atoms by atomic mass |
-| **mirror_flag** | in | Mirror molecule 2 before comparison |
-| **atomlabel_flag** | in | Use atom labels for type matching |
+| **mirror_flag** | in | Reflect molecule 2 (x → −x) before comparison |
+| **atomlabel_flag** | in | Only match atoms with the same label |
 | **print_stats** | in | Print optimisation statistics to stdout |
-| **random_flag** | in | Seed RNG from system clock |
-| **prunetol_flag** | in | Enable pruning (discard candidate pairings by distance) |
-| **prune_tol** | in | Pruning distance tolerance (Å); required when `prunetol_flag = true`, ignored otherwise (no default) |
-| **conv_freq** | in | Convergence frequency threshold |
-| **max_trials** | in | Maximum number of optimisation trials |
+| **random_flag** | in | Seed the random-number generator from the system clock (otherwise results are reproducible) |
+| **prunetol_flag** | in | Enable pruning of atom pairs (see above) |
+| **prune_tol** | in | Pruning tolerance (Å); required when `prunetol_flag = true`, ignored otherwise (no default) |
+| **conv_freq** | in | Stop once the best solution has been found this many times |
+| **max_trials** | in | Maximum number of random orientations |
 | **n_records** | in | Maximum number of ranked candidate solutions to return (≥ 1). Values > 1 only take effect when `align_flag` and `remap_flag` are both true |
 | **rmsd_list** | out | RMSD (Å) of each returned record, length `n_records`; caller allocates |
-| **atomperm_list** | out | Flattened, **0-based** atom permutations, length `n_records*n_atoms1` (one entry per atom of molecule 1). Record `i` occupies `atomperm_list[i*n_atoms1 .. i*n_atoms1+n_atoms1-1]`; caller allocates ≥ `n_records*n_atoms1` elements |
+| **mapping_list** | out | Flattened, **0-based** atom permutations, length `n_records*n_padding` with `n_padding = max(n_atoms1, n_atoms2)` (see [Atom permutations and padding](#atom-permutations-and-padding)); caller allocates ≥ `n_records*n_padding` elements |
 | **transform_list** | out | Flattened row-major 4 × 4 homogeneous transforms, length `n_records*16`. Record `i` occupies `transform_list[i*16 .. i*16+15]`; caller allocates ≥ `n_records*16` elements |
 | **occ_records** | out | Actual number of records written (≤ `n_records`) |
-| **error_code** | out | A constant from `enum molalign_error_code` in `error_codes.h`: `MOLALIGN_SUCCESS`; `MOLALIGN_ERROR_NOT_ISOMERS` (molecules are not isomers); `MOLALIGN_ERROR_ATOM_TYPE_MISMATCH` (atom types do not match; only when `remap_flag = false`); `MOLALIGN_ERROR_PRUNED_ASSIGNMENT_FAILED` (assignment failed, e.g. `prune_tol` too tight; only when `remap_flag = true`) |
+| **error_code** | out | A constant from `enum molalign_error_code` in `error_codes.h`: `MOLALIGN_SUCCESS`; `MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER` (an `elnum` outside 0–104); `MOLALIGN_ERROR_NOT_ISOMERS` (molecules are not isomers); `MOLALIGN_ERROR_ATOM_TYPE_MISMATCH` (atom types do not match; only when `remap_flag = false`); `MOLALIGN_ERROR_PRUNED_ASSIGNMENT_FAILED` (assignment failed, e.g. `prune_tol` too tight; only when `remap_flag = true`) |
 
 #### Minimal example
 
@@ -346,7 +367,7 @@ int main(void)
 
     /* Request a single (best) solution */
     double rmsd_list[1], transform_list[16];
-    int    atomperm_list[3], occ_records, error_code;
+    int    mapping_list[3], occ_records, error_code;   /* n_padding = 3 */
 
     atormsd_calculate(
         3, ad1, xy1,
@@ -357,7 +378,7 @@ int main(void)
         /*stats=*/false, /*random=*/false,
         /*prunetol_flag=*/false, /*prune_tol=*/0.0, /*conv_freq=*/10, /*max_trials=*/10000,
         /*n_records=*/1,
-        rmsd_list, atomperm_list,
+        rmsd_list, mapping_list,
         transform_list, &occ_records, &error_code);
 
     if (error_code != MOLALIGN_SUCCESS) { fprintf(stderr, "Error %d\n", error_code); return 1; }
@@ -374,7 +395,7 @@ To retrieve several ranked solutions, allocate the output arrays for
 
 double rmsd_list[N_RECORDS];
 double transform_list[N_RECORDS * 16];
-int    atomperm_list[N_RECORDS * 3];  /* N_RECORDS * n_atoms1 */
+int    mapping_list[N_RECORDS * 3];  /* N_RECORDS * n_padding */
 int    occ_records, error_code;
 
 atormsd_calculate(
@@ -385,7 +406,7 @@ atormsd_calculate(
     /*stats=*/false, /*random=*/false,
     /*prunetol_flag=*/false, /*prune_tol=*/0.0, /*conv_freq=*/10, /*max_trials=*/10000,
     /*n_records=*/N_RECORDS,
-    rmsd_list, atomperm_list,
+    rmsd_list, mapping_list,
     transform_list, &occ_records, &error_code);
 
 for (int i = 0; i < occ_records; i++) {
@@ -414,9 +435,18 @@ void conformsd_calculate(
     bool print_stats, bool print_assigntree, bool random_flag,
     int conv_freq, int max_trials,
     int n_records,
-    double *rmsd_list, int *atomperm_list,
+    double *rmsd_list, int *mapping_list,
     double *transform_list, int *occ_records, int *error_code);
 ```
+
+Atom assignments always respect the bond topology: they are searched over
+the assignment tree of the Hierarchical Neighborhood of Atoms (HNA)
+partition, so symmetry-equivalent atoms are permuted without ever breaking
+a bond. With alignment and remapping, the search strategy is chosen from
+the assignment tree: random orientation sampling when the total number of
+complete assignments exceeds `conv_freq` times the sum of partial
+combinations, and exhaustive enumeration otherwise (see
+[Algorithm Notes](#algorithm-notes)).
 
 Bond data is passed as a flat `int` array of length `n_bonds * 3`, packed as:
 
@@ -426,16 +456,17 @@ Bond data is passed as a flat `int` array of length `n_bonds * 3`, packed as:
 
 Atom indices are **1-based**. When `bondtol_flag = true` the library derives
 connectivity from atomic geometry and the bond arrays may be empty
-(`n_bonds = 0`, `bond_data = NULL`). In that case `bond_tol` (bond detection
-tolerance) has no default and must be supplied; it is ignored when
-`bondtol_flag = false`.
+(`n_bonds = 0`, `bond_data = NULL`): two atoms are bonded when closer than
+the sum of their covalent radii plus `bond_tol` (Å). `bond_tol` then has no
+default and must be supplied; it is ignored when `bondtol_flag = false`.
 
 The bond `type` is any integer code. It is only used when `bondtype_flag = true`,
 and then only compared for equality between bonds, never interpreted: both
 molecules must therefore use the same bond-type convention (for example,
 read from the same file format with the same parser). Note that the same
 molecule encoded with different Kekulé or aromatic bond types is then
-reported as `MOLALIGN_ERROR_NOT_CONFORMERS`.
+reported as `MOLALIGN_ERROR_NOT_CONFORMERS` (or
+`MOLALIGN_ERROR_BOND_MISMATCH` when `remap_flag = false`).
 
 #### Parameters
 
@@ -451,26 +482,26 @@ reported as `MOLALIGN_ERROR_NOT_CONFORMERS`.
 | **coords2** | in | Coordinates for molecule 2, length `n_atoms2*3` |
 | **n_bonds2** | in | Number of bonds in molecule 2 |
 | **bond_data2** | in | Flat bond array for molecule 2, length `n_bonds2*3` |
-| **align_flag** | in | Enable structural alignment (default `false` in the Python/Cython wrapper) |
-| **remap_flag** | in | Enable atom remapping (default `false` in the Python/Cython wrapper) |
-| **heavy_flag** | in | Use only heavy (non-hydrogen) atoms |
+| **align_flag** | in | Optimally rotate and translate molecule 2 onto molecule 1 (default `false` in the Python/Cython wrapper) |
+| **remap_flag** | in | Find the atom permutation that minimises the RMSD (default `false` in the Python/Cython wrapper) |
+| **heavy_flag** | in | Exclude hydrogen atoms from the RMSD |
 | **mass_flag** | in | Weight atoms by atomic mass |
-| **mirror_flag** | in | Mirror molecule 2 before comparison |
-| **atomlabel_flag** | in | Use atom labels for type matching |
+| **mirror_flag** | in | Reflect molecule 2 (x → −x) before comparison |
+| **atomlabel_flag** | in | Only match atoms with the same label |
 | **bondtol_flag** | in | Derive connectivity from geometry (ignores bond arrays) |
-| **bond_tol** | in | Bond detection tolerance; required when `bondtol_flag = true`, ignored otherwise (no default) |
+| **bond_tol** | in | Bond detection tolerance (Å), see above; required when `bondtol_flag = true`, ignored otherwise (no default) |
 | **bondtype_flag** | in | Use bond types to guide atom matching (types compared, not interpreted; see above). Ignored when `bondtol_flag = true` |
 | **print_stats** | in | Print optimisation statistics to stdout |
-| **print_assigntree** | in | Print the internal assignment tree |
-| **random_flag** | in | Seed RNG from system clock |
-| **conv_freq** | in | Convergence frequency threshold |
-| **max_trials** | in | Maximum number of optimisation trials |
+| **print_assigntree** | in | Print the assignment tree and its combination counts to stdout |
+| **random_flag** | in | Seed the random-number generator from the system clock (otherwise results are reproducible) |
+| **conv_freq** | in | Stop the random orientation search once the best solution has been found more than this many times; also the strategy threshold (see above). 100 is the validated value |
+| **max_trials** | in | Maximum number of random orientations |
 | **n_records** | in | Maximum number of ranked candidate solutions to return (≥ 1). Values > 1 only take effect when `align_flag` and `remap_flag` are both true |
 | **rmsd_list** | out | RMSD (Å) of each returned record, length `n_records`; caller allocates |
-| **atomperm_list** | out | Flattened, **0-based** atom permutations, length `n_records*n_atoms1` (one entry per atom of molecule 1). Record `i` occupies `atomperm_list[i*n_atoms1 .. i*n_atoms1+n_atoms1-1]`; caller allocates ≥ `n_records*n_atoms1` elements |
+| **mapping_list** | out | Flattened, **0-based** atom permutations, length `n_records*n_padding` with `n_padding = max(n_atoms1, n_atoms2)` (see [Atom permutations and padding](#atom-permutations-and-padding)); caller allocates ≥ `n_records*n_padding` elements |
 | **transform_list** | out | Flattened row-major 4 × 4 homogeneous transforms, length `n_records*16`. Record `i` occupies `transform_list[i*16 .. i*16+15]`; caller allocates ≥ `n_records*16` elements |
 | **occ_records** | out | Actual number of records written (≤ `n_records`) |
-| **error_code** | out | A constant from `enum molalign_error_code` in `error_codes.h`: `MOLALIGN_SUCCESS`; `MOLALIGN_ERROR_NOT_ISOMERS` (molecules are not isomers); `MOLALIGN_ERROR_MISSING_BONDS` (bond data missing for one or both molecules); `MOLALIGN_ERROR_ATOM_TYPE_MISMATCH` (atom types do not match; only when `remap_flag = false`); `MOLALIGN_ERROR_BOND_MISMATCH` (bond connectivity does not match; only when `remap_flag = false`); `MOLALIGN_ERROR_NOT_CONFORMERS` (same composition but different connectivity; only when `remap_flag = true`) |
+| **error_code** | out | A constant from `enum molalign_error_code` in `error_codes.h`: `MOLALIGN_SUCCESS`; `MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER` (an `elnum` outside 0–104); `MOLALIGN_ERROR_NOT_ISOMERS` (molecules are not isomers); `MOLALIGN_ERROR_MISSING_BONDS` (bond data missing for one or both molecules); `MOLALIGN_ERROR_ATOM_TYPE_MISMATCH` (atom types do not match; only when `remap_flag = false`); `MOLALIGN_ERROR_BOND_MISMATCH` (bond connectivity does not match; only when `remap_flag = false`); `MOLALIGN_ERROR_NOT_CONFORMERS` (same composition but different connectivity; only when `remap_flag = true`) |
 
 #### Minimal example
 
@@ -497,7 +528,7 @@ int main(void)
 
     /* Request a single (best) solution */
     double rmsd_list[1], transform_list[16];
-    int    atomperm_list[4], occ_records, error_code;
+    int    mapping_list[4], occ_records, error_code;   /* n_padding = 4 */
 
     conformsd_calculate(
         4, ad1, xy1, 3, bd1,
@@ -510,7 +541,7 @@ int main(void)
         /*stats=*/false, /*print_assigntree=*/false, /*random=*/false,
         /*conv_freq=*/100, /*max_trials=*/10000,
         /*n_records=*/1,
-        rmsd_list, atomperm_list,
+        rmsd_list, mapping_list,
         transform_list, &occ_records, &error_code);
 
     if (error_code != MOLALIGN_SUCCESS) { fprintf(stderr, "Error %d\n", error_code); return 1; }
@@ -525,10 +556,11 @@ over the first `occ_records` entries.
 
 ### Demo program
 
-A self-contained demo program (bindings/atormsd_demo.c) show how
-to call `atormsd_calculate` directly from C, using flat coordinate/element
-arrays read from XYZ files. Compile and run instructions are in each file's
-header comment.
+The demo program `bindings/atormsd_demo.c` shows how to call
+`atormsd_calculate` from C with element and coordinate arrays read from
+XYZ files, including buffer sizing for padded permutations. Compile and run
+instructions are in its header comment; run it with `-help` for its
+options.
 
 Python API
 ----------
@@ -604,12 +636,12 @@ print(result.rmsd)
 | **heavy_only** | `bool` | `False` | Exclude hydrogen atoms from the calculation |
 | **mass_weighted** | `bool` | `False` | Weight each atom by its atomic mass |
 | **mirror** | `bool` | `False` | Reflect `other` before comparison |
-| **use_atom_label** | `bool` | `False` | Use atom labels to distinguish atom types |
+| **use_atom_label** | `bool` | `False` | Only match atoms with the same label (see `labels` in the constructors) |
 | **stats** | `bool` | `False` | Print detailed optimisation statistics |
-| **random** | `bool` | `False` | Seed the random-number generator from the system clock |
-| **prune_tol** | `float` | `None` | Pruning distance tolerance (Å): discard assignments with pair distances exceeding `prune_tol`. `None` disables pruning |
-| **conv_freq** | `int` | `10` | Stop searching once the best solution has been found this many consecutive times |
-| **max_trials** | `int` | `10000` | Stop after at most this many optimisation trials |
+| **random** | `bool` | `False` | Seed the random-number generator from the system clock (otherwise results are reproducible) |
+| **prune_tol** | `float` | `None` | Pruning tolerance (Å): two atoms are never paired if their sorted distances to the atoms of some atom type differ by more than 2√3 × `prune_tol`. `None` disables pruning |
+| **conv_freq** | `int` | `10` | Stop searching once the best solution has been found this many times |
+| **max_trials** | `int` | `10000` | Stop after at most this many random orientations |
 | **n_records** | `int` | `1` | Request up to this many ranked solutions (see below) |
 
 Pass `n_records > 1` (with `align=True, remap=True`) to retrieve several
@@ -672,7 +704,7 @@ RMSD) first. By default only the single best solution is computed:
 results = c0.rmsd_to(c1, align=True, remap=True)
 result = results[0]             # best (lowest RMSD) solution
 print(result.rmsd)              # float, Å
-print(result.atom_permutation)  # int32 array, 0-based
+print(result.mapping)           # int32 array, 0-based
 print(result.transform)         # 4×4 float64 array
 ```
 
@@ -686,13 +718,13 @@ print(result.transform)         # 4×4 float64 array
 | **heavy_only** | `bool` | `False` | Exclude hydrogen atoms from the calculation |
 | **mass_weighted** | `bool` | `False` | Weight each atom by its atomic mass |
 | **mirror** | `bool` | `False` | Reflect `other` before comparison |
-| **use_atom_label** | `bool` | `False` | Use atom labels to distinguish atom types |
+| **use_atom_label** | `bool` | `False` | Only match atoms with the same label (see `labels` in the constructors) |
 | **bond_tol** | `float` | `None` | Bond-detection tolerance (Å): infer bond connectivity from geometry instead of using each structure's bond table. `None` disables bond detection |
 | **use_bond_type** | `bool` | `False` | Use bond types to guide atom matching. Both conformers must have the same `bond_source` (e.g. read from files of the same format), otherwise `ValueError` is raised; no effect when `bond_tol` is given |
 | **stats** | `bool` | `False` | Print detailed optimisation statistics |
-| **random** | `bool` | `False` | Seed the random-number generator from the system clock |
-| **conv_freq** | `int` | `100` | Stop searching once the best solution has been found this many consecutive times |
-| **max_trials** | `int` | `10000` | Stop after at most this many optimisation trials |
+| **random** | `bool` | `False` | Seed the random-number generator from the system clock (otherwise results are reproducible) |
+| **conv_freq** | `int` | `100` | Stop the random orientation search once the best solution has been found more than this many times; also the threshold that selects it over exhaustive enumeration (see [Algorithm Notes](#algorithm-notes)). 100 is the validated value |
+| **max_trials** | `int` | `10000` | Stop after at most this many random orientations |
 | **n_records** | `int` | `1` | Request up to this many ranked solutions (see below) |
 
 Pass `n_records > 1` (with `align=True, remap=True`) to retrieve several
@@ -719,12 +751,12 @@ solution (best/lowest RMSD first). Each `RMSDResult` holds:
 | Attribute | Type | Description |
 |-----------|------|-------------|
 | **rmsd** | `float` | Root-mean-square deviation in Å |
-| **atom_permutation** | `int32 ndarray (n,)` | 0-based index array mapping *other* atoms onto *self* |
+| **mapping** | `int32 ndarray (n_padding,)` | 0-based index array: entry `j` is the atom of *other* placed on line `j` of *self*. `n_padding = max(len(self), len(other))`; the lengths only differ with `heavy_only=True`, when values `>= len(other)` denote dummy atoms padding *other* and entries `j >= len(self)` hold its extra atoms |
 | **transform** | `float64 ndarray (4, 4)` | Homogeneous rotation + translation matrix (maps *other* to *self* frame); includes the reflection when `mirror=True` |
 
 #### Applying the result
 
-Use the ´apply_to´ method to apply the result to the coordinates:
+Use the `apply_to` method to apply the result to the coordinates:
 ```python
 # Produce a new object that is aligned and reordered to match the reference
 result = mol0.rmsd_to(mol1, align=True, remap=True)[0]

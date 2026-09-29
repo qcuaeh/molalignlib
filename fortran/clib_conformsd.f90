@@ -16,9 +16,24 @@ module clib_conformsd
 
 contains
 
-! C callable wrapper for conformsd functionality.
+subroutine conformsd_calculate(                                              &
+      c_n_atoms1,  c_atom_data1,  c_coords1,                                    &
+      c_n_bonds1,  c_bond_data1,                                                  &
+      c_n_atoms2,  c_atom_data2,  c_coords2,                                    &
+      c_n_bonds2,  c_bond_data2,                                                  &
+      c_align_flag, c_remap_flag, c_heavy_flag, c_mass_flag,                &
+      c_mirror_flag, c_atomlabel_flag, c_bondtol_flag, c_bond_tol,          &
+      c_bondtype_flag,                                                      &
+      c_print_stats, c_print_assigntree, c_random_flag,                      &
+      c_conv_freq, c_max_trials,                                           &
+      c_n_records,                                                          &
+      c_rmsd_list, c_mapping_list,                                              &
+      c_transform_list, c_occ_records, c_error_code)                         &
+      bind(C, name="conformsd_calculate")
+! C-callable symmetry-corrected RMSD between conformers (see the conformsd
+! program).
 !
-! Caller supplies pre-read molecular data as flat C arrays:
+! Inputs, as flat C arrays:
 !   c_atom_data1/2 : packed atom data, length c_n_atoms*2:
 !                    [elnum0, label0, elnum1, label1, ...]
 !                    label = 0 means unlabelled.
@@ -57,9 +72,8 @@ contains
 !   permutation of 0..n_padding-1. Entry j (0-based) is the atom of molecule 2
 !   that goes on line j of molecule 1. Values >= c_n_atoms2 denote padding
 !   atoms of molecule 2; entries j >= c_n_atoms1 are padding lines of
-!   molecule 1 and carry the extra atoms of molecule 2. When the molecules
-!   have the same size (always the case unless c_heavy_flag is true)
-!   n_padding = c_n_atoms1 and nothing changes for existing callers.
+!   molecule 1 and carry the extra atoms of molecule 2. The sizes can only
+!   differ when c_heavy_flag is true.
 !   Atoms excluded from the comparison (hydrogens with c_heavy_flag) are
 !   paired afterwards: bonded to the image of their heavy neighbour first,
 !   then by distance, then with padding atoms.
@@ -72,20 +86,6 @@ contains
 ! only when c_remap_flag is false), and MOLALIGN_ERROR_NOT_CONFORMERS
 ! (only when c_remap_flag is true; passed through from the conformer
 ! assignment routines).
-subroutine conformsd_calculate(                                              &
-      c_n_atoms1,  c_atom_data1,  c_coords1,                                    &
-      c_n_bonds1,  c_bond_data1,                                                  &
-      c_n_atoms2,  c_atom_data2,  c_coords2,                                    &
-      c_n_bonds2,  c_bond_data2,                                                  &
-      c_align_flag, c_remap_flag, c_heavy_flag, c_mass_flag,                &
-      c_mirror_flag, c_atomlabel_flag, c_bondtol_flag, c_bond_tol,          &
-      c_bondtype_flag,                                                      &
-      c_print_stats, c_print_assigntree, c_random_flag,                      &
-      c_conv_freq, c_max_trials,                                           &
-      c_n_records,                                                          &
-      c_rmsd_list, c_mapping_list,                                              &
-      c_transform_list, c_occ_records, c_error_code)                         &
-      bind(C, name="conformsd_calculate")
 
    ! Molecule 1
    integer(ik), intent(in), value :: c_n_atoms1

@@ -15,6 +15,9 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module assorting
+! Initial partition of the atoms of both molecules by atom type (element,
+! and label group with atomlabel_flag); the starting point of the HNA
+! refinement
 use parameters
 use common_types
 use flags
@@ -49,6 +52,7 @@ procedure(compare_atoms_interface), pointer :: compare_atoms
 contains
 
 logical(lk) function compare_atoms_simple(item, elnum, group) result(equal)
+! Same element
    type(atomtype_item_t), intent(in) :: item
    integer(ik), intent(in) :: elnum, group
 
@@ -56,6 +60,7 @@ logical(lk) function compare_atoms_simple(item, elnum, group) result(equal)
 end function
 
 logical(lk) function compare_atoms_labeled(item, elnum, group) result(equal)
+! Same element and label group
    type(atomtype_item_t), intent(in) :: item
    integer(ik), intent(in) :: elnum, group
 
@@ -80,6 +85,7 @@ subroutine add_atomtype(atomtypetable, elnum, group, partidx)
 end subroutine
 
 function find_atomtype(atomtypetable, elnum, group) result(partidx)
+! Part index of an atom type, or 0 if it is not in the table
    type(atomtype_table_t), intent(in) :: atomtypetable
    integer(ik), intent(in) :: elnum, group
    integer(ik) :: partidx
@@ -92,20 +98,18 @@ function find_atomtype(atomtypetable, elnum, group) result(partidx)
       end if
    end do
 
-   partidx = 0  ! Not found
+   partidx = 0
 end function
 
 subroutine collect_atomtypes(atoms1, atoms2, atomtypes)
 ! Partition the atoms of both molecules by atom type. Every atom passed in
 ! is classified, so pass only the included atoms (e.g. atoms(atomset)):
 ! items and itemdirs then use the compact numbering of the included atoms.
-! Single-pass approach using reverse mapping - no large 2D arrays needed
    type(atom_t), dimension(:), intent(in) :: atoms1, atoms2
    type(partition_t), intent(out) :: atomtypes
 
    ! Local variables
    type(atomtype_table_t) :: atomtypetable
-   ! Small temporary arrays - only O(max_parts) size
    integer(ik), dimension(:), allocatable :: part_count1, part_count2
    integer(ik), dimension(:), allocatable :: part_fill1, part_fill2
    integer(ik) :: n_atoms1, n_atoms2
@@ -120,23 +124,20 @@ subroutine collect_atomtypes(atoms1, atoms2, atomtypes)
 
    n_atoms1 = size(atoms1)
    n_atoms2 = size(atoms2)
-   max_parts = n_atoms1 + n_atoms2  ! Maximum possible partitions
+   max_parts = n_atoms1 + n_atoms2
 
-   ! Allocate temporary storage
    allocate(part_count1(max_parts))
    allocate(part_count2(max_parts))
    allocate(atomtypetable%items(max_parts))
    allocate(atomtypes%itemdir1(n_atoms1))
    allocate(atomtypes%itemdir2(n_atoms2))
 
-   ! Initialize counters
    part_count1 = 0
    part_count2 = 0
    atomtypetable%n_items = 0
    current_part = 0
 
-   ! SINGLE PASS: Process all atoms, build assignments AND count sizes
-   ! First molecule
+   ! Type of every atom and size of every part
    do atomidx = 1, n_atoms1
       partidx = find_atomtype(atomtypetable, atoms1(atomidx)%elnum, atoms1(atomidx)%group)
       if (partidx == 0) then
@@ -148,7 +149,6 @@ subroutine collect_atomtypes(atoms1, atoms2, atomtypes)
       part_count1(partidx) = part_count1(partidx) + 1
    end do
 
-   ! Second molecule
    do atomidx = 1, n_atoms2
       partidx = find_atomtype(atomtypetable, atoms2(atomidx)%elnum, atoms2(atomidx)%group)
       if (partidx == 0) then
@@ -160,11 +160,9 @@ subroutine collect_atomtypes(atoms1, atoms2, atomtypes)
       part_count2(partidx) = part_count2(partidx) + 1
    end do
 
-   ! Now allocate final structure with exact sizes (no waste!)
    atomtypes%n_parts = current_part
    allocate(atomtypes%parts(atomtypes%n_parts))
 
-   ! Allocate each partition with exact size
    do i = 1, atomtypes%n_parts
       atomtypes%parts(i)%elnum = atomtypetable%items(i)%elnum
       atomtypes%parts(i)%n_items1 = part_count1(i)
@@ -177,27 +175,24 @@ subroutine collect_atomtypes(atoms1, atoms2, atomtypes)
       allocate(atomtypes%parts(i)%children(0))
    end do
 
-   ! FAST FILL: Use assignments to populate final arrays efficiently
+   ! Atoms of every part
    allocate(part_fill1(current_part))
    allocate(part_fill2(current_part))
-   part_fill1 = 0  ! Current fill position for each partition
+   part_fill1 = 0
    part_fill2 = 0
 
-   ! Fill first molecule using reverse mapping
    do i = 1, n_atoms1
       partidx = atomtypes%itemdir1(i)
       part_fill1(partidx) = part_fill1(partidx) + 1
       atomtypes%parts(partidx)%items1(part_fill1(partidx)) = i
    end do
 
-   ! Fill second molecule using reverse mapping
    do i = 1, n_atoms2
       partidx = atomtypes%itemdir2(i)
       part_fill2(partidx) = part_fill2(partidx) + 1
       atomtypes%parts(partidx)%items2(part_fill2(partidx)) = i
    end do
 
-   ! Clean up small temporary arrays
    deallocate(part_count1, part_count2)
    deallocate(part_fill1, part_fill2)
 end subroutine

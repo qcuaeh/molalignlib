@@ -15,6 +15,7 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module str_utils
+! String conversions
 use parameters
 implicit none
 private

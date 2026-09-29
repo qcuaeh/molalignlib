@@ -15,6 +15,9 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module assignment_atoms
+! Topology-unaware atom assignment at fixed orientation (linear sum
+! assignment within each atom type), used for atom clusters and as the
+! starting point of the isomer search
 use parameters
 use flags
 use common_types
@@ -32,9 +35,9 @@ public assign_atoms_pruned
 contains
 
 subroutine assign_atoms( atomtypes, costs, mapping1)
-! ----------------------------------------------------------------
-! Finds the optimal mapping between points with fixed orientation
-! ----------------------------------------------------------------
+! Assignment minimizing the sum of costs, solved independently for each
+! atom type with the Hungarian algorithm (assndx). costs(h) is the cost
+! matrix of atom type h.
    type(partition_t), target, intent(in) :: atomtypes
    type(real_matrix), dimension(:), intent(in) :: costs
    integer(ik), dimension(:), intent(out) :: mapping1
@@ -60,16 +63,13 @@ subroutine assign_atoms( atomtypes, costs, mapping1)
 end subroutine
 
 subroutine assign_atoms_pruned( atomtypes, coords1, coords2, prunes, mapping1, error_code)
-! ----------------------------------------------------------------
-! Finds the optimal mapping between points with fixed orientation
-! ----------------------------------------------------------------
+! Assignment minimizing the sum of squared distances, solved independently
+! for each atom type with the sparse Jonker-Volgenant algorithm; pairs
+! marked in prunes(h) are excluded
    type(partition_t), target, intent(in) :: atomtypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
    type(bool_matrix), dimension(:), intent(in) :: prunes
-   ! mapping1 must be allocated by the caller with size(atomtypes%itemdir1)
-   ! elements (the included atoms, in the compact numbering of
-   ! collect_atomtypes). Every atom belongs to one block, so it is fully
-   ! assigned below; complete_mapping later adds the excluded atoms.
+   ! Allocated by the caller with size(atomtypes%itemdir1) elements
    integer(ik), dimension(:), intent(out) :: mapping1
    integer(ik), intent(out) :: error_code
    ! Local variables
@@ -80,7 +80,7 @@ subroutine assign_atoms_pruned( atomtypes, coords1, coords2, prunes, mapping1, e
    error_code = MOLALIGN_SUCCESS
    allocate (submap1(maxval(atomtypes%parts%n_items1)))
 
-   ! Optimize mapping1 for each block
+   ! Every atom belongs to one atom type, so mapping1 is fully assigned
    do h = 1, atomtypes%n_parts
       n = atomtypes%parts(h)%n_items1
       call solve_lap_pruned(n, atomtypes%parts(h)%items1, atomtypes%parts(h)%items2, &
@@ -91,55 +91,24 @@ subroutine assign_atoms_pruned( atomtypes, coords1, coords2, prunes, mapping1, e
 end subroutine
 
 subroutine solve_lap_pruned(n, s1, s2, x1, x2, pruned, submap1, dist, error_code)
-! Adapted from GMIN: A program for finding global minima
-! Copyright (C) 1999-2006 David J. Wales
-
-!   Interface to spjv.f for calculating minimum distance
-!   of two atomic configurations with respect to
-!   particle permutations.
-!   The function mapdist determines the distance or weight function,
-!
-!       Tomas Oppelstrup, Jul 10, 2003
-!       tomaso@nada.kth.se
-!
-
-!   This is the main routine for minimum distance calculation.
-!   Given two coordinate vectors x1,x2 of particles each, return
-!   the minimum distance in dist, and the permutation in submap1.
-!   submap1 is an integer vector such that
-!     x1(i) <--> x2(submap1(i))
-!   i.e.
-!     sum(i=1,n) mapdist(x1(i), x2(submap1(i))) == dist
-
-!   Input
-!     n  : System size
-!     x1,x2: Coordinate vectors (n particles)
-
+! Minimum sum of squared distances between atoms x1(:,s1(i)) and
+! x2(:,s2(submap1(i))), i = 1..n, over the permutations submap1 that avoid
+! the pruned pairs (pruned(j,i) excludes pairing s1(i) with s2(j)). The
+! sparse cost matrix is solved with jovosap in fixed point (scale).
+! Adapted from GMIN (Copyright (C) 1999-2006 David J. Wales), interface by
+! Tomas Oppelstrup.
    integer(ik), intent(in) :: n
    integer(ik), intent(in) :: s1(n), s2(n)
    real(rk), intent(in) :: x1(3, *), x2(3, *)
    logical(lk), intent(in) :: pruned(n, n)
-   real(rk), parameter :: scale = 1.0e6_rk ! Precision
-
-!   Output
-!     submap1: Permutation so that x1(i) <--> x2(submap1(i))
-!     dist: Minimum attainable distance
-!   We have
+   real(rk), parameter :: scale = 1.0e6_rk ! Fixed-point precision
    integer(ik), intent(out) :: submap1(n)
    real(rk), intent(out) :: dist
    integer(ik), intent(out) :: error_code
 
-!   Internal variables
-!   cc, kk, first:
-!     Sparse matrix of distances
-!   first(i):
-!     Beginning of row i in data,index vectors
-!   kk(first(i)..first(i+1)-1):
-!     Column indexes of existing elements in row i
-!   cc(first(i)..first(i+1)-1):
-!     Matrix elements of row i
+   ! Sparse cost matrix: row i has columns kk(first(i):first(i+1)-1) with
+   ! costs cc(first(i):first(i+1)-1)
    integer(ik) :: first(n+1), y(n)
-!   integer :: m, i, j, k, l, l2, a, sz, t
    integer(ik) :: i, j, k, sz
    integer(int64) :: u(n), v(n), h
    integer(ik), allocatable :: kk(:)
@@ -168,8 +137,6 @@ subroutine solve_lap_pruned(n, s1, s2, x1, x2, pruned, submap1, dist, error_code
       first(i+1) = first(i) + n - count(pruned(:, i))
    end do
 
-!  Compute the sparse cost matrix...
-
    do i = 1, n
       k = first(i)
       do j = 1, n
@@ -181,17 +148,12 @@ subroutine solve_lap_pruned(n, s1, s2, x1, x2, pruned, submap1, dist, error_code
       end do
    end do
 
-!   Call bipartite matching routine
    call jovosap(n, sz, cc, kk, first, submap1, y, u, v, h)
 
-!   Validate the assignment and compute its cost. Row i's entries occupy
-!   kk/cc(first(i):first(i+1)-1), so submap1(i) must be found within that
-!   slice (i.e. the pair was not pruned), and no column may be used twice.
-!   Any violation means no valid assignment exists under the pruning.
-!
-!   The cost is always recomputed here from the validated assignment
-!   rather than taken from h, since jovosap leaves h negative (cost not
-!   computed) when the initial guess is already optimal.
+   ! Validate the assignment: every pair must be unpruned and no column used
+   ! twice, otherwise no valid assignment exists under the pruning. The cost
+   ! is recomputed here because jovosap leaves h negative when its initial
+   ! guess is already optimal.
    col_used = .false.
    h = 0
    do i = 1, n

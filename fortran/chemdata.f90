@@ -24,6 +24,7 @@ integer(ik), parameter :: symlen = 3 ! Symbol length
 ! (zero mass, zero radii), so every real element's index equals its atomic
 ! number. Dummy atoms, including padding atoms, always have elnum = 0.
 integer(ik), parameter :: n_elems = 104
+! Bond perception tolerance (Angstrom), see molecule::bonds_from_atoms
 real(rk) :: bond_tol
 
 ! Element symbols

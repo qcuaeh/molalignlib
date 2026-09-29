@@ -15,6 +15,9 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module eigen
+! Smallest eigenvalue and eigenvector of a symmetric 4x4 matrix (Kearsley's
+! residual matrix) with LAPACK ssyev/dsyev, which sort eigenvalues in
+! ascending order. Alternative to eigen_jacobi.
 use parameters
 
 implicit none

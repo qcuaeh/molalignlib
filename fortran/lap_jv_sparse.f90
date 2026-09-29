@@ -4,15 +4,9 @@ implicit none
 contains
 
 subroutine jovosap(n,sz,cc,kk,first,x,y,u,v,h)
-! This subroutine performs weighted bipartite matching for
-! for a sparse non-negative integer weight matrix.
-
-! Adapted from GMIN: A program for finding global minima
-! Copyright (C) 1999-2006 David J. Wales
-! The original source is
-!     http://www.magiclogic.com/assignment.html
-! A publication reference can be found on the above homepage and
-! in a comment below
+! Minimum-cost bipartite matching for a sparse non-negative integer cost
+! matrix (Jonker-Volgenant). Adapted from GMIN (Copyright (C) 1999-2006
+! David J. Wales); original source http://www.magiclogic.com/assignment.html
 
    integer :: n,sz
    integer :: kk(sz),first(n+1),x(n),y(n)
@@ -23,33 +17,20 @@ subroutine jovosap(n,sz,cc,kk,first,x,y,u,v,h)
    integer(int64), parameter :: bigint = 1000000000000_int64
    logical :: ok(n)
 
-! THIS SUBROUTINE SOLVES THE SPARSE LINEAR ASSIGNMENT PROBLEM
-! ACCORDING 
+! R. Jonker and A. Volgenant, "A Shortest Augmenting Path Algorithm for
+! Dense and Sparse Linear Assignment Problems", Computing 38, 325-340 (1987)
 !
-! "A Shortest Augmenting Path Algorithm for Dense and Sparse Linear   
-!  Assignment Problems," Computing 38, 325-340, 1987
-! 
-! by
-! 
-! R. Jonker and A. Volgenant, University of Amsterdam.
-!
-! INPUT PARAMETERS :
-! N = NUMBER OF ROWS AND COLUMNS
-! C = WEIGHT MATRIX
-!
-! OUTPUT PARAMETERS
-! X = COL ASSIGNED TO ROW
-! Y = ROW ASSIGNED TO COL
-! U = DUAL ROW VARIABLE
-! V = DUAL COLUMN VARIABLE
-! H = VALUE OF OPTIMAL SOLUTION
-!
-! INITIALIZATION
+! Input:  n            number of rows and columns
+!         cc, kk, first sparse cost matrix: row i has columns
+!                      kk(first(i):first(i+1)-1) with costs cc(...)
+! Output: x            column assigned to each row
+!         y            row assigned to each column
+!         u, v         dual row and column variables
+!         h            cost of the optimal solution, or -1 when the
+!                      initial solution is already optimal
+! On failure the routine returns early with an incomplete assignment.
 
-!   Next line added by tomaso@nada.kth.se, to enable detection
-!   of solutions being equivalent to the initial guess
-! If Y(:) is initialised to zero then we see segmentation faults if 
-! a Y element is unset, etc.
+   ! Initialization
 
    y(1:n) = 0
    x(1:n) = 0
@@ -72,7 +53,6 @@ subroutine jovosap(n,sz,cc,kk,first,x,y,u,v,h)
       j0=n-j+1
       i=y(j0)
       if (i == 0) then
-!         print '(a,i6,a)','jovosap> warning b - matching failed'
          return
       end if
       if (x(i) /= 0) then
@@ -102,7 +82,7 @@ subroutine jovosap(n,sz,cc,kk,first,x,y,u,v,h)
         v(j1)=v(j1)-min
       end if
    end do
-! improve the initial solution
+   ! Improve the initial solution
    cnt=0
    if (l == 0) goto 1000
 41 l0=l
@@ -148,7 +128,7 @@ subroutine jovosap(n,sz,cc,kk,first,x,y,u,v,h)
    if (k <= l0) goto 50
    cnt=cnt+1
    if ((l > 0).and.(cnt < 2)) goto 41
-! augmentation part
+   ! Augmentation
    l0=l
    do l=1,l0
       do j=1,n
@@ -177,15 +157,13 @@ subroutine jovosap(n,sz,cc,kk,first,x,y,u,v,h)
       do j0=1,k
          j=todo(j0)
          if (j == 0) then
-!            print '(a,i6,a)','jovosap> warning c - matching failed'
             return
          end if
          if (y(j) == 0) goto 80
          ok(j)=.true.
       end do
-! repeat until a free row has been found
+      ! Repeat until a free row has been found
 60    if (k == 0) then
-!         print '(a,i6,a)','jovosap> warning d - matching failed'
          return
       end if
       j0=todo(k)

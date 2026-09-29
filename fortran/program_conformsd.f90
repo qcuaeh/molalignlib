@@ -81,7 +81,7 @@ n_records = 1
 conv_freq = 100
 max_trials = MAX_TRIALS_DEFAULT
 
-! Read command options
+! Read command line options
 
 call init_args()
 
@@ -158,11 +158,9 @@ call pad_atoms( atoms2, n_padding)
 
 ! Atom sets only ever contain real atoms
 if (heavy_flag) then
-   ! Include only heavy atoms
    call include_heavy_atoms( atoms1(1:n_atoms1), atomset1)
    call include_heavy_atoms( atoms2(1:n_atoms2), atomset2)
 else
-   ! Include all atoms
    call include_all_atoms( atoms1(1:n_atoms1), atomset1)
    call include_all_atoms( atoms2(1:n_atoms2), atomset2)
 end if
@@ -180,12 +178,13 @@ if (any(atomtypes%parts%n_items1 /= atomtypes%parts%n_items2)) then
    stop 'These molecules are not isomers'
 end if
 
-! Reset bonds
+! With -bondtol, perceive bonds from geometry instead of the files
 if (bondtol_flag) then
    call bonds_from_atoms( atoms1(1:n_atoms1), bonds1)
    call bonds_from_atoms( atoms2(1:n_atoms2), bonds2)
 end if
 
+! Abort if either molecule has no bonds
 if (size(bonds1) < 1 .or. size(bonds2) < 1) then
    if (size(bonds1) < 1 .and. size(bonds2) < 1) then
       stop 'Molecules have no bonds!'

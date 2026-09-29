@@ -18,7 +18,7 @@ module flags
 use parameters
 implicit none
 
-! Flags
+! Global run options, set by the programs and C bindings
 logical(lk) :: bondtol_flag
 logical(lk) :: bondtype_flag
 logical(lk) :: random_flag

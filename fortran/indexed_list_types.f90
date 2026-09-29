@@ -15,6 +15,10 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module indexed_list_types
+! Array representation of the partition and assignment trees. They are
+! built as linked lists (linked_list_types), which suits their dynamic
+! growth, and converted once to fixed-size arrays for the searches, which
+! improves cache locality and avoids pointer chasing.
 use parameters
 use common_types
 use linked_list_types
@@ -33,6 +37,7 @@ public print_chain_tree_array
 public print_part_signatures_array
 public print_chain_details_array
 
+! Part of the HNA partition tree
 type, public :: partree_item_t
    integer(ik) :: depth
    integer(ik) :: n_children
@@ -41,69 +46,73 @@ type, public :: partree_item_t
    integer(ik) :: first_child_idx
    integer(ik) :: last_child_idx
    integer(ik) :: next_sibling_idx
-   ! OPTIMIZATION: Direct child access array - eliminates linked traversal
-   integer(ik), allocatable :: child_indices(:)  ! Direct array of child part indices
-   ! Item segments in flattened arrays (using offsets)
+   integer(ik), allocatable :: child_indices(:)
+   ! Atoms of the part: atomidcs1(items1_offset+1 : items1_offset+n_items1)
+   ! and likewise for molecule 2
    integer(ik) :: items1_offset, n_items1
    integer(ik) :: items2_offset, n_items2
-   ! OPTIMIZED: Store unique signature values, frequencies, and total length
-   integer(ik) :: signature_values(MAX_COORDNUM)       ! unique values in signature
-   integer(ik) :: signature_frequencies(MAX_COORDNUM)  ! frequency of each unique value
-   integer(ik) :: signature_unique_count            ! number of unique values
-   integer(ik) :: signature_size            ! total signature length (sum of frequencies)
+   ! Signature as distinct values with their frequencies
+   integer(ik) :: signature_values(MAX_COORDNUM)
+   integer(ik) :: signature_frequencies(MAX_COORDNUM)
+   integer(ik) :: signature_unique_count  ! number of distinct values
+   integer(ik) :: signature_size          ! sum of frequencies
 end type
 
+! Link: one refinement level of an assignment tree node
 type, public :: chain_item_t
    integer(ik) :: n_parts
-   integer(ik) :: parent_chain_idx    ! which chain owns this link
-   ! Part reference segment in flattened array (using offset)
-   integer(ik) :: partref_offset      ! offset into partref_entries array
-   ! NOTE: itemdir1_offset and itemdir2_offset REMOVED - no longer needed with 2D arrays
+   integer(ik) :: parent_chain_idx    ! node that owns this link
+   ! Parts refined at this level:
+   ! partref_entries(partref_offset+1 : partref_offset+n_parts)
+   integer(ik) :: partref_offset
 end type
 
+! Assignment tree node
 type, public :: assigntree_item_t
    integer(ik) :: n_atoms1, n_atoms2
    integer(ik) :: n_links, n_children
-   ! Cross-tree reference (0 = null)
-   integer(ik) :: split_part_idx      ! points to part array
-   ! Chain tree relationships (0 = null)
+   ! Part individualized at this node (0 = none, for the root)
+   integer(ik) :: split_part_idx
+   ! Relationships (0 = null)
    integer(ik) :: parent_chain_idx
    integer(ik) :: first_child_idx
    integer(ik) :: last_child_idx
    integer(ik) :: next_sibling_idx
-   ! OPTIMIZATION: Direct child access array - eliminates linked traversal
-   integer(ik), allocatable :: child_indices(:)  ! Direct array of child chain indices
-   ! Link segment in flattened array (using offset)
-   integer(ik) :: link_offset         ! offset into links array
+   integer(ik), allocatable :: child_indices(:)
+   ! Links of the node: chain(link_offset+1 : link_offset+n_links)
+   integer(ik) :: link_offset
 end type
 
-! Array-based assignment tree with 2D itemdir arrays
+! Partition tree, assignment tree and adjacency lists in array form
 type, public :: array_trees_t
-   ! Pure arrays for item values (no linked lists!)
+   ! Atoms of all parts, in contiguous segments per part
    integer(ik), allocatable :: atomidcs1(:)
    integer(ik), allocatable :: atomidcs2(:)
    type(chain_item_t), allocatable :: chain(:)
    type(partree_item_t), allocatable :: partree(:)
    type(assigntree_item_t), allocatable :: assigntree(:)
-   ! Flattened variable-length data - all pure integer arrays!
-   ! [atom_idx, link_idx]: each link is one contiguous column, so resetting
-   ! a branch's consecutive links is a single contiguous block
-   integer(ik), allocatable :: itemdir1_entries(:,:)  ! [atom_idx, link_idx]
-   integer(ik), allocatable :: itemdir2_entries(:,:)  ! [atom_idx, link_idx]
-   integer(ik), allocatable :: partref_entries(:)     ! Part indices for partrefs
-   ! Adjacency information stored directly for fastest access
-   integer(ik), allocatable :: adjcs1_cn(:)         ! Count for each adjcs1 atom's adjacency list
-   integer(ik), allocatable :: adjcs2_cn(:)         ! Count for each adjcs2 atom's adjacency list
-   integer(ik), allocatable :: adjcs1_list(:,:)     ! Direct 2D adjacency lists for adjcs1 [atom_idx, neighbor_idx]
-   integer(ik), allocatable :: adjcs2_list(:,:)     ! Direct 2D adjacency lists for adjcs2 [atom_idx, neighbor_idx]
-   integer(ik), allocatable :: adjcs1_bondtype(:,:) ! Bond types matching adjcs1_list [atom_idx, neighbor_idx]
-   integer(ik), allocatable :: adjcs2_bondtype(:,:) ! Bond types matching adjcs2_list [atom_idx, neighbor_idx]
-   ! Metadata
-   integer(ik) :: n_atoms1, n_atoms2  ! number of atoms in each molecule
+   ! Vertex directories [atom, link]: part of each atom at each link
+   ! (0 = not placed at that link). Each link is a column, so the
+   ! consecutive links of a node are cleared as one contiguous block.
+   integer(ik), allocatable :: itemdir1_entries(:,:)
+   integer(ik), allocatable :: itemdir2_entries(:,:)
+   ! Part indices listed by the links
+   integer(ik), allocatable :: partref_entries(:)
+   ! Adjacency lists [atom, neighbor] with coordination numbers and bond types
+   integer(ik), allocatable :: adjcs1_cn(:)
+   integer(ik), allocatable :: adjcs2_cn(:)
+   integer(ik), allocatable :: adjcs1_list(:,:)
+   integer(ik), allocatable :: adjcs2_list(:,:)
+   integer(ik), allocatable :: adjcs1_bondtype(:,:)
+   integer(ik), allocatable :: adjcs2_bondtype(:,:)
+   ! Sizes
+   integer(ik) :: n_atoms1, n_atoms2
    integer(ik) :: total_items1, total_items2, total_parts
    integer(ik) :: total_links, total_chains
    integer(ik) :: total_partref_entries
-   ! Assignment statistics
+   ! Assignment tree statistics (Table 1 of the paper): number of complete
+   ! assignments (product of branch possibilities) and sum of partial
+   ! combinations evaluated by the local search
    real(real64) :: partial_combinations
    real(real64) :: total_combinations
 end type
@@ -111,6 +120,7 @@ end type
 contains
 
 subroutine cache_adjacency_lists(adjcs1, adjcs2, cache_arrays)
+! Copy the adjacency lists of both molecules into cache_arrays
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(array_trees_t), intent(inout) :: cache_arrays
    integer(ik) :: i, n_atoms1, n_atoms2
@@ -118,7 +128,6 @@ subroutine cache_adjacency_lists(adjcs1, adjcs2, cache_arrays)
    n_atoms1 = size(adjcs1)
    n_atoms2 = size(adjcs2)
 
-   ! Allocate adjacency arrays
    allocate(cache_arrays%adjcs1_cn(n_atoms1))
    allocate(cache_arrays%adjcs2_cn(n_atoms2))
    allocate(cache_arrays%adjcs1_list(n_atoms1, MAX_COORDNUM))
@@ -126,20 +135,17 @@ subroutine cache_adjacency_lists(adjcs1, adjcs2, cache_arrays)
    allocate(cache_arrays%adjcs1_bondtype(n_atoms1, MAX_COORDNUM))
    allocate(cache_arrays%adjcs2_bondtype(n_atoms2, MAX_COORDNUM))
 
-   ! Initialize adjacency lists to zero
    cache_arrays%adjcs1_list = 0
    cache_arrays%adjcs2_list = 0
    cache_arrays%adjcs1_bondtype = NO_BOND
    cache_arrays%adjcs2_bondtype = NO_BOND
 
-   ! Copy adjacency data for molecule 1
    do i = 1, n_atoms1
       cache_arrays%adjcs1_cn(i) = adjcs1(i)%cn
       cache_arrays%adjcs1_list(i, 1:adjcs1(i)%cn) = adjcs1(i)%list(1:adjcs1(i)%cn)
       cache_arrays%adjcs1_bondtype(i, 1:adjcs1(i)%cn) = adjcs1(i)%bondtype(1:adjcs1(i)%cn)
    end do
 
-   ! Copy adjacency data for molecule 2
    do i = 1, n_atoms2
       cache_arrays%adjcs2_cn(i) = adjcs2(i)%cn
       cache_arrays%adjcs2_list(i, 1:adjcs2(i)%cn) = adjcs2(i)%list(1:adjcs2(i)%cn)
@@ -148,55 +154,50 @@ subroutine cache_adjacency_lists(adjcs1, adjcs2, cache_arrays)
 end subroutine
 
 subroutine cache_partition_tree(partition_tree, cache_arrays)
+! Convert the linked partition tree into cache_arrays
    type(partition_node_t), pointer, intent(in) :: partition_tree
    type(array_trees_t), intent(inout) :: cache_arrays
    integer(ik) :: item1_idx, item2_idx
 
-   ! Set part tree metadata
    cache_arrays%total_parts = partition_tree%total_parts
    cache_arrays%total_items1 = partition_tree%total_items1
    cache_arrays%total_items2 = partition_tree%total_items2
 
-   ! Allocate part tree arrays
    allocate(cache_arrays%atomidcs1(cache_arrays%total_items1))
    allocate(cache_arrays%atomidcs2(cache_arrays%total_items2))
    allocate(cache_arrays%partree(cache_arrays%total_parts))
 
-   ! Initialize arrays
    cache_arrays%atomidcs1 = 0
    cache_arrays%atomidcs2 = 0
 
-   ! Convert part tree
    item1_idx = 0
    item2_idx = 0
    call convert_parts_recurse(partition_tree, cache_arrays, item1_idx, item2_idx)
 end subroutine
 
 subroutine cache_assignment_tree(assignment_tree, cache_arrays)
+! Convert the linked assignment tree into cache_arrays and compute its
+! combination statistics. The vertex directories start empty.
    type(chaintree_node_t), pointer, intent(in) :: assignment_tree
    type(array_trees_t), intent(inout) :: cache_arrays
    integer(ik) :: partref_idx, link_idx
 
-   ! Set assignment tree metadata
    cache_arrays%n_atoms1 = assignment_tree%n_atoms1
    cache_arrays%n_atoms2 = assignment_tree%n_atoms2
    cache_arrays%total_chains = assignment_tree%total_chains
    cache_arrays%total_links = assignment_tree%total_links
    cache_arrays%total_partref_entries = assignment_tree%total_partrefs
 
-   ! Allocate assignment tree arrays
    allocate(cache_arrays%chain(cache_arrays%total_links))
    allocate(cache_arrays%assigntree(cache_arrays%total_chains))
    allocate(cache_arrays%partref_entries(cache_arrays%total_partref_entries))
    allocate(cache_arrays%itemdir1_entries(cache_arrays%n_atoms1, cache_arrays%total_links))
    allocate(cache_arrays%itemdir2_entries(cache_arrays%n_atoms2, cache_arrays%total_links))
 
-   ! Initialize arrays
    cache_arrays%partref_entries = 0
    cache_arrays%itemdir1_entries = 0
    cache_arrays%itemdir2_entries = 0
 
-   ! Convert assignment tree
    partref_idx = 0
    link_idx = 0
    call convert_chains_recurse(assignment_tree, cache_arrays, partref_idx, link_idx, &
@@ -204,6 +205,7 @@ subroutine cache_assignment_tree(assignment_tree, cache_arrays)
 end subroutine
 
 subroutine convert_signature(part, cache_arrays, part_idx)
+! Store the signature of part as distinct values with their frequencies
    type(partition_node_t), pointer, intent(in) :: part
    type(array_trees_t), intent(inout) :: cache_arrays
    integer(ik), intent(in) :: part_idx
@@ -211,22 +213,17 @@ subroutine convert_signature(part, cache_arrays, part_idx)
    integer(ik) :: temp_count, i, j, value
    logical(lk) :: found
 
-   ! First pass: collect the signature codes. They are already integer
-   ! encoded edge codes (part global_idx and bond type) and neighbors
-   ! without a part were left out when the signature was built.
+   ! Edge codes (see adjacency::edge_code) of the neighbors with a part
    temp_count = size(part%signature)
    temp_values(:temp_count) = part%signature
 
-   ! Store total signature length
    cache_arrays%partree(part_idx)%signature_size = temp_count
 
-   ! Second pass: compute unique values and their frequencies
    cache_arrays%partree(part_idx)%signature_unique_count = 0
    do i = 1, temp_count
       value = temp_values(i)
       found = .FALSE.
 
-      ! Check if this value is already in unique list
       do j = 1, cache_arrays%partree(part_idx)%signature_unique_count
          if (cache_arrays%partree(part_idx)%signature_values(j) == value) then
             cache_arrays%partree(part_idx)%signature_frequencies(j) = &
@@ -236,7 +233,6 @@ subroutine convert_signature(part, cache_arrays, part_idx)
          end if
       end do
 
-      ! If not found, add as new unique value
       if (.not. found) then
          cache_arrays%partree(part_idx)%signature_unique_count = &
             cache_arrays%partree(part_idx)%signature_unique_count + 1
@@ -245,12 +241,14 @@ subroutine convert_signature(part, cache_arrays, part_idx)
       end if
    end do
 
-   ! Zero out unused entries using intrinsic operation
+   ! Zero the unused entries
    cache_arrays%partree(part_idx)%signature_values(cache_arrays%partree(part_idx)%signature_unique_count + 1:MAX_COORDNUM) = 0
    cache_arrays%partree(part_idx)%signature_frequencies(cache_arrays%partree(part_idx)%signature_unique_count + 1:MAX_COORDNUM) = 0
 end subroutine
 
 recursive subroutine convert_parts_recurse(part, cache_arrays, item1_idx, item2_idx)
+! Store part and its subtree at their global indices. item1_idx and
+! item2_idx are the last used positions of atomidcs1 and atomidcs2.
    type(partition_node_t), pointer, intent(in) :: part
    type(array_trees_t), intent(inout) :: cache_arrays
    integer(ik), intent(inout) :: item1_idx, item2_idx
@@ -260,13 +258,11 @@ recursive subroutine convert_parts_recurse(part, cache_arrays, item1_idx, item2_
 
    if (.not. associated(part)) return
 
-   ! Convert this part (global indices always start at 1)
    part_idx = part%global_idx
 
    cache_arrays%partree(part_idx)%depth = part%depth
    cache_arrays%partree(part_idx)%n_children = part%n_children
 
-   ! Relationships using global indices
    if (associated(part%parent_part)) then
       cache_arrays%partree(part_idx)%parent_part_idx = part%parent_part%global_idx
    else
@@ -291,17 +287,15 @@ recursive subroutine convert_parts_recurse(part, cache_arrays, item1_idx, item2_
       cache_arrays%partree(part_idx)%next_sibling_idx = 0
    end if
 
-   ! Set up item segments using offset approach (offset = start_idx - 1)
-   cache_arrays%partree(part_idx)%items1_offset = item1_idx  ! item1_idx tracks the last used index
+   ! Atom segments start after the last used positions
+   cache_arrays%partree(part_idx)%items1_offset = item1_idx
    cache_arrays%partree(part_idx)%n_items1 = part%n_items1
 
-   cache_arrays%partree(part_idx)%items2_offset = item2_idx  ! item2_idx tracks the last used index
+   cache_arrays%partree(part_idx)%items2_offset = item2_idx
    cache_arrays%partree(part_idx)%n_items2 = part%n_items2
 
-   ! OPTIMIZED: Convert signature to unique values, frequencies, and total length
    call convert_signature(part, cache_arrays, part_idx)
 
-   ! Convert items1 to pure array format
    item => part%first_item1
    i = 0
    do while (associated(item))
@@ -311,7 +305,6 @@ recursive subroutine convert_parts_recurse(part, cache_arrays, item1_idx, item2_
       item => item%next_item
    end do
 
-   ! Convert items2 to pure array format
    item => part%first_item2
    i = 0
    do while (associated(item))
@@ -321,7 +314,6 @@ recursive subroutine convert_parts_recurse(part, cache_arrays, item1_idx, item2_
       item => item%next_item
    end do
 
-   ! OPTIMIZATION: Populate direct child access array for faster traversal
    if (part%n_children > 0) then
       allocate(cache_arrays%partree(part_idx)%child_indices(part%n_children))
       child_part => part%first_child_part
@@ -333,7 +325,6 @@ recursive subroutine convert_parts_recurse(part, cache_arrays, item1_idx, item2_
       end do
    end if
 
-   ! Recursively convert all children
    child_part => part%first_child_part
    do while (associated(child_part))
       call convert_parts_recurse(child_part, cache_arrays, item1_idx, item2_idx)
@@ -343,6 +334,12 @@ end subroutine
 
 recursive subroutine convert_chains_recurse(chain, cache_arrays, partref_idx, link_idx, &
                                             partial_combinations, total_combinations)
+! Store the node chain and its subtree at their global indices, and return
+! the combination statistics of the subtree: total_combinations is the
+! number of complete assignments (product over the children of the pair
+! choices times their own totals) and partial_combinations the number of
+! leaves visited by the local search (sum over the children of the same
+! terms).
    type(chaintree_node_t), pointer, intent(in) :: chain
    type(array_trees_t), intent(inout) :: cache_arrays
    integer(ik), intent(inout) :: partref_idx, link_idx
@@ -356,17 +353,14 @@ recursive subroutine convert_chains_recurse(chain, cache_arrays, partref_idx, li
 
    if (.not. associated(chain)) return
 
-   ! If this is a leaf level (no children), both values are 1
    if (chain%n_children == 0) then
       partial_combinations = 1
       total_combinations = 1
    else
-      ! Initialize accumulators for non-leaf nodes
       partial_combinations = 0
       total_combinations = 1
    end if
 
-   ! Convert this chain (existing conversion logic)
    chain_idx = chain%global_idx
 
    cache_arrays%assigntree(chain_idx)%n_atoms1 = chain%n_atoms1
@@ -374,14 +368,12 @@ recursive subroutine convert_chains_recurse(chain, cache_arrays, partref_idx, li
    cache_arrays%assigntree(chain_idx)%n_links = chain%n_links
    cache_arrays%assigntree(chain_idx)%n_children = chain%n_children
 
-   ! Cross-tree reference
    if (associated(chain%split_part)) then
       cache_arrays%assigntree(chain_idx)%split_part_idx = chain%split_part%global_idx
    else
       cache_arrays%assigntree(chain_idx)%split_part_idx = 0
    end if
 
-   ! Chain relationships
    if (associated(chain%parent_chain)) then
       cache_arrays%assigntree(chain_idx)%parent_chain_idx = chain%parent_chain%global_idx
    else
@@ -406,7 +398,6 @@ recursive subroutine convert_chains_recurse(chain, cache_arrays, partref_idx, li
       cache_arrays%assigntree(chain_idx)%next_sibling_idx = 0
    end if
 
-   ! OPTIMIZATION: Populate direct child access array for faster traversal
    if (chain%n_children > 0) then
       allocate(cache_arrays%assigntree(chain_idx)%child_indices(chain%n_children))
       child_chain => chain%first_child_chain
@@ -418,10 +409,9 @@ recursive subroutine convert_chains_recurse(chain, cache_arrays, partref_idx, li
       end do
    end if
 
-   ! Set link offset (offset = start_idx - 1)
+   ! Link segment starts after the last used position
    cache_arrays%assigntree(chain_idx)%link_offset = link_idx
 
-   ! Convert links in this chain using offset approach
    link => chain%first_link
    do while (associated(link))
       link_idx = link_idx + 1
@@ -430,10 +420,8 @@ recursive subroutine convert_chains_recurse(chain, cache_arrays, partref_idx, li
       cache_arrays%chain(current_link_idx)%n_parts = link%n_parts
       cache_arrays%chain(current_link_idx)%parent_chain_idx = chain%global_idx
 
-      ! Set partref offset (offset = start_idx - 1)
       cache_arrays%chain(current_link_idx)%partref_offset = partref_idx
 
-      ! Convert partrefs to pure array format
       partref => link%first_partref
       do while (associated(partref))
          partref_idx = partref_idx + 1
@@ -444,20 +432,15 @@ recursive subroutine convert_chains_recurse(chain, cache_arrays, partref_idx, li
       link => link%next_link
    end do
 
-   ! Recursively convert child chains and accumulate statistics
    child_chain => chain%first_child_chain
    do while (associated(child_chain))
       call convert_chains_recurse(child_chain, cache_arrays, partref_idx, link_idx, &
                                   child_combinations, child_product)
 
-      ! Count statistics if this is not a leaf
       if (chain%n_children > 0) then
+         ! The first atom of molecule 1 is paired with each atom of molecule 2
          n_items2 = child_chain%split_part%n_items2
-
-         ! Update combinations (sum): first item1 with each item2
          partial_combinations = partial_combinations + (n_items2 * child_combinations)
-
-         ! Update product (multiply): split sizes only
          total_combinations = total_combinations * (n_items2 * child_product)
       end if
 
@@ -478,7 +461,7 @@ subroutine print_tree_items_array(cache_arrays)
    write(stderr, '(A)') repeat("=", 25)
    write(stderr, *)
 
-   ! Root part is always at index 1, print its children recursively
+   ! The root part is at index 1
    call print_items_recursive_array(cache_arrays, 1)
    write(stderr, *)
 end subroutine
@@ -488,15 +471,12 @@ recursive subroutine print_items_recursive_array(cache_arrays, part_idx)
    integer(ik), intent(in) :: part_idx
    integer(ik) :: child_idx, i
 
-   ! Use direct array access instead of linked traversal for better performance
    do i = 1, cache_arrays%partree(part_idx)%n_children
       child_idx = cache_arrays%partree(part_idx)%child_indices(i)
 
-      ! Print the child items with part index prefix
       write(stderr, '(A,I0,A)', advance='no') "Part ", child_idx, ':'
       call print_part_items_array(cache_arrays, child_idx)
 
-      ! Recursively print this child's children
       call print_items_recursive_array(cache_arrays, child_idx)
    end do
 end subroutine
@@ -506,22 +486,18 @@ subroutine print_part_items_array(cache_arrays, part_idx)
    integer(ik), intent(in) :: part_idx
    integer(ik) :: i
 
-   ! Print items1 using offset-based access
    do i = 1, cache_arrays%partree(part_idx)%n_items1
       write(stderr, '(1X,I0)', advance='no') cache_arrays%atomidcs1(cache_arrays%partree(part_idx)%items1_offset + i)
    end do
 
    write(stderr, '(A)', advance='no') ' /'
 
-   ! Print items2 using offset-based access
    do i = 1, cache_arrays%partree(part_idx)%n_items2
       write(stderr, '(1X,I0)', advance='no') cache_arrays%atomidcs2(cache_arrays%partree(part_idx)%items2_offset + i)
    end do
 
    write(stderr, *)
 end subroutine
-
-! Array-based tree printing procedures
 
 subroutine print_part_tree_array(cache_arrays)
    type(array_trees_t), intent(in) :: cache_arrays
@@ -541,10 +517,7 @@ subroutine print_part_tree_array(cache_arrays)
    allocate(is_last_child(100))
    is_last_child = .FALSE.
 
-   ! Print root line
    write(stderr, '(A)') 'ROOT'
-
-   ! Print children recursively (root is always at index 1)
    call print_part_recursive_array(cache_arrays, 1, 0, is_last_child)
    write(stderr, *)
 
@@ -564,7 +537,6 @@ subroutine print_part_signatures_array(cache_arrays)
    write(stderr, '(A)') repeat("=", 25)
    write(stderr, *)
 
-   ! Print signatures for all parts (root is always at index 1)
    call print_signatures_recursive_array(cache_arrays, 1)
    write(stderr, *)
 end subroutine
@@ -576,20 +548,17 @@ recursive subroutine print_signatures_recursive_array(cache_arrays, part_idx)
 
    if (part_idx == 0) return
 
-   ! Process all children using direct array access
    do i = 1, cache_arrays%partree(part_idx)%n_children
       child_idx = cache_arrays%partree(part_idx)%child_indices(i)
 
-      ! Print the child signature with frequencies and total length
       write(stderr,'(A,I0,A,I0,A)',advance='no') 'Part ', child_idx, ' (len=', &
          cache_arrays%partree(child_idx)%signature_size, '):'
 
-      ! Print unique signature values with frequencies
+      ! Distinct values as part_index:bond_type x frequency
       if (cache_arrays%partree(child_idx)%signature_unique_count > 0) then
          write(stderr, '(A)', advance='no') ' ['
          do j = 1, cache_arrays%partree(child_idx)%signature_unique_count
             if (j > 1) write(stderr, '(A)', advance='no') ', '
-            ! Decode edge code as part_index:bond_type
             write(stderr, '(I0,A,I0,A,I0)', advance='no') &
                cache_arrays%partree(child_idx)%signature_values(j)/BOND_TYPE_RADIX, ':', &
                modulo(cache_arrays%partree(child_idx)%signature_values(j), BOND_TYPE_RADIX), '×', &
@@ -600,7 +569,6 @@ recursive subroutine print_signatures_recursive_array(cache_arrays, part_idx)
          write(stderr, '(A)') ' []'
       end if
 
-      ! Recursively print this child's children
       call print_signatures_recursive_array(cache_arrays, child_idx)
    end do
 end subroutine
@@ -618,7 +586,6 @@ subroutine print_leaf_items_array(cache_arrays)
    write(stderr, '(A)') repeat("=", 25)
    write(stderr, *)
 
-   ! Print leaf items recursively (root is always at index 1)
    call print_leaf_items_recursive_array(cache_arrays, 1)
    write(stderr, *)
 end subroutine
@@ -630,17 +597,14 @@ recursive subroutine print_leaf_items_recursive_array(cache_arrays, part_idx)
 
    if (part_idx == 0) return
 
-   ! Process all children using direct array access
    do i = 1, cache_arrays%partree(part_idx)%n_children
       child_idx = cache_arrays%partree(part_idx)%child_indices(i)
 
-      ! Only print items if this is a leaf part (no children)
       if (cache_arrays%partree(child_idx)%n_children == 0) then
          write(stderr, '(A,I0,A)', advance='no') 'Part ', child_idx, ':'
          call print_part_items_array(cache_arrays, child_idx)
       end if
 
-      ! Recursively traverse this child's children to find more leaves
       call print_leaf_items_recursive_array(cache_arrays, child_idx)
    end do
 end subroutine
@@ -663,13 +627,11 @@ subroutine print_chain_details_array(cache_arrays)
          write(stderr, '(A,I0)') '  Split part: ', cache_arrays%assigntree(i)%split_part_idx
       end if
 
-      ! Show links in this chain using offset-based access
       do j = 1, cache_arrays%assigntree(i)%n_links
          link_idx = cache_arrays%assigntree(i)%link_offset + j
          write(stderr, '(A,I0,A,I0,A)', advance='no') '  Link ', link_idx, &
             ' (', cache_arrays%chain(link_idx)%n_parts, ' parts): '
 
-         ! Show parts in this link using offset-based access
          do k = 1, cache_arrays%chain(link_idx)%n_parts
             part_idx = cache_arrays%partref_entries(cache_arrays%chain(link_idx)%partref_offset + k)
             write(stderr, '(I0)', advance='no') part_idx
@@ -698,7 +660,6 @@ subroutine print_first_level_items_array(cache_arrays)
    write(stderr, '(A)') repeat("=", 25)
    write(stderr, *)
 
-   ! Print items for all parts at first level using direct array access
    do i = 1, cache_arrays%partree(1)%n_children
       child_idx = cache_arrays%partree(1)%child_indices(i)
       write(stderr, '(A,I0,A)', advance='no') 'Part ', child_idx, ':'
@@ -716,14 +677,11 @@ recursive subroutine print_part_recursive_array(cache_arrays, part_idx, depth, i
 
    if (part_idx == 0) return
 
-   ! Process all children using direct array access
    do i = 1, cache_arrays%partree(part_idx)%n_children
       child_idx = cache_arrays%partree(part_idx)%child_indices(i)
 
-      ! Check if this is the last child
+      ! Tree drawing prefix
       is_last_child(depth + 1) = (i == cache_arrays%partree(part_idx)%n_children)
-
-      ! Print prefix components directly
       do j = 1, depth
          if (is_last_child(j)) then
             write(stderr, '(A)', advance='no') "   "
@@ -732,24 +690,23 @@ recursive subroutine print_part_recursive_array(cache_arrays, part_idx, depth, i
          end if
       end do
 
-      ! Add branch characters
       if (is_last_child(depth + 1)) then
          write(stderr, '(A)', advance='no') "`--"
       else
          write(stderr, '(A)', advance='no') "|--"
       end if
 
-      ! Print part index with item counts
       write(stderr, '(A,I0,A,I0,A)') '* (', &
          cache_arrays%partree(child_idx)%n_items1, '/', &
          cache_arrays%partree(child_idx)%n_items2, ')'
 
-      ! Recursively print this child's children
       call print_part_recursive_array(cache_arrays, child_idx, depth + 1, is_last_child)
    end do
 end subroutine
 
 subroutine print_chain_tree_array(atomtypes, cache_arrays)
+! Print the assignment tree (as in Figure 2 of the paper, one node per
+! split part labeled element*size) and its combination statistics
    type(partition_t), intent(in) :: atomtypes
    type(array_trees_t), intent(in) :: cache_arrays
    logical(lk), dimension(:), allocatable :: is_last_child
@@ -763,12 +720,10 @@ subroutine print_chain_tree_array(atomtypes, cache_arrays)
    allocate(is_last_child(100))
    is_last_child = .FALSE.
 
-   ! Print children recursively (root is always at index 1)
    write(stdout, '(A)') '*'
    call print_chain_recursive_array(atomtypes, cache_arrays, 1, 0, is_last_child)
    write(stdout, *)
 
-   ! Print assignment statistics
    if (cache_arrays%total_combinations < 1.0E+12) then
       write(stdout, '(A,I0)') "Total combinations: ", int(cache_arrays%total_combinations, kind=int64)
    else
@@ -794,14 +749,11 @@ recursive subroutine print_chain_recursive_array(atomtypes, cache_arrays, chain_
 
    if (chain_idx == 0) return
 
-   ! Process all children using direct array access instead of linked traversal
    do i = 1, cache_arrays%assigntree(chain_idx)%n_children
       child_idx = cache_arrays%assigntree(chain_idx)%child_indices(i)
 
-      ! Check if this is the last child
+      ! Tree drawing prefix
       is_last_child(depth + 1) = (i == cache_arrays%assigntree(chain_idx)%n_children)
-
-      ! Print prefix components directly
       do j = 1, depth
          if (is_last_child(j)) then
             write(stdout, '(A)', advance='no') "   "
@@ -810,21 +762,19 @@ recursive subroutine print_chain_recursive_array(atomtypes, cache_arrays, chain_
          end if
       end do
 
-      ! Add branch characters
       if (is_last_child(depth + 1)) then
          write(stdout, '(A)', advance='no') "'--"
       else
          write(stdout, '(A)', advance='no') "|--"
       end if
 
-      ! Print the split part index with item counts
+      ! Element and size of the split part
       split_part_idx = cache_arrays%assigntree(child_idx)%split_part_idx
       first_atom_idx = cache_arrays%atomidcs1(cache_arrays%partree(split_part_idx)%items1_offset+1)
       write(stdout, '(A,"*",I0)') &
          trim(atomic_symbols(atomtypes%parts(atomtypes%itemdir1(first_atom_idx))%elnum)), &
          cache_arrays%partree(split_part_idx)%n_items1
 
-      ! Recursively print this child's children
       call print_chain_recursive_array(atomtypes, cache_arrays, child_idx, depth + 1, is_last_child)
    end do
 end subroutine

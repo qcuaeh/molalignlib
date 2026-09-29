@@ -15,6 +15,8 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module adjacency
+! Bond graphs as adjacency lists with bond types, and their comparison under
+! an atom mapping
 use parameters
 use common_types
 use permutation
@@ -33,6 +35,7 @@ public intersect_bonds
 public find_differing_bonds
 public edge_code
 
+! Adjacency list of an atom
 type, public :: adjc_t
    integer(ik) :: cn
    integer(ik) :: list(MAX_COORDNUM)
@@ -50,7 +53,7 @@ contains
 
 elemental function edge_code(part_idx, bondtype) result(code)
 ! Signature entry of a neighbor in part part_idx reached through a bond
-! of type bondtype. The hot loop of assignment_conformer inlines this
+! of type bondtype. assignment_conformer::update_hna_part inlines this
 ! expression, so keep both in sync.
    integer(ik), intent(in) :: part_idx, bondtype
    integer(ik) :: code
@@ -58,7 +61,6 @@ elemental function edge_code(part_idx, bondtype) result(code)
 end function
 
 function adjacencydiff(mapping1, adjcs1, adjcs2) result(diff)
-!------------------------------------------------------------------------------
 ! Adjacency difference: the number of atom pairs whose bond types differ
 ! under mapping1, "no bond" being the bond type NO_BOND. A pair counts once
 ! whether it is bonded in only one molecule or bonded in both with
@@ -69,16 +71,14 @@ function adjacencydiff(mapping1, adjcs1, adjcs2) result(diff)
 ! With A = pair bonded in 1, B = bonded in 2, C = bonded in both and
 ! S = bonded in both with the same type, a pair differs by A + B - C - S,
 ! so diff = total_edges1 + total_edges2 - common_edges - same_edges.
-!------------------------------------------------------------------------------
    integer(ik), dimension(:), intent(in) :: mapping1
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    integer(ik) :: diff
    integer(ik) :: j, p, idx1, idx2, mapped_idx1, neighbor_idx1, mapped_neighbor_idx1
    integer(ik) :: common_edges, same_edges, nadjs, total_edges1, total_edges2
 
-   ! Count common edges, edges with equal types and total edges, counting
-   ! each edge only once by only considering edges where idx1 < neighbor_idx1
-   ! (upper triangle)
+   ! Edges of molecule 1 (each counted once, idx1 < neighbor_idx1) and those
+   ! also present in molecule 2, with and without equal type
    common_edges = 0
    same_edges = 0
    total_edges1 = 0
@@ -90,14 +90,11 @@ function adjacencydiff(mapping1, adjcs1, adjcs2) result(diff)
       do j = 1, nadjs
          neighbor_idx1 = adjcs1(idx1)%list(j)
 
-         ! Only count edge if idx1 < neighbor_idx1 to avoid double-counting
          if (idx1 < neighbor_idx1) then
             total_edges1 = total_edges1 + 1
 
             mapped_neighbor_idx1 = mapping1(neighbor_idx1)
 
-            ! Check if edge (mapped_idx1, mapped_neighbor_idx1) exists in
-            ! structure 2, and whether it has the same type
             do p = 1, adjcs2(mapped_idx1)%cn
                if (adjcs2(mapped_idx1)%list(p) == mapped_neighbor_idx1) then
                   common_edges = common_edges + 1
@@ -111,8 +108,7 @@ function adjacencydiff(mapping1, adjcs1, adjcs2) result(diff)
       end do
    end do
 
-   ! Calculate total edges in structure 2 (mapping1 is a permutation, so
-   ! this visits every atom of molecule 2 exactly once)
+   ! Edges of molecule 2, each counted once
    total_edges2 = 0
    do idx2 = 1, size(mapping1)
       nadjs = adjcs2(idx2)%cn
@@ -120,7 +116,6 @@ function adjacencydiff(mapping1, adjcs1, adjcs2) result(diff)
       do j = 1, nadjs
          neighbor_idx1 = adjcs2(idx2)%list(j)
 
-         ! Only count edge if idx2 < neighbor to avoid double-counting
          if (idx2 < neighbor_idx1) then
             total_edges2 = total_edges2 + 1
          end if
@@ -131,9 +126,8 @@ function adjacencydiff(mapping1, adjcs1, adjcs2) result(diff)
 end function
 
 function adjacencydelta(adjcs1, adjmat2, mapping1, k, l) result(delta)
-!------------------------------------------------------------------------------
-! Efficiently compute the change in adjacency difference (see
-! adjacencydiff) when swapping atoms k and l in the permutation. Uses
+! Change of the adjacency difference (see adjacencydiff) when the images of
+! atoms k and l are swapped in mapping1, in O(cn) operations. Uses
 ! adjacency lists for structure 1 and the adjacency matrix of structure 2
 ! (bond type of each bond, NO_BOND where there is no bond).
 !
@@ -142,7 +136,6 @@ function adjacencydelta(adjcs1, adjmat2, mapping1, k, l) result(delta)
 ! swap, so only bonds of structure 1 contribute, each by the weight
 ! w = C + S of its partner pair in structure 2 before minus after the swap.
 ! Without bond types w = 2*C, which gives the classical 2*(nkk + nll - nkl - nlk).
-!------------------------------------------------------------------------------
    type(adjc_t), dimension(:), intent(in) :: adjcs1
    integer(ik), dimension(:,:), intent(in) :: adjmat2
    integer(ik), dimension(:), intent(in) :: mapping1
@@ -190,7 +183,6 @@ subroutine find_differing_bonds(mapping1, adjmat1, adjmat2, moldiffs)
 ! Atom pairs (numbering of molecule 2) whose bond types differ under
 ! mapping1: bonded in only one molecule, or bonded in both with different
 ! types. Their number is the adjacency difference (see adjacencydiff).
-
    integer(ik), dimension(:), intent(in) :: mapping1
    integer(ik), dimension(:,:), intent(in) :: adjmat1, adjmat2
    integer(ik), dimension(:,:), allocatable, intent(out) :: moldiffs
@@ -202,22 +194,19 @@ subroutine find_differing_bonds(mapping1, adjmat1, adjmat2, moldiffs)
    integer(ik) :: atom1, atom2
 
    n_atoms = size(mapping1)
-   ! Maximum possible differing edges
    max_edges = n_atoms * (n_atoms - 1) / 2
 
    allocate(temp_bonds(2, max_edges))
    n_bonds = 0
 
-   ! Compare all pairs of atoms
    do idx1 = 1, n_atoms
       mapped_idx1 = mapping1(idx1)
 
       do idx2 = idx1 + 1, n_atoms
          mapped_idx2 = mapping1(idx2)
 
-         ! If the bond types differ, it's a differing bond
          if (adjmat1(idx1, idx2) /= adjmat2(mapped_idx1, mapped_idx2)) then
-            ! Store atom pair with lower index first
+            ! Lower index first
             atom1 = min(mapped_idx1, mapped_idx2)
             atom2 = max(mapped_idx1, mapped_idx2)
 
@@ -228,11 +217,10 @@ subroutine find_differing_bonds(mapping1, adjmat1, adjmat2, moldiffs)
       end do
    end do
 
-   ! Allocate final array with exact size
    allocate(moldiffs(2, n_bonds))
    moldiffs = temp_bonds(:, 1:n_bonds)
 
-   ! Sort the bonds for efficient comparison
+   ! Sorted, so that lists can be compared element by element
    if (n_bonds > 0) then
       call sort_pairs(moldiffs)
    end if

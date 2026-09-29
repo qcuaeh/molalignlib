@@ -50,7 +50,7 @@ type, public :: int_listmatrix
    type(int_list), dimension(:,:), allocatable :: a
 end type
 
-! Part array
+! Part of a flat partition: atoms of each molecule in the part
 type, public :: partition_part_t
    integer(ik) :: elnum
    integer(ik) :: n_items1
@@ -62,7 +62,7 @@ type, public :: partition_part_t
    integer(ik), dimension(:), allocatable :: children
 end type
 
-! Partition array
+! Flat partition; itemdir1/2 give the part of each atom
 type, public :: partition_t
    integer(ik) :: n_parts
    type(partition_part_t), dimension(:), allocatable :: parts

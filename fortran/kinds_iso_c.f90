@@ -15,6 +15,6 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module kinds
-! C interoperable kinds
+! C interoperable kinds (for the C bindings)
 use, intrinsic :: iso_c_binding, only: lk=>c_bool, ik=>c_int, rk=>c_double
 end module

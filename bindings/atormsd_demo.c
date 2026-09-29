@@ -1,10 +1,8 @@
 /* atormsd_demo.c
  *
- * Demo for atormsd_calculate (array-based interface).
- * Reads XYZ files and passes coordinate/element arrays to the Fortran library.
- *
- * Self-contained: nothing beyond molalign.h and libmolalign is needed to
- * build it.
+ * Demo of atormsd_calculate: reads two XYZ files and passes their element
+ * and coordinate arrays to the library. Only molalign.h, error_codes.h and
+ * libmolalign are needed to build it.
  *
  * Compile:
  *   gcc atormsd_demo.c -o demo_atormsd -lm -lgfortran -lmolalign
@@ -30,9 +28,7 @@
 #include "molalign.h"
 #include "error_codes.h"
 
-/* ======================================================================
- * CLI - single-dash long-option parser
- * ====================================================================== */
+/* ---- Command line: single-dash long options ---- */
 
 typedef struct {
     const char *name;
@@ -97,11 +93,11 @@ static void print_options(const long_opt_t *opts, const opt_info_t *info)
     }
 }
 
-/* ======================================================================
- * XYZ reader
- * ====================================================================== */
+/* ---- XYZ reader ---- */
 
-/* Lowercase atomic symbols indexed by atomic number. */
+/* Lowercase symbols indexed by element number, as in the library's element
+ * table: real elements up to Lr (103), then its Lennard-Jones pseudo-element
+ * "lj" (104). Index 0 (the dummy atom) is empty, so it cannot be read. */
 static const char *pt_symbols[] = {
     "",                                                                   /* 0      */
     "h",  "he",                                                           /* 1-2    */
@@ -120,13 +116,12 @@ static const char *pt_symbols[] = {
     "fr", "ra",                                                           /* 87-88  */
     "ac", "th", "pa", "u",  "np", "pu", "am", "cm",                     /* 89-96  */
     "bk", "cf", "es", "fm", "md", "no", "lr",                           /* 97-103 */
-    "rf", "db", "sg", "bh", "hs", "mt", "ds", "rg", "cn",              /* 104-112*/
-    "nh", "fl", "mc", "lv", "ts", "og"                                   /* 113-118*/
+    "lj"                                                                 /* 104    */
 };
 static const int pt_size = (int)(sizeof(pt_symbols) / sizeof(pt_symbols[0]));
 
-/* Return atomic number for a lowercase element symbol (e.g. "c", "fe").
- * Returns 0 if not found. */
+/* Atomic number of a lowercase element symbol (e.g. "c", "fe"), or 0 if
+ * unknown. */
 static int elnum_lookup(const char *elsym)
 {
     for (int i = 1; i < pt_size; i++)
@@ -246,11 +241,9 @@ fail:
     return 1;
 }
 
-/* ======================================================================
- * Demo program
- * ====================================================================== */
+/* ---- Demo program ---- */
 
-/* option value constants */
+/* Option identifiers (also indices into opt_info) */
 enum {
     OPT_ALIGN = 1, OPT_REMAP, OPT_HEAVY, OPT_MASS,
     OPT_MIRROR, OPT_ATOMLABEL, OPT_ASSIGNMENT, OPT_PRINTTRANS,
@@ -278,21 +271,21 @@ static const long_opt_t long_options[] = {
 };
 
 static const opt_info_t opt_info[] = {
-    [OPT_ALIGN]           = {"Enable structural alignment",                        NULL   },
-    [OPT_REMAP]           = {"Enable atom remapping to minimise RMSD",             NULL   },
-    [OPT_HEAVY]           = {"Use only heavy (non-hydrogen) atoms",                NULL   },
-    [OPT_MASS]            = {"Weight atoms by their atomic masses",                NULL   },
-    [OPT_MIRROR]          = {"Mirror the second molecule",                         NULL   },
-    [OPT_ATOMLABEL]       = {"Use atom labels for matching",                       NULL   },
-    [OPT_STATS]           = {"Print optimisation statistics",                      NULL   },
-    [OPT_RANDOM]          = {"Use random algorithm",                               NULL   },
-    [OPT_PRUNETOL]        = {"Set pruning tolerance",                              "TOL"  },
-    [OPT_FREQ]            = {"Set convergence frequency (default: 10)",            "N"    },
-    [OPT_TRIALS]          = {"Set maximum number of trials (default: 10000)",      "N"    },
-    [OPT_RECORDS]         = {"Return up to N ranked solutions (default: 1)",       "N"    },
-    [OPT_ASSIGNMENT]      = {"Print the atom permutation",                         NULL   },
-    [OPT_PRINTTRANS]      = {"Print the 4x4 homogeneous transformation matrix",    NULL   },
-    [OPT_HELP]            = {"Show this help message",                             NULL   },
+    [OPT_ALIGN]      = {"Optimally rotate and translate cluster 2 onto cluster 1",   NULL },
+    [OPT_REMAP]      = {"Find the atom permutation that minimises the RMSD",        NULL },
+    [OPT_HEAVY]      = {"Exclude hydrogen atoms from the RMSD",                     NULL },
+    [OPT_MASS]       = {"Weight atoms by their atomic masses",                      NULL },
+    [OPT_MIRROR]     = {"Reflect cluster 2 (x -> -x) before comparing",             NULL },
+    [OPT_ATOMLABEL]  = {"Only match atoms with the same label (e.g. C1, C2)",       NULL },
+    [OPT_STATS]      = {"Print optimisation statistics",                            NULL },
+    [OPT_RANDOM]     = {"Seed the random number generator from the clock",          NULL },
+    [OPT_PRUNETOL]   = {"Prune atom pairs with tolerance TOL (Angstrom)",           "TOL"},
+    [OPT_FREQ]       = {"Stop once the best solution is found N times (default: 10)", "N" },
+    [OPT_TRIALS]     = {"Maximum number of random orientations (default: 10000)",   "N"  },
+    [OPT_RECORDS]    = {"Return up to N ranked solutions (default: 1)",             "N"  },
+    [OPT_ASSIGNMENT] = {"Print the atom permutation (1-based)",                     NULL },
+    [OPT_PRINTTRANS] = {"Print the 4x4 homogeneous transformation matrix",          NULL },
+    [OPT_HELP]       = {"Show this help message",                                   NULL },
 };
 
 static void print_usage(const char *prog)
@@ -317,7 +310,7 @@ int main(int argc, char **argv)
     int n_records = 1;
     int argi = 1, opt;
 
-    /* positional arguments collected during the parse loop */
+    /* Positional arguments (the two file paths) */
     const char *posargs[2] = {NULL, NULL};
     int npos = 0;
 
@@ -356,7 +349,7 @@ int main(int argc, char **argv)
     /* Everything below is released at `done`; free(NULL) is a no-op, so
      * every exit path can jump there regardless of how far it got. */
     int status = 1;
-    int n1 = 0, n2 = 0;
+    int n1 = 0, n2 = 0, n_padding = 0;
     int *atom_data1 = NULL, *atom_data2 = NULL;
     double *coords1 = NULL, *coords2 = NULL;
     double *rmsd_list = NULL, *transform_list = NULL;
@@ -366,10 +359,12 @@ int main(int argc, char **argv)
     if (read_xyz(posargs[0], &n1, &atom_data1, &coords1) != 0) goto done;
     if (read_xyz(posargs[1], &n2, &atom_data2, &coords2) != 0) goto done;
 
-    /* Output buffers hold up to n_records candidate solutions. Each
-     * permutation has exactly n1 entries (one per atom of molecule 1). */
+    /* Output buffers for up to n_records solutions. Each permutation has
+     * n_padding = max(n1, n2) entries: with -heavy the clusters may differ in
+     * size, and the smaller one is padded with dummy atoms. */
+    n_padding = n1 > n2 ? n1 : n2;
     rmsd_list      = malloc((size_t)n_records * sizeof(double));
-    mapping_list  = malloc((size_t)n_records * (size_t)n1 * sizeof(int));
+    mapping_list   = malloc((size_t)n_records * (size_t)n_padding * sizeof(int));
     transform_list = malloc((size_t)n_records * 16 * sizeof(double));
     if (!rmsd_list || !mapping_list || !transform_list) {
         fprintf(stderr, "Error: out of memory\n");
@@ -400,13 +395,16 @@ int main(int argc, char **argv)
 
     for (int r = 0; r < occ_records; r++) {
         const double *rec_transform = &transform_list[r * 16];
-        const int *rec_mapping = &mapping_list[r * n1];
+        const int *rec_mapping = &mapping_list[(size_t)r * n_padding];
 
         printf("RMSD: %.6f\n", rmsd_list[r]);
 
+        /* Entry i is the atom of cluster 2 placed on line i of cluster 1.
+         * Values > n2 (1-based) are dummy atoms padding cluster 2, and
+         * entries i >= n1 hold the extra atoms of cluster 2. */
         if (print_assignment) {
             printf("Mapping:");
-            for (int i = 0; i < n1; i++) printf(" %d", rec_mapping[i] + 1); /* 1-based */
+            for (int i = 0; i < n_padding; i++) printf(" %d", rec_mapping[i] + 1);
             putchar('\n');
         }
 

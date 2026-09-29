@@ -99,14 +99,13 @@ recursive subroutine real_quicksort(x, m, n)
 end subroutine
 
 subroutine sort_pairs(pairs)
-! Sort pairs lexicographically: first by atom1, then by atom2
+! Sort the columns of pairs lexicographically (bubble sort; lists are short)
    integer(ik), dimension(:,:), intent(inout) :: pairs
    integer(ik) :: n, i, j, temp1, temp2
    logical(lk) :: swapped
 
    n = size(pairs, 2)
 
-   ! Simple bubble sort (can be replaced with quicksort if needed)
    do i = n, 2, -1
       swapped = .FALSE.
       do j = 1, i - 1
