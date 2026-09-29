@@ -263,6 +263,7 @@ if (remap_flag) then
 
    else
 
+      allocate (mapping1(size(atomset1)))
       call assign_atoms_pruned( atomtypes, coords1w, coords2w, prunes, mapping1, error_code)
       if (error_code /= 0) stop 'Error: Assignment failed'
 

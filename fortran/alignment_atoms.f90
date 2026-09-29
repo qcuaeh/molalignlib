@@ -49,6 +49,8 @@ subroutine optimize_mapping_atoms(atomtypes, prunes, coords1, &
 
    ! Allocations
    allocate (coords2r, mold=coords2)
+   allocate (mapping1(size(atomtypes%itemdir1)))
+   allocate (new_mapping(size(atomtypes%itemdir1)))
 
    error_code = MOLALIGN_SUCCESS
 

@@ -272,6 +272,7 @@ subroutine atormsd_calculate(                                        &
 
       else
 
+         allocate (mapping1(size(atomset1)))
          call assign_atoms_pruned(atomtypes, coords1w, coords2w, prunes, mapping1, c_error_code)
          if (c_error_code /= MOLALIGN_SUCCESS) return
 
