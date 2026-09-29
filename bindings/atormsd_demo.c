@@ -305,8 +305,8 @@ int main(int argc, char **argv)
     bool print_assignment = false, print_transform = false;
     bool print_stats = false, random_flag = false;
     bool prunetol_flag = false;
-    double prune_tol = 0.0;
-    int conv_freq = 10, max_trials = 10000;
+    double prunetol = 0.0;
+    int max_freq = 10, max_trials = 10000;
     int n_records = 1;
     int argi = 1, opt;
 
@@ -325,8 +325,8 @@ int main(int argc, char **argv)
         case OPT_ATOMLABEL:       atomlabel_flag = true;        break;
         case OPT_STATS:           print_stats   = true;         break;
         case OPT_RANDOM:          random_flag   = true;         break;
-        case OPT_PRUNETOL:        prunetol_flag = true; prune_tol = atof(optarg); break;
-        case OPT_FREQ:            conv_freq     = atoi(optarg); break;
+        case OPT_PRUNETOL:        prunetol_flag = true; prunetol = atof(optarg); break;
+        case OPT_FREQ:            max_freq     = atoi(optarg); break;
         case OPT_TRIALS:          max_trials    = atoi(optarg); break;
         case OPT_RECORDS:         n_records     = atoi(optarg); break;
         case OPT_ASSIGNMENT:      print_assignment = true;      break;
@@ -377,7 +377,7 @@ int main(int argc, char **argv)
         align_flag, remap_flag, heavy_flag, mass_flag,
         mirror_flag, atomlabel_flag,
         print_stats, random_flag,
-        prunetol_flag, prune_tol, conv_freq, max_trials,
+        prunetol_flag, prunetol, max_freq, max_trials,
         n_records,
         rmsd_list, mapping_list,
         transform_list, &occ_records, &error_code);

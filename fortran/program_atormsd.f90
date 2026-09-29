@@ -54,7 +54,7 @@ real(rk), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, c
 real(rk), dimension(:,:), allocatable :: full_coords1, full_coords2, full_coords2r
 integer(ik), dimension(:), allocatable :: atomset1, atomset2
 integer(ik), dimension(:), allocatable :: mapping1, full_atomperm1
-integer(ik) :: n_records, max_trials, conv_freq
+integer(ik) :: n_records, max_trials, max_freq
 integer(ik) :: in_unit, aligned_unit
 integer(ik) :: error_code
 integer(ik) :: n_atoms1, n_atoms2, n_padding
@@ -74,7 +74,7 @@ print_assignment = .FALSE.
 write_aligned = .FALSE.
 
 n_records = 1
-conv_freq = 10
+max_freq = 10
 max_trials = MAX_TRIALS_DEFAULT
 prune_procedure => prune_none
 
@@ -90,7 +90,7 @@ do while (get_arg(arg))
       remap_flag = .TRUE.
    case ('-prunetol')
       prune_procedure => prune_rd
-      call read_optarg(arg, prune_tol)
+      call read_optarg(arg, prunetol)
    case ('-atomlabel')
       atomlabel_flag = .TRUE.
    case ('-heavy')
@@ -99,9 +99,9 @@ do while (get_arg(arg))
       mass_flag = .TRUE.
    case ('-mirror')
       mirror_flag = .TRUE.
-   case ('-freq')
-      call read_optarg(arg, conv_freq)
-   case ('-trials')
+   case ('-maxfreq')
+      call read_optarg(arg, max_freq)
+   case ('-maxtrials')
       call read_optarg( arg, max_trials)
    case ('-records')
       call read_optarg( arg, n_records)
@@ -228,7 +228,7 @@ if (remap_flag) then
 
       call allocate_registry( registry, n_records)
       call optimize_mapping_atoms( atomtypes, prunes, &
-            coords1w, coords2w, conv_freq, max_trials, registry, error_code)
+            coords1w, coords2w, max_freq, max_trials, registry, error_code)
       if (error_code /= 0) stop 'Error: Assignment failed'
 
       if (print_stats) call print_records( registry)

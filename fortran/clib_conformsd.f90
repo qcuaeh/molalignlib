@@ -22,10 +22,10 @@ subroutine conformsd_calculate(                                              &
       c_n_atoms2,  c_atom_data2,  c_coords2,                                    &
       c_n_bonds2,  c_bond_data2,                                                  &
       c_align_flag, c_remap_flag, c_heavy_flag, c_mass_flag,                &
-      c_mirror_flag, c_atomlabel_flag, c_bondtol_flag, c_bond_tol,          &
+      c_mirror_flag, c_atomlabel_flag, c_bondtol_flag, c_bondtol,          &
       c_bondtype_flag,                                                      &
       c_print_stats, c_print_assigntree, c_random_flag,                      &
-      c_conv_freq, c_max_trials,                                           &
+      c_max_freq, c_max_trials,                                           &
       c_n_records,                                                          &
       c_rmsd_list, c_mapping_list,                                              &
       c_transform_list, c_occ_records, c_error_code)                         &
@@ -41,7 +41,7 @@ subroutine conformsd_calculate(                                              &
 !   c_n_bonds1/2   : number of bonds (may be 0 when c_bondtol_flag is true, i.e. derive from geometry)
 !   c_bond_data1/2 : flat bond array, length c_n_bonds*3, layout: [atom1, atom2, type, ...]
 !                    (1-based atom indices as in the original file)
-!   c_bond_tol     : bond detection tolerance (only used, and required, when
+!   c_bondtol     : bond detection tolerance (only used, and required, when
 !                    c_bondtol_flag is true; no default)
 !   c_bondtype_flag: use the bond types in the HNA refinement. Types
 !                    are compared, never interpreted, so both molecules
@@ -104,10 +104,10 @@ subroutine conformsd_calculate(                                              &
    ! Flags
    logical(lk), intent(in), value :: c_align_flag, c_remap_flag, c_heavy_flag, c_mass_flag
    logical(lk), intent(in), value :: c_mirror_flag, c_atomlabel_flag, c_bondtol_flag
-   real(rk),    intent(in), value :: c_bond_tol
+   real(rk),    intent(in), value :: c_bondtol
    logical(lk), intent(in), value :: c_bondtype_flag
    logical(lk), intent(in), value :: c_print_stats, c_print_assigntree, c_random_flag
-   integer(ik), intent(in), value :: c_conv_freq, c_max_trials
+   integer(ik), intent(in), value :: c_max_freq, c_max_trials
 
    ! Requested number of ranked records
    integer(ik), intent(in), value :: c_n_records
@@ -156,7 +156,7 @@ subroutine conformsd_calculate(                                              &
    mirror_flag      = c_mirror_flag
    atomlabel_flag   = c_atomlabel_flag
    bondtol_flag     = c_bondtol_flag
-   bond_tol         = c_bond_tol
+   bondtol         = c_bondtol
    bondtype_flag    = c_bondtype_flag .and. .not. c_bondtol_flag
    random_flag      = c_random_flag
    print_stats      = c_print_stats
@@ -286,7 +286,7 @@ subroutine conformsd_calculate(                                              &
 
          call allocate_registry(registry, n_records)
          call optimize_mapping_conformer(adjcs1, adjcs2, atomtypes, &
-               coords1w, coords2w, c_conv_freq, c_max_trials, registry, c_error_code)
+               coords1w, coords2w, c_max_freq, c_max_trials, registry, c_error_code)
          if (c_error_code /= MOLALIGN_SUCCESS) return
 
          if (print_stats) call print_records(registry)

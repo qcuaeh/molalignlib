@@ -25,7 +25,7 @@ integer(ik), parameter :: symlen = 3 ! Symbol length
 ! number. Dummy atoms, including padding atoms, always have elnum = 0.
 integer(ik), parameter :: n_elems = 104
 ! Bond perception tolerance (Angstrom), see molecule::bonds_from_atoms
-real(rk) :: bond_tol
+real(rk) :: bondtol
 
 ! Element symbols
 character(symlen), parameter :: atomic_symbols(0:n_elems) = [ &

@@ -10,7 +10,7 @@ from molalignlib import read_clusters, read_conformers
 mol0, mol1 = read_clusters('clusters.xyz', frames=(0,1))
 
 # Ask for the top 5 lowest RMSD mappings
-results = mol0.rmsd_to(mol1, remap=True, align=True, prune_tol=0.1, n_records=5)
+results = mol0.rmsd_to(mol1, remap=True, align=True, prunetol=0.1, n_records=5)
 
 for i, result in enumerate(results, start=1):
     print(f'Mapping {i} RMSD = {result.rmsd:.4f}')
@@ -37,6 +37,6 @@ conformers = read_conformers('conformers.xyz')   # read all frames
 
 for mol0 in conformers:
     for mol1 in conformers:
-        result = mol1.rmsd_to(mol0, remap=True, align=True, bond_tol=0.3)[0]
+        result = mol1.rmsd_to(mol0, remap=True, align=True, bondtol=0.3)[0]
         print(f'{result.rmsd:.4f}', end=2*' ')
     print()

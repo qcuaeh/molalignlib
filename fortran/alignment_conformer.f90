@@ -37,10 +37,10 @@ implicit none
 contains
 
 subroutine optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
-      coords1, coords2, conv_freq, max_trials, registry, error_code)
+      coords1, coords2, max_freq, max_trials, registry, error_code)
 ! Symmetry-corrected alignment of two conformers (Figure S1 of the paper).
 ! The assignment tree is built once and the strategy is chosen from its
-! shape: when the total number of assignments exceeds conv_freq times the
+! shape: when the total number of assignments exceeds max_freq times the
 ! sum of partial combinations, the stochastic search is used; otherwise
 ! every assignment is enumerated and scored after optimal superposition.
 !
@@ -48,14 +48,14 @@ subroutine optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
 ! assignment at that orientation is found and the pair is iterated
 ! (superposition, reassignment) until the assignment no longer changes.
 ! Each local minimum is recorded, and the search stops when the best one
-! has been found more than conv_freq times or after max_trials trials.
+! has been found more than max_freq times or after max_trials trials.
 !
 ! adjcs, atomtypes and coords hold the included atoms only, in a common
 ! numbering; the atom permutations stored in registry use that numbering.
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(partition_t), intent(in) :: atomtypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
-   integer(ik), intent(in) :: conv_freq, max_trials
+   integer(ik), intent(in) :: max_freq, max_trials
    type(registry_t), target, intent(inout) :: registry
    integer(ik), intent(out) :: error_code
 
@@ -83,7 +83,7 @@ subroutine optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
 
    ! Adaptive choice of strategy (see FORCE_EXHAUSTIVE and FORCE_STOCHASTIC)
    if (.not. FORCE_EXHAUSTIVE .and. (FORCE_STOCHASTIC .or. &
-         cache_arrays%total_combinations > conv_freq*cache_arrays%partial_combinations)) then
+         cache_arrays%total_combinations > max_freq*cache_arrays%partial_combinations)) then
 
       call random_initialize()
 
@@ -130,7 +130,7 @@ subroutine optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
 
          call insert_record_mapping( registry, mapping1, steps, total_rotation, 0, mapdist)
 
-         if (registry%records(1)%freq > conv_freq) then
+         if (registry%records(1)%freq > max_freq) then
             exit
          end if
 

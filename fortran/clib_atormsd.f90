@@ -22,7 +22,7 @@ subroutine atormsd_calculate(                                        &
       c_align_flag, c_remap_flag, c_heavy_flag, c_mass_flag,         &
       c_mirror_flag, c_atomlabel_flag,                               &
       c_print_stats, c_random_flag,                                   &
-      c_prunetol_flag, c_prune_tol, c_conv_freq, c_max_trials,       &
+      c_prunetol_flag, c_prunetol, c_max_freq, c_max_trials,       &
       c_n_records,                                                   &
       c_rmsd_list, c_mapping_list,                                       &
       c_transform_list, c_occ_records, c_error_code)                  &
@@ -34,7 +34,7 @@ subroutine atormsd_calculate(                                        &
 !                    [elnum0, label0, elnum1, label1, ...]
 !                    label = 0 means unlabelled.
 !   c_coords1/2    : XYZ coordinates, row-major (c_n_atoms x 3), length c_n_atoms*3
-!   c_prune_tol    : pruning tolerance (only used, and required, when
+!   c_prunetol    : pruning tolerance (only used, and required, when
 !                    c_prunetol_flag is true; no default)
 !
 ! Multiple ranked candidate solutions:
@@ -86,8 +86,8 @@ subroutine atormsd_calculate(                                        &
    logical(lk), intent(in), value :: c_mirror_flag, c_atomlabel_flag
    logical(lk), intent(in), value :: c_print_stats, c_random_flag
    logical(lk), intent(in), value :: c_prunetol_flag
-   real(rk),    intent(in), value :: c_prune_tol
-   integer(ik), intent(in), value :: c_conv_freq, c_max_trials
+   real(rk),    intent(in), value :: c_prunetol
+   integer(ik), intent(in), value :: c_max_freq, c_max_trials
 
    ! Requested number of ranked records
    integer(ik), intent(in), value :: c_n_records
@@ -139,7 +139,7 @@ subroutine atormsd_calculate(                                        &
 
    if (c_prunetol_flag) then
       prune_procedure => prune_rd
-      prune_tol = c_prune_tol
+      prunetol = c_prunetol
    else
       prune_procedure => prune_none
    end if
@@ -241,7 +241,7 @@ subroutine atormsd_calculate(                                        &
 
          call allocate_registry(registry, n_records)
          call optimize_mapping_atoms(atomtypes, prunes, &
-               coords1w, coords2w, c_conv_freq, c_max_trials, registry, c_error_code)
+               coords1w, coords2w, c_max_freq, c_max_trials, registry, c_error_code)
          if (c_error_code /= MOLALIGN_SUCCESS) return
 
          if (print_stats) call print_records(registry)

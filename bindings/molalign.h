@@ -42,12 +42,12 @@ extern "C" {
  * @param random_flag   Seed the random number generator from the clock
  *                      (otherwise results are reproducible)
  * @param prunetol_flag Enable distance-based pruning of atom pairs
- * @param prune_tol     Pruning tolerance (Angstrom): two atoms are never
+ * @param prunetol     Pruning tolerance (Angstrom): two atoms are never
  *                      paired if their sorted distances to the atoms of some
- *                      atom type differ by more than 2*sqrt(3)*prune_tol.
+ *                      atom type differ by more than 2*sqrt(3)*prunetol.
  *                      Required (no default) when prunetol_flag=true;
  *                      unused otherwise.
- * @param conv_freq     Stop the random search once the best solution has
+ * @param max_freq     Stop the random search once the best solution has
  *                      been found this many times
  * @param max_trials    Maximum number of random orientations
  *
@@ -92,7 +92,7 @@ void atormsd_calculate(
     bool align_flag, bool remap_flag, bool heavy_flag, bool mass_flag,
     bool mirror_flag, bool atomlabel_flag,
     bool print_stats, bool random_flag,
-    bool prunetol_flag, double prune_tol, int conv_freq, int max_trials,
+    bool prunetol_flag, double prunetol, int max_freq, int max_trials,
     int n_records,
     double *rmsd_list, int *mapping_list,
     double *transform_list, int *occ_records, int *error_code);
@@ -139,9 +139,9 @@ void atormsd_calculate(
  *                      the reflection
  * @param atomlabel_flag Only match atoms with the same label
  * @param bondtol_flag  Derive connectivity from geometry, not bond table
- * @param bond_tol      Bond detection tolerance (Angstrom): atoms are bonded
+ * @param bondtol      Bond detection tolerance (Angstrom): atoms are bonded
  *                      when closer than the sum of their covalent radii plus
- *                      bond_tol. Required (no default) when bondtol_flag=true;
+ *                      bondtol. Required (no default) when bondtol_flag=true;
  *                      unused otherwise.
  * @param bondtype_flag Use bond types to guide atom matching: bonds of
  *                      different type are distinguished in the HNA
@@ -158,7 +158,7 @@ void atormsd_calculate(
  *                      counts to stdout
  * @param random_flag   Seed the random number generator from the clock
  *                      (otherwise results are reproducible)
- * @param conv_freq     Stop the random orientation search once the best
+ * @param max_freq     Stop the random orientation search once the best
  *                      solution has been found more than this many times;
  *                      also the threshold on the ratio of total to partial
  *                      assignment combinations above which that search is
@@ -215,10 +215,10 @@ void conformsd_calculate(
     int n_atoms2, const int *atom_data2, const double *coords2,
     int n_bonds2, const int *bond_data2,
     bool align_flag, bool remap_flag, bool heavy_flag, bool mass_flag,
-    bool mirror_flag, bool atomlabel_flag, bool bondtol_flag, double bond_tol,
+    bool mirror_flag, bool atomlabel_flag, bool bondtol_flag, double bondtol,
     bool bondtype_flag,
     bool print_stats, bool print_assigntree, bool random_flag,
-    int conv_freq, int max_trials,
+    int max_freq, int max_trials,
     int n_records,
     double *rmsd_list, int *mapping_list,
     double *transform_list, int *occ_records, int *error_code);

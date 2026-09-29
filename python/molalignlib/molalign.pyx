@@ -31,7 +31,7 @@ cdef extern from "molalign.h":
         bint align_flag, bint remap_flag, bint heavy_flag, bint mass_flag,
         bint mirror_flag, bint atomlabel_flag,
         bint print_stats, bint random_flag,
-        bint prunetol_flag, double prune_tol, int conv_freq, int max_trials,
+        bint prunetol_flag, double prunetol, int max_freq, int max_trials,
         int n_records,
         double *rmsd_list, int *mapping_list,
         double *transform_list, int *occ_records, int *error_code)
@@ -42,10 +42,10 @@ cdef extern from "molalign.h":
         int n_atoms2, const int *atom_data2, const double *coords2,
         int n_bonds2, const int *bond_data2,
         bint align_flag, bint remap_flag, bint heavy_flag, bint mass_flag,
-        bint mirror_flag, bint atomlabel_flag, bint bondtol_flag, double bond_tol,
+        bint mirror_flag, bint atomlabel_flag, bint bondtol_flag, double bondtol,
         bint bondtype_flag,
         bint print_stats, bint print_assigntree, bint random_flag,
-        int conv_freq, int max_trials,
+        int max_freq, int max_trials,
         int n_records,
         double *rmsd_list, int *mapping_list,
         double *transform_list, int *occ_records, int *error_code)
@@ -163,8 +163,8 @@ def atormsd_calculate(
     bint   print_stats,
     bint   random_flag,
     bint   prunetol_flag,
-    prune_tol,
-    int    conv_freq,
+    prunetol,
+    int    max_freq,
     int    max_trials,
     int    n_records = 1,
 ):
@@ -183,7 +183,7 @@ def atormsd_calculate(
         beyond the first are only ever produced when both ``align_flag``
         and ``remap_flag`` are true; otherwise exactly one solution is
         returned regardless of this value.
-    prune_tol : float or None
+    prunetol : float or None
         Pruning tolerance (Angstrom). Required (no default) when
         ``prunetol_flag`` is true; unused otherwise.
     (the remaining arguments map one-to-one onto the C arguments)
@@ -215,12 +215,12 @@ def atormsd_calculate(
     coords1    = np.ascontiguousarray(coords1)
     coords2    = np.ascontiguousarray(coords2)
 
-    # prune_tol is required, and only used, when prunetol_flag=True
-    cdef double c_prune_tol = 0.0
+    # prunetol is required, and only used, when prunetol_flag=True
+    cdef double c_prunetol = 0.0
     if prunetol_flag:
-        if prune_tol is None:
-            raise ValueError("prune_tol is required when prunetol_flag=True")
-        c_prune_tol = <double>prune_tol
+        if prunetol is None:
+            raise ValueError("prunetol is required when prunetol_flag=True")
+        c_prunetol = <double>prunetol
 
     cdef int    occ_records = 0
     cdef int    err         = 0
@@ -241,7 +241,7 @@ def atormsd_calculate(
             align_flag, remap_flag, heavy_flag, mass_flag,
             mirror_flag, atomlabel_flag,
             print_stats, random_flag,
-            prunetol_flag, c_prune_tol, conv_freq, max_trials,
+            prunetol_flag, c_prunetol, max_freq, max_trials,
             n_records,
             rmsd_list, mapping_list,
             transform_list, &occ_records, &err,
@@ -281,12 +281,12 @@ def conformsd_calculate(
     bint mirror_flag   = False,
     bint atomlabel_flag = False,
     bint bondtol_flag  = False,
-    bond_tol                          = None,
+    bondtol                          = None,
     bint bondtype_flag = False,
     bint print_stats    = False,
     bint print_assigntree = False,
     bint random_flag   = False,
-    int  conv_freq      = 100,
+    int  max_freq      = 100,
     int  max_trials    = 10000,
     int  n_records     = 1,
 ):
@@ -304,7 +304,7 @@ def conformsd_calculate(
         ``[[a1, a2, bond_type], ...]`` (1-based atom indices).
         Pass ``None`` (or omit) when ``bondtol_flag=True``; in that case the
         library derives connectivity from geometry.
-    bond_tol : float, required when bondtol_flag=True
+    bondtol : float, required when bondtol_flag=True
         Bond detection tolerance (Angstrom) for geometry-based connectivity.
         Has no default and is ignored when bondtol_flag=False.
     bondtype_flag : bool, default False
@@ -318,7 +318,7 @@ def conformsd_calculate(
         that minimises the RMSD.
     print_assigntree : bool
         Print the assignment tree and its combination counts to stdout.
-    conv_freq : int, default 100
+    max_freq : int, default 100
         Stop the random orientation search once the best solution has been
         found more than this many times; also the threshold on the ratio of
         total to partial assignment combinations above which that search is
@@ -372,12 +372,12 @@ def conformsd_calculate(
     cdef int nb1 = bd1.shape[0]
     cdef int nb2 = bd2.shape[0]
 
-    # bond_tol is required, and only used, when bondtol_flag=True
-    cdef double c_bond_tol = 0.0
+    # bondtol is required, and only used, when bondtol_flag=True
+    cdef double c_bondtol = 0.0
     if bondtol_flag:
-        if bond_tol is None:
-            raise ValueError("bond_tol is required when bondtol_flag=True")
-        c_bond_tol = <double>bond_tol
+        if bondtol is None:
+            raise ValueError("bondtol is required when bondtol_flag=True")
+        c_bondtol = <double>bondtol
 
     cdef int    occ_records = 0
     cdef int    err         = 0
@@ -400,10 +400,10 @@ def conformsd_calculate(
             nb2,
             <const int    *>bd2.data,
             align_flag, remap_flag, heavy_flag, mass_flag,
-            mirror_flag, atomlabel_flag, bondtol_flag, c_bond_tol,
+            mirror_flag, atomlabel_flag, bondtol_flag, c_bondtol,
             bondtype_flag,
             print_stats, print_assigntree, random_flag,
-            conv_freq, max_trials,
+            max_freq, max_trials,
             n_records,
             rmsd_list, mapping_list,
             transform_list, &occ_records, &err,

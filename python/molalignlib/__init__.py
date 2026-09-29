@@ -437,8 +437,8 @@ class Atoms(object):
         use_atom_label=False,
         stats=False,
         random=False,
-        prune_tol=None,
-        conv_freq=10,
+        prunetol=None,
+        max_freq=10,
         max_trials=10000,
         n_records=1,
     ):
@@ -457,19 +457,19 @@ class Atoms(object):
         RMSDResult.mapping). Hydrogens are not part of the RMSD; they are
         paired afterwards by distance.
 
-        prune_tol (Å) enables pruning: two atoms are never paired if their
+        prunetol (Å) enables pruning: two atoms are never paired if their
         sorted distances to the atoms of some atom type differ by more than
-        2*sqrt(3)*prune_tol. Defaults to None, which disables pruning.
+        2*sqrt(3)*prunetol. Defaults to None, which disables pruning.
 
         The search over random orientations stops once the best solution
-        has been found conv_freq times, or after max_trials orientations.
+        has been found max_freq times, or after max_trials orientations.
         random=True seeds it from the clock (otherwise results are
         reproducible), and stats=True prints its statistics.
         """
         if not isinstance(other, Atoms):
             raise TypeError("Expected Atoms, got {}".format(type(other).__name__))
 
-        prunetol_flag = prune_tol is not None
+        prunetol_flag = prunetol is not None
 
         rmsd_vals, maps, tfs = _molalign.atormsd_calculate(
             self._atom_data, self._coords,
@@ -483,8 +483,8 @@ class Atoms(object):
             print_stats=stats,
             random_flag=random,
             prunetol_flag=prunetol_flag,
-            prune_tol=prune_tol,
-            conv_freq=conv_freq,
+            prunetol=prunetol,
+            max_freq=max_freq,
             max_trials=max_trials,
             n_records=n_records,
         )
@@ -640,11 +640,11 @@ class Conformer(object):
         mass_weighted=False,
         mirror=False,
         use_atom_label=False,
-        bond_tol=None,
+        bondtol=None,
         use_bond_type=False,
         stats=False,
         random=False,
-        conv_freq=100,
+        max_freq=100,
         max_trials=10000,
         n_records=1,
     ):
@@ -664,7 +664,7 @@ class Conformer(object):
         they are paired afterwards, following their heavy neighbour where
         bonds are known and by distance otherwise.
 
-        bond_tol (Å) enables bond detection: connectivity is inferred from
+        bondtol (Å) enables bond detection: connectivity is inferred from
         geometry with this tolerance instead of using each structure's bond
         table. Defaults to None, which disables bond detection.
 
@@ -672,14 +672,14 @@ class Conformer(object):
         matching. Types are compared, never interpreted, so both conformers
         must have the same bond_source (e.g. both read from files of the
         same format); otherwise a ValueError is raised. It has no effect
-        when bond_tol is given, since inferred bonds are untyped.
+        when bondtol is given, since inferred bonds are untyped.
 
         With align=True, the search strategy is chosen from the assignment
         tree: random orientations when the total number of assignments
-        exceeds conv_freq times the sum of partial combinations, exhaustive
+        exceeds max_freq times the sum of partial combinations, exhaustive
         enumeration otherwise. The random search stops once the best
-        solution has been found more than conv_freq times, or after
-        max_trials orientations. The default conv_freq=100 is the value
+        solution has been found more than max_freq times, or after
+        max_trials orientations. The default max_freq=100 is the value
         validated on the CCD and BIRD benchmarks. random=True seeds the
         search from the clock (otherwise results are reproducible), and
         stats=True prints its statistics.
@@ -687,7 +687,7 @@ class Conformer(object):
         if not isinstance(other, Conformer):
             raise TypeError("Expected Conformer, got {}".format(type(other).__name__))
 
-        bondtol_flag = bond_tol is not None
+        bondtol_flag = bondtol is not None
 
         if use_bond_type and not bondtol_flag and self._bond_source != other._bond_source:
             raise ValueError(
@@ -707,11 +707,11 @@ class Conformer(object):
             mirror_flag=mirror,
             atomlabel_flag=use_atom_label,
             bondtol_flag=bondtol_flag,
-            bond_tol=bond_tol,
+            bondtol=bondtol,
             bondtype_flag=use_bond_type,
             print_stats=stats,
             random_flag=random,
-            conv_freq=conv_freq,
+            max_freq=max_freq,
             max_trials=max_trials,
             n_records=n_records,
         )

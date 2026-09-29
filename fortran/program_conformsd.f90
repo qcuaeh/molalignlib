@@ -55,7 +55,7 @@ real(rk), dimension(:,:), allocatable :: full_coords1, full_coords2, full_coords
 integer(ik), dimension(:), allocatable :: atomset1, atomset2
 integer(ik), dimension(:), allocatable :: bondtypes
 integer(ik), dimension(:), allocatable :: mapping1, full_atomperm1
-integer(ik) :: n_records, max_trials, conv_freq
+integer(ik) :: n_records, max_trials, max_freq
 integer(ik) :: in_unit, aligned_unit
 integer(ik) :: error_code
 integer(ik) :: n_atoms1, n_atoms2, n_padding
@@ -78,7 +78,7 @@ print_assignment = .FALSE.
 write_aligned = .FALSE.
 
 n_records = 1
-conv_freq = 100
+max_freq = 100
 max_trials = MAX_TRIALS_DEFAULT
 
 ! Read command line options
@@ -93,7 +93,7 @@ do while (get_arg(arg))
       remap_flag = .TRUE.
    case ('-bondtol')
       bondtol_flag = .TRUE.
-      call read_optarg(arg, bond_tol)
+      call read_optarg(arg, bondtol)
    case ('-bondtype')
       bondtype_flag = .TRUE.
    case ('-atomlabel')
@@ -104,9 +104,9 @@ do while (get_arg(arg))
       mass_flag = .TRUE.
    case ('-mirror')
       mirror_flag = .TRUE.
-   case ('-freq')
-      call read_optarg( arg, conv_freq)
-   case ('-trials')
+   case ('-maxfreq')
+      call read_optarg( arg, max_freq)
+   case ('-maxtrials')
       call read_optarg( arg, max_trials)
    case ('-records')
       call read_optarg( arg, n_records)
@@ -268,7 +268,7 @@ if (remap_flag) then
 
       call allocate_registry( registry, n_records)
       call optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
-            coords1w, coords2w, conv_freq, max_trials, registry, error_code)
+            coords1w, coords2w, max_freq, max_trials, registry, error_code)
       if (error_code /= 0) stop 'These molecules are not conformers'
 
       if (print_stats) call print_records( registry)

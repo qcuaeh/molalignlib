@@ -337,7 +337,7 @@ end subroutine
 
 subroutine bonds_from_atoms(atoms, bonds)
 ! Bonds perceived from geometry: two atoms are bonded when their distance is
-! below the sum of their covalent radii plus bond_tol. All bonds get type 1.
+! below the sum of their covalent radii plus bondtol. All bonds get type 1.
    type(atom_t), dimension(:), intent(in) :: atoms
    type(bond_t), dimension(:), allocatable, intent(out) :: bonds
    ! Local variables
@@ -355,7 +355,7 @@ subroutine bonds_from_atoms(atoms, bonds)
    do i = 1, n_atoms
       do j = i + 1, n_atoms
          atom_dist = sqrt(sum((atoms(i)%coords - atoms(j)%coords)**2))
-         is_bonded(i, j) = atom_dist < atom_radii(i) + atom_radii(j) + bond_tol
+         is_bonded(i, j) = atom_dist < atom_radii(i) + atom_radii(j) + bondtol
       end do
    end do
 
