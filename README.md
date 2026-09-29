@@ -24,8 +24,9 @@ Table of Contents
    - [Demo program](#demo-program)
 5. [Python API](#python-api)
    - [Installation](#installation)
-   - [Atoms](#atoms)
-   - [Conformer](#conformer)
+   - [Molecule](#molecule)
+   - [atormsd_to](#atormsd_to)
+   - [conformsd_to](#conformsd_to)
    - [RMSDResult](#rmsdresult)
 6. [Runnable examples](#runnable-examples)
 7. [Algorithm Notes](#algorithm-notes)
@@ -36,10 +37,10 @@ Overview
 
 MolAlignLib exposes two distinct RMSD calculation modes:
 
-| Program | Function | When to use |
-|------|-------------------|-------------|
-| **atormsd** | atormsd_calculate | Unstructured atom clusters (no bond topology required) |
-| **conformsd** | conformsd_calculate | Molecular conformers (bond topology guides atom matching via HNA partitioning) |
+| Program | C function | Python method | When to use |
+|------|-------------------|---------------|-------------|
+| **atormsd** | atormsd_calculate | Molecule.atormsd_to | Unstructured atom clusters (no bond topology required) |
+| **conformsd** | conformsd_calculate | Molecule.conformsd_to | Molecular conformers (bond topology guides atom matching via HNA partitioning) |
 
 Both modes support:
 - **Alignment** (`-align`): optimally rotate and translate one structure onto the other.
@@ -585,52 +586,107 @@ python3 -m pip install --user .
 > **Note:** `pip install .` does not build the standalone executables. Use the
 > plain CMake workflow above to build `conformsd` and `atormsd`.
 
-### Atoms
+### Molecule
 
-Represents an unstructured set of atoms with no bond topology. Useful for comparing metal clusters, nanoparticles, or other systems where connectivity is absent or irrelevant. Wraps `atormsd_calculate`.
+The Python API has a single structure class, `Molecule`: a set of atoms with
+3-D coordinates and an optional bond table. The same object can be compared
+in two ways, one method per algorithm of the library:
+
+| Method | Wraps | Bonds |
+|--------|-------|-------|
+| [`atormsd_to`](#atormsd_to) | `atormsd_calculate` | Ignored; atoms are matched within atom types only. Useful for metal clusters, nanoparticles, or other systems where connectivity is absent or irrelevant |
+| [`conformsd_to`](#conformsd_to) | `conformsd_calculate` | Required (from the bond table, or inferred with `bondtol`); HNA partitioning guarantees chemically valid assignments, handling arbitrary degrees of topological symmetry efficiently |
+
+```python
+from molalignlib import Molecule, read_molecules
+```
 
 #### Construction
 
 ```python
-# From a file (defaults to the first frame)
-mol = Atoms.from_file("clusters.xyz")
+# From a file (defaults to the first frame; bonds are read when the format has them)
+mol = Molecule.from_file("conformers.sdf")
 
-# From a file (specific frame in a multi-frame trajectory)
-mol = Atoms.from_file("clusters.xyz", frame_idx=2)
+# From a file (specific frame in a multi-frame file)
+mol = Molecule.from_file("conformers.sdf", frame_idx=2)
 
-# From element symbols and coordinates directly
+# From element symbols and coordinates directly (no bonds)
 import numpy as np
 symbols = ["Fe", "Fe"]
 coords  = np.array([[0.0, 0.0, 0.0], [2.5, 0.0, 0.0]], dtype=np.float64)
-mol = Atoms.from_symbols(symbols, coords, name="dimer")
+mol = Molecule.from_symbols(symbols, coords, name="dimer")
 
-# From atomic numbers and coordinates directly
-mol = Atoms.from_numbers([26, 26], coords, name="dimer")  # two Fe atoms
+# From element symbols, coordinates, and bonds
+symbols   = ["C", "O", "H", "H"]
+coords    = np.zeros((4, 3), dtype=np.float64)
+bond_data = np.array([[1,2,2],[1,3,1],[1,4,1]], dtype=np.int32)  # 1-based
+mol = Molecule.from_symbols(symbols, coords, bond_data=bond_data)
+
+# From atomic numbers, coordinates, and (optionally) bonds
+mol = Molecule.from_numbers([6, 8, 1, 1], coords, bond_data=bond_data)
 ```
+
+All constructors accept `labels=` (one integer per atom, default 0) for use
+with `use_atom_label=True`, and `name=`.
+
+Molecules read from files record the file format as their `bond_source`;
+molecules built from arrays have `bond_source=None` unless you pass one.
+`conformsd_to(use_bond_type=True)` only accepts pairs with the same
+`bond_source`, because bond types are compared as plain integers and are
+only meaningful within one convention.
 
 #### Reading multiple frames
 
 ```python
-clusters = read_clusters("clusters.xyz")           # all frames, returns a list
-mol0, mol1 = read_clusters("clusters.xyz", frames=(0, 1))
+molecules = read_molecules("conformers.sdf")            # all frames, returns a list
+mol0, mol1 = read_molecules("conformers.sdf", frames=(0, 1))
 ```
 
-#### Computing RMSD
+#### Properties
 
-`rmsd_to()` always returns a **list** of `RMSDResult`, ranked best (lowest
-RMSD) first. By default only the single best solution is computed:
+| Property | Description |
+|----------|-------------|
+| **name** | Name (file stem plus frame index for molecules read with `read_molecules`) |
+| **n_atoms** | Number of atoms (also `len(mol)`) |
+| **n_bonds**, **has_bonds** | Number of bonds, and whether there are any |
+| **symbols** | Element symbols |
+| **atom_data** | `int32 (n_atoms, 2)` array of `[atomic_number, label]` |
+| **coords** | `float64 (n_atoms, 3)` coordinates in Å |
+| **bond_data** | `int32 (n_bonds, 3)` array of `[atom1, atom2, type]`, 1-based (empty when there are no bonds) |
+| **bond_source** | Bond-type convention tag (file format, or `None`) |
+
+#### Writing output
+
+`write()` uses chemfiles, so it supports the same range of formats as
+reading (XYZ, PDB, SDF, MOL2, ...); the output format is inferred from
+the file extension. Bond connectivity is written too when the molecule has
+bonds and the target format supports it (e.g. SDF/MOL2); bond *types* are
+not currently preserved, only which atoms are bonded. Writing to a format
+with no bond table (e.g. XYZ) simply omits connectivity:
 
 ```python
-results = mol0.rmsd_to(mol1, align=True, remap=True)
+mol.write("output.sdf", comment="my molecule")
+mol.write("output.xyz")  # coordinates and symbols only
+```
+
+### atormsd_to
+
+Compares the two molecules as unstructured atom clusters. Bonds are
+ignored, so it works the same for molecules with or without a bond table.
+
+```python
+mol0, mol1 = read_molecules("clusters.xyz", frames=(0, 1))
+
+results = mol0.atormsd_to(mol1, align=True, remap=True)
 result = results[0]   # best (lowest RMSD) solution
 print(result.rmsd)
 ```
 
-##### `Atoms.rmsd_to()` parameters
+#### Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| **other** | `Atoms` | *required* | The structure to compare against `self` |
+| **other** | `Molecule` | *required* | The structure to compare against `self` |
 | **align** | `bool` | `False` | Optimally rotate and translate `other` onto `self` |
 | **remap** | `bool` | `False` | Find the atom permutation that minimises the RMSD |
 | **heavy_only** | `bool` | `False` | Exclude hydrogen atoms from the calculation |
@@ -642,111 +698,55 @@ print(result.rmsd)
 | **prunetol** | `float` | `None` | Pruning tolerance (Å): two atoms are never paired if their sorted distances to the atoms of some atom type differ by more than 2√3 × `prunetol`. `None` disables pruning |
 | **max_freq** | `int` | `10` | Stop searching once the best solution has been found this many times |
 | **max_trials** | `int` | `10000` | Stop after at most this many random orientations |
-| **n_records** | `int` | `1` | Request up to this many ranked solutions (see below) |
+| **n_records** | `int` | `1` | Request up to this many ranked solutions (see [Retrieving multiple ranked solutions](#retrieving-multiple-ranked-solutions)) |
 
-Pass `n_records > 1` (with `align=True, remap=True`) to retrieve several
-ranked candidate solutions in one call.
+### conformsd_to
 
-#### Writing output
-
-`write()` uses chemfiles, so it supports the same range of formats as
-reading (XYZ, PDB, SDF, MOL2, ...); the output format is inferred from
-the file extension:
-
-```python
-mol.write("output.xyz", comment="my cluster")
-mol.write("output.pdb")
-```
-
-### Conformer
-
-Represents a molecule with full bond topology. The HNA partitioning is used internally to guarantee chemically valid atom assignments, handling arbitrary degrees of topological symmetry efficiently. Wraps `conformsd_calculate`.
-
-#### Construction
+Compares the two molecules as conformers. Atom assignments always respect
+the bond topology, so both molecules must have the same bond graph. Bonds
+come from each molecule's bond table, or are inferred from geometry when
+`bondtol` is given; a molecule without bonds (e.g. read from XYZ) therefore
+needs `bondtol`, otherwise a "missing bond data" `ValueError` is raised.
 
 ```python
-# From a file (defaults to the first frame; bond table is parsed automatically)
-conf = Conformer.from_file("conformers.sdf")
+c0, c1 = read_molecules("conformers.sdf", frames=(0, 1))
 
-# From a file (specific frame in a multi-frame SDF)
-conf = Conformer.from_file("conformers.sdf", frame_idx=2)
-
-# From element symbols, coordinates, and bonds directly
-import numpy as np
-symbols   = ["C", "O", "H", "H"]
-coords    = np.zeros((4, 3), dtype=np.float64)
-bond_data = np.array([[1,2,2],[1,3,1],[1,4,1]], dtype=np.int32)  # 1-based
-conf = Conformer.from_symbols(symbols, coords, bond_data=bond_data)
-
-# From atomic numbers, coordinates, and bonds directly
-conf = Conformer.from_numbers([6, 8, 1, 1], coords, bond_data=bond_data)
-```
-
-Conformers read from files record the file format as their `bond_source`;
-conformers built from arrays have `bond_source=None` unless you pass one.
-`rmsd_to(use_bond_type=True)` only accepts pairs with the same
-`bond_source`, because bond types are compared as plain integers and are
-only meaningful within one convention.
-
-#### Reading multiple frames
-
-```python
-conformers = read_conformers("conformers.sdf")           # all frames, returns a list
-c0, c1 = read_conformers("conformers.sdf", frames=(0, 1))
-```
-
-#### Computing RMSD
-
-`rmsd_to()` always returns a **list** of `RMSDResult`, ranked best (lowest
-RMSD) first. By default only the single best solution is computed:
-
-```python
-results = c0.rmsd_to(c1, align=True, remap=True)
+results = c0.conformsd_to(c1, align=True, remap=True)
 result = results[0]             # best (lowest RMSD) solution
 print(result.rmsd)              # float, Å
 print(result.mapping)           # int32 array, 0-based
 print(result.transform)         # 4×4 float64 array
+
+# XYZ input has no bond table: infer connectivity from geometry
+x0, x1 = read_molecules("conformers.xyz", frames=(0, 1))
+result = x0.conformsd_to(x1, align=True, remap=True, bondtol=0.3)[0]
 ```
 
-##### `Conformer.rmsd_to()` parameters
+#### Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| **other** | `Conformer` | *required* | The structure to compare against `self` |
+| **other** | `Molecule` | *required* | The structure to compare against `self` |
 | **align** | `bool` | `False` | Optimally rotate and translate `other` onto `self` |
 | **remap** | `bool` | `False` | Find the atom permutation that minimises the RMSD |
 | **heavy_only** | `bool` | `False` | Exclude hydrogen atoms from the calculation |
 | **mass_weighted** | `bool` | `False` | Weight each atom by its atomic mass |
 | **mirror** | `bool` | `False` | Reflect `other` before comparison |
 | **use_atom_label** | `bool` | `False` | Only match atoms with the same label (see `labels` in the constructors) |
-| **bondtol** | `float` | `None` | Bond-detection tolerance (Å): infer bond connectivity from geometry instead of using each structure's bond table. `None` disables bond detection |
-| **use_bond_type** | `bool` | `False` | Use bond types to guide atom matching. Both conformers must have the same `bond_source` (e.g. read from files of the same format), otherwise `ValueError` is raised; no effect when `bondtol` is given |
+| **bondtol** | `float` | `None` | Bond-detection tolerance (Å): infer bond connectivity from geometry instead of using each molecule's bond table. `None` uses the bond tables |
+| **use_bond_type** | `bool` | `False` | Use bond types to guide atom matching. Both molecules must have the same `bond_source` (e.g. read from files of the same format), otherwise `ValueError` is raised; no effect when `bondtol` is given |
 | **stats** | `bool` | `False` | Print detailed optimisation statistics |
+| **assign_tree** | `bool` | `False` | Print the assignment tree and its combination counts |
 | **random** | `bool` | `False` | Seed the random-number generator from the system clock (otherwise results are reproducible) |
 | **max_freq** | `int` | `100` | Stop the random orientation search once the best solution has been found more than this many times; also the threshold that selects it over exhaustive enumeration (see [Algorithm Notes](#algorithm-notes)). 100 is the validated value |
 | **max_trials** | `int` | `10000` | Stop after at most this many random orientations |
-| **n_records** | `int` | `1` | Request up to this many ranked solutions (see below) |
-
-Pass `n_records > 1` (with `align=True, remap=True`) to retrieve several
-ranked candidate solutions in one call.
-
-#### Writing output
-
-Like `Atoms.write()`, the output format is inferred from the file
-extension. Bond connectivity is written too (when the target format
-supports it, e.g. SDF/MOL2); bond *types* are not currently preserved,
-only which atoms are bonded. Writing to a format with no bond table
-(e.g. XYZ) simply omits connectivity:
-
-```python
-conf.write("output.sdf", comment="my conformer")
-conf.write("output.xyz")  # coordinates and symbols only
-```
+| **n_records** | `int` | `1` | Request up to this many ranked solutions (see [Retrieving multiple ranked solutions](#retrieving-multiple-ranked-solutions)) |
 
 ### RMSDResult
 
-`.rmsd_to()` returns a `list[RMSDResult]`, one element per requested
-solution (best/lowest RMSD first). Each `RMSDResult` holds:
+`atormsd_to()` and `conformsd_to()` both return a `list[RMSDResult]`, one
+element per solution found (best/lowest RMSD first). Each `RMSDResult`
+holds:
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
@@ -756,17 +756,15 @@ solution (best/lowest RMSD first). Each `RMSDResult` holds:
 
 #### Applying the result
 
-Use the `apply_to` method to apply the result to the coordinates:
-```python
-# Produce a new object that is aligned and reordered to match the reference
-result = mol0.rmsd_to(mol1, align=True, remap=True)[0]
-mol1_aligned = result.apply_to(mol1)
-mol1_aligned.write("aligned.xyz")
-```
+Use the `apply_to` method to produce a new `Molecule` that is aligned and
+reordered to match the reference. Its bonds, if any, are renumbered to the
+new atom order, so the result can be written with connectivity:
 
-`write()` is available on both `Atoms` and `Conformer` (see
-[Writing output](#writing-output) under [Atoms](#atoms) and
-[Writing output](#writing-output-1) under [Conformer](#conformer)).
+```python
+result = mol0.conformsd_to(mol1, align=True, remap=True)[0]
+mol1_aligned = result.apply_to(mol1)
+mol1_aligned.write("aligned.sdf")
+```
 
 #### Retrieving multiple ranked solutions
 
@@ -777,7 +775,7 @@ length 1 regardless of `n_records`, and may be shorter than `n_records`
 if fewer distinct solutions were found:
 
 ```python
-results = mol0.rmsd_to(mol1, align=True, remap=True, n_records=5)
+results = mol0.atormsd_to(mol1, align=True, remap=True, n_records=5)
 
 for i, result in enumerate(results):
     print(f"Solution {i}: RMSD = {result.rmsd:.4f} Å")

@@ -10,20 +10,27 @@ Supported file formats (via chemfiles):
 
 Classes
 -------
-Atoms
-    An unstructured set of atoms (no bond topology), compared with
-    atormsd_calculate.
+Molecule
+    A set of atoms with 3-D coordinates and an optional bond table. The same
+    object can be compared in two ways, one method per algorithm of the
+    library:
 
-Conformer
-    A molecule with bond topology, compared with conformsd_calculate, whose
-    atom assignments always respect the bonds (HNA partitioning).
+    atormsd_to(other, ...)
+        Unstructured comparison (atormsd_calculate). Bonds are ignored and
+        atoms are matched only within atom types.
 
-Both expose a .rmsd_to(other, n_records=1, **kwargs) method that returns a
-list of RMSDResult objects, best (lowest RMSD) first. By default only the
-single best solution is computed (a list of length 1); pass a larger
-n_records to get several ranked candidate solutions at once. The returned
-list may be shorter than n_records if the library did not find that many
-distinct solutions.
+    conformsd_to(other, ...)
+        Conformer comparison (conformsd_calculate). Atom assignments always
+        respect the bond topology (HNA partitioning); both molecules must
+        have the same bond graph.
+
+RMSDResult
+    Return value of both methods. Each method returns a list of
+    RMSDResult objects, best (lowest RMSD) first. By default only the single
+    best solution is computed (a list of length 1); pass a larger n_records
+    to get several ranked candidate solutions at once. The returned list may
+    be shorter than n_records if the library did not find that many distinct
+    solutions.
 """
 
 from pathlib import Path
@@ -31,6 +38,17 @@ import numpy as np
 import chemfiles
 
 from . import molalign as _molalign
+
+
+__all__ = [
+    "ATOMIC_SYMBOLS",
+    "DUMMY_ATOMIC_NUMBER",
+    "symbol_to_atomic_number",
+    "atomic_number_to_symbol",
+    "RMSDResult",
+    "Molecule",
+    "read_molecules",
+]
 
 
 # ---------------------------------------------------------------------------
@@ -91,7 +109,7 @@ def atomic_number_to_symbol(number):
 # ---------------------------------------------------------------------------
 
 class RMSDResult(object):
-    """Return value of .rmsd_to()."""
+    """Return value of Molecule.atormsd_to / conformsd_to."""
 
     def __init__(self, rmsd, mapping, transform):
         self.rmsd = rmsd
@@ -112,17 +130,21 @@ class RMSDResult(object):
         mirrored, aligned structure.
         """
 
-    def apply_to(self, cluster_or_conformer):
+    def apply_to(self, molecule):
         """
-        Apply the stored transform and atom permutation to a cluster or conformer,
-        returning a new object aligned and reordered to match the reference.
+        Apply the stored transform and atom permutation to a Molecule,
+        returning a new Molecule aligned and reordered to match the reference.
 
         The result has len(mapping) atoms, so line j of it corresponds
         to line j of the reference. If the reference has more atoms (possible
         only with heavy_only=True), the missing lines are filled with dummy
         atoms (element "X", atomic number 0) whose coordinates are
-        placeholders. If it has fewer, the extra atoms come last.
+        placeholders. If it has fewer, the extra atoms come last. Bonds are
+        renumbered to the new atom order.
         """
+        if not isinstance(molecule, Molecule):
+            raise TypeError("Expected Molecule, got {}".format(type(molecule).__name__))
+
         R = self.transform[:3, :3]
         t = self.transform[:3, 3]
         idx = np.asarray(self.mapping)
@@ -130,9 +152,9 @@ class RMSDResult(object):
         # When the permutation is longer than the molecule, pad it with dummy
         # atoms ("X") appended after the real atoms, as the Fortran core does,
         # so that every index is valid.
-        coords = cluster_or_conformer.coords
-        atom_data = cluster_or_conformer.atom_data
-        symbols = list(cluster_or_conformer.symbols)
+        coords = molecule.coords
+        atom_data = molecule.atom_data
+        symbols = list(molecule.symbols)
         n_dummy = len(idx) - len(coords)
         if n_dummy > 0:
             coords = np.vstack([coords, np.zeros((n_dummy, 3), dtype=coords.dtype)])
@@ -141,34 +163,23 @@ class RMSDResult(object):
             symbols += [ATOMIC_SYMBOLS[DUMMY_ATOMIC_NUMBER]] * n_dummy
 
         new_coords = coords[idx] @ R.T + t
-        new_atomdata = atom_data[idx]
+        new_atom_data = atom_data[idx]
         new_symbols = [symbols[i] for i in idx]
 
-        if isinstance(cluster_or_conformer, Conformer):
-            # Renumber the bond atoms to the new atom order
+        # Renumber the (1-based) bond atoms to the new atom order
+        new_bond_data = molecule.bond_data.copy()
+        if new_bond_data.shape[0] > 0:
             inv_idx = np.argsort(idx)
-            new_bonddata = cluster_or_conformer.bond_data.copy()
-            
-            for i in range(new_bonddata.shape[0]):
-                new_bonddata[i, 0] = inv_idx[new_bonddata[i, 0] - 1] + 1
-                new_bonddata[i, 1] = inv_idx[new_bonddata[i, 1] - 1] + 1
-                
-            c = Conformer(
-                atom_data=new_atomdata,
-                coords=new_coords,
-                bond_data=new_bonddata,
-                name=cluster_or_conformer.name,
-                symbols=new_symbols,
-                bond_source=cluster_or_conformer.bond_source
-            )
-        else:
-            c = Atoms(
-                atom_data=new_atomdata,
-                coords=new_coords,
-                name=cluster_or_conformer.name,
-                symbols=new_symbols
-            )
-        return c
+            new_bond_data[:, :2] = inv_idx[new_bond_data[:, :2] - 1] + 1
+
+        return Molecule(
+            atom_data=new_atom_data,
+            coords=new_coords,
+            bond_data=new_bond_data,
+            name=molecule.name,
+            symbols=new_symbols,
+            bond_source=molecule.bond_source,
+        )
 
     def __repr__(self):
         return "RMSDResult(rmsd={:.6f})".format(self.rmsd)
@@ -181,7 +192,7 @@ class RMSDResult(object):
 def _file_format(path):
     """
     Format tag of a file, taken from its extension (the same way chemfiles
-    infers the format). Conformers read from files with the same tag were
+    infers the format). Molecules read from files with the same tag were
     parsed by the same chemfiles reader, so their bond types follow the same
     convention.
     """
@@ -196,7 +207,7 @@ def _extract_frame_data(frame):
     n_atoms = len(frame.atoms)
     atom_data = np.zeros((n_atoms, 2), dtype=np.int32)
     symbols = []
-    
+
     for i, atom in enumerate(frame.atoms):
         # chemfiles reports 0 (or None) for types it doesn't know, such as
         # "X" and "LJ", and uses its own numbering beyond Lr. In those cases
@@ -206,17 +217,17 @@ def _extract_frame_data(frame):
         if not elnum or elnum > _LAST_REAL_ELEMENT:
             elnum = symbol_to_atomic_number(atom.type)
         atom_data[i, 0] = elnum
-        atom_data[i, 1] = 0  
+        atom_data[i, 1] = 0
         symbols.append(atom.type)
-        
+
     coords = np.array(frame.positions, dtype=np.float64)
-    
+
     bonds = frame.topology.bonds
     try:
         orders = frame.topology.bond_orders
     except AttributeError:
         orders = []
-        
+
     n_bonds = len(bonds)
     bond_data = np.empty((n_bonds, 3), dtype=np.int32)
     for i in range(n_bonds):
@@ -226,14 +237,14 @@ def _extract_frame_data(frame):
             bond_data[i, 2] = int(orders[i])
         else:
             bond_data[i, 2] = 1
-            
+
     return atom_data, coords, bond_data, symbols
 
 
 def _build_frame(coords, symbols, comment=None, bond_data=None):
     """
     Build a chemfiles.Frame from coordinates, symbols, and (optionally)
-    1-based bond_data (as stored on Conformer), for writing out through
+    1-based bond_data (as stored on Molecule), for writing out through
     chemfiles.Trajectory.
     """
     frame = chemfiles.Frame()
@@ -265,254 +276,68 @@ def _write_frame(path, frame):
         trajectory.write(frame)
 
 
+def _molecule_from_frame(frame, name, bond_source):
+    atom_data, coords, bond_data, symbols = _extract_frame_data(frame)
+    return Molecule(
+        atom_data=atom_data, coords=coords, bond_data=bond_data,
+        name=name, symbols=symbols, bond_source=bond_source,
+    )
+
+
 # ---------------------------------------------------------------------------
-# Public frame readers
+# Public frame reader
 # ---------------------------------------------------------------------------
 
-def read_clusters(path, frames=None):
+def read_molecules(path, frames=None):
     """
-    Read the frames of a file as Atoms objects: a tuple with the frames of
-    the given indices, or a list of all frames if frames is None. Bond
-    information is ignored.
-    """
-    stem = Path(path).stem
-    clusters = []
-    
-    with chemfiles.Trajectory(str(path)) as trajectory:
-        if frames is not None:
-            for idx in frames:
-                frame = trajectory.read_step(idx)
-                atom_data, coords, _, symbols = _extract_frame_data(frame)
-                name = "{}_{}".format(stem, idx)
-                clusters.append(Atoms(
-                    atom_data=atom_data, coords=coords, name=name, symbols=symbols
-                ))
-            return tuple(clusters)
-        else:
-            for idx, frame in enumerate(trajectory):
-                atom_data, coords, _, symbols = _extract_frame_data(frame)
-                name = "{}_{}".format(stem, idx)
-                clusters.append(Atoms(
-                    atom_data=atom_data, coords=coords, name=name, symbols=symbols
-                ))
-            return clusters
-
-def read_conformers(path, frames=None):
-    """
-    Read the frames of a file as Conformer objects: a tuple with the frames
+    Read the frames of a file as Molecule objects: a tuple with the frames
     of the given indices, or a list of all frames if frames is None. Bonds
-    are read, and bond_source is set to the file format.
+    are read when the format provides them, and bond_source is set to the
+    file format.
     """
     stem = Path(path).stem
-    conformers = []
-    
+    source = _file_format(path)
+    molecules = []
+
     with chemfiles.Trajectory(str(path)) as trajectory:
         if frames is not None:
             for idx in frames:
                 frame = trajectory.read_step(idx)
-                atom_data, coords, bond_data, symbols = _extract_frame_data(frame)
                 name = "{}_{}".format(stem, idx)
-                conformers.append(Conformer(
-                    atom_data=atom_data, coords=coords, bond_data=bond_data, 
-                    name=name, symbols=symbols, bond_source=_file_format(path)
-                ))
-            return tuple(conformers)
-        else:
-            for idx, frame in enumerate(trajectory):
-                atom_data, coords, bond_data, symbols = _extract_frame_data(frame)
-                name = "{}_{}".format(stem, idx)
-                conformers.append(Conformer(
-                    atom_data=atom_data, coords=coords, bond_data=bond_data, 
-                    name=name, symbols=symbols, bond_source=_file_format(path)
-                ))
-            return conformers
+                molecules.append(_molecule_from_frame(frame, name, source))
+            return tuple(molecules)
+
+        for idx, frame in enumerate(trajectory):
+            name = "{}_{}".format(stem, idx)
+            molecules.append(_molecule_from_frame(frame, name, source))
+        return molecules
 
 
 # ---------------------------------------------------------------------------
-# Atoms
+# Molecule
 # ---------------------------------------------------------------------------
 
-class Atoms(object):
+class Molecule(object):
     """
-    An unstructured cluster of atoms with 3-D coordinates but no bond topology.
-    """
+    A set of atoms with 3-D coordinates and an optional bond table.
 
-    def __init__(self, atom_data=None, coords=None, name="cluster", symbols=None, labels=None):
-        """
-        Either ``atom_data`` (an (n, 2) array of element numbers and labels)
-        or ``symbols`` (element symbols, e.g. ["C", "H", "H", "H"]) must be
-        provided; the other is derived. If both are given, ``atom_data`` is
-        used for the calculations and ``symbols`` only for output.
-
-        labels : sequence of int, optional
-            Per-atom labels, which restrict matching to atoms with the same
-            label when ``use_atom_label=True``. Only used when building
-            ``atom_data`` from ``symbols``; defaults to all zero
-            (unlabelled).
-        """
-        self._coords = np.asarray(coords, dtype=np.float64)
-        self._name = name
-
-        if atom_data is None:
-            if symbols is None:
-                raise ValueError("Either atom_data or symbols must be provided")
-            elnums = [symbol_to_atomic_number(s) for s in symbols]
-            if labels is None:
-                labels = [0] * len(elnums)
-            elif len(labels) != len(elnums):
-                raise ValueError("labels must have the same length as symbols")
-            self._atom_data = np.array(list(zip(elnums, labels)), dtype=np.int32)
-            self._symbols = list(symbols)
-        else:
-            self._atom_data = np.asarray(atom_data, dtype=np.int32)
-            if symbols is None:
-                self._symbols = [atomic_number_to_symbol(a[0]) for a in self._atom_data]
-            else:
-                self._symbols = list(symbols)
-
-        if self._coords.shape[0] != self._atom_data.shape[0]:
-            raise ValueError("coords and atom_data/symbols must have the same length")
-
-    @classmethod
-    def from_file(cls, path, frame_idx=0):
-        """Read a single frame from a file as an Atoms."""
-        with chemfiles.Trajectory(str(path)) as trajectory:
-            frame = trajectory.read_step(frame_idx)
-            atom_data, coords, _, symbols = _extract_frame_data(frame)
-            name = Path(path).stem
-            return cls(atom_data=atom_data, coords=coords, name=name, symbols=symbols)
-
-    @classmethod
-    def from_symbols(cls, symbols, coords, name="cluster", labels=None):
-        """Build an Atoms directly from element symbols and coordinates."""
-        return cls(coords=coords, name=name, symbols=symbols, labels=labels)
-
-    @classmethod
-    def from_numbers(cls, atomic_numbers, coords, name="cluster", labels=None):
-        """Build an Atoms directly from atomic numbers and coordinates."""
-        atomic_numbers = list(atomic_numbers)
-        if labels is None:
-            labels = [0] * len(atomic_numbers)
-        elif len(labels) != len(atomic_numbers):
-            raise ValueError("labels must have the same length as atomic_numbers")
-        atom_data = np.array(list(zip(atomic_numbers, labels)), dtype=np.int32)
-        return cls(atom_data=atom_data, coords=coords, name=name)
-
-    @property
-    def name(self):
-        return self._name
-
-    @property
-    def n_atoms(self):
-        return self._atom_data.shape[0]
-
-    @property
-    def atom_data(self):
-        return self._atom_data
-
-    @property
-    def coords(self):
-        return self._coords
-
-    @property
-    def symbols(self):
-        return self._symbols
-
-    def write(self, path, comment=None):
-        """
-        Write this cluster with chemfiles. The format is inferred from the
-        file extension (e.g. .xyz, .pdb, .sdf, .mol2), as when reading.
-        """
-        frame = _build_frame(self._coords, self._symbols, comment=comment)
-        _write_frame(path, frame)
-
-    def rmsd_to(
-        self,
-        other,
-        align=False,
-        remap=False,
-        heavy_only=False,
-        mass_weighted=False,
-        mirror=False,
-        use_atom_label=False,
-        stats=False,
-        random=False,
-        prunetol=None,
-        max_freq=10,
-        max_trials=10000,
-        n_records=1,
-    ):
-        """
-        Compute up to n_records ranked candidate solutions.
-
-        Returns a list of RMSDResult, best (lowest RMSD) first. Records
-        beyond the first are only ever produced when both align=True and
-        remap=True; otherwise the returned list always has length 1
-        regardless of n_records. The list may be shorter than n_records
-        if the library did not find that many distinct solutions.
-
-        With heavy_only=True the two clusters may differ in their number of
-        hydrogens. The smaller one is then padded with dummy atoms, and each
-        mapping has max(len(self), len(other)) entries (see
-        RMSDResult.mapping). Hydrogens are not part of the RMSD; they are
-        paired afterwards by distance.
-
-        prunetol (Å) enables pruning: two atoms are never paired if their
-        sorted distances to the atoms of some atom type differ by more than
-        2*sqrt(3)*prunetol. Defaults to None, which disables pruning.
-
-        The search over random orientations stops once the best solution
-        has been found max_freq times, or after max_trials orientations.
-        random=True seeds it from the clock (otherwise results are
-        reproducible), and stats=True prints its statistics.
-        """
-        if not isinstance(other, Atoms):
-            raise TypeError("Expected Atoms, got {}".format(type(other).__name__))
-
-        prunetol_flag = prunetol is not None
-
-        rmsd_vals, maps, tfs = _molalign.atormsd_calculate(
-            self._atom_data, self._coords,
-            other._atom_data, other._coords,
-            align_flag=align,
-            remap_flag=remap,
-            heavy_flag=heavy_only,
-            mass_flag=mass_weighted,
-            mirror_flag=mirror,
-            atomlabel_flag=use_atom_label,
-            print_stats=stats,
-            random_flag=random,
-            prunetol_flag=prunetol_flag,
-            prunetol=prunetol,
-            max_freq=max_freq,
-            max_trials=max_trials,
-            n_records=n_records,
-        )
-        return [
-            RMSDResult(rmsd=rmsd_vals[i], mapping=maps[i], transform=tfs[i])
-            for i in range(len(rmsd_vals))
-        ]
-
-    def __repr__(self):
-        return "Atoms(name={!r}, n_atoms={})".format(self._name, self.n_atoms)
-
-
-# ---------------------------------------------------------------------------
-# Conformer
-# ---------------------------------------------------------------------------
-
-class Conformer(object):
-    """
-    A molecule with full bond topology and 3-D coordinates (a conformer).
+    Use atormsd_to to compare it as an unstructured cluster (bonds ignored)
+    and conformsd_to to compare it as a conformer (same bond graph
+    required).
     """
 
-    def __init__(self, atom_data=None, coords=None, bond_data=None, name="conformer",
+    def __init__(self, atom_data=None, coords=None, bond_data=None, name="molecule",
                  symbols=None, labels=None, bond_source=None):
         """
         Either ``atom_data`` (an (n, 2) array of element numbers and labels)
         or ``symbols`` (element symbols, e.g. ["C", "H", "H", "H"]) must be
         provided; the other is derived. If both are given, ``atom_data`` is
         used for the calculations and ``symbols`` only for output.
+
+        bond_data : array of shape (b, 3), optional
+            ``[[a1, a2, bond_type], ...]`` with 1-based atom indices.
+            Defaults to no bonds. Required by conformsd_to unless
+            connectivity is inferred with ``bondtol``.
 
         labels : sequence of int, optional
             Per-atom labels, which restrict matching to atoms with the same
@@ -522,10 +347,10 @@ class Conformer(object):
 
         bond_source : str, optional
             Tag naming the convention of the bond types in ``bond_data``
-            (the file format for conformers read from files). Bond types are
-            only compared when both conformers share the same tag; see
-            ``rmsd_to(use_bond_type=True)``. Defaults to None, which is
-            the tag of all conformers built directly from arrays.
+            (the file format for molecules read from files). Bond types are
+            only compared when both molecules share the same tag; see
+            ``use_bond_type``. Defaults to None, which is the tag of all
+            molecules built directly from arrays.
         """
         self._coords = np.asarray(coords, dtype=np.float64)
 
@@ -537,7 +362,7 @@ class Conformer(object):
                 labels = [0] * len(elnums)
             elif len(labels) != len(elnums):
                 raise ValueError("labels must have the same length as symbols")
-            self._atom_data = np.array(list(zip(elnums, labels)), dtype=np.int32)
+            self._atom_data = np.array(list(zip(elnums, labels)), dtype=np.int32).reshape(-1, 2)
             self._symbols = list(symbols)
         else:
             self._atom_data = np.asarray(atom_data, dtype=np.int32)
@@ -550,42 +375,43 @@ class Conformer(object):
             raise ValueError("coords and atom_data/symbols must have the same length")
 
         if bond_data is not None:
-            self._bond_data = np.asarray(bond_data, dtype=np.int32)
+            self._bond_data = np.asarray(bond_data, dtype=np.int32).reshape(-1, 3)
         else:
             self._bond_data = np.empty((0, 3), dtype=np.int32)
 
         self._name = name
         self._bond_source = bond_source
 
+    # -- constructors -------------------------------------------------------
+
     @classmethod
     def from_file(cls, path, frame_idx=0):
-        """Read a single frame from a file as a Conformer."""
+        """Read a single frame from a file as a Molecule."""
         with chemfiles.Trajectory(str(path)) as trajectory:
             frame = trajectory.read_step(frame_idx)
-            atom_data, coords, bond_data, symbols = _extract_frame_data(frame)
-            name = Path(path).stem
-            return cls(atom_data=atom_data, coords=coords, bond_data=bond_data, name=name,
-                       symbols=symbols, bond_source=_file_format(path))
+            return _molecule_from_frame(frame, Path(path).stem, _file_format(path))
 
     @classmethod
-    def from_symbols(cls, symbols, coords, bond_data=None, name="conformer", labels=None,
+    def from_symbols(cls, symbols, coords, bond_data=None, name="molecule", labels=None,
                      bond_source=None):
-        """Build a Conformer directly from element symbols, coordinates, and bonds."""
-        return cls(coords=coords, bond_data=bond_data, name=name, symbols=symbols, labels=labels,
-                   bond_source=bond_source)
+        """Build a Molecule directly from element symbols, coordinates, and bonds."""
+        return cls(coords=coords, bond_data=bond_data, name=name, symbols=symbols,
+                   labels=labels, bond_source=bond_source)
 
     @classmethod
-    def from_numbers(cls, atomic_numbers, coords, bond_data=None, name="conformer", labels=None,
+    def from_numbers(cls, atomic_numbers, coords, bond_data=None, name="molecule", labels=None,
                      bond_source=None):
-        """Build a Conformer directly from atomic numbers, coordinates, and bonds."""
+        """Build a Molecule directly from atomic numbers, coordinates, and bonds."""
         atomic_numbers = list(atomic_numbers)
         if labels is None:
             labels = [0] * len(atomic_numbers)
         elif len(labels) != len(atomic_numbers):
             raise ValueError("labels must have the same length as atomic_numbers")
-        atom_data = np.array(list(zip(atomic_numbers, labels)), dtype=np.int32)
+        atom_data = np.array(list(zip(atomic_numbers, labels)), dtype=np.int32).reshape(-1, 2)
         return cls(atom_data=atom_data, coords=coords, bond_data=bond_data, name=name,
                    bond_source=bond_source)
+
+    # -- properties ---------------------------------------------------------
 
     @property
     def name(self):
@@ -598,6 +424,10 @@ class Conformer(object):
     @property
     def n_bonds(self):
         return self._bond_data.shape[0]
+
+    @property
+    def has_bonds(self):
+        return self.n_bonds > 0
 
     @property
     def atom_data(self):
@@ -620,18 +450,106 @@ class Conformer(object):
         """Tag of the bond-type convention (file format, or None)."""
         return self._bond_source
 
+    def __len__(self):
+        return self.n_atoms
+
+    # -- output -------------------------------------------------------------
+
     def write(self, path, comment=None):
         """
-        Write this conformer, with its bond connectivity, using chemfiles.
-        The format is inferred from the file extension (e.g. .sdf, .mol2,
-        .pdb, .xyz), as when reading. Bond types are not written.
+        Write this molecule, with its bond connectivity, using chemfiles.
+        The format is inferred from the file extension (e.g. .xyz, .sdf,
+        .mol2, .pdb), as when reading. Bond types are not written.
         """
         frame = _build_frame(
-            self._coords, self._symbols, comment=comment, bond_data=self._bond_data
+            self._coords, self._symbols, comment=comment,
+            bond_data=self._bond_data if self.has_bonds else None,
         )
         _write_frame(path, frame)
 
-    def rmsd_to(
+    # -- comparison helpers -------------------------------------------------
+
+    def _check_other(self, other):
+        if not isinstance(other, Molecule):
+            raise TypeError("Expected Molecule, got {}".format(type(other).__name__))
+
+    def _check_bond_types(self, other, use_bond_type, bondtol_flag):
+        """Bond types are only comparable within the same bond_source."""
+        if use_bond_type and not bondtol_flag and self._bond_source != other._bond_source:
+            raise ValueError(
+                "use_bond_type=True requires both molecules to have the same bond "
+                "source (got {!r} and {!r})".format(self._bond_source, other._bond_source)
+            )
+
+    # -- atormsd ------------------------------------------------------------
+
+    def atormsd_to(
+        self,
+        other,
+        align=False,
+        remap=False,
+        heavy_only=False,
+        mass_weighted=False,
+        mirror=False,
+        use_atom_label=False,
+        stats=False,
+        random=False,
+        prunetol=None,
+        max_freq=10,
+        max_trials=10000,
+        n_records=1,
+    ):
+        """
+        Compare as unstructured atom clusters (atormsd_calculate); bonds are
+        ignored. Returns up to n_records RMSDResult, best (lowest RMSD) first.
+
+        Records beyond the first are only ever produced when both align=True
+        and remap=True; otherwise the returned list always has length 1
+        regardless of n_records. The list may be shorter than n_records
+        if the library did not find that many distinct solutions.
+
+        With heavy_only=True the two molecules may differ in their number of
+        hydrogens. The smaller one is then padded with dummy atoms, and each
+        mapping has max(len(self), len(other)) entries (see
+        RMSDResult.mapping). Hydrogens are not part of the RMSD; they are
+        paired afterwards by distance.
+
+        prunetol (Å) enables pruning: two atoms are never paired if their
+        sorted distances to the atoms of some atom type differ by more than
+        2*sqrt(3)*prunetol. Defaults to None, which disables pruning.
+
+        The search over random orientations stops once the best solution
+        has been found max_freq times, or after max_trials orientations.
+        random=True seeds it from the clock (otherwise results are
+        reproducible), and stats=True prints its statistics.
+        """
+        self._check_other(other)
+
+        rmsd_vals, maps, tfs = _molalign.atormsd_calculate(
+            self._atom_data, self._coords,
+            other._atom_data, other._coords,
+            align_flag=align,
+            remap_flag=remap,
+            heavy_flag=heavy_only,
+            mass_flag=mass_weighted,
+            mirror_flag=mirror,
+            atomlabel_flag=use_atom_label,
+            print_stats=stats,
+            random_flag=random,
+            prunetol_flag=prunetol is not None,
+            prunetol=prunetol,
+            max_freq=max_freq,
+            max_trials=max_trials,
+            n_records=n_records,
+        )
+        return [
+            RMSDResult(rmsd=rmsd_vals[i], mapping=maps[i], transform=tfs[i])
+            for i in range(len(rmsd_vals))
+        ]
+
+    # -- conformsd ----------------------------------------------------------
+
+    def conformsd_to(
         self,
         other,
         align=False,
@@ -643,17 +561,19 @@ class Conformer(object):
         bondtol=None,
         use_bond_type=False,
         stats=False,
+        assign_tree=False,
         random=False,
         max_freq=100,
         max_trials=10000,
         n_records=1,
     ):
         """
-        Compute up to n_records ranked candidate solutions.
+        Compare as conformers (conformsd_calculate): atom assignments always
+        respect the bond topology, so both molecules must have the same bond
+        graph. Returns up to n_records RMSDResult, best (lowest RMSD) first.
 
-        Returns a list of RMSDResult, best (lowest RMSD) first. Records
-        beyond the first are only ever produced when both align=True and
-        remap=True; otherwise the returned list always has length 1
+        Records beyond the first are only ever produced when both align=True
+        and remap=True; otherwise the returned list always has length 1
         regardless of n_records. The list may be shorter than n_records
         if the library did not find that many distinct solutions.
 
@@ -665,11 +585,12 @@ class Conformer(object):
         bonds are known and by distance otherwise.
 
         bondtol (Å) enables bond detection: connectivity is inferred from
-        geometry with this tolerance instead of using each structure's bond
-        table. Defaults to None, which disables bond detection.
+        geometry with this tolerance instead of using each molecule's bond
+        table. Defaults to None, which uses the bond tables (an error is
+        raised if one of them is empty).
 
         use_bond_type=True also uses the bond types to guide atom
-        matching. Types are compared, never interpreted, so both conformers
+        matching. Types are compared, never interpreted, so both molecules
         must have the same bond_source (e.g. both read from files of the
         same format); otherwise a ValueError is raised. It has no effect
         when bondtol is given, since inferred bonds are untyped.
@@ -681,25 +602,19 @@ class Conformer(object):
         solution has been found more than max_freq times, or after
         max_trials orientations. The default max_freq=100 is the value
         validated on the CCD and BIRD benchmarks. random=True seeds the
-        search from the clock (otherwise results are reproducible), and
-        stats=True prints its statistics.
+        search from the clock (otherwise results are reproducible),
+        stats=True prints its statistics and assign_tree=True prints the
+        assignment tree and its combination counts.
         """
-        if not isinstance(other, Conformer):
-            raise TypeError("Expected Conformer, got {}".format(type(other).__name__))
-
+        self._check_other(other)
         bondtol_flag = bondtol is not None
-
-        if use_bond_type and not bondtol_flag and self._bond_source != other._bond_source:
-            raise ValueError(
-                "use_bond_type=True requires both conformers to have the same bond "
-                "source (got {!r} and {!r})".format(self._bond_source, other._bond_source)
-            )
+        self._check_bond_types(other, use_bond_type, bondtol_flag)
 
         rmsd_vals, maps, tfs = _molalign.conformsd_calculate(
             self._atom_data, self._coords,
             other._atom_data, other._coords,
-            bond_data1=self._bond_data if not bondtol_flag else None,
-            bond_data2=other._bond_data if not bondtol_flag else None,
+            bond_data1=None if bondtol_flag else self._bond_data,
+            bond_data2=None if bondtol_flag else other._bond_data,
             align_flag=align,
             remap_flag=remap,
             heavy_flag=heavy_only,
@@ -710,6 +625,7 @@ class Conformer(object):
             bondtol=bondtol,
             bondtype_flag=use_bond_type,
             print_stats=stats,
+            print_assigntree=assign_tree,
             random_flag=random,
             max_freq=max_freq,
             max_trials=max_trials,
@@ -721,6 +637,6 @@ class Conformer(object):
         ]
 
     def __repr__(self):
-        return "Conformer(name={!r}, n_atoms={}, n_bonds={})".format(
+        return "Molecule(name={!r}, n_atoms={}, n_bonds={})".format(
             self._name, self.n_atoms, self.n_bonds
         )

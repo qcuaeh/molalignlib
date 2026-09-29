@@ -41,13 +41,14 @@ macro(add_cython_extension EXT_NAME PYX_FILE)
     add_library(${EXT_NAME}_ext MODULE ${_c})
     target_link_libraries(${EXT_NAME}_ext PRIVATE molalignlib)
 
-    # Belt-and-suspenders: also hide symbols by default in the extension's
-    # own compiled C code (the Cython-generated wrapper). PyInit_<name>
-    # stays exported regardless, since Python.h marks it with default
-    # visibility explicitly via PyMODINIT_FUNC. This keeps the extension
-    # from exposing anything beyond its module init function.
+    # The top-level CMakeLists adds -fvisibility=hidden to CMAKE_C_FLAGS.
+    # On Python < 3.9, PyMODINIT_FUNC has no visibility attribute, so that
+    # flag hides PyInit_<name> and the module can't be imported. Target
+    # options come after CMAKE_C_FLAGS on the command line, so this wins.
+    # All other Cython-generated functions are static, so nothing else
+    # gets exported.
     if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-        target_compile_options(${EXT_NAME}_ext PRIVATE -fvisibility=hidden)
+        target_compile_options(${EXT_NAME}_ext PRIVATE -fvisibility=default)
     endif()
 
     # Set the output name to include the correct Python ABI suffix so that
