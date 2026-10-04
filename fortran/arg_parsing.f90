@@ -106,9 +106,11 @@ subroutine char_read_optarg(option, optarg)
    call get_optarg(option, optarg)
 end subroutine
 
-subroutine int_read_optarg(option, optarg)
+subroutine int_read_optarg(option, optarg, min_value)
+! Read the integer argument of option; values below min_value are rejected.
    character(*), intent(in) :: option
    integer(ik), intent(out) :: optarg
+   integer(ik), intent(in) :: min_value
    character(:), allocatable :: chararg 
    integer(ik) :: stat
 
@@ -116,6 +118,11 @@ subroutine int_read_optarg(option, optarg)
    read (chararg, *, iostat=stat) optarg
    if (stat /= 0) then
       write (stderr, '(A,1X,A,1X,A)') 'Option', option, 'requires an integer argument'
+      stop
+   end if
+   if (optarg < min_value) then
+      write (stderr, '(A,1X,A,1X,A,1X,I0)') 'Option', option, &
+            'requires an integer argument of at least', min_value
       stop
    end if
 end subroutine

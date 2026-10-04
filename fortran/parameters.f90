@@ -25,9 +25,6 @@ implicit none
 ! Enable internal consistency checks
 logical(lk), parameter :: DEBUG_TESTS = .FALSE.
 
-! Stop the stochastic conformer alignment after max_trials trials
-logical(lk), parameter :: MAX_TRIALS_EXIT = .TRUE.
-
 ! Branch-and-bound pruning in the conformer assignment search
 logical(lk), parameter :: PRUNE_ASSIGNMENTS = .TRUE.
 
@@ -54,7 +51,7 @@ integer(ik), parameter :: MAX_COORDNUM = 10
 
 ! Bond types. The bond state of an atom pair is an integer bond type:
 ! NO_BOND (0) when the atoms are not bonded, and a positive type when they
-! are. Without bond types every bond is ANY_BOND; with bond types the
+! are. Without bond types every bond is GENERIC_BOND; with bond types the
 ! types read from file are compacted to 1, 2, ... Two atom pairs match
 ! when their bond types are equal, so "no bond" behaves as a bond of type
 ! zero. A partition signature entry encodes (neighbor part index, bond
@@ -63,12 +60,21 @@ integer(ik), parameter :: MAX_COORDNUM = 10
 ! Bond types above MAX_BOND_TYPE are merged into MAX_BOND_TYPE, which only
 ! makes the comparison coarser, never wrong.
 integer(ik), parameter :: NO_BOND = 0
-integer(ik), parameter :: ANY_BOND = 1
+integer(ik), parameter :: GENERIC_BOND = 1
 integer(ik), parameter :: BOND_TYPE_RADIX = 256
 integer(ik), parameter :: MAX_BOND_TYPE = BOND_TYPE_RADIX - 1
 
 ! Default maximum number of random trials
 integer(ik), parameter :: MAX_TRIALS_DEFAULT = 10000
+
+! Default maximum number of molecular fragments (connected components of
+! the bond graph of the included atoms) allowed by conformsd
+integer(ik), parameter :: MAX_FRAGS_DEFAULT = 1
+
+! Default mapping frequencies
+integer(ik), parameter :: ATO_FREQ_DEFAULT = 10
+integer(ik), parameter :: CONFO_FREQ_DEFAULT = 100
+integer(ik), parameter :: ISO_FREQ_DEFAULT = 100
 
 ! Displayed decimal places
 integer(ik), parameter :: DECIMAL_PLACES = 6

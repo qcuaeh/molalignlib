@@ -19,16 +19,16 @@ use parameters
 implicit none
 
 ! Global run options, set by the programs and C bindings
-logical(lk) :: bondtol_flag
-logical(lk) :: bondtype_flag
+logical(lk) :: bonding_flag
+logical(lk) :: usebondtype_flag
 logical(lk) :: random_flag
 logical(lk) :: mirror_flag
-logical(lk) :: atomlabel_flag
+logical(lk) :: useatomtype_flag
 logical(lk) :: heavy_flag
-logical(lk) :: mass_flag
+logical(lk) :: massweight_flag
 logical(lk) :: align_flag
 logical(lk) :: remap_flag
-logical(lk) :: print_stats
-logical(lk) :: print_assigntree
+logical(lk) :: printstats_flag
+logical(lk) :: printassigntree_flag
 
 end module

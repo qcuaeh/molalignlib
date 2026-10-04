@@ -90,7 +90,7 @@ type, public :: array_trees_t
    integer(ik), allocatable :: atomidcs2(:)
    type(chain_item_t), allocatable :: chain(:)
    type(partree_item_t), allocatable :: partree(:)
-   type(assigntree_item_t), allocatable :: assigntree(:)
+   type(assigntree_item_t), allocatable :: assignment_tree(:)
    ! Vertex directories [atom, link]: part of each atom at each link
    ! (0 = not placed at that link). Each link is a column, so the
    ! consecutive links of a node are cleared as one contiguous block.
@@ -189,7 +189,7 @@ subroutine cache_assignment_tree(assignment_tree, cache_arrays)
    cache_arrays%total_partref_entries = assignment_tree%total_partrefs
 
    allocate(cache_arrays%chain(cache_arrays%total_links))
-   allocate(cache_arrays%assigntree(cache_arrays%total_chains))
+   allocate(cache_arrays%assignment_tree(cache_arrays%total_chains))
    allocate(cache_arrays%partref_entries(cache_arrays%total_partref_entries))
    allocate(cache_arrays%itemdir1_entries(cache_arrays%n_atoms1, cache_arrays%total_links))
    allocate(cache_arrays%itemdir2_entries(cache_arrays%n_atoms2, cache_arrays%total_links))
@@ -363,54 +363,54 @@ recursive subroutine convert_chains_recurse(chain, cache_arrays, partref_idx, li
 
    chain_idx = chain%global_idx
 
-   cache_arrays%assigntree(chain_idx)%n_atoms1 = chain%n_atoms1
-   cache_arrays%assigntree(chain_idx)%n_atoms2 = chain%n_atoms2
-   cache_arrays%assigntree(chain_idx)%n_links = chain%n_links
-   cache_arrays%assigntree(chain_idx)%n_children = chain%n_children
+   cache_arrays%assignment_tree(chain_idx)%n_atoms1 = chain%n_atoms1
+   cache_arrays%assignment_tree(chain_idx)%n_atoms2 = chain%n_atoms2
+   cache_arrays%assignment_tree(chain_idx)%n_links = chain%n_links
+   cache_arrays%assignment_tree(chain_idx)%n_children = chain%n_children
 
    if (associated(chain%split_part)) then
-      cache_arrays%assigntree(chain_idx)%split_part_idx = chain%split_part%global_idx
+      cache_arrays%assignment_tree(chain_idx)%split_part_idx = chain%split_part%global_idx
    else
-      cache_arrays%assigntree(chain_idx)%split_part_idx = 0
+      cache_arrays%assignment_tree(chain_idx)%split_part_idx = 0
    end if
 
    if (associated(chain%parent_chain)) then
-      cache_arrays%assigntree(chain_idx)%parent_chain_idx = chain%parent_chain%global_idx
+      cache_arrays%assignment_tree(chain_idx)%parent_chain_idx = chain%parent_chain%global_idx
    else
-      cache_arrays%assigntree(chain_idx)%parent_chain_idx = 0
+      cache_arrays%assignment_tree(chain_idx)%parent_chain_idx = 0
    end if
 
    if (associated(chain%first_child_chain)) then
-      cache_arrays%assigntree(chain_idx)%first_child_idx = chain%first_child_chain%global_idx
+      cache_arrays%assignment_tree(chain_idx)%first_child_idx = chain%first_child_chain%global_idx
    else
-      cache_arrays%assigntree(chain_idx)%first_child_idx = 0
+      cache_arrays%assignment_tree(chain_idx)%first_child_idx = 0
    end if
 
    if (associated(chain%last_child_chain)) then
-      cache_arrays%assigntree(chain_idx)%last_child_idx = chain%last_child_chain%global_idx
+      cache_arrays%assignment_tree(chain_idx)%last_child_idx = chain%last_child_chain%global_idx
    else
-      cache_arrays%assigntree(chain_idx)%last_child_idx = 0
+      cache_arrays%assignment_tree(chain_idx)%last_child_idx = 0
    end if
 
    if (associated(chain%next_sibling_chain)) then
-      cache_arrays%assigntree(chain_idx)%next_sibling_idx = chain%next_sibling_chain%global_idx
+      cache_arrays%assignment_tree(chain_idx)%next_sibling_idx = chain%next_sibling_chain%global_idx
    else
-      cache_arrays%assigntree(chain_idx)%next_sibling_idx = 0
+      cache_arrays%assignment_tree(chain_idx)%next_sibling_idx = 0
    end if
 
    if (chain%n_children > 0) then
-      allocate(cache_arrays%assigntree(chain_idx)%child_indices(chain%n_children))
+      allocate(cache_arrays%assignment_tree(chain_idx)%child_indices(chain%n_children))
       child_chain => chain%first_child_chain
       n_children = 0
       do while (associated(child_chain))
          n_children = n_children + 1
-         cache_arrays%assigntree(chain_idx)%child_indices(n_children) = child_chain%global_idx
+         cache_arrays%assignment_tree(chain_idx)%child_indices(n_children) = child_chain%global_idx
          child_chain => child_chain%next_sibling_chain
       end do
    end if
 
    ! Link segment starts after the last used position
-   cache_arrays%assigntree(chain_idx)%link_offset = link_idx
+   cache_arrays%assignment_tree(chain_idx)%link_offset = link_idx
 
    link => chain%first_link
    do while (associated(link))
@@ -620,15 +620,15 @@ subroutine print_chain_details_array(cache_arrays)
 
    do i = 1, cache_arrays%total_chains
       write(stderr, '(A,I0,A,I0,A,I0,A)') 'Chain ', i, ': ', &
-         cache_arrays%assigntree(i)%n_links, ' links, ', &
-         cache_arrays%assigntree(i)%n_children, ' children'
+         cache_arrays%assignment_tree(i)%n_links, ' links, ', &
+         cache_arrays%assignment_tree(i)%n_children, ' children'
 
-      if (cache_arrays%assigntree(i)%split_part_idx > 0) then
-         write(stderr, '(A,I0)') '  Split part: ', cache_arrays%assigntree(i)%split_part_idx
+      if (cache_arrays%assignment_tree(i)%split_part_idx > 0) then
+         write(stderr, '(A,I0)') '  Split part: ', cache_arrays%assignment_tree(i)%split_part_idx
       end if
 
-      do j = 1, cache_arrays%assigntree(i)%n_links
-         link_idx = cache_arrays%assigntree(i)%link_offset + j
+      do j = 1, cache_arrays%assignment_tree(i)%n_links
+         link_idx = cache_arrays%assignment_tree(i)%link_offset + j
          write(stderr, '(A,I0,A,I0,A)', advance='no') '  Link ', link_idx, &
             ' (', cache_arrays%chain(link_idx)%n_parts, ' parts): '
 
@@ -749,11 +749,11 @@ recursive subroutine print_chain_recursive_array(atomtypes, cache_arrays, chain_
 
    if (chain_idx == 0) return
 
-   do i = 1, cache_arrays%assigntree(chain_idx)%n_children
-      child_idx = cache_arrays%assigntree(chain_idx)%child_indices(i)
+   do i = 1, cache_arrays%assignment_tree(chain_idx)%n_children
+      child_idx = cache_arrays%assignment_tree(chain_idx)%child_indices(i)
 
       ! Tree drawing prefix
-      is_last_child(depth + 1) = (i == cache_arrays%assigntree(chain_idx)%n_children)
+      is_last_child(depth + 1) = (i == cache_arrays%assignment_tree(chain_idx)%n_children)
       do j = 1, depth
          if (is_last_child(j)) then
             write(stdout, '(A)', advance='no') "   "
@@ -769,7 +769,7 @@ recursive subroutine print_chain_recursive_array(atomtypes, cache_arrays, chain_
       end if
 
       ! Element and size of the split part
-      split_part_idx = cache_arrays%assigntree(child_idx)%split_part_idx
+      split_part_idx = cache_arrays%assignment_tree(child_idx)%split_part_idx
       first_atom_idx = cache_arrays%atomidcs1(cache_arrays%partree(split_part_idx)%items1_offset+1)
       write(stdout, '(A,"*",I0)') &
          trim(atomic_symbols(atomtypes%parts(atomtypes%itemdir1(first_atom_idx))%elnum)), &

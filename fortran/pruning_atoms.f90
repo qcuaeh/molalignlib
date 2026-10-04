@@ -25,7 +25,7 @@ use flags
 implicit none
 
 ! Pruning tolerance (Angstrom)
-real(rk) :: prunetol
+real(rk) :: prune_tol
 ! Expected value factor = 2*sqrt(3)
 real(rk), parameter :: EVALFAC = 3.4641
 ! Selected pruning method (prune_none or prune_rd)
@@ -71,7 +71,7 @@ end subroutine
 subroutine prune_rd( atomtypes, coords1, coords2, prunes)
 ! Prune the pairs whose atoms have incompatible environments: atoms i and j
 ! are not paired if, for some atom type, their sorted distances to the
-! atoms of that type differ by more than EVALFAC*prunetol. The test is
+! atoms of that type differ by more than EVALFAC*prune_tol. The test is
 ! orientation independent, so it holds for all trials.
    type(partition_t), intent(in) :: atomtypes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
@@ -124,7 +124,7 @@ subroutine prune_rd( atomtypes, coords1, coords2, prunes)
          do j = 1, n_items2
             jatom = atomtypes%parts(h)%items2(j)
             do k = 1, atomtypes%n_parts
-               if (any(abs(dists2(jatom)%u(k)%u - dists1(iatom)%u(k)%u) > EVALFAC*prunetol)) then
+               if (any(abs(dists2(jatom)%u(k)%u - dists1(iatom)%u(k)%u) > EVALFAC*prune_tol)) then
                   prunes(h)%a(j, i) = .TRUE.
                   exit
                end if

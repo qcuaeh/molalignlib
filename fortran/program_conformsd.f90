@@ -22,6 +22,7 @@ use parameters
 use str_utils
 use chemdata
 use molecule
+use adjacency
 use euclidean
 use permutation
 use assorting
@@ -35,7 +36,7 @@ use arg_parsing
 use flags
 implicit none
 
-logical(lk) :: print_assignment
+logical(lk) :: printmapping_flag
 logical(lk) :: write_aligned
 character(:), allocatable :: title1, title2
 character(:), allocatable :: arg, aligned_path
@@ -55,7 +56,8 @@ real(rk), dimension(:,:), allocatable :: full_coords1, full_coords2, full_coords
 integer(ik), dimension(:), allocatable :: atomset1, atomset2
 integer(ik), dimension(:), allocatable :: bondtypes
 integer(ik), dimension(:), allocatable :: mapping1, full_atomperm1
-integer(ik) :: n_records, max_trials, max_freq
+integer(ik) :: max_records, max_trials, confo_freq, max_fragments
+integer(ik) :: n_frags1, n_frags2
 integer(ik) :: in_unit, aligned_unit
 integer(ik) :: error_code
 integer(ik) :: n_atoms1, n_atoms2, n_padding
@@ -67,19 +69,20 @@ heavy_flag = .FALSE.
 mirror_flag = .FALSE.
 align_flag = .FALSE.
 remap_flag = .FALSE.
-mass_flag = .FALSE.
-bondtol_flag = .FALSE.
-bondtype_flag = .FALSE.
-atomlabel_flag = .FALSE.
+massweight_flag = .FALSE.
+bonding_flag = .FALSE.
+usebondtype_flag = .FALSE.
+useatomtype_flag = .FALSE.
 random_flag = .FALSE.
-print_stats = .FALSE.
-print_assigntree = .FALSE.
-print_assignment = .FALSE.
+printstats_flag = .FALSE.
+printassigntree_flag = .FALSE.
+printmapping_flag = .FALSE.
 write_aligned = .FALSE.
 
-n_records = 1
-max_freq = 100
+max_records = 1
+confo_freq = CONFO_FREQ_DEFAULT
 max_trials = MAX_TRIALS_DEFAULT
+max_fragments = MAX_FRAGS_DEFAULT
 
 ! Read command line options
 
@@ -92,33 +95,35 @@ do while (get_arg(arg))
    case ('-remap')
       remap_flag = .TRUE.
    case ('-bondtol')
-      bondtol_flag = .TRUE.
-      call read_optarg(arg, bondtol)
+      bonding_flag = .TRUE.
+      call read_optarg(arg, bond_tol)
    case ('-bondtype')
-      bondtype_flag = .TRUE.
-   case ('-atomlabel')
-      atomlabel_flag = .TRUE.
+      usebondtype_flag = .TRUE.
+   case ('-atomtype')
+      useatomtype_flag = .TRUE.
    case ('-heavy')
       heavy_flag = .TRUE.
-   case ('-mass')
-      mass_flag = .TRUE.
+   case ('-massweight')
+      massweight_flag = .TRUE.
    case ('-mirror')
       mirror_flag = .TRUE.
-   case ('-maxfreq')
-      call read_optarg( arg, max_freq)
+   case ('-confofreq')
+      call read_optarg( arg, confo_freq, 1_ik)
    case ('-maxtrials')
-      call read_optarg( arg, max_trials)
-   case ('-records')
-      call read_optarg( arg, n_records)
+      call read_optarg( arg, max_trials, 1_ik)
+   case ('-maxfrags')
+      call read_optarg( arg, max_fragments, 1_ik)
+   case ('-maxrecs')
+      call read_optarg( arg, max_records, 1_ik)
    case ('-aligned')
       write_aligned = .TRUE.
       call read_optarg( arg, aligned_path)
-   case ('-assignment')
-      print_assignment = .TRUE.
+   case ('-mapping')
+      printmapping_flag = .TRUE.
    case ('-assigntree')
-      print_assigntree = .TRUE.
+      printassigntree_flag = .TRUE.
    case ('-stats')
-      print_stats = .TRUE.
+      printstats_flag = .TRUE.
    case ('-random')
       random_flag = .TRUE.
    case default
@@ -144,8 +149,10 @@ end select
 
 ! Bond types are compared, not interpreted, so they must come from the
 ! same parser: both files must have the same format
-if (bondtype_flag .and. in_format1 /= in_format2) then
-   stop 'Bond types can only be compared between files of the same format'
+if (usebondtype_flag .and. .not. bonding_flag) then
+   if (in_format1 /= in_format2) then
+      stop 'Bond types can only be compared between files of the same format'
+   end if
 end if
 
 ! Pad the smaller molecule with dummy atoms appended at the end. Real atoms
@@ -179,37 +186,41 @@ if (any(atomtypes%parts%n_items1 /= atomtypes%parts%n_items2)) then
 end if
 
 ! With -bondtol, perceive bonds from geometry instead of the files
-if (bondtol_flag) then
+if (bonding_flag) then
    call bonds_from_atoms( atoms1(1:n_atoms1), bonds1)
    call bonds_from_atoms( atoms2(1:n_atoms2), bonds2)
-end if
-
-! Abort if either molecule has no bonds
-if (size(bonds1) < 1 .or. size(bonds2) < 1) then
-   if (size(bonds1) < 1 .and. size(bonds2) < 1) then
-      stop 'Molecules have no bonds!'
-   else if (size(bonds1) < 1) then
-      stop 'First molecule has no bonds!'
-   else if (size(bonds2) < 1) then
-      stop 'Second molecule has no bonds!'
-   end if
 end if
 
 ! Set adjacency lists of the included atoms (bonds to excluded atoms are
 ! dropped). With -bondtype, the edges used by the refinement carry the bond
 ! types, compacted jointly for both molecules.
-if (bondtype_flag) then
+if (usebondtype_flag) then
    bondtypes = distinct_bondtypes( bonds1, bonds2)
-   call adjacency_from_bonds( atoms1(atomset1), extract_bonds( atomset1, n_padding, bonds1), adjcs1, bondtypes)
-   call adjacency_from_bonds( atoms2(atomset2), extract_bonds( atomset2, n_padding, bonds2), adjcs2, bondtypes)
 else
-   call adjacency_from_bonds( atoms1(atomset1), extract_bonds( atomset1, n_padding, bonds1), adjcs1)
-   call adjacency_from_bonds( atoms2(atomset2), extract_bonds( atomset2, n_padding, bonds2), adjcs2)
+   ! No bond types: every bond is GENERIC_BOND
+   allocate (bondtypes(0))
+end if
+call adjacency_from_bonds( atoms1(atomset1), extract_bonds( atomset1, n_padding, bonds1), adjcs1, bondtypes)
+call adjacency_from_bonds( atoms2(atomset2), extract_bonds( atomset2, n_padding, bonds2), adjcs2, bondtypes)
+
+! Abort if either molecule has more fragments than allowed (counted on the
+! bond graph of the included atoms, which is what the search uses)
+n_frags1 = count_fragments( adjcs1)
+n_frags2 = count_fragments( adjcs2)
+if (n_frags1 > max_fragments) then
+   write (stderr, '(A,1X,I0,1X,A,1X,I0,A)') 'First molecule has', n_frags1, &
+         'fragments, more than the maximum of', max_fragments, ' (see -maxfrags)'
+   stop
+end if
+if (n_frags2 > max_fragments) then
+   write (stderr, '(A,1X,I0,1X,A,1X,I0,A)') 'Second molecule has', n_frags2, &
+         'fragments, more than the maximum of', max_fragments, ' (see -maxfrags)'
+   stop
 end if
 
 ! Weights of the included atoms, normalised to sum 1 over them so both
 ! molecules are scaled by the same factor
-if (mass_flag) then
+if (massweight_flag) then
    weights1 = atomic_masses(atoms1(atomset1)%elnum)
    weights2 = atomic_masses(atoms2(atomset2)%elnum)
 else
@@ -266,14 +277,14 @@ if (remap_flag) then
 
    if (align_flag) then
 
-      call allocate_registry( registry, n_records)
+      call allocate_registry( registry, max_records)
       call optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
-            coords1w, coords2w, max_freq, max_trials, registry, error_code)
+            coords1w, coords2w, confo_freq, max_trials, registry, error_code)
       if (error_code /= 0) stop 'These molecules are not conformers'
 
-      if (print_stats) call print_records( registry)
+      if (printstats_flag) call print_records( registry)
 
-      do i = 1, registry%occ_records
+      do i = 1, registry%n_records
          mapping1 = registry%records(i)%mapping1
          rotquat = least_rotquat( mapping1, coords1w, coords2w)
          full_coords2r = rotated_coords( full_coords2, rotquat, center1)
@@ -290,7 +301,7 @@ if (remap_flag) then
             call write_file( aligned_unit, out_format, title2, atoms2, bonds2, full_atomperm1)
          else
             write (stdout,'(A)',advance='no') str( rmsd)
-            if (print_assignment) then
+            if (printmapping_flag) then
                write (stdout,'(1X)',advance='no')
                call print_permutation(full_atomperm1)
             end if
@@ -311,7 +322,7 @@ if (remap_flag) then
             n_atoms1, n_atoms2, bonds1, bonds2, full_coords1, full_coords2r, full_atomperm1)
 
       write (stdout,'(A)',advance='no') str( rmsd)
-      if (print_assignment) then
+      if (printmapping_flag) then
          write (stdout,'(1X)',advance='no')
          call print_permutation(full_atomperm1)
       end if

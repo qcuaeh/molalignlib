@@ -324,8 +324,8 @@ subroutine assign_branch_atoms(cache_arrays, split_part_idx, child_branch_idx, &
    call assign_pair_to_children(cache_arrays, split_part_idx, first_link_idx, &
          chosen_item1_idx, chosen_item2_idx, atom_map)
 
-   n_links = cache_arrays%assigntree(child_branch_idx)%n_links
-   link_offset = cache_arrays%assigntree(child_branch_idx)%link_offset
+   n_links = cache_arrays%assignment_tree(child_branch_idx)%n_links
+   link_offset = cache_arrays%assignment_tree(child_branch_idx)%link_offset
 
    if (DEBUG_TESTS) then
       ! The searches only clear links link_offset+1..link_offset+n_links, so
@@ -361,9 +361,9 @@ subroutine collect_split_parts(cache_arrays, split_parts, n_split_parts)
 
    count = 0
    do i = 1, cache_arrays%total_chains
-      if (cache_arrays%assigntree(i)%split_part_idx > 0) then
-         if (cache_arrays%partree(cache_arrays%assigntree(i)%split_part_idx)%n_items1 > 1 .and. &
-             cache_arrays%partree(cache_arrays%assigntree(i)%split_part_idx)%n_items2 > 1) then
+      if (cache_arrays%assignment_tree(i)%split_part_idx > 0) then
+         if (cache_arrays%partree(cache_arrays%assignment_tree(i)%split_part_idx)%n_items1 > 1 .and. &
+             cache_arrays%partree(cache_arrays%assignment_tree(i)%split_part_idx)%n_items2 > 1) then
             count = count + 1
          end if
       end if
@@ -374,11 +374,11 @@ subroutine collect_split_parts(cache_arrays, split_parts, n_split_parts)
 
    count = 0
    do i = 1, cache_arrays%total_chains
-      if (cache_arrays%assigntree(i)%split_part_idx > 0) then
-         if (cache_arrays%partree(cache_arrays%assigntree(i)%split_part_idx)%n_items1 > 1 .and. &
-             cache_arrays%partree(cache_arrays%assigntree(i)%split_part_idx)%n_items2 > 1) then
+      if (cache_arrays%assignment_tree(i)%split_part_idx > 0) then
+         if (cache_arrays%partree(cache_arrays%assignment_tree(i)%split_part_idx)%n_items1 > 1 .and. &
+             cache_arrays%partree(cache_arrays%assignment_tree(i)%split_part_idx)%n_items2 > 1) then
             count = count + 1
-            split_parts(count) = cache_arrays%assigntree(i)%split_part_idx
+            split_parts(count) = cache_arrays%assignment_tree(i)%split_part_idx
          end if
       end if
    end do
@@ -403,16 +403,16 @@ recursive subroutine recur_assign_atoms_greedy(coords1, coords2, cache_arrays, &
    integer(ik) :: item1_idx, item2_idx
    integer(ik) :: items1_offset, items2_offset
 
-   if (cache_arrays%assigntree(branch_idx)%n_children == 0) then
+   if (cache_arrays%assignment_tree(branch_idx)%n_children == 0) then
       return
    end if
 
-   do i = 1, cache_arrays%assigntree(branch_idx)%n_children
-      child_branch_idx = cache_arrays%assigntree(branch_idx)%child_indices(i)
-      first_link_idx = cache_arrays%assigntree(child_branch_idx)%link_offset + 1
-      split_part_idx = cache_arrays%assigntree(child_branch_idx)%split_part_idx
-      branch_link_offset = cache_arrays%assigntree(child_branch_idx)%link_offset
-      branch_num_links = cache_arrays%assigntree(child_branch_idx)%n_links
+   do i = 1, cache_arrays%assignment_tree(branch_idx)%n_children
+      child_branch_idx = cache_arrays%assignment_tree(branch_idx)%child_indices(i)
+      first_link_idx = cache_arrays%assignment_tree(child_branch_idx)%link_offset + 1
+      split_part_idx = cache_arrays%assignment_tree(child_branch_idx)%split_part_idx
+      branch_link_offset = cache_arrays%assignment_tree(child_branch_idx)%link_offset
+      branch_num_links = cache_arrays%assignment_tree(child_branch_idx)%n_links
 
       n_items1 = cache_arrays%partree(split_part_idx)%n_items1
       n_items2 = cache_arrays%partree(split_part_idx)%n_items2
@@ -510,7 +510,7 @@ recursive subroutine recur_assign_atoms_global(coords1, coords2, cache_arrays, &
    ! Node that owns this split part
    child_branch_idx = 0
    do i = 1, cache_arrays%total_chains
-      if (cache_arrays%assigntree(i)%split_part_idx == split_part_idx) then
+      if (cache_arrays%assignment_tree(i)%split_part_idx == split_part_idx) then
          child_branch_idx = i
          exit
       end if
@@ -520,9 +520,9 @@ recursive subroutine recur_assign_atoms_global(coords1, coords2, cache_arrays, &
       error stop 'Could not find child branch for split part'
    end if
 
-   first_link_idx = cache_arrays%assigntree(child_branch_idx)%link_offset + 1
-   branch_link_offset = cache_arrays%assigntree(child_branch_idx)%link_offset
-   branch_num_links = cache_arrays%assigntree(child_branch_idx)%n_links
+   first_link_idx = cache_arrays%assignment_tree(child_branch_idx)%link_offset + 1
+   branch_link_offset = cache_arrays%assignment_tree(child_branch_idx)%link_offset
+   branch_num_links = cache_arrays%assignment_tree(child_branch_idx)%n_links
 
    n_items2 = cache_arrays%partree(split_part_idx)%n_items2
 
@@ -598,7 +598,7 @@ recursive subroutine recur_assign_atoms_local(coords1, coords2, cache_arrays, &
 
    n_atoms = cache_arrays%n_atoms1
 
-   if (cache_arrays%assigntree(branch_idx)%n_children == 0) then
+   if (cache_arrays%assignment_tree(branch_idx)%n_children == 0) then
       n_combinations = n_combinations + 1
       return
    end if
@@ -607,12 +607,12 @@ recursive subroutine recur_assign_atoms_local(coords1, coords2, cache_arrays, &
    call submap_init(best_branch_map, n_atoms)
    call submap_init(branch_map, n_atoms)
 
-   do i = 1, cache_arrays%assigntree(branch_idx)%n_children
-      child_branch_idx = cache_arrays%assigntree(branch_idx)%child_indices(i)
-      first_link_idx = cache_arrays%assigntree(child_branch_idx)%link_offset + 1
-      split_part_idx = cache_arrays%assigntree(child_branch_idx)%split_part_idx
-      branch_link_offset = cache_arrays%assigntree(child_branch_idx)%link_offset
-      branch_num_links = cache_arrays%assigntree(child_branch_idx)%n_links
+   do i = 1, cache_arrays%assignment_tree(branch_idx)%n_children
+      child_branch_idx = cache_arrays%assignment_tree(branch_idx)%child_indices(i)
+      first_link_idx = cache_arrays%assignment_tree(child_branch_idx)%link_offset + 1
+      split_part_idx = cache_arrays%assignment_tree(child_branch_idx)%split_part_idx
+      branch_link_offset = cache_arrays%assignment_tree(child_branch_idx)%link_offset
+      branch_num_links = cache_arrays%assignment_tree(child_branch_idx)%n_links
 
       n_items2 = cache_arrays%partree(split_part_idx)%n_items2
       min_branch_dist = huge(min_branch_dist)
@@ -694,9 +694,9 @@ function estimate_unassigned_lower_bound(coords1, coords2, cache_arrays, branch_
    
    lower_bound = 0.0_rk
    
-   do i = 1, cache_arrays%assigntree(branch_idx)%n_children
-      child_idx = cache_arrays%assigntree(branch_idx)%child_indices(i)
-      split_part_idx = cache_arrays%assigntree(child_idx)%split_part_idx
+   do i = 1, cache_arrays%assignment_tree(branch_idx)%n_children
+      child_idx = cache_arrays%assignment_tree(branch_idx)%child_indices(i)
+      split_part_idx = cache_arrays%assignment_tree(child_idx)%split_part_idx
       
       items1_offset = cache_arrays%partree(split_part_idx)%items1_offset
       n_items1 = cache_arrays%partree(split_part_idx)%n_items1
@@ -746,7 +746,7 @@ recursive subroutine recur_assign_atoms_local_pruned(coords1, coords2, cache_arr
 
    n_atoms = cache_arrays%n_atoms1
 
-   if (cache_arrays%assigntree(branch_idx)%n_children == 0) then
+   if (cache_arrays%assignment_tree(branch_idx)%n_children == 0) then
       n_combinations = n_combinations + 1
       success = .TRUE.
       return
@@ -765,18 +765,18 @@ recursive subroutine recur_assign_atoms_local_pruned(coords1, coords2, cache_arr
    call submap_init(best_branch_map, n_atoms)
    call submap_init(branch_map, n_atoms)
 
-   do i = 1, cache_arrays%assigntree(branch_idx)%n_children
+   do i = 1, cache_arrays%assignment_tree(branch_idx)%n_children
       ! Budget exhausted by the previous children
       if (remaining_budget < 0) then
          success = .FALSE.
          return
       end if
 
-      child_branch_idx = cache_arrays%assigntree(branch_idx)%child_indices(i)
-      first_link_idx = cache_arrays%assigntree(child_branch_idx)%link_offset + 1
-      split_part_idx = cache_arrays%assigntree(child_branch_idx)%split_part_idx
-      branch_link_offset = cache_arrays%assigntree(child_branch_idx)%link_offset
-      branch_num_links = cache_arrays%assigntree(child_branch_idx)%n_links
+      child_branch_idx = cache_arrays%assignment_tree(branch_idx)%child_indices(i)
+      first_link_idx = cache_arrays%assignment_tree(child_branch_idx)%link_offset + 1
+      split_part_idx = cache_arrays%assignment_tree(child_branch_idx)%split_part_idx
+      branch_link_offset = cache_arrays%assignment_tree(child_branch_idx)%link_offset
+      branch_num_links = cache_arrays%assignment_tree(child_branch_idx)%n_links
 
       n_items2 = cache_arrays%partree(split_part_idx)%n_items2
       min_branch_dist = huge(min_branch_dist)

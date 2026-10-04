@@ -27,9 +27,9 @@ Molecule
 RMSDResult
     Return value of both methods. Each method returns a list of
     RMSDResult objects, best (lowest RMSD) first. By default only the single
-    best solution is computed (a list of length 1); pass a larger n_records
+    best solution is computed (a list of length 1); pass a larger max_records
     to get several ranked candidate solutions at once. The returned list may
-    be shorter than n_records if the library did not find that many distinct
+    be shorter than max_records if the library did not find that many distinct
     solutions.
 """
 
@@ -337,11 +337,11 @@ class Molecule(object):
         bond_data : array of shape (b, 3), optional
             ``[[a1, a2, bond_type], ...]`` with 1-based atom indices.
             Defaults to no bonds. Required by conformsd_to unless
-            connectivity is inferred with ``bondtol``.
+            connectivity is inferred with ``bond_tol``.
 
         labels : sequence of int, optional
             Per-atom labels, which restrict matching to atoms with the same
-            label when ``use_atom_label=True``. Only used when building
+            label when ``use_atom_type=True``. Only used when building
             ``atom_data`` from ``symbols``; defaults to all zero
             (unlabelled).
 
@@ -473,9 +473,9 @@ class Molecule(object):
         if not isinstance(other, Molecule):
             raise TypeError("Expected Molecule, got {}".format(type(other).__name__))
 
-    def _check_bond_types(self, other, use_bond_type, bondtol_flag):
+    def _check_bond_types(self, other, use_bond_type, bonding_flag):
         """Bond types are only comparable within the same bond_source."""
-        if use_bond_type and not bondtol_flag and self._bond_source != other._bond_source:
+        if use_bond_type and not bonding_flag and self._bond_source != other._bond_source:
             raise ValueError(
                 "use_bond_type=True requires both molecules to have the same bond "
                 "source (got {!r} and {!r})".format(self._bond_source, other._bond_source)
@@ -489,23 +489,23 @@ class Molecule(object):
         align=False,
         remap=False,
         heavy_only=False,
-        mass_weighted=False,
+        mass_weight=False,
         mirror=False,
-        use_atom_label=False,
-        stats=False,
+        use_atom_type=False,
+        print_stats=False,
         random=False,
-        prunetol=None,
-        max_freq=10,
+        prune_tol=None,
+        ato_freq=10,
         max_trials=10000,
-        n_records=1,
+        max_records=1,
     ):
         """
         Compare as unstructured atom clusters (atormsd_calculate); bonds are
-        ignored. Returns up to n_records RMSDResult, best (lowest RMSD) first.
+        ignored. Returns up to max_records RMSDResult, best (lowest RMSD) first.
 
         Records beyond the first are only ever produced when both align=True
         and remap=True; otherwise the returned list always has length 1
-        regardless of n_records. The list may be shorter than n_records
+        regardless of max_records. The list may be shorter than max_records
         if the library did not find that many distinct solutions.
 
         With heavy_only=True the two molecules may differ in their number of
@@ -514,16 +514,19 @@ class Molecule(object):
         RMSDResult.mapping). Hydrogens are not part of the RMSD; they are
         paired afterwards by distance.
 
-        prunetol (Å) enables pruning: two atoms are never paired if their
+        prune_tol (Å) enables pruning: two atoms are never paired if their
         sorted distances to the atoms of some atom type differ by more than
-        2*sqrt(3)*prunetol. Defaults to None, which disables pruning.
+        2*sqrt(3)*prune_tol. Defaults to None, which disables pruning.
 
         The search over random orientations stops once the best solution
-        has been found max_freq times, or after max_trials orientations.
+        has been found ato_freq times, or after max_trials orientations
+        (ato_freq, max_trials and max_records must be >= 1).
         random=True seeds it from the clock (otherwise results are
-        reproducible), and stats=True prints its statistics.
+        reproducible), and print_stats=True prints its statistics.
         """
+
         self._check_other(other)
+        pruning_flag = prune_tol is not None
 
         rmsd_vals, maps, tfs = _molalign.atormsd_calculate(
             self._atom_data, self._coords,
@@ -531,16 +534,16 @@ class Molecule(object):
             align_flag=align,
             remap_flag=remap,
             heavy_flag=heavy_only,
-            mass_flag=mass_weighted,
+            massweight_flag=mass_weight,
             mirror_flag=mirror,
-            atomlabel_flag=use_atom_label,
-            print_stats=stats,
+            useatomtype_flag=use_atom_type,
+            printstats_flag=print_stats,
             random_flag=random,
-            prunetol_flag=prunetol is not None,
-            prunetol=prunetol,
-            max_freq=max_freq,
+            prune_tol=prune_tol,
+            pruning_flag=pruning_flag,
+            ato_freq=ato_freq,
             max_trials=max_trials,
-            n_records=n_records,
+            max_records=max_records,
         )
         return [
             RMSDResult(rmsd=rmsd_vals[i], mapping=maps[i], transform=tfs[i])
@@ -555,26 +558,27 @@ class Molecule(object):
         align=False,
         remap=False,
         heavy_only=False,
-        mass_weighted=False,
+        mass_weight=False,
         mirror=False,
-        use_atom_label=False,
-        bondtol=None,
+        use_atom_type=False,
+        bond_tol=None,
         use_bond_type=False,
-        stats=False,
-        assign_tree=False,
+        print_stats=False,
+        print_assignment_tree=False,
         random=False,
-        max_freq=100,
+        confo_freq=100,
         max_trials=10000,
-        n_records=1,
+        max_fragments=1,
+        max_records=1,
     ):
         """
         Compare as conformers (conformsd_calculate): atom assignments always
         respect the bond topology, so both molecules must have the same bond
-        graph. Returns up to n_records RMSDResult, best (lowest RMSD) first.
+        graph. Returns up to max_records RMSDResult, best (lowest RMSD) first.
 
         Records beyond the first are only ever produced when both align=True
         and remap=True; otherwise the returned list always has length 1
-        regardless of n_records. The list may be shorter than n_records
+        regardless of max_records. The list may be shorter than max_records
         if the library did not find that many distinct solutions.
 
         With heavy_only=True the two molecules may differ in their number of
@@ -584,52 +588,63 @@ class Molecule(object):
         they are paired afterwards, following their heavy neighbour where
         bonds are known and by distance otherwise.
 
-        bondtol (Å) enables bond detection: connectivity is inferred from
+        bond_tol (Å) enables bond detection: connectivity is inferred from
         geometry with this tolerance instead of using each molecule's bond
-        table. Defaults to None, which uses the bond tables (an error is
-        raised if one of them is empty).
+        table. Defaults to None, which uses the bond tables.
+
+        max_fragments (>= 1, default 1) is the maximum number of molecular
+        fragments (connected components of the bond graph of the compared
+        atoms, i.e. after heavy_only exclusions) allowed in each molecule;
+        a ValueError is raised if either molecule has more. An atom without
+        bonds is a fragment of its own, so with the default a molecule of
+        two or more atoms must have bonds connecting all of them.
 
         use_bond_type=True also uses the bond types to guide atom
         matching. Types are compared, never interpreted, so both molecules
         must have the same bond_source (e.g. both read from files of the
         same format); otherwise a ValueError is raised. It has no effect
-        when bondtol is given, since inferred bonds are untyped.
+        when bond_tol is given, since inferred bonds are untyped.
 
         With align=True, the search strategy is chosen from the assignment
         tree: random orientations when the total number of assignments
-        exceeds max_freq times the sum of partial combinations, exhaustive
+        exceeds confo_freq times the sum of partial combinations, exhaustive
         enumeration otherwise. The random search stops once the best
-        solution has been found more than max_freq times, or after
-        max_trials orientations. The default max_freq=100 is the value
+        solution has been found more than confo_freq times, or after
+        max_trials orientations. confo_freq, max_trials and max_records must
+        be >= 1. The default confo_freq=100 is the value
         validated on the CCD and BIRD benchmarks. random=True seeds the
         search from the clock (otherwise results are reproducible),
-        stats=True prints its statistics and assign_tree=True prints the
+        print_stats=True prints its statistics and print_assignment_tree=True prints the
         assignment tree and its combination counts.
         """
+
         self._check_other(other)
-        bondtol_flag = bondtol is not None
-        self._check_bond_types(other, use_bond_type, bondtol_flag)
+        bonding_flag = bond_tol is not None
+        self._check_bond_types(other, use_bond_type, bonding_flag)
+        bond_data1 = None if bonding_flag else self._bond_data
+        bond_data2 = None if bonding_flag else other._bond_data
 
         rmsd_vals, maps, tfs = _molalign.conformsd_calculate(
             self._atom_data, self._coords,
             other._atom_data, other._coords,
-            bond_data1=None if bondtol_flag else self._bond_data,
-            bond_data2=None if bondtol_flag else other._bond_data,
+            bond_data1=bond_data1,
+            bond_data2=bond_data2,
             align_flag=align,
             remap_flag=remap,
             heavy_flag=heavy_only,
-            mass_flag=mass_weighted,
+            massweight_flag=mass_weight,
             mirror_flag=mirror,
-            atomlabel_flag=use_atom_label,
-            bondtol_flag=bondtol_flag,
-            bondtol=bondtol,
-            bondtype_flag=use_bond_type,
-            print_stats=stats,
-            print_assigntree=assign_tree,
+            useatomtype_flag=use_atom_type,
+            usebondtype_flag=use_bond_type,
+            bond_tol=bond_tol,
+            bonding_flag=bonding_flag, 
+            printstats_flag=print_stats,
+            printassigntree_flag=print_assignment_tree,
             random_flag=random,
-            max_freq=max_freq,
+            confo_freq=confo_freq,
             max_trials=max_trials,
-            n_records=n_records,
+            max_fragments=max_fragments,
+            max_records=max_records,
         )
         return [
             RMSDResult(rmsd=rmsd_vals[i], mapping=maps[i], transform=tfs[i])

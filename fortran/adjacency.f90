@@ -34,14 +34,15 @@ public match_bonds_to_mol1
 public intersect_bonds
 public find_differing_bonds
 public edge_code
+public count_fragments
 
 ! Adjacency list of an atom
 type, public :: adjc_t
    integer(ik) :: cn
    integer(ik) :: list(MAX_COORDNUM)
-   ! Type of the bond to each neighbor in list (ANY_BOND when bond
+   ! Type of the bond to each neighbor in list (GENERIC_BOND when bond
    ! types are not used, a compacted bond type otherwise)
-   integer(ik) :: bondtype(MAX_COORDNUM) = ANY_BOND
+   integer(ik) :: bondtype(MAX_COORDNUM) = GENERIC_BOND
 end type
 
 ! Edit modes of edit_mismatched_bonds
@@ -352,5 +353,49 @@ subroutine adjmat_to_adjcs(adjmat, adjcs)
    end do
 end subroutine
 
+function count_fragments(adjcs) result(n_frags)
+! Number of molecular fragments: connected components of the bond graph
+! given by adjcs. An atom without bonds is a fragment of its own, so a
+! graph without bonds has as many fragments as atoms; an empty graph has
+! none. Iterative depth-first search, so deep graphs cannot overflow the
+! call stack.
+   type(adjc_t), dimension(:), intent(in) :: adjcs
+   integer(ik) :: n_frags
+   ! Local variables
+   logical(lk), dimension(:), allocatable :: visited
+   integer(ik), dimension(:), allocatable :: stack
+   integer(ik) :: n_atoms, n_stack, start, node, neighbor, j
+
+   n_atoms = size(adjcs)
+   allocate(visited(n_atoms))
+   allocate(stack(n_atoms))
+   visited = .false.
+   n_frags = 0
+
+   do start = 1, n_atoms
+      if (visited(start)) cycle
+
+      ! New fragment: mark every atom reachable from start. Atoms are
+      ! marked when pushed, so each is pushed at most once and the stack
+      ! never holds more than n_atoms entries.
+      n_frags = n_frags + 1
+      visited(start) = .true.
+      n_stack = 1
+      stack(1) = start
+
+      do while (n_stack > 0)
+         node = stack(n_stack)
+         n_stack = n_stack - 1
+         do j = 1, adjcs(node)%cn
+            neighbor = adjcs(node)%list(j)
+            if (.not. visited(neighbor)) then
+               visited(neighbor) = .true.
+               n_stack = n_stack + 1
+               stack(n_stack) = neighbor
+            end if
+         end do
+      end do
+   end do
+end function
 
 end module

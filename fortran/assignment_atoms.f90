@@ -122,7 +122,7 @@ subroutine solve_lap_pruned(n, s1, s2, x1, x2, pruned, submap1, dist, error_code
    ! result on such a matrix is undefined.
    do i = 1, n
       if (all(pruned(:, i)) .or. all(pruned(i, :))) then
-         error_code = MOLALIGN_ERROR_PRUNED_ASSIGNMENT_FAILED
+         error_code = MOLALIGN_ERROR_ASSIGNMENT_FAILED
          return
       end if
    end do
@@ -158,11 +158,11 @@ subroutine solve_lap_pruned(n, s1, s2, x1, x2, pruned, submap1, dist, error_code
    h = 0
    do i = 1, n
       if (submap1(i) < 1 .or. submap1(i) > n) then
-         error_code = MOLALIGN_ERROR_PRUNED_ASSIGNMENT_FAILED
+         error_code = MOLALIGN_ERROR_ASSIGNMENT_FAILED
          return
       end if
       if (col_used(submap1(i))) then
-         error_code = MOLALIGN_ERROR_PRUNED_ASSIGNMENT_FAILED
+         error_code = MOLALIGN_ERROR_ASSIGNMENT_FAILED
          return
       end if
       col_used(submap1(i)) = .true.
@@ -176,7 +176,7 @@ subroutine solve_lap_pruned(n, s1, s2, x1, x2, pruned, submap1, dist, error_code
       end do
       if (.not. found) then
          ! Assignment uses a pruned pair: pruning tolerance might be too tight
-         error_code = MOLALIGN_ERROR_PRUNED_ASSIGNMENT_FAILED
+         error_code = MOLALIGN_ERROR_ASSIGNMENT_FAILED
          return
       end if
    end do

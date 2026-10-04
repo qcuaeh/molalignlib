@@ -15,44 +15,42 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module error_codes
-! Error codes returned by atormsd_calculate and conformsd_calculate (their
-! error_code argument) and by the routines they call. This module is the canonical numbering; error_codes.h mirrors it by
+! Error codes returned by atormsd_calculate, conformsd_calculate and
+! isormsd_calculate (their error_code argument) and by the routines they
+! call. This module is the canonical numbering; molalign.h mirrors it by
 ! hand for C, so update it (and the Cython wrapper) when a value changes.
-! Each value has one meaning; the notes say which functions can return it.
 implicit none
 private
 
 public :: MOLALIGN_SUCCESS
 public :: MOLALIGN_ERROR_NOT_ISOMERS
 public :: MOLALIGN_ERROR_ATOM_TYPE_MISMATCH
-public :: MOLALIGN_ERROR_MISSING_BONDS
+public :: MOLALIGN_ERROR_TOO_MANY_FRAGMENTS
 public :: MOLALIGN_ERROR_BOND_MISMATCH
 public :: MOLALIGN_ERROR_NOT_CONFORMERS
-public :: MOLALIGN_ERROR_PRUNED_ASSIGNMENT_FAILED
+public :: MOLALIGN_ERROR_ASSIGNMENT_FAILED
 public :: MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER
+public :: MOLALIGN_ERROR_INVALID_BOUND
 
 enum, bind(c)
-   ! No error. Returned by: both.
-   enumerator :: MOLALIGN_SUCCESS                  = 0
-   ! Different atom counts or compositions. Returned by: both.
-   enumerator :: MOLALIGN_ERROR_NOT_ISOMERS        = 1
-   ! Atom types differ in input order. Returned by: both (remap_flag=false only).
-   enumerator :: MOLALIGN_ERROR_ATOM_TYPE_MISMATCH = 2
-   ! One or both molecules have no bonds. Returned by: conformsd.
-   enumerator :: MOLALIGN_ERROR_MISSING_BONDS      = 3
-   ! Bonds differ in input order. Returned by: conformsd (remap_flag=false only).
-   enumerator :: MOLALIGN_ERROR_BOND_MISMATCH      = 4
-   ! Same composition but non-isomorphic bond graphs. Returned by: conformsd
-   ! (remap_flag=true only).
-   ! conformer refinement, where it is handled and never returned.
-   enumerator :: MOLALIGN_ERROR_NOT_CONFORMERS     = 5
-   ! No valid assignment under the pruning constraints (pruning tolerance
-   ! might be too tight). Returned by: atormsd (remap_flag=true only).
-   enumerator :: MOLALIGN_ERROR_PRUNED_ASSIGNMENT_FAILED  = 6
-   ! An atomic number is outside the element tables in chemdata
-   ! (0:n_elems, where 0 is the dummy atom). Returned by: atormsd,
-   ! conformsd.
-   enumerator :: MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER     = 7
+   ! No error.
+   enumerator :: MOLALIGN_SUCCESS                        = 0
+   ! Different atom counts or compositions.
+   enumerator :: MOLALIGN_ERROR_NOT_ISOMERS              = 1
+   ! Atom types differ in input order.
+   enumerator :: MOLALIGN_ERROR_ATOM_TYPE_MISMATCH       = 2
+   ! More molecular fragments than max_fragments.
+   enumerator :: MOLALIGN_ERROR_TOO_MANY_FRAGMENTS       = 3
+   ! Bonds differ in input order.
+   enumerator :: MOLALIGN_ERROR_BOND_MISMATCH            = 4
+   ! Same composition but non-isomorphic bond graphs.
+   enumerator :: MOLALIGN_ERROR_NOT_CONFORMERS           = 5
+   ! No valid assignment under the pruning constraints.
+   enumerator :: MOLALIGN_ERROR_ASSIGNMENT_FAILED        = 6
+   ! Atomic number outside the element tables.
+   enumerator :: MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER    = 7
+   ! Count parameter less than 1.
+   enumerator :: MOLALIGN_ERROR_INVALID_BOUND            = 8
 end enum
 
 end module error_codes

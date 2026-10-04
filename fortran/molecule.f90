@@ -337,7 +337,7 @@ end subroutine
 
 subroutine bonds_from_atoms(atoms, bonds)
 ! Bonds perceived from geometry: two atoms are bonded when their distance is
-! below the sum of their covalent radii plus bondtol. All bonds get type 1.
+! below the sum of their covalent radii plus bond_tol. All bonds get type 1.
    type(atom_t), dimension(:), intent(in) :: atoms
    type(bond_t), dimension(:), allocatable, intent(out) :: bonds
    ! Local variables
@@ -355,7 +355,7 @@ subroutine bonds_from_atoms(atoms, bonds)
    do i = 1, n_atoms
       do j = i + 1, n_atoms
          atom_dist = sqrt(sum((atoms(i)%coords - atoms(j)%coords)**2))
-         is_bonded(i, j) = atom_dist < atom_radii(i) + atom_radii(j) + bondtol
+         is_bonded(i, j) = atom_dist < atom_radii(i) + atom_radii(j) + bond_tol
       end do
    end do
 
@@ -380,16 +380,16 @@ end subroutine
 subroutine adjacency_from_bonds(atoms, bonds, adjcs, bondtypes)
 ! Adjacency lists of all atoms in atoms. To restrict them to a set of
 ! atoms, pass the atoms of the set and the bonds from extract_bonds.
-! If bondtypes (see distinct_bondtypes) is present, each neighbor carries
-! the compacted type of its bond: the position of the bond's type in
-! bondtypes. Bond types are not interpreted, only compared, so both
-! molecules must come from the same source (file format and parser).
-! Without bondtypes all bonds are ANY_BOND and only connectivity is
-! compared.
+! Each neighbor carries the compacted type of its bond: the position of
+! the bond's type in bondtypes (see distinct_bondtypes). Bond types are not
+! interpreted, only compared, so both molecules must come from the same
+! source (file format and parser). Bonds whose type is not in bondtypes are
+! GENERIC_BOND, so passing an empty bondtypes ignores bond types and only
+! connectivity is compared.
    type(atom_t), dimension(:), intent(in) :: atoms
    type(bond_t), dimension(:), intent(in) :: bonds
    type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs
-   integer(ik), dimension(:), intent(in), optional :: bondtypes
+   integer(ik), dimension(:), intent(in) :: bondtypes
    ! Local variables
    integer(ik), dimension(:,:), allocatable :: adjmat
    integer(ik) :: n_atoms, atomidx1, atomidx2, bondtype, i, j
@@ -402,15 +402,13 @@ subroutine adjacency_from_bonds(atoms, bonds, adjcs, bondtypes)
    allocate (adjmat(n_atoms, n_atoms))
    adjmat = NO_BOND
    do i = 1, size(bonds)
-      bondtype = ANY_BOND
-      if (present(bondtypes)) then
-         do j = 1, size(bondtypes)
-            if (bondtypes(j) == bonds(i)%bondtype) then
-               bondtype = min(j, MAX_BOND_TYPE)
-               exit
-            end if
-         end do
-      end if
+      bondtype = GENERIC_BOND
+      do j = 1, size(bondtypes)
+         if (bondtypes(j) == bonds(i)%bondtype) then
+            bondtype = min(j, MAX_BOND_TYPE)
+            exit
+         end if
+      end do
       atomidx1 = bonds(i)%atomidx1
       atomidx2 = bonds(i)%atomidx2
       adjmat(atomidx1, atomidx2) = bondtype

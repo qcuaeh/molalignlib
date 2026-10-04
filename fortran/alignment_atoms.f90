@@ -32,17 +32,17 @@ implicit none
 contains
 
 subroutine optimize_mapping_atoms(atomtypes, prunes, coords1, &
-      coords2, max_freq, max_trials, registry, error_code)
+      coords2, ato_freq, max_trials, registry, error_code)
 ! Alignment of two atom clusters by random orientations followed by
 ! alternating assignment and superposition until the assignment is stable
 ! (J. Chem. Inf. Model. 2023, 63, 1157). The search stops when the best
-! local minimum has been found max_freq times or after max_trials trials.
+! local minimum has been found ato_freq times or after max_trials trials.
 ! coords1 and coords2 hold the included atoms only, in the numbering of
 ! atomtypes; the atom permutations stored in registry use that numbering.
    type(partition_t), intent(in) :: atomtypes
    type(bool_matrix), dimension(:), intent(in) :: prunes
    real(rk), dimension(:,:), intent(in) :: coords1, coords2
-   integer(ik), intent(in) :: max_freq, max_trials
+   integer(ik), intent(in) :: ato_freq, max_trials
    type(registry_t), intent(inout) :: registry
    integer(ik), intent(out) :: error_code
 
@@ -60,7 +60,7 @@ subroutine optimize_mapping_atoms(atomtypes, prunes, coords1, &
    call reset_registry( registry)
    call random_initialize()
 
-   do while (registry%records(1)%freq < max_freq .and. registry%n_trials < max_trials)
+   do while (registry%records(1)%freq < ato_freq .and. registry%n_trials < max_trials)
 
       ! Random orientation of molecule 2
       coords2r = coords2

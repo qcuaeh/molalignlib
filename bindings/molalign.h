@@ -8,6 +8,34 @@ extern "C" {
 #endif
 
 /**
+ * Error codes returned by atormsd_calculate and conformsd_calculate, and by
+ * the Fortran isormsd_calculate, through their error_code argument.
+ *
+ * Hand-maintained mirror of the Fortran error_codes module
+ * (error_codes.f90): keep the values of both in sync.
+ */
+enum molalign_error_code {
+    /* No error. */
+    MOLALIGN_SUCCESS                        = 0,
+    /* Different atom counts or compositions. */
+    MOLALIGN_ERROR_NOT_ISOMERS              = 1,
+    /* Atom types differ in input order. */
+    MOLALIGN_ERROR_ATOM_TYPE_MISMATCH       = 2,
+    /* More molecular fragments than max_fragments. */
+    MOLALIGN_ERROR_TOO_MANY_FRAGMENTS       = 3,
+    /* Bonds differ in input order. */
+    MOLALIGN_ERROR_BOND_MISMATCH            = 4,
+    /* Same composition but non-isomorphic bond graphs. */
+    MOLALIGN_ERROR_NOT_CONFORMERS           = 5,
+    /* No valid assignment under the pruning constraints. */
+    MOLALIGN_ERROR_ASSIGNMENT_FAILED = 6,
+    /* Atomic number outside the element tables. */
+    MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER    = 7,
+    /* Count parameter less than 1. */
+    MOLALIGN_ERROR_INVALID_BOUND        = 8
+};
+
+/**
  * Calculate the RMSD between two atom clusters (no bond topology), optionally
  * returning several ranked candidate solutions instead of just the best one.
  * With alignment and remapping, random orientations are each refined by
@@ -23,7 +51,7 @@ extern "C" {
  *                       atom "X", 104 = Lennard-Jones "LJ"); dummy atoms
  *                       are always excluded from the comparison.
  *                       label = 0 means unlabelled; labels only matter
- *                       with atomlabel_flag=true.
+ *                       with useatomtype_flag=true.
  * @param coords1       Coordinates, row-major [x0,y0,z0,...], length n_atoms1*3
  * @param n_atoms2      Number of atoms in molecule 2
  * @param atom_data2    Packed atom data, length n_atoms2*2 (same layout)
@@ -33,69 +61,71 @@ extern "C" {
  * @param remap_flag    Find the atom permutation that minimises the RMSD
  *                      (otherwise the input order is kept)
  * @param heavy_flag    Exclude hydrogen atoms from the RMSD
- * @param mass_flag     Weight atoms by their atomic masses
+ * @param massweight_flag     Weight atoms by their atomic masses
  * @param mirror_flag   Mirror second molecule (reflect it on the yz plane,
  *                      x -> -x) before comparing; transform_list includes
  *                      the reflection
- * @param atomlabel_flag Only match atoms with the same label
- * @param print_stats   Print optimisation statistics to stdout
+ * @param useatomtype_flag Only match atoms with the same label
+ * @param printstats_flag   Print optimisation statistics to stdout
  * @param random_flag   Seed the random number generator from the clock
  *                      (otherwise results are reproducible)
- * @param prunetol_flag Enable distance-based pruning of atom pairs
- * @param prunetol     Pruning tolerance (Angstrom): two atoms are never
+ * @param pruning_flag Enable distance-based pruning of atom pairs
+ * @param prune_tol     Pruning tolerance (Angstrom): two atoms are never
  *                      paired if their sorted distances to the atoms of some
- *                      atom type differ by more than 2*sqrt(3)*prunetol.
- *                      Required (no default) when prunetol_flag=true;
+ *                      atom type differ by more than 2*sqrt(3)*prune_tol.
+ *                      Required (no default) when pruning_flag=true;
  *                      unused otherwise.
- * @param max_freq     Stop the random search once the best solution has
- *                      been found this many times
- * @param max_trials    Maximum number of random orientations
+ * @param ato_freq     Stop the random search once the best solution has
+ *                      been found this many times (>=1)
+ * @param max_trials    Maximum number of random orientations (>=1)
  *
- * @param n_records     Maximum number of ranked candidate solutions to
+ * @param max_records     Maximum number of ranked candidate solutions to
  *                       return (>=1). Multiple records are only ever
  *                       produced when both align_flag and remap_flag are
  *                       true; otherwise exactly one record is written
- *                       regardless of this value (see occ_records).
+ *                       regardless of this value (see n_records).
  *
- * @param rmsd_list     [out] RMSD of each returned record, length n_records.
- *                            Only the first *occ_records entries are valid.
+ * @param rmsd_list     [out] RMSD of each returned record, length max_records.
+ *                            Only the first *n_records entries are valid.
  * @param mapping_list [out] Flattened, 0-based atom permutations, length
- *                            n_records*n_padding, n_padding = max(n_atoms1, n_atoms2).
+ *                            max_records*n_padding, n_padding = max(n_atoms1, n_atoms2).
  *                            Record i (0-based) occupies
  *                            mapping_list[i*n_padding .. i*n_padding + n_padding - 1].
  *                            Same padding convention as conformsd_calculate:
  *                            values >= n_atoms2 are dummy atoms of cluster 2.
  *                            Sizes can only differ when heavy_flag=true.
- *                            Caller allocates >= n_records*n_padding.
+ *                            Caller allocates >= max_records*n_padding.
  * @param transform_list [out] Flattened row-major 4x4 homogeneous transforms,
- *                            length n_records*16. Record i occupies
+ *                            length max_records*16. Record i occupies
  *                            transform_list[i*16 .. i*16 + 15]. Maps
  *                            the input molecule-2 coords to the molecule-1
  *                            frame: p_out = R*p_in + t. With mirror_flag=true,
  *                            R includes the reflection (det R = -1). With
  *                            align_flag=false, R is the identity, or just the
  *                            reflection when mirror_flag=true, and t = 0.
- *                            Caller allocates >= n_records*16.
- * @param occ_records   [out] Actual number of records written (<= n_records)
+ *                            Caller allocates >= max_records*16.
+ * @param n_records   [out] Actual number of records written (<= max_records)
  * @param error_code    [out] A value from enum molalign_error_code
- *                            (error_codes.h): MOLALIGN_SUCCESS,
+ *                            (above): MOLALIGN_SUCCESS,
+ *                            MOLALIGN_ERROR_INVALID_BOUND (ato_freq,
+ *                            max_trials or max_records less than 1),
  *                            MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER,
  *                            MOLALIGN_ERROR_NOT_ISOMERS,
  *                            MOLALIGN_ERROR_ATOM_TYPE_MISMATCH (only when
  *                            remap_flag=false), or
- *                            MOLALIGN_ERROR_PRUNED_ASSIGNMENT_FAILED (only when
+ *                            MOLALIGN_ERROR_ASSIGNMENT_FAILED (only when
  *                            remap_flag=true).
  */
 void atormsd_calculate(
     int n_atoms1, const int *atom_data1, const double *coords1,
     int n_atoms2, const int *atom_data2, const double *coords2,
-    bool align_flag, bool remap_flag, bool heavy_flag, bool mass_flag,
-    bool mirror_flag, bool atomlabel_flag,
-    bool print_stats, bool random_flag,
-    bool prunetol_flag, double prunetol, int max_freq, int max_trials,
-    int n_records,
+    bool align_flag, bool remap_flag, bool heavy_flag, bool massweight_flag,
+    bool mirror_flag, bool useatomtype_flag,
+    bool printstats_flag, bool random_flag,
+    bool pruning_flag, double prune_tol, int ato_freq, int max_trials,
+    int max_records,
     double *rmsd_list, int *mapping_list,
-    double *transform_list, int *occ_records, int *error_code);
+    double *transform_list, int *n_records, int *error_code);
 
 /**
  * Calculate the symmetry-corrected RMSD between two molecular conformers,
@@ -116,34 +146,34 @@ void atormsd_calculate(
  *                       atom "X", 104 = Lennard-Jones "LJ"); dummy atoms
  *                       are always excluded from the comparison.
  *                       label = 0 means unlabelled; labels only matter
- *                       with atomlabel_flag=true.
+ *                       with useatomtype_flag=true.
  * @param coords1       Coordinates, row-major [x0,y0,z0,...], length n_atoms1*3
- * @param n_bonds1      Number of bonds in molecule 1 (may be 0 when bondtol_flag=true)
+ * @param n_bonds1      Number of bonds in molecule 1 (may be 0 when bonding_flag=true)
  * @param bond_data1    Flat bond array [a1,a2,type,...], 1-based, length n_bonds1*3.
  *                      type is any integer bond-type code; it is only used
- *                      when bondtype_flag=true, and then only compared for
+ *                      when usebondtype_flag=true, and then only compared for
  *                      equality, never interpreted.
  * @param n_atoms2      Number of atoms in molecule 2
  * @param atom_data2    Packed atom data, length n_atoms2*2 (same layout)
  * @param coords2       Coordinates, row-major [x0,y0,z0,...], length n_atoms2*3
- * @param n_bonds2      Number of bonds in molecule 2 (may be 0 when bondtol_flag=true)
+ * @param n_bonds2      Number of bonds in molecule 2 (may be 0 when bonding_flag=true)
  * @param bond_data2    Flat bond array [a1,a2,type,...], 1-based, length n_bonds2*3
  *
  * @param align_flag    Optimally rotate and translate molecule 2 onto molecule 1
  * @param remap_flag    Find the atom permutation that minimises the RMSD
  *                      (otherwise the input order is kept)
  * @param heavy_flag    Exclude hydrogen atoms from the RMSD
- * @param mass_flag     Weight atoms by their atomic masses
+ * @param massweight_flag     Weight atoms by their atomic masses
  * @param mirror_flag   Mirror second molecule (reflect it on the yz plane,
  *                      x -> -x) before comparing; transform_list includes
  *                      the reflection
- * @param atomlabel_flag Only match atoms with the same label
- * @param bondtol_flag  Derive connectivity from geometry, not bond table
- * @param bondtol      Bond detection tolerance (Angstrom): atoms are bonded
+ * @param useatomtype_flag Only match atoms with the same label
+ * @param bonding_flag  Derive connectivity from geometry, not bond table
+ * @param bond_tol      Bond detection tolerance (Angstrom): atoms are bonded
  *                      when closer than the sum of their covalent radii plus
- *                      bondtol. Required (no default) when bondtol_flag=true;
+ *                      bond_tol. Required (no default) when bonding_flag=true;
  *                      unused otherwise.
- * @param bondtype_flag Use bond types to guide atom matching: bonds of
+ * @param usebondtype_flag Use bond types to guide atom matching: bonds of
  *                      different type are distinguished in the HNA
  *                      partition. Types are compared, not interpreted, so
  *                      both molecules must use the same bond-type
@@ -152,30 +182,37 @@ void atormsd_calculate(
  *                      of the same molecule yield
  *                      MOLALIGN_ERROR_NOT_CONFORMERS, or
  *                      MOLALIGN_ERROR_BOND_MISMATCH when remap_flag=false.
- *                      Ignored when bondtol_flag=true.
- * @param print_stats   Print optimisation statistics to stdout
- * @param print_assigntree Print the assignment tree and its combination
+ *                      Ignored when bonding_flag=true.
+ * @param printstats_flag   Print optimisation statistics to stdout
+ * @param printassigntree_flag Print the assignment tree and its combination
  *                      counts to stdout
  * @param random_flag   Seed the random number generator from the clock
  *                      (otherwise results are reproducible)
- * @param max_freq     Stop the random orientation search once the best
+ * @param confo_freq     Stop the random orientation search once the best
  *                      solution has been found more than this many times;
  *                      also the threshold on the ratio of total to partial
  *                      assignment combinations above which that search is
  *                      used instead of exhaustive enumeration. 100 is the
  *                      value validated on the CCD and BIRD benchmarks.
- * @param max_trials    Maximum number of random orientations
+ *                      Must be >=1.
+ * @param max_trials    Maximum number of random orientations (>=1)
+ * @param max_fragments     Maximum number of molecular fragments (connected
+ *                      components of the bond graph of the compared atoms,
+ *                      i.e. after heavy_flag exclusions) allowed in each
+ *                      molecule (>=1; 1 is the usual choice). An atom
+ *                      without bonds is a fragment of its own. Exceeding it
+ *                      yields MOLALIGN_ERROR_TOO_MANY_FRAGMENTS.
  *
- * @param n_records     Maximum number of ranked candidate solutions to
+ * @param max_records     Maximum number of ranked candidate solutions to
  *                       return (>=1). Multiple records are only ever
  *                       produced when both align_flag and remap_flag are
  *                       true; otherwise exactly one record is written
- *                       regardless of this value (see occ_records).
+ *                       regardless of this value (see n_records).
  *
- * @param rmsd_list     [out] RMSD of each returned record, length n_records.
- *                            Only the first *occ_records entries are valid.
+ * @param rmsd_list     [out] RMSD of each returned record, length max_records.
+ *                            Only the first *n_records entries are valid.
  * @param mapping_list [out] Flattened, 0-based atom permutations, length
- *                            n_records*n_padding, where
+ *                            max_records*n_padding, where
  *                            n_padding = max(n_atoms1, n_atoms2). Record i (0-based)
  *                            occupies mapping_list[i*n_padding .. i*n_padding + n_padding - 1]
  *                            and is a permutation of 0..n_padding-1: entry j is
@@ -187,22 +224,25 @@ void atormsd_calculate(
  *                            extra atoms of molecule 2. The sizes can only
  *                            differ when heavy_flag=true; otherwise
  *                            n_padding == n_atoms1.
- *                            Caller allocates >= n_records*n_padding.
+ *                            Caller allocates >= max_records*n_padding.
  * @param transform_list [out] Flattened row-major 4x4 homogeneous transforms,
- *                            length n_records*16. Record i occupies
+ *                            length max_records*16. Record i occupies
  *                            transform_list[i*16 .. i*16 + 15]. Maps
  *                            the input molecule-2 coords to the molecule-1
  *                            frame: p_out = R*p_in + t. With mirror_flag=true,
  *                            R includes the reflection (det R = -1). With
  *                            align_flag=false, R is the identity, or just the
  *                            reflection when mirror_flag=true, and t = 0.
- *                            Caller allocates >= n_records*16.
- * @param occ_records   [out] Actual number of records written (<= n_records)
+ *                            Caller allocates >= max_records*16.
+ * @param n_records   [out] Actual number of records written (<= max_records)
  * @param error_code    [out] A value from enum molalign_error_code
- *                            (error_codes.h): MOLALIGN_SUCCESS,
+ *                            (above): MOLALIGN_SUCCESS,
+ *                            MOLALIGN_ERROR_INVALID_BOUND (confo_freq,
+ *                            max_trials, max_fragments or max_records less
+ *                            than 1),
  *                            MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER,
  *                            MOLALIGN_ERROR_NOT_ISOMERS,
- *                            MOLALIGN_ERROR_MISSING_BONDS,
+ *                            MOLALIGN_ERROR_TOO_MANY_FRAGMENTS,
  *                            MOLALIGN_ERROR_ATOM_TYPE_MISMATCH or
  *                            MOLALIGN_ERROR_BOND_MISMATCH (both only when
  *                            remap_flag=false), or
@@ -214,14 +254,14 @@ void conformsd_calculate(
     int n_bonds1, const int *bond_data1,
     int n_atoms2, const int *atom_data2, const double *coords2,
     int n_bonds2, const int *bond_data2,
-    bool align_flag, bool remap_flag, bool heavy_flag, bool mass_flag,
-    bool mirror_flag, bool atomlabel_flag, bool bondtol_flag, double bondtol,
-    bool bondtype_flag,
-    bool print_stats, bool print_assigntree, bool random_flag,
-    int max_freq, int max_trials,
-    int n_records,
+    bool align_flag, bool remap_flag, bool heavy_flag, bool massweight_flag,
+    bool mirror_flag, bool useatomtype_flag, bool bonding_flag, double bond_tol,
+    bool usebondtype_flag,
+    bool printstats_flag, bool printassigntree_flag, bool random_flag,
+    int confo_freq, int max_trials, int max_fragments,
+    int max_records,
     double *rmsd_list, int *mapping_list,
-    double *transform_list, int *occ_records, int *error_code);
+    double *transform_list, int *n_records, int *error_code);
 
 #ifdef __cplusplus
 }

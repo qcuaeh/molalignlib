@@ -132,7 +132,7 @@ subroutine read_file_xyz(unit, title, atoms, bonds)
       call parse_label(label, elnum, group)
       atoms(i)%elnum = elnum
       atoms(i)%coords = coords
-      if (atomlabel_flag) then
+      if (useatomtype_flag) then
          atoms(i)%group = group
       end if
    end do
@@ -261,7 +261,7 @@ subroutine read_v2000_format(unit, counts_line, atoms, bonds)
       call parse_label(label, elnum, group)
       atoms(i)%elnum = elnum
       atoms(i)%coords = coords
-      if (atomlabel_flag) then
+      if (useatomtype_flag) then
          atoms(i)%group = group
       end if
    end do
@@ -358,7 +358,7 @@ subroutine read_v3000_format(unit, counts_line, atoms, bonds)
       call parse_label(label, elnum, group)
       atoms(i)%elnum = elnum
       atoms(i)%coords = coords
-      if (atomlabel_flag) then
+      if (useatomtype_flag) then
          atoms(i)%group = group
       end if
    end do
@@ -483,7 +483,7 @@ subroutine read_file_mol2(unit, title, atoms, bonds)
       call parse_label(label, elnum, group)
       atoms(i)%elnum = elnum
       atoms(i)%coords = coords
-      if (atomlabel_flag) then
+      if (useatomtype_flag) then
          atoms(i)%group = group
       end if
    end do

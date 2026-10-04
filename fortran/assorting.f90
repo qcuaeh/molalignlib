@@ -16,7 +16,7 @@
 
 module assorting
 ! Initial partition of the atoms of both molecules by atom type (element,
-! and label group with atomlabel_flag); the starting point of the HNA
+! and label group with useatomtype_flag); the starting point of the HNA
 ! refinement
 use parameters
 use common_types
@@ -116,7 +116,7 @@ subroutine collect_atomtypes(atoms1, atoms2, atomtypes)
    integer(ik) :: current_part, max_parts
    integer(ik) :: atomidx, partidx, i
 
-   if (atomlabel_flag) then
+   if (useatomtype_flag) then
       compare_atoms => compare_atoms_labeled
    else
       compare_atoms => compare_atoms_simple

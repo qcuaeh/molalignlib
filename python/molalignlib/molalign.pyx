@@ -3,7 +3,8 @@
 Cython wrappers of the C functions atormsd_calculate and conformsd_calculate
 (molalign.h). The C functions are imported as c_atormsd_calculate and
 c_conformsd_calculate so that the Python wrappers can keep their names;
-validation, buffer allocation and result packing are shared helpers.
+validation, buffer allocation, error handling and result packing are shared
+helpers.
 """
 
 import numpy as np
@@ -12,62 +13,61 @@ from libc.stdlib cimport malloc, free
 
 np.import_array()
 
-cdef extern from "error_codes.h":
-    # Error codes of the error_code argument, taken from error_codes.h so
+cdef extern from "molalign.h":
+    # Error codes of the error_code argument, taken from molalign.h so
     # their values are not repeated here
     enum: MOLALIGN_SUCCESS
     enum: MOLALIGN_ERROR_NOT_ISOMERS
     enum: MOLALIGN_ERROR_ATOM_TYPE_MISMATCH
-    enum: MOLALIGN_ERROR_MISSING_BONDS
+    enum: MOLALIGN_ERROR_TOO_MANY_FRAGMENTS
     enum: MOLALIGN_ERROR_BOND_MISMATCH
     enum: MOLALIGN_ERROR_NOT_CONFORMERS
-    enum: MOLALIGN_ERROR_PRUNED_ASSIGNMENT_FAILED
+    enum: MOLALIGN_ERROR_ASSIGNMENT_FAILED
     enum: MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER
+    enum: MOLALIGN_ERROR_INVALID_BOUND
 
-cdef extern from "molalign.h":
     void c_atormsd_calculate "atormsd_calculate"(
         int n_atoms1, const int *atom_data1, const double *coords1,
         int n_atoms2, const int *atom_data2, const double *coords2,
-        bint align_flag, bint remap_flag, bint heavy_flag, bint mass_flag,
-        bint mirror_flag, bint atomlabel_flag,
-        bint print_stats, bint random_flag,
-        bint prunetol_flag, double prunetol, int max_freq, int max_trials,
-        int n_records,
+        bint align_flag, bint remap_flag, bint heavy_flag, bint massweight_flag,
+        bint mirror_flag, bint useatomtype_flag,
+        bint printstats_flag, bint random_flag,
+        bint pruning_flag, double prune_tol, int ato_freq, int max_trials,
+        int max_records,
         double *rmsd_list, int *mapping_list,
-        double *transform_list, int *occ_records, int *error_code)
+        double *transform_list, int *n_records, int *error_code)
 
     void c_conformsd_calculate "conformsd_calculate"(
         int n_atoms1, const int *atom_data1, const double *coords1,
         int n_bonds1, const int *bond_data1,
         int n_atoms2, const int *atom_data2, const double *coords2,
         int n_bonds2, const int *bond_data2,
-        bint align_flag, bint remap_flag, bint heavy_flag, bint mass_flag,
-        bint mirror_flag, bint atomlabel_flag, bint bondtol_flag, double bondtol,
-        bint bondtype_flag,
-        bint print_stats, bint print_assigntree, bint random_flag,
-        int max_freq, int max_trials,
-        int n_records,
+        bint align_flag, bint remap_flag, bint heavy_flag, bint massweight_flag,
+        bint mirror_flag, bint useatomtype_flag, bint bonding_flag, double bond_tol,
+        bint usebondtype_flag,
+        bint printstats_flag, bint printassigntree_flag, bint random_flag,
+        int confo_freq, int max_trials, int max_fragments,
+        int max_records,
         double *rmsd_list, int *mapping_list,
-        double *transform_list, int *occ_records, int *error_code)
+        double *transform_list, int *n_records, int *error_code)
 
 
-_ATORMSD_ERROR_MESSAGES = {
-    MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER: "Atomic number out of range (valid: 0 to 104, where 0 is the dummy atom 'X').",
-    MOLALIGN_ERROR_NOT_ISOMERS: "Clusters are not isomers.",
-    MOLALIGN_ERROR_ATOM_TYPE_MISMATCH: "Atom types mismatch between the two clusters.",
-    MOLALIGN_ERROR_PRUNED_ASSIGNMENT_FAILED: "Assignment failed (pruning tolerance might be too tight).",
-}
-
-_CONFORMSD_ERROR_MESSAGES = {
+# Messages for every error code of both C functions. Each function can only
+# return a subset of them (see molalign.h); codes that a function never
+# returns are simply never looked up for it.
+_ERROR_MESSAGES = {
     MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER: "Atomic number out of range (valid: 0 to 104, where 0 is the dummy atom 'X').",
     MOLALIGN_ERROR_NOT_ISOMERS: "Molecules are not isomers (different atom counts or compositions).",
-    MOLALIGN_ERROR_ATOM_TYPE_MISMATCH: "Atom type mismatch between the two conformers.",
-    MOLALIGN_ERROR_MISSING_BONDS: "Missing bond data for one or both conformers.",
+    MOLALIGN_ERROR_ATOM_TYPE_MISMATCH: "Atom type mismatch between the two molecules.",
+    MOLALIGN_ERROR_TOO_MANY_FRAGMENTS: "One or both molecules have more molecular fragments "
+       "(connected components of the bond graph) than max_fragments.",
     MOLALIGN_ERROR_BOND_MISMATCH: "Bond connectivity mismatch between the two conformers, or bond "
-       "type mismatch when bondtype_flag=True (only raised when remap_flag=False).",
+       "type mismatch when usebondtype_flag=True (only raised when remap_flag=False).",
     MOLALIGN_ERROR_NOT_CONFORMERS: "Molecules are not conformers (same composition but different "
-       "bond graphs, or different bond types when bondtype_flag=True; only raised when "
+       "bond graphs, or different bond types when usebondtype_flag=True; only raised when "
        "remap_flag=True).",
+    MOLALIGN_ERROR_ASSIGNMENT_FAILED: "Assignment failed (pruning tolerance might be too tight).",
+    MOLALIGN_ERROR_INVALID_BOUND: "A bound parameter is out of range.",
 }
 
 # Bond array passed when no bonds are given (bond_data=None)
@@ -83,9 +83,8 @@ cdef _validate_atoms(
     np.ndarray[np.float64_t, ndim=2] coords1,
     np.ndarray[np.int32_t,   ndim=2] atom_data2,
     np.ndarray[np.float64_t, ndim=2] coords2,
-    int n_records,
 ):
-    """Validate atom/coord shapes and n_records; raise ValueError on failure."""
+    """Validate atom/coord shapes; raise ValueError on failure."""
     if atom_data1.ndim != 2 or atom_data1.shape[1] != 2:
         raise ValueError("atom_data1 must have shape (n, 2)")
     if atom_data2.ndim != 2 or atom_data2.shape[1] != 2:
@@ -94,8 +93,19 @@ cdef _validate_atoms(
         raise ValueError("coords1 must have shape (n, 3)")
     if coords2.ndim != 2 or coords2.shape[1] != 3:
         raise ValueError("coords2 must have shape (n, 3)")
-    if n_records < 1:
-        raise ValueError("n_records must be >= 1")
+
+
+def _validate_counts(**counts):
+    """
+    Validate count parameters (*_freq, max_*):
+    each must be >= 1. Raise ValueError naming the first offending one.
+    The C functions check them as well (MOLALIGN_ERROR_INVALID_BOUND),
+    but checking here gives a precise message before any buffer is
+    allocated.
+    """
+    for name, value in counts.items():
+        if value < 1:
+            raise ValueError("{} must be >= 1 (got {})".format(name, value))
 
 
 cdef _validate_bonds(np.ndarray[np.int32_t, ndim=2] bd1,
@@ -107,17 +117,25 @@ cdef _validate_bonds(np.ndarray[np.int32_t, ndim=2] bd1,
         raise ValueError("bond_data2 must have shape (b, 3)")
 
 
-cdef int _alloc_buffers(int n_records, int n_atoms,
+cdef _raise_on_error(int err, str func_name):
+    """Raise ValueError for a nonzero error code from the C library."""
+    if err != MOLALIGN_SUCCESS:
+        raise ValueError(
+            _ERROR_MESSAGES.get(err, "{} error code {}.".format(func_name, err))
+        )
+
+
+cdef int _alloc_buffers(int max_records, int n_atoms,
                          double **rmsd_list, int **mapping_list,
                          double **transform_list) except -1:
     """
-    Allocate the three output buffers for n_records records of n_atoms
+    Allocate the three output buffers for max_records records of n_atoms
     mapping entries. Returns 0; on failure frees any allocated buffer and
     raises MemoryError.
     """
-    rmsd_list[0]      = <double *>malloc(n_records * sizeof(double))
-    mapping_list[0]  = <int *>malloc(n_records * n_atoms * sizeof(int))
-    transform_list[0] = <double *>malloc(n_records * 16 * sizeof(double))
+    rmsd_list[0]      = <double *>malloc(max_records * sizeof(double))
+    mapping_list[0]  = <int *>malloc(max_records * n_atoms * sizeof(int))
+    transform_list[0] = <double *>malloc(max_records * 16 * sizeof(double))
 
     if rmsd_list[0] == NULL or mapping_list[0] == NULL or transform_list[0] == NULL:
         if rmsd_list[0] != NULL: free(rmsd_list[0])
@@ -128,17 +146,17 @@ cdef int _alloc_buffers(int n_records, int n_atoms,
 
 
 cdef _pack_outputs(double *rmsd_list, int *mapping_list, double *transform_list,
-                    int n_atoms, int occ_records):
-    """Copy the first occ_records records of the C buffers into numpy arrays."""
-    rmsd = np.array([rmsd_list[i] for i in range(occ_records)], dtype=np.float64)
+                    int n_atoms, int n_records):
+    """Copy the first n_records records of the C buffers into numpy arrays."""
+    rmsd = np.array([rmsd_list[i] for i in range(n_records)], dtype=np.float64)
 
-    mapping = np.empty((occ_records, n_atoms), dtype=np.int32)
-    for r in range(occ_records):
+    mapping = np.empty((n_records, n_atoms), dtype=np.int32)
+    for r in range(n_records):
         for a in range(n_atoms):
             mapping[r, a] = mapping_list[r * n_atoms + a]
 
-    transform = np.empty((occ_records, 4, 4), dtype=np.float64)
-    for r in range(occ_records):
+    transform = np.empty((n_records, 4, 4), dtype=np.float64)
+    for r in range(n_records):
         for a in range(16):
             transform[r, a // 4, a % 4] = transform_list[r * 16 + a]
 
@@ -157,16 +175,16 @@ def atormsd_calculate(
     bint   align_flag,
     bint   remap_flag,
     bint   heavy_flag,
-    bint   mass_flag,
+    bint   massweight_flag,
     bint   mirror_flag,
-    bint   atomlabel_flag,
-    bint   print_stats,
+    bint   useatomtype_flag,
+    bint   printstats_flag,
     bint   random_flag,
-    bint   prunetol_flag,
-    prunetol,
-    int    max_freq,
+    bint   pruning_flag,
+    prune_tol,
+    int    ato_freq,
     int    max_trials,
-    int    n_records = 1,
+    int    max_records = 1,
 ):
     """
     Thin wrapper around the C ``atormsd_calculate`` function (see molalign.h
@@ -178,33 +196,37 @@ def atormsd_calculate(
         ``[[atomic_number, label], ...]`` for each molecule.
     coords1, coords2 : float64 array, shape (n, 3)
         Cartesian coordinates in Angstrom.
-    n_records : int, default 1
-        Maximum number of ranked candidate solutions to return. Records
-        beyond the first are only ever produced when both ``align_flag``
-        and ``remap_flag`` are true; otherwise exactly one solution is
-        returned regardless of this value.
-    prunetol : float or None
+    ato_freq, max_trials : int
+        Convergence frequency and maximum number of random orientations of
+        the search; both must be >= 1.
+    max_records : int, default 1
+        Maximum number of ranked candidate solutions to return (>= 1).
+        Records beyond the first are only ever produced when both
+        ``align_flag`` and ``remap_flag`` are true; otherwise exactly one
+        solution is returned regardless of this value.
+    prune_tol : float or None
         Pruning tolerance (Angstrom). Required (no default) when
-        ``prunetol_flag`` is true; unused otherwise.
+        ``pruning_flag`` is true; unused otherwise.
     (the remaining arguments map one-to-one onto the C arguments)
 
     Returns
     -------
-    rmsd : float64 ndarray, shape (occ_records,)
+    rmsd : float64 ndarray, shape (n_records,)
         RMSD of each returned candidate solution, best first.
-    mapping : int32 ndarray, shape (occ_records, n_padding) — 0-based
+    mapping : int32 ndarray, shape (n_records, n_padding) — 0-based
         ``n_padding = max(n_atoms1, n_atoms2)``; same padding convention as
         ``conformsd_calculate``. Sizes can only differ when ``heavy_flag=True``.
-    transform : float64 ndarray, shape (occ_records, 4, 4)
+    transform : float64 ndarray, shape (n_records, 4, 4)
         Homogeneous matrices mapping the input coordinates of molecule 2 to
         the molecule-1 frame. With ``mirror_flag=True`` the 3x3 block
         includes the reflection (determinant -1). With ``align_flag=False``
         it is the identity, or just the reflection when mirroring.
 
-    ``occ_records`` (<= n_records) is however many distinct solutions the
+    ``n_records`` (<= max_records) is however many distinct solutions the
     library actually found; it may be smaller than requested.
     """
-    _validate_atoms(atom_data1, coords1, atom_data2, coords2, n_records)
+    _validate_atoms(atom_data1, coords1, atom_data2, coords2)
+    _validate_counts(ato_freq=ato_freq, max_trials=max_trials, max_records=max_records)
 
     cdef int n1 = atom_data1.shape[0]
     cdef int n2 = atom_data2.shape[0]
@@ -215,20 +237,20 @@ def atormsd_calculate(
     coords1    = np.ascontiguousarray(coords1)
     coords2    = np.ascontiguousarray(coords2)
 
-    # prunetol is required, and only used, when prunetol_flag=True
-    cdef double c_prunetol = 0.0
-    if prunetol_flag:
-        if prunetol is None:
-            raise ValueError("prunetol is required when prunetol_flag=True")
-        c_prunetol = <double>prunetol
+    # prune_tol is required, and only used, when pruning_flag=True
+    cdef double c_prune_tol = 0.0
+    if pruning_flag:
+        if prune_tol is None:
+            raise ValueError("prune_tol is required when pruning_flag=True")
+        c_prune_tol = <double>prune_tol
 
-    cdef int    occ_records = 0
+    cdef int    n_records = 0
     cdef int    err         = 0
 
     cdef double *rmsd_list
     cdef int    *mapping_list
     cdef double *transform_list
-    _alloc_buffers(n_records, n_padding, &rmsd_list, &mapping_list, &transform_list)
+    _alloc_buffers(max_records, n_padding, &rmsd_list, &mapping_list, &transform_list)
 
     try:
         c_atormsd_calculate(
@@ -238,22 +260,19 @@ def atormsd_calculate(
             n2,
             <const int    *>atom_data2.data,
             <const double *>coords2.data,
-            align_flag, remap_flag, heavy_flag, mass_flag,
-            mirror_flag, atomlabel_flag,
-            print_stats, random_flag,
-            prunetol_flag, c_prunetol, max_freq, max_trials,
-            n_records,
+            align_flag, remap_flag, heavy_flag, massweight_flag,
+            mirror_flag, useatomtype_flag,
+            printstats_flag, random_flag,
+            pruning_flag, c_prune_tol, ato_freq, max_trials,
+            max_records,
             rmsd_list, mapping_list,
-            transform_list, &occ_records, &err,
+            transform_list, &n_records, &err,
         )
 
-        if err != 0:
-            raise ValueError(
-                _ATORMSD_ERROR_MESSAGES.get(err, "atormsd_calculate error code {}.".format(err))
-            )
+        _raise_on_error(err, "atormsd_calculate")
 
         rmsd, mapping, transform = _pack_outputs(
-            rmsd_list, mapping_list, transform_list, n_padding, occ_records
+            rmsd_list, mapping_list, transform_list, n_padding, n_records
         )
     finally:
         free(rmsd_list)
@@ -277,18 +296,19 @@ def conformsd_calculate(
     bint align_flag    = False,
     bint remap_flag    = False,
     bint heavy_flag    = False,
-    bint mass_flag     = False,
+    bint massweight_flag     = False,
     bint mirror_flag   = False,
-    bint atomlabel_flag = False,
-    bint bondtol_flag  = False,
-    bondtol                          = None,
-    bint bondtype_flag = False,
-    bint print_stats    = False,
-    bint print_assigntree = False,
+    bint useatomtype_flag = False,
+    bint bonding_flag  = False,
+    bond_tol                          = None,
+    bint usebondtype_flag = False,
+    bint printstats_flag    = False,
+    bint printassigntree_flag = False,
     bint random_flag   = False,
-    int  max_freq      = 100,
+    int  confo_freq      = 100,
     int  max_trials    = 10000,
-    int  n_records     = 1,
+    int  max_fragments     = 1,
+    int  max_records     = 1,
 ):
     """
     Thin wrapper around the C ``conformsd_calculate`` function (see
@@ -302,55 +322,65 @@ def conformsd_calculate(
         Cartesian coordinates in Angstrom.
     bond_data1, bond_data2 : int32 array, shape (b, 3), or None
         ``[[a1, a2, bond_type], ...]`` (1-based atom indices).
-        Pass ``None`` (or omit) when ``bondtol_flag=True``; in that case the
+        Pass ``None`` (or omit) when ``bonding_flag=True``; in that case the
         library derives connectivity from geometry.
-    bondtol : float, required when bondtol_flag=True
+    bond_tol : float, required when bonding_flag=True
         Bond detection tolerance (Angstrom) for geometry-based connectivity.
-        Has no default and is ignored when bondtol_flag=False.
-    bondtype_flag : bool, default False
+        Has no default and is ignored when bonding_flag=False.
+    usebondtype_flag : bool, default False
         Use the bond types (third column of ``bond_data``) to guide atom
         matching. Types are compared for equality, never interpreted, so
         both molecules must use the same bond-type convention (read from
         the same file format with the same parser). Ignored when
-        ``bondtol_flag=True``.
+        ``bonding_flag=True``.
     align_flag, remap_flag : bool, default False
         Optimally superpose molecule 2, and search the atom permutation
         that minimises the RMSD.
-    print_assigntree : bool
+    printassigntree_flag : bool
         Print the assignment tree and its combination counts to stdout.
-    max_freq : int, default 100
+    confo_freq : int, default 100
         Stop the random orientation search once the best solution has been
         found more than this many times; also the threshold on the ratio of
         total to partial assignment combinations above which that search is
-        used instead of exhaustive enumeration.
-    n_records : int, default 1
-        Maximum number of ranked candidate solutions to return. Records
-        beyond the first are only ever produced when both ``align_flag``
-        and ``remap_flag`` are true; otherwise exactly one solution is
-        returned regardless of this value.
+        used instead of exhaustive enumeration. Must be >= 1.
+    max_trials : int, default 10000
+        Maximum number of random orientations (>= 1).
+    max_fragments : int, default 1
+        Maximum number of molecular fragments (connected components of the
+        bond graph of the compared atoms, i.e. after ``heavy_flag``
+        exclusions) allowed in each molecule (>= 1). An atom without bonds
+        is a fragment of its own, so a molecule without bonds has as many
+        fragments as atoms. Exceeding it raises ValueError.
+    max_records : int, default 1
+        Maximum number of ranked candidate solutions to return (>= 1).
+        Records beyond the first are only ever produced when both
+        ``align_flag`` and ``remap_flag`` are true; otherwise exactly one
+        solution is returned regardless of this value.
     (the remaining keyword arguments map one-to-one onto the C arguments)
 
     Returns
     -------
-    rmsd : float64 ndarray, shape (occ_records,)
+    rmsd : float64 ndarray, shape (n_records,)
         RMSD of each returned candidate solution, best first.
-    mapping : int32 ndarray, shape (occ_records, n_padding) — 0-based
+    mapping : int32 ndarray, shape (n_records, n_padding) — 0-based
         ``n_padding = max(n_atoms1, n_atoms2)``. Each row is a permutation of
         ``0..n_padding-1``; entry ``j`` is the atom of molecule 2 placed on line
         ``j`` of molecule 1. The smaller molecule is padded with dummy atoms
         appended after its real atoms: values ``>= n_atoms2`` denote dummy
         atoms of molecule 2, and entries ``j >= n_atoms1`` hold the extra
         atoms of molecule 2. Sizes can only differ when ``heavy_flag=True``.
-    transform : float64 ndarray, shape (occ_records, 4, 4)
+    transform : float64 ndarray, shape (n_records, 4, 4)
         Homogeneous matrices mapping the input coordinates of molecule 2 to
         the molecule-1 frame. With ``mirror_flag=True`` the 3x3 block
         includes the reflection (determinant -1). With ``align_flag=False``
         it is the identity, or just the reflection when mirroring.
 
-    ``occ_records`` (<= n_records) is however many distinct solutions the
+    ``n_records`` (<= max_records) is however many distinct solutions the
     library actually found; it may be smaller than requested.
     """
-    _validate_atoms(atom_data1, coords1, atom_data2, coords2, n_records)
+    _validate_atoms(atom_data1, coords1, atom_data2, coords2)
+    _validate_counts(confo_freq=confo_freq, max_trials=max_trials,
+                     max_fragments=max_fragments, max_records=max_records)
 
     cdef int n1 = atom_data1.shape[0]
     cdef int n2 = atom_data2.shape[0]
@@ -372,20 +402,20 @@ def conformsd_calculate(
     cdef int nb1 = bd1.shape[0]
     cdef int nb2 = bd2.shape[0]
 
-    # bondtol is required, and only used, when bondtol_flag=True
-    cdef double c_bondtol = 0.0
-    if bondtol_flag:
-        if bondtol is None:
-            raise ValueError("bondtol is required when bondtol_flag=True")
-        c_bondtol = <double>bondtol
+    # bond_tol is required, and only used, when bonding_flag=True
+    cdef double c_bond_tol = 0.0
+    if bonding_flag:
+        if bond_tol is None:
+            raise ValueError("bond_tol is required when bonding_flag=True")
+        c_bond_tol = <double>bond_tol
 
-    cdef int    occ_records = 0
+    cdef int    n_records = 0
     cdef int    err         = 0
 
     cdef double *rmsd_list
     cdef int    *mapping_list
     cdef double *transform_list
-    _alloc_buffers(n_records, n_padding, &rmsd_list, &mapping_list, &transform_list)
+    _alloc_buffers(max_records, n_padding, &rmsd_list, &mapping_list, &transform_list)
 
     try:
         c_conformsd_calculate(
@@ -399,23 +429,20 @@ def conformsd_calculate(
             <const double *>coords2.data,
             nb2,
             <const int    *>bd2.data,
-            align_flag, remap_flag, heavy_flag, mass_flag,
-            mirror_flag, atomlabel_flag, bondtol_flag, c_bondtol,
-            bondtype_flag,
-            print_stats, print_assigntree, random_flag,
-            max_freq, max_trials,
-            n_records,
+            align_flag, remap_flag, heavy_flag, massweight_flag,
+            mirror_flag, useatomtype_flag, bonding_flag, c_bond_tol,
+            usebondtype_flag,
+            printstats_flag, printassigntree_flag, random_flag,
+            confo_freq, max_trials, max_fragments,
+            max_records,
             rmsd_list, mapping_list,
-            transform_list, &occ_records, &err,
+            transform_list, &n_records, &err,
         )
 
-        if err != 0:
-            raise ValueError(
-                _CONFORMSD_ERROR_MESSAGES.get(err, "conformsd_calculate error code {}.".format(err))
-            )
+        _raise_on_error(err, "conformsd_calculate")
 
         rmsd, mapping, transform = _pack_outputs(
-            rmsd_list, mapping_list, transform_list, n_padding, occ_records
+            rmsd_list, mapping_list, transform_list, n_padding, n_records
         )
     finally:
         free(rmsd_list)

@@ -2,6 +2,7 @@ module clib_conformsd
    use parameters
    use str_utils
    use molecule
+   use adjacency
    use euclidean
    use chemdata
    use permutation
@@ -21,14 +22,14 @@ subroutine conformsd_calculate(                                              &
       c_n_bonds1,  c_bond_data1,                                                  &
       c_n_atoms2,  c_atom_data2,  c_coords2,                                    &
       c_n_bonds2,  c_bond_data2,                                                  &
-      c_align_flag, c_remap_flag, c_heavy_flag, c_mass_flag,                &
-      c_mirror_flag, c_atomlabel_flag, c_bondtol_flag, c_bondtol,          &
-      c_bondtype_flag,                                                      &
-      c_print_stats, c_print_assigntree, c_random_flag,                      &
-      c_max_freq, c_max_trials,                                           &
-      c_n_records,                                                          &
+      c_align_flag, c_remap_flag, c_heavy_flag, c_massweight_flag,                &
+      c_mirror_flag, c_useatomtype_flag, c_bonding_flag, c_bond_tol,          &
+      c_usebondtype_flag,                                                      &
+      c_printstats_flag, c_printassigntree_flag, c_random_flag,                      &
+      c_confo_freq, c_max_trials, c_max_fragments,                              &
+      c_max_records,                                                          &
       c_rmsd_list, c_mapping_list,                                              &
-      c_transform_list, c_occ_records, c_error_code)                         &
+      c_transform_list, c_n_records, c_error_code)                         &
       bind(C, name="conformsd_calculate")
 ! C-callable symmetry-corrected RMSD between conformers (see the conformsd
 ! program).
@@ -38,26 +39,33 @@ subroutine conformsd_calculate(                                              &
 !                    [elnum0, label0, elnum1, label1, ...]
 !                    label = 0 means unlabelled.
 !   c_coords1/2    : XYZ coordinates, row-major (c_n_atoms x 3), length c_n_atoms*3
-!   c_n_bonds1/2   : number of bonds (may be 0 when c_bondtol_flag is true, i.e. derive from geometry)
+!   c_n_bonds1/2   : number of bonds (may be 0 when c_bonding_flag is true, i.e. derive from geometry)
 !   c_bond_data1/2 : flat bond array, length c_n_bonds*3, layout: [atom1, atom2, type, ...]
 !                    (1-based atom indices as in the original file)
-!   c_bondtol     : bond detection tolerance (only used, and required, when
-!                    c_bondtol_flag is true; no default)
-!   c_bondtype_flag: use the bond types in the HNA refinement. Types
+!   c_bond_tol     : bond detection tolerance (only used, and required, when
+!                    c_bonding_flag is true; no default)
+!   c_usebondtype_flag: use the bond types in the HNA refinement. Types
 !                    are compared, never interpreted, so both molecules
 !                    must use the same convention (read from the same
 !                    file format with the same parser). Ignored
-!                    when c_bondtol_flag is true (perceived bonds are untyped).
+!                    when c_bonding_flag is true (perceived bonds are untyped).
+!   c_confo_freq, c_max_trials : convergence frequency and maximum number of
+!                    random orientations of the stochastic search (>= 1).
+!   c_max_fragments    : maximum number of molecular fragments (connected
+!                    components of the bond graph of the included atoms)
+!                    allowed in each molecule (>= 1; 1 by default in the
+!                    program and the Python wrapper). An atom without bonds
+!                    is a fragment of its own.
 !
 ! Multiple ranked candidate solutions:
-!   c_n_records requests up to that many ranked candidate solutions. Records
-!   beyond the first are only ever produced when both c_align_flag and
+!   c_max_records (>= 1) requests up to that many ranked candidate solutions.
+!   Records beyond the first are only ever produced when both c_align_flag and
 !   c_remap_flag are true (the optimize_mapping_conformer search); in every
-!   other case exactly one record is written regardless of c_n_records.
-!   c_occ_records reports how many were actually written; only the first
-!   c_occ_records entries of c_rmsd_list, c_mapping_list, and
+!   other case exactly one record is written regardless of c_max_records.
+!   c_n_records reports how many were actually written; only the first
+!   c_n_records entries of c_rmsd_list, c_mapping_list, and
 !   c_transform_list are meaningful. All output arrays are flattened and
-!   must be allocated by the caller with at least c_n_records elements per
+!   must be allocated by the caller with at least c_max_records elements per
 !   record (n_padding for c_mapping_list, 16 for c_transform_list).
 !
 ! Transforms:
@@ -78,10 +86,11 @@ subroutine conformsd_calculate(                                              &
 !   paired afterwards: bonded to the image of their heavy neighbour first,
 !   then by distance, then with padding atoms.
 !
-! c_error_code values: see the error_codes module (error_codes.f90) and its
-! C mirror, error_codes.h. This function can return MOLALIGN_SUCCESS,
-! MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER,
-! MOLALIGN_ERROR_NOT_ISOMERS, MOLALIGN_ERROR_MISSING_BONDS,
+! c_error_code values:
+! See error_codes.f90 and molalign.h. This function can return MOLALIGN_SUCCESS,
+! MOLALIGN_ERROR_INVALID_BOUND (c_confo_freq, c_max_trials, c_max_fragments
+! or c_max_records less than 1), MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER,
+! MOLALIGN_ERROR_NOT_ISOMERS, MOLALIGN_ERROR_TOO_MANY_FRAGMENTS,
 ! MOLALIGN_ERROR_ATOM_TYPE_MISMATCH and MOLALIGN_ERROR_BOND_MISMATCH (both
 ! only when c_remap_flag is false), and MOLALIGN_ERROR_NOT_CONFORMERS
 ! (only when c_remap_flag is true; passed through from the conformer
@@ -102,21 +111,21 @@ subroutine conformsd_calculate(                                              &
    integer(ik), dimension(c_n_bonds2*3), intent(in) :: c_bond_data2
 
    ! Flags
-   logical(lk), intent(in), value :: c_align_flag, c_remap_flag, c_heavy_flag, c_mass_flag
-   logical(lk), intent(in), value :: c_mirror_flag, c_atomlabel_flag, c_bondtol_flag
-   real(rk),    intent(in), value :: c_bondtol
-   logical(lk), intent(in), value :: c_bondtype_flag
-   logical(lk), intent(in), value :: c_print_stats, c_print_assigntree, c_random_flag
-   integer(ik), intent(in), value :: c_max_freq, c_max_trials
+   logical(lk), intent(in), value :: c_align_flag, c_remap_flag, c_heavy_flag, c_massweight_flag
+   logical(lk), intent(in), value :: c_mirror_flag, c_useatomtype_flag, c_bonding_flag
+   real(rk),    intent(in), value :: c_bond_tol
+   logical(lk), intent(in), value :: c_usebondtype_flag
+   logical(lk), intent(in), value :: c_printstats_flag, c_printassigntree_flag, c_random_flag
+   integer(ik), intent(in), value :: c_confo_freq, c_max_trials, c_max_fragments
 
    ! Requested number of ranked records
-   integer(ik), intent(in), value :: c_n_records
+   integer(ik), intent(in), value :: c_max_records
 
    ! Outputs
    real(rk),    dimension(*), intent(out) :: c_rmsd_list
    integer(ik), dimension(*), intent(out) :: c_mapping_list
    real(rk),    dimension(*), intent(out) :: c_transform_list
-   integer(ik),                intent(out) :: c_occ_records
+   integer(ik),                intent(out) :: c_n_records
    integer(ik),                intent(out) :: c_error_code
 
    ! Local variables
@@ -133,18 +142,24 @@ subroutine conformsd_calculate(                                              &
    integer(ik), dimension(:), allocatable :: atomset1, atomset2
    integer(ik), dimension(:), allocatable :: bondtypes
    integer(ik), dimension(:), allocatable :: mapping1, full_atomperm1
-   integer(ik) :: n_records, n_padding
+   integer(ik) :: max_records, n_padding
    integer(ik) :: i, j, base
 
    c_error_code = MOLALIGN_SUCCESS
-   c_occ_records = 0
+   c_n_records = 0
 
-   ! Requested record count (must be at least 1)
-   n_records = max(1_ik, c_n_records)
+   ! Validate the count parameters before touching any output array
+   if (c_confo_freq < 1 .or. c_max_trials < 1 .or. c_max_fragments < 1 .or. c_max_records < 1) then
+      c_error_code = MOLALIGN_ERROR_INVALID_BOUND
+      return
+   end if
+
+   ! Requested record count
+   max_records = c_max_records
 
    ! Initialise all requested transform slots to identity so that, even on
    ! an early error return, every slot the caller allocated is well-defined.
-   do i = 1, n_records
+   do i = 1, max_records
       call set_identity_transform(c_transform_list((i-1)*16+1:i*16))
    end do
 
@@ -152,15 +167,15 @@ subroutine conformsd_calculate(                                              &
    align_flag       = c_align_flag
    remap_flag       = c_remap_flag
    heavy_flag       = c_heavy_flag
-   mass_flag        = c_mass_flag
+   massweight_flag        = c_massweight_flag
    mirror_flag      = c_mirror_flag
-   atomlabel_flag   = c_atomlabel_flag
-   bondtol_flag     = c_bondtol_flag
-   bondtol         = c_bondtol
-   bondtype_flag    = c_bondtype_flag .and. .not. c_bondtol_flag
+   useatomtype_flag   = c_useatomtype_flag
+   bonding_flag     = c_bonding_flag
+   bond_tol         = c_bond_tol
+   usebondtype_flag    = c_usebondtype_flag .and. .not. c_bonding_flag
    random_flag      = c_random_flag
-   print_stats      = c_print_stats
-   print_assigntree = c_print_assigntree
+   printstats_flag      = c_printstats_flag
+   printassigntree_flag = c_printassigntree_flag
 
    ! Build atom_t and bond_t arrays from flat C arrays
    ! (returns MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER for out-of-range elnums)
@@ -207,32 +222,33 @@ subroutine conformsd_calculate(                                              &
    end if
 
    ! Reset bonds (padding atoms never get bonds)
-   if (bondtol_flag) then
+   if (bonding_flag) then
       call bonds_from_atoms(atoms1(1:c_n_atoms1), bonds1)
       call bonds_from_atoms(atoms2(1:c_n_atoms2), bonds2)
    end if
 
-   ! Abort if either molecule has no bonds
-   if (size(bonds1) < 1 .or. size(bonds2) < 1) then
-      c_error_code = MOLALIGN_ERROR_MISSING_BONDS
-      return
-   end if
-
    ! Set adjacency lists of the included atoms (bonds to excluded atoms are
-   ! dropped). With bondtype_flag, the edges used by the refinement carry
+   ! dropped). With usebondtype_flag, the edges used by the refinement carry
    ! the bond types, compacted jointly for both molecules.
-   if (bondtype_flag) then
+   if (usebondtype_flag) then
       bondtypes = distinct_bondtypes(bonds1, bonds2)
-      call adjacency_from_bonds(atoms1(atomset1), extract_bonds(atomset1, n_padding, bonds1), adjcs1, bondtypes)
-      call adjacency_from_bonds(atoms2(atomset2), extract_bonds(atomset2, n_padding, bonds2), adjcs2, bondtypes)
    else
-      call adjacency_from_bonds(atoms1(atomset1), extract_bonds(atomset1, n_padding, bonds1), adjcs1)
-      call adjacency_from_bonds(atoms2(atomset2), extract_bonds(atomset2, n_padding, bonds2), adjcs2)
+      ! No bond types: every bond is GENERIC_BOND
+      allocate (bondtypes(0))
+   end if
+   call adjacency_from_bonds(atoms1(atomset1), extract_bonds(atomset1, n_padding, bonds1), adjcs1, bondtypes)
+   call adjacency_from_bonds(atoms2(atomset2), extract_bonds(atomset2, n_padding, bonds2), adjcs2, bondtypes)
+
+   ! Abort if either molecule has more fragments than allowed (counted on
+   ! the bond graph of the included atoms, which is what the search uses)
+   if (count_fragments(adjcs1) > c_max_fragments .or. count_fragments(adjcs2) > c_max_fragments) then
+      c_error_code = MOLALIGN_ERROR_TOO_MANY_FRAGMENTS
+      return
    end if
 
    ! Weights of the included atoms, normalised to sum 1 over them so both
    ! molecules are scaled by the same factor
-   if (mass_flag) then
+   if (massweight_flag) then
       weights1 = atomic_masses(atoms1(atomset1)%elnum)
       weights2 = atomic_masses(atoms2(atomset2)%elnum)
    else
@@ -284,15 +300,15 @@ subroutine conformsd_calculate(                                              &
 
       if (align_flag) then
 
-         call allocate_registry(registry, n_records)
+         call allocate_registry(registry, max_records)
          call optimize_mapping_conformer(adjcs1, adjcs2, atomtypes, &
-               coords1w, coords2w, c_max_freq, c_max_trials, registry, c_error_code)
+               coords1w, coords2w, c_confo_freq, c_max_trials, registry, c_error_code)
          if (c_error_code /= MOLALIGN_SUCCESS) return
 
-         if (print_stats) call print_records(registry)
+         if (printstats_flag) call print_records(registry)
 
-         c_occ_records = registry%occ_records
-         do i = 1, registry%occ_records
+         c_n_records = registry%n_records
+         do i = 1, registry%n_records
             mapping1 = registry%records(i)%mapping1
             rotquat = least_rotquat(mapping1, coords1w, coords2w)
             full_coords2r = rotated_coords(full_coords2, rotquat, center1)
@@ -327,7 +343,7 @@ subroutine conformsd_calculate(                                              &
          call complete_mapping(atomset1, atomset2, mapping1, atoms1, atoms2, &
                c_n_atoms1, c_n_atoms2, bonds1, bonds2, full_coords1, full_coords2r, full_atomperm1)
 
-         c_occ_records = 1
+         c_n_records = 1
          c_rmsd_list(1) = rmsd
          do j = 1, n_padding
             c_mapping_list(j) = full_atomperm1(j) - 1  ! 0-based for C
@@ -376,7 +392,7 @@ subroutine conformsd_calculate(                                              &
 
       rmsd = sqrt(sqdistmean(mapping1, weights1, coords1, coords2r))
 
-      c_occ_records = 1
+      c_n_records = 1
       c_rmsd_list(1) = rmsd
       do j = 1, n_padding
          c_mapping_list(j) = full_atomperm1(j) - 1  ! 0-based for C

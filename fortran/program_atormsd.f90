@@ -35,7 +35,7 @@ use arg_parsing
 use flags
 implicit none
 
-logical(lk) :: print_assignment
+logical(lk) :: printmapping_flag
 logical(lk) :: write_aligned
 character(:), allocatable :: title1, title2
 character(:), allocatable :: arg, aligned_path
@@ -54,7 +54,7 @@ real(rk), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, c
 real(rk), dimension(:,:), allocatable :: full_coords1, full_coords2, full_coords2r
 integer(ik), dimension(:), allocatable :: atomset1, atomset2
 integer(ik), dimension(:), allocatable :: mapping1, full_atomperm1
-integer(ik) :: n_records, max_trials, max_freq
+integer(ik) :: max_records, max_trials, ato_freq
 integer(ik) :: in_unit, aligned_unit
 integer(ik) :: error_code
 integer(ik) :: n_atoms1, n_atoms2, n_padding
@@ -66,15 +66,15 @@ heavy_flag = .FALSE.
 mirror_flag = .FALSE.
 align_flag = .FALSE.
 remap_flag = .FALSE.
-mass_flag = .FALSE.
-atomlabel_flag = .FALSE.
+massweight_flag = .FALSE.
+useatomtype_flag = .FALSE.
 random_flag = .FALSE.
-print_stats = .FALSE.
-print_assignment = .FALSE.
+printstats_flag = .FALSE.
+printmapping_flag = .FALSE.
 write_aligned = .FALSE.
 
-n_records = 1
-max_freq = 10
+max_records = 1
+ato_freq = ATO_FREQ_DEFAULT
 max_trials = MAX_TRIALS_DEFAULT
 prune_procedure => prune_none
 
@@ -90,28 +90,28 @@ do while (get_arg(arg))
       remap_flag = .TRUE.
    case ('-prunetol')
       prune_procedure => prune_rd
-      call read_optarg(arg, prunetol)
-   case ('-atomlabel')
-      atomlabel_flag = .TRUE.
+      call read_optarg(arg, prune_tol)
+   case ('-atomtype')
+      useatomtype_flag = .TRUE.
    case ('-heavy')
       heavy_flag = .TRUE.
-   case ('-mass')
-      mass_flag = .TRUE.
+   case ('-massweight')
+      massweight_flag = .TRUE.
    case ('-mirror')
       mirror_flag = .TRUE.
-   case ('-maxfreq')
-      call read_optarg(arg, max_freq)
+   case ('-atofreq')
+      call read_optarg(arg, ato_freq, 1_ik)
    case ('-maxtrials')
-      call read_optarg( arg, max_trials)
-   case ('-records')
-      call read_optarg( arg, n_records)
+      call read_optarg( arg, max_trials, 1_ik)
+   case ('-maxrecs')
+      call read_optarg( arg, max_records, 1_ik)
    case ('-aligned')
       write_aligned = .TRUE.
       call read_optarg( arg, aligned_path)
-   case ('-assignment')
-      print_assignment = .TRUE.
+   case ('-mapping')
+      printmapping_flag = .TRUE.
    case ('-stats')
-      print_stats = .TRUE.
+      printstats_flag = .TRUE.
    case ('-random')
       random_flag = .TRUE.
    case default
@@ -167,7 +167,7 @@ end if
 
 ! Weights of the included atoms, normalised to sum 1 over them so both
 ! molecules are scaled by the same factor
-if (mass_flag) then
+if (massweight_flag) then
    weights1 = atomic_masses(atoms1(atomset1)%elnum)
    weights2 = atomic_masses(atoms2(atomset2)%elnum)
 else
@@ -226,14 +226,14 @@ if (remap_flag) then
 
    if (align_flag) then
 
-      call allocate_registry( registry, n_records)
+      call allocate_registry( registry, max_records)
       call optimize_mapping_atoms( atomtypes, prunes, &
-            coords1w, coords2w, max_freq, max_trials, registry, error_code)
+            coords1w, coords2w, ato_freq, max_trials, registry, error_code)
       if (error_code /= 0) stop 'Error: Assignment failed'
 
-      if (print_stats) call print_records( registry)
+      if (printstats_flag) call print_records( registry)
 
-      do i = 1, registry%occ_records
+      do i = 1, registry%n_records
          mapping1 = registry%records(i)%mapping1
          rotquat = least_rotquat( mapping1, coords1w, coords2w)
          full_coords2r = rotated_coords( full_coords2, rotquat, center1)
@@ -251,7 +251,7 @@ if (remap_flag) then
             call write_file( aligned_unit, out_format, title2, atoms2, bonds2, full_atomperm1)
          else
             write (stdout,'(A)',advance='no') str( rmsd)
-            if (print_assignment) then
+            if (printmapping_flag) then
                write (stdout,'(1X)',advance='no')
                call print_permutation(full_atomperm1)
             end if
@@ -273,7 +273,7 @@ if (remap_flag) then
             n_atoms1, n_atoms2, bonds1, bonds2, full_coords1, full_coords2r, full_atomperm1)
 
       write (stdout,'(A)',advance='no') str( rmsd)
-      if (print_assignment) then
+      if (printmapping_flag) then
          write (stdout,'(1X)',advance='no')
          call print_permutation(full_atomperm1)
       end if

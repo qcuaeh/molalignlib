@@ -47,27 +47,27 @@ type :: registry_t
    logical(lk) :: overflow     ! some minimum did not fit in records
    integer(ik) :: total_steps
    integer(ik) :: n_trials
-   integer(ik) :: occ_records  ! occupied records
+   integer(ik) :: n_records  ! occupied records
    type(record_t), dimension(:), allocatable :: records
 end type
 
 contains
 
-subroutine allocate_registry(registry, n_records)
+subroutine allocate_registry(registry, max_records)
    type(registry_t), intent(inout) :: registry
-   integer(ik), intent(in) :: n_records
+   integer(ik), intent(in) :: max_records
 
-   if (n_records < 1) then
-      error stop 'n_records is less than 1'
+   if (max_records < 1) then
+      error stop 'max_records is less than 1'
    end if
 
-   allocate (registry%records(n_records))
+   allocate (registry%records(max_records))
 end subroutine
 
 subroutine reset_registry(registry)
    type(registry_t), intent(inout) :: registry
 
-   registry%occ_records = 0
+   registry%n_records = 0
    registry%n_trials = 0
    registry%total_steps = 0
    registry%overflow = .FALSE.
@@ -94,7 +94,7 @@ subroutine insert_record_mapping(registry, mapping1, steps, rotation, mapdiff, m
    registry%total_steps = registry%total_steps + steps
 
    ! Known permutation
-   do i = 1, registry%occ_records
+   do i = 1, registry%n_records
       record => registry%records(i)
       if (all(mapping1 == record%mapping1)) then
          record%freq = record%freq + 1
@@ -104,8 +104,8 @@ subroutine insert_record_mapping(registry, mapping1, steps, rotation, mapdiff, m
    end do
 
    ! Rank of the new permutation
-   insert_pos = registry%occ_records + 1
-   do i = 1, registry%occ_records
+   insert_pos = registry%n_records + 1
+   do i = 1, registry%n_records
       record => registry%records(i)
       if (mapdiff < record%mapdiff) then
          insert_pos = i
@@ -120,7 +120,7 @@ subroutine insert_record_mapping(registry, mapping1, steps, rotation, mapdiff, m
 
    if (insert_pos <= size(registry%records)) then
       ! Make room (if full, the last record is dropped)
-      do j = min(registry%occ_records, size(registry%records) - 1), insert_pos, -1
+      do j = min(registry%n_records, size(registry%records) - 1), insert_pos, -1
          registry%records(j + 1) = registry%records(j)
       end do
 
@@ -132,8 +132,8 @@ subroutine insert_record_mapping(registry, mapping1, steps, rotation, mapdiff, m
       record%rotation = rotation
       record%steps = steps
 
-      if (registry%occ_records < size(registry%records)) then
-         registry%occ_records = registry%occ_records + 1
+      if (registry%n_records < size(registry%records)) then
+         registry%n_records = registry%n_records + 1
       else
          registry%overflow = .TRUE.
       end if
@@ -164,7 +164,7 @@ subroutine insert_record_moldiff(registry, moldiffs, mapping1, steps, rotation, 
    found_match = .FALSE.
    match_pos = 0
 
-   do i = 1, registry%occ_records
+   do i = 1, registry%n_records
       record => registry%records(i)
 
       if (mapdiff == record%mapdiff) then
@@ -183,13 +183,13 @@ subroutine insert_record_moldiff(registry, moldiffs, mapping1, steps, rotation, 
                temp_record%mapdist = mapdist
                temp_record%rotation = rotation
 
-               do j = i, registry%occ_records - 1
+               do j = i, registry%n_records - 1
                   registry%records(j) = registry%records(j + 1)
                end do
-               registry%occ_records = registry%occ_records - 1
+               registry%n_records = registry%n_records - 1
 
-               insert_pos = registry%occ_records + 1
-               do j = 1, registry%occ_records
+               insert_pos = registry%n_records + 1
+               do j = 1, registry%n_records
                   if (mapdiff < registry%records(j)%mapdiff .or. &
                       (mapdiff == registry%records(j)%mapdiff .and. &
                        mapdist < registry%records(j)%mapdist)) then
@@ -199,14 +199,14 @@ subroutine insert_record_moldiff(registry, moldiffs, mapping1, steps, rotation, 
                end do
 
                if (insert_pos <= size(registry%records)) then
-                  do j = min(registry%occ_records, size(registry%records) - 1), insert_pos, -1
+                  do j = min(registry%n_records, size(registry%records) - 1), insert_pos, -1
                      registry%records(j + 1) = registry%records(j)
                   end do
 
                   registry%records(insert_pos) = temp_record
 
-                  if (registry%occ_records < size(registry%records)) then
-                     registry%occ_records = registry%occ_records + 1
+                  if (registry%n_records < size(registry%records)) then
+                     registry%n_records = registry%n_records + 1
                   else
                      registry%overflow = .TRUE.
                   end if
@@ -219,8 +219,8 @@ subroutine insert_record_moldiff(registry, moldiffs, mapping1, steps, rotation, 
       end if
    end do
 
-   insert_pos = registry%occ_records + 1
-   do i = 1, registry%occ_records
+   insert_pos = registry%n_records + 1
+   do i = 1, registry%n_records
       if (mapdiff < registry%records(i)%mapdiff .or. &
           (mapdiff == registry%records(i)%mapdiff .and. &
            mapdist < registry%records(i)%mapdist)) then
@@ -230,7 +230,7 @@ subroutine insert_record_moldiff(registry, moldiffs, mapping1, steps, rotation, 
    end do
 
    if (insert_pos <= size(registry%records)) then
-      do j = min(registry%occ_records, size(registry%records) - 1), insert_pos, -1
+      do j = min(registry%n_records, size(registry%records) - 1), insert_pos, -1
          registry%records(j + 1) = registry%records(j)
       end do
 
@@ -243,8 +243,8 @@ subroutine insert_record_moldiff(registry, moldiffs, mapping1, steps, rotation, 
       record%rotation = rotation
       record%steps = steps
 
-      if (registry%occ_records < size(registry%records)) then
-         registry%occ_records = registry%occ_records + 1
+      if (registry%n_records < size(registry%records)) then
+         registry%n_records = registry%n_records + 1
       else
          registry%overflow = .TRUE.
       end if
@@ -263,7 +263,7 @@ subroutine print_records(registry)
    line = repeat('-', 39)
    write (stdout, '(2x,a,4x,a,5x,a,4x,a,5x,a,6x,a)') '#', 'Freq', 'Steps', 'Δadj', 'Δxyz'
    write (stdout, '(a)') line
-   do i = 1, registry%occ_records
+   do i = 1, registry%n_records
       record = registry%records(i)
       write (stdout, '(i3,4x,i4,4x,f5.1,3x,i4,4x,f8.4)') &
          i, record%freq, record%steps, record%mapdiff, record%mapdist
@@ -275,9 +275,9 @@ subroutine print_records(registry)
    write (stdout, '(a,1x,i0)') 'Minimization steps:', registry%total_steps
 
    if (registry%overflow) then
-      write (stdout, '(a,1x,i0)') 'Visited local minima: >', registry%occ_records
+      write (stdout, '(a,1x,i0)') 'Visited local minima: >', registry%n_records
    else
-      write (stdout, '(a,1x,i0)') 'Visited local minima:', registry%occ_records
+      write (stdout, '(a,1x,i0)') 'Visited local minima:', registry%n_records
    end if
 
    write (stdout, *)

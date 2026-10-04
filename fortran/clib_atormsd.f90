@@ -19,13 +19,13 @@ contains
 subroutine atormsd_calculate(                                        &
       c_n_atoms1,  c_atom_data1,  c_coords1,                            &
       c_n_atoms2,  c_atom_data2,  c_coords2,                            &
-      c_align_flag, c_remap_flag, c_heavy_flag, c_mass_flag,         &
-      c_mirror_flag, c_atomlabel_flag,                               &
-      c_print_stats, c_random_flag,                                   &
-      c_prunetol_flag, c_prunetol, c_max_freq, c_max_trials,       &
-      c_n_records,                                                   &
+      c_align_flag, c_remap_flag, c_heavy_flag, c_massweight_flag,         &
+      c_mirror_flag, c_useatomtype_flag,                               &
+      c_printstats_flag, c_random_flag,                                   &
+      c_pruning_flag, c_prune_tol, c_ato_freq, c_max_trials,       &
+      c_max_records,                                                   &
       c_rmsd_list, c_mapping_list,                                       &
-      c_transform_list, c_occ_records, c_error_code)                  &
+      c_transform_list, c_n_records, c_error_code)                  &
       bind(C, name="atormsd_calculate")
 ! C-callable RMSD between atom clusters (see the atormsd program).
 !
@@ -34,18 +34,20 @@ subroutine atormsd_calculate(                                        &
 !                    [elnum0, label0, elnum1, label1, ...]
 !                    label = 0 means unlabelled.
 !   c_coords1/2    : XYZ coordinates, row-major (c_n_atoms x 3), length c_n_atoms*3
-!   c_prunetol    : pruning tolerance (only used, and required, when
-!                    c_prunetol_flag is true; no default)
+!   c_prune_tol    : pruning tolerance (only used, and required, when
+!                    c_pruning_flag is true; no default)
+!   c_ato_freq, c_max_trials : convergence frequency and maximum number of
+!                    random orientations of the search (>= 1).
 !
 ! Multiple ranked candidate solutions:
-!   c_n_records requests up to that many ranked candidate solutions. Records
-!   beyond the first are only ever produced when both c_align_flag and
+!   c_max_records (>= 1) requests up to that many ranked candidate solutions.
+!   Records beyond the first are only ever produced when both c_align_flag and
 !   c_remap_flag are true (the optimize_mapping_atoms search); in every
-!   other case exactly one record is written regardless of c_n_records.
-!   c_occ_records reports how many were actually written; only the first
-!   c_occ_records entries of c_rmsd_list, c_mapping_list, and
+!   other case exactly one record is written regardless of c_max_records.
+!   c_n_records reports how many were actually written; only the first
+!   c_n_records entries of c_rmsd_list, c_mapping_list, and
 !   c_transform_list are meaningful. All output arrays are flattened and
-!   must be allocated by the caller with at least c_n_records elements per
+!   must be allocated by the caller with at least c_max_records elements per
 !   record (n_padding for c_mapping_list, 16 for c_transform_list).
 !
 ! Transforms:
@@ -64,11 +66,12 @@ subroutine atormsd_calculate(                                        &
 !   Excluded atoms (hydrogens with c_heavy_flag) are paired afterwards with
 !   the nearest remaining atom of the same element, then with padding atoms.
 !
-! c_error_code values: see the error_codes module (error_codes.f90) and its
-! C mirror, error_codes.h. This function can return MOLALIGN_SUCCESS,
-! MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER, MOLALIGN_ERROR_NOT_ISOMERS,
+! c_error_code values:
+! See error_codes.f90 and molalign.h. This function can return MOLALIGN_SUCCESS,
+! MOLALIGN_ERROR_INVALID_BOUND (c_ato_freq, c_max_trials or c_max_records
+! less than 1), MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER, MOLALIGN_ERROR_NOT_ISOMERS,
 ! MOLALIGN_ERROR_ATOM_TYPE_MISMATCH (only when c_remap_flag is false) and
-! MOLALIGN_ERROR_PRUNED_ASSIGNMENT_FAILED (only when c_remap_flag is true;
+! MOLALIGN_ERROR_ASSIGNMENT_FAILED (only when c_remap_flag is true;
 ! passed through from assign_atoms_pruned).
 
    ! Molecule 1
@@ -82,21 +85,21 @@ subroutine atormsd_calculate(                                        &
    real(rk),    dimension(c_n_atoms2*3), intent(in) :: c_coords2
 
    ! Flags
-   logical(lk), intent(in), value :: c_align_flag, c_remap_flag, c_heavy_flag, c_mass_flag
-   logical(lk), intent(in), value :: c_mirror_flag, c_atomlabel_flag
-   logical(lk), intent(in), value :: c_print_stats, c_random_flag
-   logical(lk), intent(in), value :: c_prunetol_flag
-   real(rk),    intent(in), value :: c_prunetol
-   integer(ik), intent(in), value :: c_max_freq, c_max_trials
+   logical(lk), intent(in), value :: c_align_flag, c_remap_flag, c_heavy_flag, c_massweight_flag
+   logical(lk), intent(in), value :: c_mirror_flag, c_useatomtype_flag
+   logical(lk), intent(in), value :: c_printstats_flag, c_random_flag
+   logical(lk), intent(in), value :: c_pruning_flag
+   real(rk),    intent(in), value :: c_prune_tol
+   integer(ik), intent(in), value :: c_ato_freq, c_max_trials
 
    ! Requested number of ranked records
-   integer(ik), intent(in), value :: c_n_records
+   integer(ik), intent(in), value :: c_max_records
 
    ! Outputs
    real(rk),    dimension(*), intent(out) :: c_rmsd_list
    integer(ik), dimension(*), intent(out) :: c_mapping_list
    real(rk),    dimension(*), intent(out) :: c_transform_list
-   integer(ik),                intent(out) :: c_occ_records
+   integer(ik),                intent(out) :: c_n_records
    integer(ik),                intent(out) :: c_error_code
 
    ! Local variables
@@ -112,18 +115,24 @@ subroutine atormsd_calculate(                                        &
    real(rk), dimension(:,:), allocatable :: full_coords1, full_coords2, full_coords2r
    integer(ik), dimension(:), allocatable :: atomset1, atomset2
    integer(ik), dimension(:), allocatable :: mapping1, full_atomperm1
-   integer(ik) :: n_records, n_padding
+   integer(ik) :: max_records, n_padding
    integer(ik) :: i, j, base
 
    c_error_code = MOLALIGN_SUCCESS
-   c_occ_records = 0
+   c_n_records = 0
 
-   ! Requested record count (must be at least 1)
-   n_records = max(1_ik, c_n_records)
+   ! Validate the count parameters before touching any output array
+   if (c_ato_freq < 1 .or. c_max_trials < 1 .or. c_max_records < 1) then
+      c_error_code = MOLALIGN_ERROR_INVALID_BOUND
+      return
+   end if
+
+   ! Requested record count
+   max_records = c_max_records
 
    ! Initialise all requested transform slots to identity so that, even on
    ! an early error return, every slot the caller allocated is well-defined.
-   do i = 1, n_records
+   do i = 1, max_records
       call set_identity_transform(c_transform_list((i-1)*16+1:i*16))
    end do
 
@@ -131,15 +140,15 @@ subroutine atormsd_calculate(                                        &
    align_flag     = c_align_flag
    remap_flag     = c_remap_flag
    heavy_flag     = c_heavy_flag
-   mass_flag      = c_mass_flag
+   massweight_flag      = c_massweight_flag
    mirror_flag    = c_mirror_flag
-   atomlabel_flag = c_atomlabel_flag
+   useatomtype_flag = c_useatomtype_flag
    random_flag    = c_random_flag
-   print_stats    = c_print_stats
+   printstats_flag    = c_printstats_flag
 
-   if (c_prunetol_flag) then
+   if (c_pruning_flag) then
       prune_procedure => prune_rd
-      prunetol = c_prunetol
+      prune_tol = c_prune_tol
    else
       prune_procedure => prune_none
    end if
@@ -185,7 +194,7 @@ subroutine atormsd_calculate(                                        &
 
    ! Weights of the included atoms, normalised to sum 1 over them so both
    ! molecules are scaled by the same factor
-   if (mass_flag) then
+   if (massweight_flag) then
       weights1 = atomic_masses(atoms1(atomset1)%elnum)
       weights2 = atomic_masses(atoms2(atomset2)%elnum)
    else
@@ -239,15 +248,15 @@ subroutine atormsd_calculate(                                        &
 
       if (align_flag) then
 
-         call allocate_registry(registry, n_records)
+         call allocate_registry(registry, max_records)
          call optimize_mapping_atoms(atomtypes, prunes, &
-               coords1w, coords2w, c_max_freq, c_max_trials, registry, c_error_code)
+               coords1w, coords2w, c_ato_freq, c_max_trials, registry, c_error_code)
          if (c_error_code /= MOLALIGN_SUCCESS) return
 
-         if (print_stats) call print_records(registry)
+         if (printstats_flag) call print_records(registry)
 
-         c_occ_records = registry%occ_records
-         do i = 1, registry%occ_records
+         c_n_records = registry%n_records
+         do i = 1, registry%n_records
             mapping1 = registry%records(i)%mapping1
             rotquat = least_rotquat(mapping1, coords1w, coords2w)
             full_coords2r = rotated_coords(full_coords2, rotquat, center1)
@@ -283,7 +292,7 @@ subroutine atormsd_calculate(                                        &
          call complete_mapping(atomset1, atomset2, mapping1, atoms1, atoms2, &
                c_n_atoms1, c_n_atoms2, no_bonds, no_bonds, full_coords1, full_coords2r, full_atomperm1)
 
-         c_occ_records = 1
+         c_n_records = 1
          c_rmsd_list(1) = rmsd
          do j = 1, n_padding
             c_mapping_list(j) = full_atomperm1(j) - 1  ! 0-based for C
@@ -325,7 +334,7 @@ subroutine atormsd_calculate(                                        &
 
       rmsd = sqrt(sqdistmean(mapping1, weights1, coords1, coords2r))
 
-      c_occ_records = 1
+      c_n_records = 1
       c_rmsd_list(1) = rmsd
       do j = 1, n_padding
          c_mapping_list(j) = full_atomperm1(j) - 1  ! 0-based for C
