@@ -137,8 +137,8 @@ subroutine cache_adjacency_lists(adjcs1, adjcs2, cache_arrays)
 
    cache_arrays%adjcs1_list = 0
    cache_arrays%adjcs2_list = 0
-   cache_arrays%adjcs1_bondtype = NO_BOND
-   cache_arrays%adjcs2_bondtype = NO_BOND
+   cache_arrays%adjcs1_bondtype = 0
+   cache_arrays%adjcs2_bondtype = 0
 
    do i = 1, n_atoms1
       cache_arrays%adjcs1_cn(i) = adjcs1(i)%cn

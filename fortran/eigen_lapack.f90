@@ -19,6 +19,7 @@ module eigen
 ! residual matrix) with LAPACK ssyev/dsyev, which sort eigenvalues in
 ! ascending order. Alternative to eigen_jacobi.
 use parameters
+use, intrinsic :: iso_fortran_env, only: real32
 
 implicit none
 

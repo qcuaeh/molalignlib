@@ -22,7 +22,7 @@ subroutine atormsd_calculate(                                        &
       c_align_flag, c_remap_flag, c_heavy_flag, c_massweight_flag,         &
       c_mirror_flag, c_useatomtype_flag,                               &
       c_printstats_flag, c_random_flag,                                   &
-      c_pruning_flag, c_prune_tol, c_ato_freq, c_max_trials,       &
+      c_prune_flag, c_prune_tol, c_ato_freq, c_max_trials,         &
       c_max_records,                                                   &
       c_rmsd_list, c_mapping_list,                                       &
       c_transform_list, c_n_records, c_error_code)                  &
@@ -32,10 +32,12 @@ subroutine atormsd_calculate(                                        &
 ! Inputs, as flat C arrays:
 !   c_atom_data1/2 : packed atom data, length c_n_atoms*2:
 !                    [elnum0, label0, elnum1, label1, ...]
+!                    elnum is an atomic number in 1..n_elems (there is no
+!                    dummy element: leave dummy atoms out).
 !                    label = 0 means unlabelled.
 !   c_coords1/2    : XYZ coordinates, row-major (c_n_atoms x 3), length c_n_atoms*3
 !   c_prune_tol    : pruning tolerance (only used, and required, when
-!                    c_pruning_flag is true; no default)
+!                    c_prune_flag is true; no default)
 !   c_ato_freq, c_max_trials : convergence frequency and maximum number of
 !                    random orientations of the search (>= 1).
 !
@@ -88,7 +90,7 @@ subroutine atormsd_calculate(                                        &
    logical(lk), intent(in), value :: c_align_flag, c_remap_flag, c_heavy_flag, c_massweight_flag
    logical(lk), intent(in), value :: c_mirror_flag, c_useatomtype_flag
    logical(lk), intent(in), value :: c_printstats_flag, c_random_flag
-   logical(lk), intent(in), value :: c_pruning_flag
+   logical(lk), intent(in), value :: c_prune_flag
    real(rk),    intent(in), value :: c_prune_tol
    integer(ik), intent(in), value :: c_ato_freq, c_max_trials
 
@@ -146,7 +148,7 @@ subroutine atormsd_calculate(                                        &
    random_flag    = c_random_flag
    printstats_flag    = c_printstats_flag
 
-   if (c_pruning_flag) then
+   if (c_prune_flag) then
       prune_procedure => prune_rd
       prune_tol = c_prune_tol
    else
@@ -198,8 +200,9 @@ subroutine atormsd_calculate(                                        &
       weights1 = atomic_masses(atoms1(atomset1)%elnum)
       weights2 = atomic_masses(atoms2(atomset2)%elnum)
    else
-      allocate (weights1(size(atomset1)), source=1.0_rk)
-      allocate (weights2(size(atomset2)), source=1.0_rk)
+      allocate (weights1(size(atomset1)), weights2(size(atomset2)))
+      weights1 = 1.0_rk
+      weights2 = 1.0_rk
    end if
    weights1 = weights1/sum(weights1)
    weights2 = weights2/sum(weights2)
@@ -213,7 +216,8 @@ subroutine atormsd_calculate(                                        &
 
    ! Coordinates of all (padded) atoms, molecule 2 transformed. They are only
    ! used to align the whole molecule 2 and to pair the excluded atoms.
-   allocate (unit_weights(n_padding), source=1.0_rk)
+   allocate (unit_weights(n_padding))
+   unit_weights = 1.0_rk
    full_coords1 = get_coords(atoms1, unit_weights, ORIGIN, IDENTITY_MATRIX)
    full_coords2 = get_coords(atoms2, unit_weights, ORIGIN, transmat2)
 

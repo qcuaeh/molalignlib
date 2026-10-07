@@ -161,7 +161,7 @@ character(4) function address_part(nodeptr) result(address)
    use iso_c_binding, only: c_loc, c_intptr_t
    type(partition_node_t), pointer, intent(in) :: nodeptr
    if (associated(nodeptr)) then
-      write (address, '(Z4.4)') modulo(transfer(c_loc(nodeptr), c_intptr_t), 16**4)
+      write (address, '(Z4.4)') modulo(transfer(c_loc(nodeptr), 0_c_intptr_t), 16_c_intptr_t**4)
    else
       address = 'NULL'
    end if

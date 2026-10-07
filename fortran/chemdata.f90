@@ -20,16 +20,18 @@ use str_utils
 implicit none
 
 integer(ik), parameter :: symlen = 3 ! Symbol length
-! Element tables are indexed 0:n_elems. Index 0 is the dummy atom 'X'
-! (zero mass, zero radii), so every real element's index equals its atomic
-! number. Dummy atoms, including padding atoms, always have elnum = 0.
+! Element tables are indexed 1:n_elems, so every element's index equals its
+! atomic number. There is no dummy element: the readers drop dummy atoms.
 integer(ik), parameter :: n_elems = 104
+! Element number of the padding atoms appended by molecule::pad_atoms. It
+! is not an element and must never index the tables below; padding atoms
+! are never included in the comparison, and element_symbol names them X.
+integer(ik), parameter :: PADDING_ELNUM = 0
 ! Bond perception tolerance (Angstrom), see molecule::bonds_from_atoms
 real(rk) :: bond_tol
 
 ! Element symbols
-character(symlen), parameter :: atomic_symbols(0:n_elems) = [ &
-'X ', & ! Dummy atom
+character(symlen), parameter :: atomic_symbols(n_elems) = [ &
 'H ', &
 'He', &
 'Li', &
@@ -138,8 +140,7 @@ character(symlen), parameter :: atomic_symbols(0:n_elems) = [ &
 
 ! Standard atomic masses
 ! Source: mendeleev Python library
-real(rk), parameter :: atomic_masses(0:n_elems) = [ &
-0.0, &  ! X
+real(rk), parameter :: atomic_masses(n_elems) = [ &
 1.0, &  ! H
 4.0, &  ! He
 6.9, &  ! Li
@@ -248,8 +249,7 @@ real(rk), parameter :: atomic_masses(0:n_elems) = [ &
 
 ! Atomic covalent radii (Angstrom)
 ! Source: mendeleev Python library
-real(rk), parameter :: covalent_radii(0:n_elems) = [ &
-0.0, &  ! X
+real(rk), parameter :: covalent_radii(n_elems) = [ &
 0.32, &  ! H
 0.46, &  ! He
 1.33, &  ! Li
@@ -358,8 +358,7 @@ real(rk), parameter :: covalent_radii(0:n_elems) = [ &
 
 ! Atomic Van der Waals radii (Angstrom)
 ! Source: mendeleev Python library
-real(rk), parameter :: vdw_radii(0:n_elems) = [ &
-0.0, &  ! X
+real(rk), parameter :: vdw_radii(n_elems) = [ &
 1.10, &  ! H
 1.40, &  ! He
 1.82, &  ! Li
@@ -465,5 +464,20 @@ real(rk), parameter :: vdw_radii(0:n_elems) = [ &
 2.46, &  ! Lr
 0.0   &  ! LJ
 ]
+
+contains
+
+function element_symbol(elnum) result(symbol)
+! Element symbol of an element number in 1:n_elems, or X for a padding
+! atom (PADDING_ELNUM), as written to output files
+   integer(ik), intent(in) :: elnum
+   character(symlen) :: symbol
+
+   if (elnum == PADDING_ELNUM) then
+      symbol = 'X'
+   else
+      symbol = atomic_symbols(elnum)
+   end if
+end function
 
 end module

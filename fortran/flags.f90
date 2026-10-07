@@ -19,7 +19,7 @@ use parameters
 implicit none
 
 ! Global run options, set by the programs and C bindings
-logical(lk) :: bonding_flag
+logical(lk) :: rebond_flag
 logical(lk) :: usebondtype_flag
 logical(lk) :: random_flag
 logical(lk) :: mirror_flag

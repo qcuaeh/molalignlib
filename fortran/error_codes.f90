@@ -31,6 +31,8 @@ public :: MOLALIGN_ERROR_NOT_CONFORMERS
 public :: MOLALIGN_ERROR_ASSIGNMENT_FAILED
 public :: MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER
 public :: MOLALIGN_ERROR_INVALID_BOUND
+public :: MOLALIGN_ERROR_INVALID_BOND_TYPE
+public :: MOLALIGN_ERROR_UNDEFINED_BOND_TYPE
 
 enum, bind(c)
    ! No error.
@@ -51,6 +53,10 @@ enum, bind(c)
    enumerator :: MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER    = 7
    ! Count parameter less than 1.
    enumerator :: MOLALIGN_ERROR_INVALID_BOUND            = 8
+   ! Bond type code outside 1..MAX_BOND_TYPE (not the code of any label).
+   enumerator :: MOLALIGN_ERROR_INVALID_BOND_TYPE        = 9
+   ! Bond of undefined type (UNDEFINED_BOND_TYPE) while bond types are used.
+   enumerator :: MOLALIGN_ERROR_UNDEFINED_BOND_TYPE      = 10
 end enum
 
 end module error_codes

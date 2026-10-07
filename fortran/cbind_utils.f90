@@ -19,9 +19,10 @@ subroutine build_atoms(n, atomdata, coords_in, atoms, error_code)
 ! Build an atom_t array from packed C arrays:
 !   atomdata  = [elnum0, label0, elnum1, label1, ...]   (length n*2)
 !   coords_in = [x0, y0, z0, x1, y1, z1, ...]           (length n*3)
-! Every elnum must lie in 0:n_elems (0 is the dummy atom); otherwise
-! error_code is MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER and atoms is
-! deallocated, so no out-of-range value reaches the element tables.
+! Every elnum must be an element number in 1:n_elems (there is no dummy
+! element: callers must leave dummy atoms out); otherwise error_code is
+! MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER and atoms is deallocated, so no
+! out-of-range value reaches the element tables.
    integer(ik), intent(in), value :: n
    integer(ik), dimension(n*2), intent(in) :: atomdata
    real(rk),    dimension(n*3), intent(in) :: coords_in
@@ -36,7 +37,7 @@ subroutine build_atoms(n, atomdata, coords_in, atoms, error_code)
       abase = (i - 1)*2
       cbase = (i - 1)*3
       elnum = atomdata(abase + 1)
-      if (elnum < 0 .or. elnum > n_elems) then
+      if (elnum < 1 .or. elnum > n_elems) then
          error_code = MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER
          deallocate(atoms)
          return
@@ -52,7 +53,9 @@ end subroutine build_atoms
 subroutine build_bonds(n, bonddata, bonds)
 ! Build a bond_t array from a flat C array:
 !   bonddata = [atom1_0, atom2_0, type_0, atom1_1, ...]  (length n*3)
-! Atom indices are 1-based, as in MOL/SDF files.
+! Atom indices are 1-based, as in MOL/SDF files. Every entry is a bond. Types
+! are bond type codes (see parameters), only used, and then validated, with
+! usebondtype_flag; without it any value is accepted.
    integer(ik), intent(in), value :: n
    integer(ik), dimension(n*3), intent(in) :: bonddata
    type(bond_t), dimension(:), allocatable, intent(out) :: bonds

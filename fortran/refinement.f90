@@ -70,6 +70,18 @@ function hna_signature(adjc, itemdir) result(signature)
    signature = codes(:n_codes)
 end function
 
+subroutine set_part_signature(part, signature)
+! Replace the signature of part (new_bare_part gives it an empty one) by a
+! copy of signature, using explicit bounds and assignment instead of
+! ALLOCATE(..., SOURCE=) without an array specification.
+   type(partition_node_t), pointer, intent(inout) :: part
+   integer(ik), dimension(:), intent(in) :: signature
+
+   if (associated(part%signature)) deallocate (part%signature)
+   allocate (part%signature(size(signature)))
+   part%signature = signature
+end subroutine
+
 subroutine refine_hna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
 ! Subdivide the leaf part `part` by signature (Pseudocode S1): one child per
 ! distinct signature, added to link, and every atom placed in its child and
@@ -91,7 +103,7 @@ subroutine refine_hna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
       child_part => find_child_part(part, signature)
       if (.not. associated(child_part)) then
          child_part => new_child_part(part)
-         allocate (child_part%signature, source=signature)
+         call set_part_signature(child_part, signature)
          call link_part(link, child_part)
       end if
       call add_new_item1(child_part, item%idx)
@@ -106,7 +118,7 @@ subroutine refine_hna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
       child_part => find_child_part(part, signature)
       if (.not. associated(child_part)) then
          child_part => new_child_part(part)
-         allocate (child_part%signature, source=signature)
+         call set_part_signature(child_part, signature)
          call link_part(link, child_part)
       end if
       call add_new_item2(child_part, item%idx)

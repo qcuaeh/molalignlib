@@ -27,10 +27,6 @@ public read_posarg
 public read_optarg
 public init_args
 
-type, public :: strlist_type
-   character(:), allocatable :: arg
-end type
-
 interface read_optarg
    module procedure int_read_optarg
    module procedure real_read_optarg
@@ -46,7 +42,7 @@ end subroutine
 
 subroutine read_posarg(arg, posargs)
    character(*), intent(in) :: arg
-   type(strlist_type), dimension(:), intent(inout) :: posargs
+   character(*), dimension(:), intent(inout) :: posargs
 
    if (arg(1:1) == '-') then
       write (stderr, '(A,1X,A)') 'Unknown option:', arg
@@ -59,7 +55,13 @@ subroutine read_posarg(arg, posargs)
       stop 'Too many arguments'
    end if
 
-   posargs(ipos)%arg = arg
+   if (len(arg) > len(posargs)) then
+      write (stderr, '(A,1X,I0,1X,A)') 'Arguments longer than', len(posargs), &
+            'characters are not supported'
+      stop
+   end if
+
+   posargs(ipos) = arg
 end subroutine
 
 logical(lk) function get_arg(arg) result(success)

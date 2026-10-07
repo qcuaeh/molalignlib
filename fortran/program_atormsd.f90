@@ -40,7 +40,7 @@ logical(lk) :: write_aligned
 character(:), allocatable :: title1, title2
 character(:), allocatable :: arg, aligned_path
 character(:), allocatable :: in_format, out_format
-type(strlist_type) :: posargs(2)
+character(ll) :: posargs(2)
 type(atom_t), dimension(:), allocatable :: atoms1, atoms2
 type(bond_t), dimension(:), allocatable :: bonds1, bonds2
 type(bool_matrix), dimension(:), allocatable :: prunes
@@ -88,7 +88,7 @@ do while (get_arg(arg))
       align_flag = .TRUE.
    case ('-remap')
       remap_flag = .TRUE.
-   case ('-prunetol')
+   case ('-prune')
       prune_procedure => prune_rd
       call read_optarg(arg, prune_tol)
    case ('-atomtype')
@@ -125,10 +125,10 @@ case (0)
 case (1)
    stop 'Too few file paths'
 case (2)
-   call open2read( posargs(1)%arg, in_format, in_unit)
+   call open2read( trim(posargs(1)), in_format, in_unit)
    call read_file( in_unit, in_format, title1, atoms1, bonds1)
    close (in_unit)
-   call open2read( posargs(2)%arg, in_format, in_unit)
+   call open2read( trim(posargs(2)), in_format, in_unit)
    call read_file( in_unit, in_format, title2, atoms2, bonds2)
    close (in_unit)
 case default
@@ -171,8 +171,9 @@ if (massweight_flag) then
    weights1 = atomic_masses(atoms1(atomset1)%elnum)
    weights2 = atomic_masses(atoms2(atomset2)%elnum)
 else
-   allocate (weights1(size(atomset1)), source=1.0_rk)
-   allocate (weights2(size(atomset2)), source=1.0_rk)
+   allocate (weights1(size(atomset1)), weights2(size(atomset2)))
+   weights1 = 1.0_rk
+   weights2 = 1.0_rk
 end if
 weights1 = weights1/sum(weights1)
 weights2 = weights2/sum(weights2)
@@ -186,7 +187,8 @@ end if
 
 ! Coordinates of all (padded) atoms, molecule 2 transformed. They are only
 ! used to align the whole molecule 2 and to pair the excluded atoms.
-allocate (unit_weights(n_padding), source=1.0_rk)
+allocate (unit_weights(n_padding))
+unit_weights = 1.0_rk
 full_coords1 = get_coords( atoms1, unit_weights, ORIGIN, IDENTITY_MATRIX)
 full_coords2 = get_coords( atoms2, unit_weights, ORIGIN, transmat2)
 

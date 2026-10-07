@@ -51,7 +51,7 @@ subroutine optimize_mapping_atoms(atomtypes, prunes, coords1, &
    real(rk), dimension(:,:), allocatable :: coords2r
    real(rk) :: mapdist, steps, rotation(4), total_rotation(4)
 
-   allocate (coords2r, mold=coords2)
+   allocate (coords2r(size(coords2, 1), size(coords2, 2)))
    allocate (mapping1(size(atomtypes%itemdir1)))
    allocate (new_mapping(size(atomtypes%itemdir1)))
 

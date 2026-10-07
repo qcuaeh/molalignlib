@@ -187,7 +187,7 @@ function rotated_coords_center_all(coords, rotquat, center) result(rotated_coord
    real(rk) :: rotmat(3, 3)
    integer(ik) :: i, j
 
-   allocate (rotated_coords, mold=coords)
+   allocate (rotated_coords(size(coords, 1), size(coords, 2)))
 
    rotmat = quatrotmat(rotquat)
 

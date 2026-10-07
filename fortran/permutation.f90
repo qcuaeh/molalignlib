@@ -85,7 +85,7 @@ function inverse_permutation(permutation)
    ! Local variables
    integer(ik) :: i
 
-   allocate (inverse_permutation, mold=permutation)
+   allocate (inverse_permutation(size(permutation)))
 
    do i = 1, size(permutation)
       inverse_permutation(permutation(i)) = i

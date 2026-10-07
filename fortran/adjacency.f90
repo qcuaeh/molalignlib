@@ -40,9 +40,9 @@ public count_fragments
 type, public :: adjc_t
    integer(ik) :: cn
    integer(ik) :: list(MAX_COORDNUM)
-   ! Type of the bond to each neighbor in list (GENERIC_BOND when bond
-   ! types are not used, a compacted bond type otherwise)
-   integer(ik) :: bondtype(MAX_COORDNUM) = GENERIC_BOND
+   ! Type of the bond to each neighbor in list (UNDEFINED_BOND_TYPE when
+   ! bond types are not used, the bond type from the input otherwise)
+   integer(ik) :: bondtype(MAX_COORDNUM) = UNDEFINED_BOND_TYPE
 end type
 
 ! Edit modes of edit_mismatched_bonds
@@ -340,7 +340,7 @@ subroutine adjmat_to_adjcs(adjmat, adjcs)
          if (adjmat(j, i) /= NO_BOND) then
             nadj = nadj + 1
             if (nadj > MAX_COORDNUM) then
-               write (stderr, '(A,1X,I0,1X,A,1X,A)') &
+               write (stderr, '(A,1X,I0,1X,A,1X,I0)') &
                      'Coordination number of atom', i, &
                      'exceeds', MAX_COORDNUM
                stop

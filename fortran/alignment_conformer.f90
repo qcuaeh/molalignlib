@@ -67,7 +67,7 @@ subroutine optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
    type(chaintree_node_t), pointer :: hna_chain
    type(array_trees_t) :: cache_arrays
 
-   allocate (coords2r, mold=coords2)
+   allocate (coords2r(size(coords2, 1), size(coords2, 2)))
 
    ! Self-consistent HNA partition and assignment tree
    call compute_sc_hna_chain( adjcs1, adjcs2, atomtypes, hna_chain, error_code)

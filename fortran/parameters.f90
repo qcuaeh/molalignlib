@@ -16,6 +16,7 @@
 
 module parameters
 use, intrinsic :: iso_fortran_env, only: int64, real64
+use, intrinsic :: iso_fortran_env, only: stdin => input_unit
 use, intrinsic :: iso_fortran_env, only: stdout => output_unit
 use, intrinsic :: iso_fortran_env, only: stderr => error_unit
 use kinds
@@ -49,20 +50,55 @@ integer(ik), parameter :: ll = 256
 ! Maximum coordination number
 integer(ik), parameter :: MAX_COORDNUM = 10
 
-! Bond types. The bond state of an atom pair is an integer bond type:
-! NO_BOND (0) when the atoms are not bonded, and a positive type when they
-! are. Without bond types every bond is GENERIC_BOND; with bond types the
-! types read from file are compacted to 1, 2, ... Two atom pairs match
-! when their bond types are equal, so "no bond" behaves as a bond of type
-! zero. A partition signature entry encodes (neighbor part index, bond
-! type) as
+! Bond types.
+! A bond type is an opaque label: a short case-insensitive string that has
+! no intrinsic meaning. Bond types are compared literally, as strings
+! (through their integer codes): two bonds match when their labels are
+! the same string and differ otherwise, so 3/2, 1.5 and 6/4 are three
+! different types, and no type is "closer" to another.
+!
+! A bond type string has one of three forms, each stored as an integer code
+! in its own block:
+!   d     a digit 1-9                            code d (1..9)
+!   ab    a letter, then a letter or a digit     code BOND_BLOCK2 + 36*a + b
+!   nsd   a digit, a separator, a digit          code BOND_BLOCK3 + 100*s + 10*n + d
+! with a = 0..25 for a..z, b = 0..35 for 0..9, a..z, n, d = 0..9, and s the
+! position (from 0) of the separator in BONDTYPE_SEPARATORS (/ : - . ,).
+! Every string of these forms is a valid bond type, and no other string is
+! (see file_utils::bondtype_code and file_utils::bondtype_str). The code 0
+! (NO_BOND) is not the code of any string, so it is not a bond type: it is
+! only used in adjacency matrices, for the atom pairs that are not bonded.
+! Every entry of a bond list is a bond.
+!
+! UNDEFINED_BOND_TYPE (BOND_TYPE_RADIX) is not the code of any string either
+! (bondtype_code and bondtype_str map it to and from the blank string): it
+! is the type of a bond whose type is undefined, such as a bond perceived
+! from geometry. It is the only code that is not compared literally.
+!
+! When bond types are not used, they are not validated, and every bond
+! becomes UNDEFINED_BOND_TYPE whatever its code (0 included), so only
+! connectivity is compared. When bond types are used, the types between
+! compared atoms must be valid codes (1 to MAX_BOND_TYPE), and
+! UNDEFINED_BOND_TYPE is an error, because an undefined type cannot be
+! compared (see molecule::check_bondtypes and molecule::adjacency_from_bonds).
+! Two atom pairs match when their bond types are equal, so "no bond"
+! behaves as a bond of type NO_BOND. A partition signature entry encodes
+! (neighbor part index, bond type) as
 !    part_idx*BOND_TYPE_RADIX + bondtype
-! Bond types above MAX_BOND_TYPE are merged into MAX_BOND_TYPE, which only
-! makes the comparison coarser, never wrong.
+! which is unique because the bond types in adjacency lists are 1 to
+! BOND_TYPE_RADIX (NO_BOND never appears in them).
+character(*), parameter :: BONDTYPE_DIGITS = '0123456789'
+character(*), parameter :: BONDTYPE_LETTERS = 'abcdefghijklmnopqrstuvwxyz'
+character(*), parameter :: BONDTYPE_ALNUM = BONDTYPE_DIGITS//BONDTYPE_LETTERS
+character(*), parameter :: BONDTYPE_SEPARATORS = '/:-.,'
 integer(ik), parameter :: NO_BOND = 0
-integer(ik), parameter :: GENERIC_BOND = 1
-integer(ik), parameter :: BOND_TYPE_RADIX = 256
-integer(ik), parameter :: MAX_BOND_TYPE = BOND_TYPE_RADIX - 1
+integer(ik), parameter :: BOND_BLOCK2 = 10
+integer(ik), parameter :: BOND_BLOCK3 = BOND_BLOCK2 &
+      + len(BONDTYPE_LETTERS)*len(BONDTYPE_ALNUM)
+integer(ik), parameter :: MAX_BOND_TYPE = BOND_BLOCK3 &
+      + 100*len(BONDTYPE_SEPARATORS) - 1
+integer(ik), parameter :: BOND_TYPE_RADIX = MAX_BOND_TYPE + 1
+integer(ik), parameter :: UNDEFINED_BOND_TYPE = BOND_TYPE_RADIX
 
 ! Default maximum number of random trials
 integer(ik), parameter :: MAX_TRIALS_DEFAULT = 10000

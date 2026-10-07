@@ -17,6 +17,8 @@
 module molecule
 ! Atoms and bonds of a molecule, atom selection and coordinate transforms
 use parameters
+use error_codes
+use flags
 use chemdata
 use adjacency
 implicit none
@@ -28,11 +30,10 @@ public include_all_atoms
 public include_heavy_atoms
 public pad_atoms
 public complete_mapping
-public extract_bonds
 public bonds_from_atoms
+public check_bondtypes
 public adjacency_from_bonds
-public distinct_bondtypes
-public mol2_bondtype
+public is_valid_bondtype
 public print_atoms
 public print_bonds
 
@@ -56,32 +57,27 @@ end interface
 contains
 
 subroutine include_all_atoms(atoms, atomset)
-! Indices of all real (non-dummy) atoms
+! Indices of all atoms. Pass only the real atoms (not the padding atoms).
    type(atom_t), dimension(:), intent(inout) :: atoms
    integer(ik), dimension(:), allocatable, intent(out) :: atomset
    ! Local variables
-   integer(ik) :: nel, atomidx
+   integer(ik) :: atomidx
 
-   ! Dummy atoms (elnum = 0) are never included
-   allocate (atomset(count(atoms%elnum > 0)))
+   allocate (atomset(size(atoms)))
 
-   nel = 0
    do atomidx = 1, size(atoms)
-      if (atoms(atomidx)%elnum > 0) then
-         nel = nel + 1
-         atomset(nel) = atomidx
-      end if
+      atomset(atomidx) = atomidx
    end do
 end subroutine
 
 subroutine include_heavy_atoms(atoms, atomset)
-! Indices of all heavy atoms
+! Indices of all heavy (non-hydrogen) atoms. Pass only the real atoms (not
+! the padding atoms).
    type(atom_t), dimension(:), intent(inout) :: atoms
    integer(ik), dimension(:), allocatable, intent(out) :: atomset
    ! Local variables
    integer(ik) :: nel, atomidx
 
-   ! elnum > 1 excludes both hydrogens and dummy atoms (elnum = 0)
    allocate (atomset(count(atoms%elnum > 1)))
 
    nel = 0
@@ -94,10 +90,11 @@ subroutine include_heavy_atoms(atoms, atomset)
 end subroutine
 
 subroutine pad_atoms(atoms, n_padding)
-! Append dummy atoms (elnum = 0) until the molecule has n_padding atoms. The
-! original atoms keep their indices, so bond tables and file line numbers
-! stay valid. Padding atoms are recognised by index (i > original size)
-! everywhere else.
+! Append padding atoms (elnum = PADDING_ELNUM) until the molecule has
+! n_padding atoms. The original atoms keep their indices, so bond tables and
+! file line numbers stay valid. Padding atoms are recognised by index
+! (i > original size) everywhere else, and their elnum never indexes the
+! element tables.
    type(atom_t), dimension(:), allocatable, intent(inout) :: atoms
    integer(ik), intent(in) :: n_padding
    ! Local variables
@@ -110,7 +107,7 @@ subroutine pad_atoms(atoms, n_padding)
    allocate (padded(n_padding))
    padded(1:n_real) = atoms
    do i = n_real + 1, n_padding
-      padded(i)%elnum = 0
+      padded(i)%elnum = PADDING_ELNUM
       padded(i)%group = 0
       padded(i)%coords = 0.0_rk
    end do
@@ -120,7 +117,8 @@ end subroutine
 
 subroutine neighbor_table(n_atoms, bonds, nbr_start, nbr_list)
 ! Compressed neighbour lists: the neighbours of atom i are
-! nbr_list(nbr_start(i) : nbr_start(i+1)-1).
+! nbr_list(nbr_start(i) : nbr_start(i+1)-1). Every bond counts, whatever
+! its type.
    integer(ik), intent(in) :: n_atoms
    type(bond_t), dimension(:), intent(in) :: bonds
    integer(ik), dimension(:), allocatable, intent(out) :: nbr_start, nbr_list
@@ -282,47 +280,6 @@ subroutine complete_mapping(atomset1, atomset2, mapping1, atoms1, atoms2, &
    end do
 end subroutine
 
-function extract_bonds(atomset, n_atoms, bonds) result(subbonds)
-! Bonds between atoms of atomset, renumbered to the compact numbering of
-! the set (atom atomset(i) becomes atom i). Bonds with an end outside the
-! set are dropped.
-   integer(ik), dimension(:), intent(in) :: atomset
-   integer(ik), intent(in) :: n_atoms
-   type(bond_t), dimension(:), intent(in) :: bonds
-   type(bond_t), dimension(:), allocatable :: subbonds
-   ! Local variables
-   integer(ik), dimension(:), allocatable :: newidx
-   integer(ik) :: i, n_bonds, a1, a2
-
-   ! Map full indices to compact indices (0 = not in the set)
-   allocate (newidx(n_atoms))
-   newidx = 0
-   do i = 1, size(atomset)
-      newidx(atomset(i)) = i
-   end do
-
-   n_bonds = 0
-   do i = 1, size(bonds)
-      if (newidx(bonds(i)%atomidx1) > 0 .and. newidx(bonds(i)%atomidx2) > 0) then
-         n_bonds = n_bonds + 1
-      end if
-   end do
-
-   allocate (subbonds(n_bonds))
-
-   n_bonds = 0
-   do i = 1, size(bonds)
-      a1 = newidx(bonds(i)%atomidx1)
-      a2 = newidx(bonds(i)%atomidx2)
-      if (a1 > 0 .and. a2 > 0) then
-         n_bonds = n_bonds + 1
-         subbonds(n_bonds)%atomidx1 = a1
-         subbonds(n_bonds)%atomidx2 = a2
-         subbonds(n_bonds)%bondtype = bonds(i)%bondtype
-      end if
-   end do
-end function
-
 subroutine set_coords(atoms, coords)
 ! Copy a 3 x n coordinate array into atoms
    type(atom_t), dimension(:), intent(inout) :: atoms
@@ -337,7 +294,9 @@ end subroutine
 
 subroutine bonds_from_atoms(atoms, bonds)
 ! Bonds perceived from geometry: two atoms are bonded when their distance is
-! below the sum of their covalent radii plus bond_tol. All bonds get type 1.
+! below the sum of their covalent radii plus bond_tol. All bonds are
+! UNDEFINED_BOND_TYPE, since geometry gives no bond type. Pass only the real
+! atoms (not the padding atoms).
    type(atom_t), dimension(:), intent(in) :: atoms
    type(bond_t), dimension(:), allocatable, intent(out) :: bonds
    ! Local variables
@@ -369,7 +328,7 @@ subroutine bonds_from_atoms(atoms, bonds)
             n_bonds = n_bonds + 1
             bonds(n_bonds)%atomidx1 = i
             bonds(n_bonds)%atomidx2 = j
-            bonds(n_bonds)%bondtype = 1
+            bonds(n_bonds)%bondtype = UNDEFINED_BOND_TYPE
          end if
       end do
    end do
@@ -377,40 +336,101 @@ subroutine bonds_from_atoms(atoms, bonds)
    deallocate (is_bonded)
 end subroutine
 
-subroutine adjacency_from_bonds(atoms, bonds, adjcs, bondtypes)
-! Adjacency lists of all atoms in atoms. To restrict them to a set of
-! atoms, pass the atoms of the set and the bonds from extract_bonds.
-! Each neighbor carries the compacted type of its bond: the position of
-! the bond's type in bondtypes (see distinct_bondtypes). Bond types are not
-! interpreted, only compared, so both molecules must come from the same
-! source (file format and parser). Bonds whose type is not in bondtypes are
-! GENERIC_BOND, so passing an empty bondtypes ignores bond types and only
-! connectivity is compared.
-   type(atom_t), dimension(:), intent(in) :: atoms
+subroutine check_bondtypes(atomset, n_atoms, bonds, error_code)
+! Check the bond types before adjacency_from_bonds. With usebondtype_flag
+! the type of every bond between atoms of atomset must be a valid bond
+! type (see is_valid_bondtype): error_code is
+! MOLALIGN_ERROR_UNDEFINED_BOND_TYPE for a bond of undefined type
+! (UNDEFINED_BOND_TYPE), which cannot be compared, and
+! MOLALIGN_ERROR_INVALID_BOND_TYPE for any other invalid code.
+! Bonds with an end outside the set are never used, so their types are not
+! checked. Without usebondtype_flag bond types are not used, so they are not
+! validated: any value is accepted (see adjacency_from_bonds). bonds use full atom indices
+! (1..n_atoms).
+   integer(ik), dimension(:), intent(in) :: atomset
+   integer(ik), intent(in) :: n_atoms
+   type(bond_t), dimension(:), intent(in) :: bonds
+   integer(ik), intent(out) :: error_code
+   ! Local variables
+   logical(lk), dimension(:), allocatable :: in_set
+   integer(ik) :: i, bondtype
+
+   error_code = MOLALIGN_SUCCESS
+   if (.not. usebondtype_flag) return
+
+   allocate (in_set(n_atoms))
+   in_set = .FALSE.
+   in_set(atomset) = .TRUE.
+
+   do i = 1, size(bonds)
+      if (.not. (in_set(bonds(i)%atomidx1) .and. in_set(bonds(i)%atomidx2))) cycle
+      bondtype = bonds(i)%bondtype
+      if (bondtype == UNDEFINED_BOND_TYPE) then
+         error_code = MOLALIGN_ERROR_UNDEFINED_BOND_TYPE
+         return
+      end if
+      if (.not. is_valid_bondtype(bondtype)) then
+         error_code = MOLALIGN_ERROR_INVALID_BOND_TYPE
+         return
+      end if
+   end do
+end subroutine
+
+subroutine adjacency_from_bonds(atomset, n_atoms, bonds, adjcs, error_code)
+! Adjacency lists of the atoms of atomset, in the compact numbering of the
+! set (atom atomset(i) becomes atom i). bonds use full atom indices
+! (1..n_atoms); bonds with an end outside the set are dropped. bonds are not
+! modified. Every entry of bonds is a bond: NO_BOND only marks the unbonded
+! pairs of the adjacency matrix.
+! Without usebondtype_flag only connectivity counts: every bond becomes
+! UNDEFINED_BOND_TYPE, whatever its type code (0 included). With it each
+! neighbor carries the type of its bond exactly as stored in bonds, which
+! check_bondtypes must have found valid. Bond types are compared literally,
+! for equality of their codes, never interpreted (see parameters). A bond
+! of undefined type (UNDEFINED_BOND_TYPE) within the set
+! cannot be compared, so with usebondtype_flag error_code is then
+! MOLALIGN_ERROR_UNDEFINED_BOND_TYPE and adjcs is left unallocated.
+   integer(ik), dimension(:), intent(in) :: atomset
+   integer(ik), intent(in) :: n_atoms
    type(bond_t), dimension(:), intent(in) :: bonds
    type(adjc_t), dimension(:), allocatable, intent(out) :: adjcs
-   integer(ik), dimension(:), intent(in) :: bondtypes
+   integer(ik), intent(out) :: error_code
    ! Local variables
+   integer(ik), dimension(:), allocatable :: newidx
    integer(ik), dimension(:,:), allocatable :: adjmat
-   integer(ik) :: n_atoms, atomidx1, atomidx2, bondtype, i, j
+   integer(ik) :: n_set, atomidx1, atomidx2, bondtype, i
 
-   n_atoms = size(atoms)
+   error_code = MOLALIGN_SUCCESS
+   n_set = size(atomset)
 
-   ! Adjacency matrix of the bonds (bond type of each bond, NO_BOND where
-   ! there is none). A pair listed more than once keeps the type of its
-   ! last occurrence.
-   allocate (adjmat(n_atoms, n_atoms))
+   ! Map full indices to compact indices (0 = not in the set)
+   allocate (newidx(n_atoms))
+   newidx = 0
+   do i = 1, n_set
+      newidx(atomset(i)) = i
+   end do
+
+   ! Adjacency matrix of the bonds within the set (bond type of each bond,
+   ! NO_BOND where there is none). A pair listed more than once keeps the
+   ! type of its last occurrence.
+   allocate (adjmat(n_set, n_set))
    adjmat = NO_BOND
    do i = 1, size(bonds)
-      bondtype = GENERIC_BOND
-      do j = 1, size(bondtypes)
-         if (bondtypes(j) == bonds(i)%bondtype) then
-            bondtype = min(j, MAX_BOND_TYPE)
-            exit
+      bondtype = bonds(i)%bondtype
+      atomidx1 = newidx(bonds(i)%atomidx1)
+      atomidx2 = newidx(bonds(i)%atomidx2)
+      if (atomidx1 == 0 .or. atomidx2 == 0) cycle
+      if (usebondtype_flag) then
+         if (bondtype == UNDEFINED_BOND_TYPE) then
+            error_code = MOLALIGN_ERROR_UNDEFINED_BOND_TYPE
+            return
          end if
-      end do
-      atomidx1 = bonds(i)%atomidx1
-      atomidx2 = bonds(i)%atomidx2
+         if (.not. is_valid_bondtype(bondtype)) then
+            error stop 'adjacency_from_bonds: invalid bond type (see check_bondtypes)'
+         end if
+      else
+         bondtype = UNDEFINED_BOND_TYPE
+      end if
       adjmat(atomidx1, atomidx2) = bondtype
       adjmat(atomidx2, atomidx1) = bondtype
    end do
@@ -418,57 +438,14 @@ subroutine adjacency_from_bonds(atoms, bonds, adjcs, bondtypes)
    call adjmat_to_adjcs(adjmat, adjcs)
 end subroutine
 
-function distinct_bondtypes(bonds1, bonds2) result(bondtypes)
-! Distinct bond types found in either molecule, in ascending order. Bond
-! type bondtypes(k) is compacted to k in adjacency_from_bonds, so the bond
-! types of both molecules are consistent when they share this array.
-   type(bond_t), dimension(:), intent(in) :: bonds1, bonds2
-   integer(ik), dimension(:), allocatable :: bondtypes
-   ! Local variables
-   integer(ik), dimension(:), allocatable :: alltypes
-   integer(ik) :: n_types, i, j, value
+function is_valid_bondtype(code) result(valid)
+! Whether code is the code of a bond type string, i.e. 1..MAX_BOND_TYPE (see
+! parameters). NO_BOND is not a bond type, and UNDEFINED_BOND_TYPE is not
+! valid either: an undefined type cannot be compared.
+   integer(ik), intent(in) :: code
+   logical(lk) :: valid
 
-   alltypes = [bonds1%bondtype, bonds2%bondtype]
-   allocate (bondtypes(size(alltypes)))
-
-   ! Insertion into a sorted list of unique values
-   n_types = 0
-   do i = 1, size(alltypes)
-      value = alltypes(i)
-      j = n_types
-      do while (j > 0)
-         if (bondtypes(j) <= value) exit
-         j = j - 1
-      end do
-      if (j > 0) then
-         if (bondtypes(j) == value) cycle
-      end if
-      bondtypes(j+2:n_types+1) = bondtypes(j+1:n_types)
-      bondtypes(j+1) = value
-      n_types = n_types + 1
-   end do
-
-   bondtypes = bondtypes(:n_types)
-end function
-
-function mol2_bondtype(typestr) result(bondtype)
-! Integer bond type (MOL convention) of a MOL2 bond type string. Amide
-! bonds are single bonds; dummy, unknown and not connected are 0.
-   character(*), intent(in) :: typestr
-   integer(ik) :: bondtype
-
-   select case (trim(adjustl(typestr)))
-   case ('1', 'am', 'AM', 'Am')
-      bondtype = 1
-   case ('2')
-      bondtype = 2
-   case ('3')
-      bondtype = 3
-   case ('ar', 'AR', 'Ar')
-      bondtype = 4
-   case default
-      bondtype = 0
-   end select
+   valid = code >= 1 .and. code <= MAX_BOND_TYPE
 end function
 
 function get_coords_atoms(atoms, weights, center, transmat) result(coords)
@@ -559,7 +536,7 @@ subroutine print_atoms(atoms)
    do i = 1, size(atoms)
       atom = atoms(i)
       fmtstr = '(I3,3X,A2,1X,I3,3(1X,f8.4),2X)'
-      write (stderr, fmtstr) i, atomic_symbols(atom%elnum), atom%group, atom%coords
+      write (stderr, fmtstr) i, element_symbol(atom%elnum), atom%group, atom%coords
    end do
 end subroutine
 

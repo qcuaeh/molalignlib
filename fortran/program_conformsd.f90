@@ -34,6 +34,7 @@ use file_reading
 use file_writing
 use arg_parsing
 use flags
+use error_codes
 implicit none
 
 logical(lk) :: printmapping_flag
@@ -41,7 +42,7 @@ logical(lk) :: write_aligned
 character(:), allocatable :: title1, title2
 character(:), allocatable :: arg, aligned_path
 character(:), allocatable :: in_format1, in_format2, out_format
-type(strlist_type) :: posargs(2)
+character(ll) :: posargs(2)
 type(atom_t), dimension(:), allocatable :: atoms1, atoms2
 type(bond_t), dimension(:), allocatable :: bonds1, bonds2
 type(adjc_t), dimension(:), allocatable :: adjcs1, adjcs2
@@ -54,7 +55,6 @@ real(rk) :: transmat2(3,3)
 real(rk), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, coords2r
 real(rk), dimension(:,:), allocatable :: full_coords1, full_coords2, full_coords2r
 integer(ik), dimension(:), allocatable :: atomset1, atomset2
-integer(ik), dimension(:), allocatable :: bondtypes
 integer(ik), dimension(:), allocatable :: mapping1, full_atomperm1
 integer(ik) :: max_records, max_trials, confo_freq, max_fragments
 integer(ik) :: n_frags1, n_frags2
@@ -70,7 +70,7 @@ mirror_flag = .FALSE.
 align_flag = .FALSE.
 remap_flag = .FALSE.
 massweight_flag = .FALSE.
-bonding_flag = .FALSE.
+rebond_flag = .FALSE.
 usebondtype_flag = .FALSE.
 useatomtype_flag = .FALSE.
 random_flag = .FALSE.
@@ -94,8 +94,8 @@ do while (get_arg(arg))
       align_flag = .TRUE.
    case ('-remap')
       remap_flag = .TRUE.
-   case ('-bondtol')
-      bonding_flag = .TRUE.
+   case ('-rebond')
+      rebond_flag = .TRUE.
       call read_optarg(arg, bond_tol)
    case ('-bondtype')
       usebondtype_flag = .TRUE.
@@ -137,23 +137,19 @@ case (0)
 case (1)
    stop 'Too few file paths'
 case (2)
-   call open2read( posargs(1)%arg, in_format1, in_unit)
+   call open2read( trim(posargs(1)), in_format1, in_unit)
    call read_file( in_unit, in_format1, title1, atoms1, bonds1)
    close (in_unit)
-   call open2read( posargs(2)%arg, in_format2, in_unit)
+   call open2read( trim(posargs(2)), in_format2, in_unit)
    call read_file( in_unit, in_format2, title2, atoms2, bonds2)
    close (in_unit)
 case default
    stop 'Too many file paths'
 end select
 
-! Bond types are compared, not interpreted, so they must come from the
-! same parser: both files must have the same format
-if (usebondtype_flag .and. .not. bonding_flag) then
-   if (in_format1 /= in_format2) then
-      stop 'Bond types can only be compared between files of the same format'
-   end if
-end if
+! Bonds perceived from geometry (-rebond) are untyped, so -bondtype has
+! no effect with them
+if (rebond_flag) usebondtype_flag = .FALSE.
 
 ! Pad the smaller molecule with dummy atoms appended at the end. Real atoms
 ! keep their indices; padding atoms are recognised by index from here on.
@@ -185,23 +181,35 @@ if (any(atomtypes%parts%n_items1 /= atomtypes%parts%n_items2)) then
    stop 'These molecules are not isomers'
 end if
 
-! With -bondtol, perceive bonds from geometry instead of the files
-if (bonding_flag) then
+! With -rebond, perceive bonds from geometry instead of the files
+if (rebond_flag) then
    call bonds_from_atoms( atoms1(1:n_atoms1), bonds1)
    call bonds_from_atoms( atoms2(1:n_atoms2), bonds2)
 end if
 
-! Set adjacency lists of the included atoms (bonds to excluded atoms are
-! dropped). With -bondtype, the edges used by the refinement carry the bond
-! types, compacted jointly for both molecules.
-if (usebondtype_flag) then
-   bondtypes = distinct_bondtypes( bonds1, bonds2)
-else
-   ! No bond types: every bond is GENERIC_BOND
-   allocate (bondtypes(0))
+! With -bondtype, reject invalid bond types between included atoms
+call check_bondtypes( atomset1, n_padding, bonds1, error_code)
+if (error_code == MOLALIGN_SUCCESS) then
+   call check_bondtypes( atomset2, n_padding, bonds2, error_code)
 end if
-call adjacency_from_bonds( atoms1(atomset1), extract_bonds( atomset1, n_padding, bonds1), adjcs1, bondtypes)
-call adjacency_from_bonds( atoms2(atomset2), extract_bonds( atomset2, n_padding, bonds2), adjcs2, bondtypes)
+if (error_code == MOLALIGN_ERROR_UNDEFINED_BOND_TYPE) then
+   stop 'Bonds of undefined type cannot be compared (see -bondtype)'
+else if (error_code /= MOLALIGN_SUCCESS) then
+   stop 'Invalid bond type between compared atoms'
+end if
+
+! Without -bondtype only connectivity counts: adjacency_from_bonds makes
+! every bond UNDEFINED_BOND_TYPE. With it, the edges used by the refinement
+! carry the bond types; bonds of undefined type are then an error.
+! Set adjacency lists of the included atoms (bonds to excluded atoms are
+! dropped)
+call adjacency_from_bonds( atomset1, n_padding, bonds1, adjcs1, error_code)
+if (error_code == MOLALIGN_SUCCESS) then
+   call adjacency_from_bonds( atomset2, n_padding, bonds2, adjcs2, error_code)
+end if
+if (error_code == MOLALIGN_ERROR_UNDEFINED_BOND_TYPE) then
+   stop 'Bonds of undefined type cannot be compared (see -bondtype)'
+end if
 
 ! Abort if either molecule has more fragments than allowed (counted on the
 ! bond graph of the included atoms, which is what the search uses)
@@ -224,8 +232,9 @@ if (massweight_flag) then
    weights1 = atomic_masses(atoms1(atomset1)%elnum)
    weights2 = atomic_masses(atoms2(atomset2)%elnum)
 else
-   allocate (weights1(size(atomset1)), source=1.0_rk)
-   allocate (weights2(size(atomset2)), source=1.0_rk)
+   allocate (weights1(size(atomset1)), weights2(size(atomset2)))
+   weights1 = 1.0_rk
+   weights2 = 1.0_rk
 end if
 weights1 = weights1/sum(weights1)
 weights2 = weights2/sum(weights2)
@@ -239,7 +248,8 @@ end if
 
 ! Coordinates of all (padded) atoms, molecule 2 transformed. They are only
 ! used to align the whole molecule 2 and to pair the excluded atoms.
-allocate (unit_weights(n_padding), source=1.0_rk)
+allocate (unit_weights(n_padding))
+unit_weights = 1.0_rk
 full_coords1 = get_coords( atoms1, unit_weights, ORIGIN, IDENTITY_MATRIX)
 full_coords2 = get_coords( atoms2, unit_weights, ORIGIN, transmat2)
 
