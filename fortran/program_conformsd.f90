@@ -34,6 +34,7 @@ use file_reading
 use file_writing
 use arg_parsing
 use flags
+use error_codes
 implicit none
 
 logical(lk) :: printmapping_flag
@@ -54,7 +55,6 @@ real(rk) :: transmat2(3,3)
 real(rk), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, coords2r
 real(rk), dimension(:,:), allocatable :: full_coords1, full_coords2, full_coords2r
 integer(ik), dimension(:), allocatable :: atomset1, atomset2
-integer(ik), dimension(:), allocatable :: bondtypes
 integer(ik), dimension(:), allocatable :: mapping1, full_atomperm1
 integer(ik) :: max_records, max_trials, confo_freq, max_fragments
 integer(ik) :: n_frags1, n_frags2
@@ -147,13 +147,9 @@ case default
    stop 'Too many file paths'
 end select
 
-! Bond types are compared, not interpreted, so they must come from the
-! same parser: both files must have the same format
-if (usebondtype_flag .and. .not. bonding_flag) then
-   if (in_format1 /= in_format2) then
-      stop 'Bond types can only be compared between files of the same format'
-   end if
-end if
+! Bonds perceived from geometry (-bondtol) are untyped, so -bondtype has
+! no effect with them
+if (bonding_flag) usebondtype_flag = .FALSE.
 
 ! Pad the smaller molecule with dummy atoms appended at the end. Real atoms
 ! keep their indices; padding atoms are recognised by index from here on.
@@ -191,17 +187,29 @@ if (bonding_flag) then
    call bonds_from_atoms( atoms2(1:n_atoms2), bonds2)
 end if
 
-! Set adjacency lists of the included atoms (bonds to excluded atoms are
-! dropped). With -bondtype, the edges used by the refinement carry the bond
-! types, compacted jointly for both molecules.
-if (usebondtype_flag) then
-   bondtypes = distinct_bondtypes( bonds1, bonds2)
-else
-   ! No bond types: every bond is GENERIC_BOND
-   allocate (bondtypes(0))
+! With -bondtype, reject invalid bond types between included atoms
+call check_bondtypes( atomset1, n_padding, bonds1, error_code)
+if (error_code == MOLALIGN_SUCCESS) then
+   call check_bondtypes( atomset2, n_padding, bonds2, error_code)
 end if
-call adjacency_from_bonds( atoms1(atomset1), extract_bonds( atomset1, n_padding, bonds1), adjcs1, bondtypes)
-call adjacency_from_bonds( atoms2(atomset2), extract_bonds( atomset2, n_padding, bonds2), adjcs2, bondtypes)
+if (error_code == MOLALIGN_ERROR_UNDEFINED_BOND_TYPE) then
+   stop 'Bonds of undefined type cannot be compared (see -bondtype)'
+else if (error_code /= MOLALIGN_SUCCESS) then
+   stop 'Invalid bond type between compared atoms'
+end if
+
+! Without -bondtype only connectivity counts: adjacency_from_bonds makes
+! every bond UNDEFINED_BOND_TYPE. With it, the edges used by the refinement
+! carry the bond types; bonds of undefined type are then an error.
+! Set adjacency lists of the included atoms (bonds to excluded atoms are
+! dropped)
+call adjacency_from_bonds( atomset1, n_padding, bonds1, adjcs1, error_code)
+if (error_code == MOLALIGN_SUCCESS) then
+   call adjacency_from_bonds( atomset2, n_padding, bonds2, adjcs2, error_code)
+end if
+if (error_code == MOLALIGN_ERROR_UNDEFINED_BOND_TYPE) then
+   stop 'Bonds of undefined type cannot be compared (see -bondtype)'
+end if
 
 ! Abort if either molecule has more fragments than allowed (counted on the
 ! bond graph of the included atoms, which is what the search uses)

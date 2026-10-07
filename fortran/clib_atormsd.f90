@@ -32,6 +32,8 @@ subroutine atormsd_calculate(                                        &
 ! Inputs, as flat C arrays:
 !   c_atom_data1/2 : packed atom data, length c_n_atoms*2:
 !                    [elnum0, label0, elnum1, label1, ...]
+!                    elnum is an atomic number in 1..n_elems (there is no
+!                    dummy element: leave dummy atoms out).
 !                    label = 0 means unlabelled.
 !   c_coords1/2    : XYZ coordinates, row-major (c_n_atoms x 3), length c_n_atoms*3
 !   c_prune_tol    : pruning tolerance (only used, and required, when

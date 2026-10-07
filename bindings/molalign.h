@@ -8,8 +8,8 @@ extern "C" {
 #endif
 
 /**
- * Error codes returned by atormsd_calculate and conformsd_calculate, and by
- * the Fortran isormsd_calculate, through their error_code argument.
+ * Error codes returned by atormsd_calculate and conformsd_calculate
+ * through their error_code argument.
  *
  * Hand-maintained mirror of the Fortran error_codes module
  * (error_codes.f90): keep the values of both in sync.
@@ -32,8 +32,49 @@ enum molalign_error_code {
     /* Atomic number outside the element tables. */
     MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER    = 7,
     /* Count parameter less than 1. */
-    MOLALIGN_ERROR_INVALID_BOUND        = 8
+    MOLALIGN_ERROR_INVALID_BOUND            = 8,
+    /* Bond type code that is not the code of any bond type label. */
+    MOLALIGN_ERROR_INVALID_BOND_TYPE        = 9,
+    /* Bond of undefined type (code 1446) while bond types are used. */
+    MOLALIGN_ERROR_UNDEFINED_BOND_TYPE      = 10
 };
+
+/**
+ * Bond types.
+ *
+ * A bond type is an opaque label, a short case-insensitive string with no
+ * intrinsic meaning, passed to the library as an integer code. Labels are
+ * compared literally: two bonds match only when their labels are the same
+ * string ("3/2", "1.5" and "6/4" are three different types). The only
+ * exception is that directed types are compared undirected ("dr"/"dl" as
+ * "dv", "up"/"dn" as "1"). A label has one of three forms:
+ *
+ *   d    a digit 1-9                         code d (1..9)
+ *   ab   a letter, then a letter or a digit  code 10 + 36*a + b
+ *   nsd  a digit, a separator, a digit       code 946 + 100*s + 10*n + d
+ *
+ * with a = 0..25 for a..z, b = 0..35 for 0..9, a..z, n, d = 0..9, and
+ * s = 0..4 for the separators / : - . , (in this order), so valid codes
+ * are 1..1445. Every entry of bond_data is a bond. The type is only used
+ * with usebondtype_flag=true, and every compared bond must then have a
+ * valid code; without it the type is ignored and any value is accepted.
+ *
+ * Code 1446 is not the code of any label: it marks a bond of undefined
+ * type, such as a bond perceived from geometry or read as MOL2 "un" or
+ * MOL/SDF type 8. An undefined type cannot be compared, so with
+ * usebondtype_flag=true it gives MOLALIGN_ERROR_UNDEFINED_BOND_TYPE.
+ *
+ * The library's file readers use conventional labels, so that bond types
+ * from different sources compare equal. Use the same ones when building
+ * bond_data, e.g.:
+ *
+ *   1, 2, 3     single, double, triple            codes 1, 2, 3
+ *   ar, am      aromatic, amide                   codes 37, 32
+ *   n/d         fractional order, e.g. 3/2        code 978 for 3/2
+ *   n:m         n-center m-electron bond, e.g. 3:2  code 1078 for 3:2
+ *
+ * (see fortran/parameters.f90 for the full list).
+ */
 
 /**
  * Calculate the RMSD between two atom clusters (no bond topology), optionally
@@ -47,9 +88,9 @@ enum molalign_error_code {
  * @param n_atoms1      Number of atoms in molecule 1
  * @param atom_data1    Packed atom data, length n_atoms1*2:
  *                       [elnum0, label0, elnum1, label1, ...]
- *                       elnum is the atomic number, 0 to 104 (0 = dummy
- *                       atom "X", 104 = Lennard-Jones "LJ"); dummy atoms
- *                       are always excluded from the comparison.
+ *                       elnum is the atomic number, 1 to 104 (104 =
+ *                       Lennard-Jones "LJ"). There is no dummy element:
+ *                       leave dummy atoms out of the arrays.
  *                       label = 0 means unlabelled; labels only matter
  *                       with useatomtype_flag=true.
  * @param coords1       Coordinates, row-major [x0,y0,z0,...], length n_atoms1*3
@@ -92,7 +133,7 @@ enum molalign_error_code {
  *                            Record i (0-based) occupies
  *                            mapping_list[i*n_padding .. i*n_padding + n_padding - 1].
  *                            Same padding convention as conformsd_calculate:
- *                            values >= n_atoms2 are dummy atoms of cluster 2.
+ *                            values >= n_atoms2 are padding atoms of cluster 2.
  *                            Sizes can only differ when heavy_flag=true.
  *                            Caller allocates >= max_records*n_padding.
  * @param transform_list [out] Flattened row-major 4x4 homogeneous transforms,
@@ -142,17 +183,19 @@ void atormsd_calculate(
  * @param n_atoms1      Number of atoms in molecule 1
  * @param atom_data1    Packed atom data, length n_atoms1*2:
  *                       [elnum0, label0, elnum1, label1, ...]
- *                       elnum is the atomic number, 0 to 104 (0 = dummy
- *                       atom "X", 104 = Lennard-Jones "LJ"); dummy atoms
- *                       are always excluded from the comparison.
+ *                       elnum is the atomic number, 1 to 104 (104 =
+ *                       Lennard-Jones "LJ"). There is no dummy element:
+ *                       leave dummy atoms out of the arrays.
  *                       label = 0 means unlabelled; labels only matter
  *                       with useatomtype_flag=true.
  * @param coords1       Coordinates, row-major [x0,y0,z0,...], length n_atoms1*3
  * @param n_bonds1      Number of bonds in molecule 1 (may be 0 when bonding_flag=true)
  * @param bond_data1    Flat bond array [a1,a2,type,...], 1-based, length n_bonds1*3.
- *                      type is any integer bond-type code; it is only used
- *                      when usebondtype_flag=true, and then only compared for
- *                      equality, never interpreted.
+ *                      Every entry is a bond. type is a bond type code (see
+ *                      "Bond types" above). It is only used when
+ *                      usebondtype_flag=true, and then the labels are
+ *                      compared literally, never interpreted; otherwise
+ *                      any value is accepted.
  * @param n_atoms2      Number of atoms in molecule 2
  * @param atom_data2    Packed atom data, length n_atoms2*2 (same layout)
  * @param coords2       Coordinates, row-major [x0,y0,z0,...], length n_atoms2*3
@@ -175,13 +218,17 @@ void atormsd_calculate(
  *                      unused otherwise.
  * @param usebondtype_flag Use bond types to guide atom matching: bonds of
  *                      different type are distinguished in the HNA
- *                      partition. Types are compared, not interpreted, so
- *                      both molecules must use the same bond-type
- *                      convention (e.g. read from the same file format with
- *                      the same parser). Differing Kekule/aromatic encodings
+ *                      partition. Labels are compared literally, never
+ *                      interpreted, so both molecules must label the same
+ *                      kind of bond with the same label (the conventional
+ *                      labels above). Differing Kekule/aromatic encodings
  *                      of the same molecule yield
  *                      MOLALIGN_ERROR_NOT_CONFORMERS, or
  *                      MOLALIGN_ERROR_BOND_MISMATCH when remap_flag=false.
+ *                      Every compared bond must have a valid code
+ *                      (otherwise MOLALIGN_ERROR_INVALID_BOND_TYPE, or
+ *                      MOLALIGN_ERROR_UNDEFINED_BOND_TYPE for a bond of
+ *                      undefined type).
  *                      Ignored when bonding_flag=true.
  * @param printstats_flag   Print optimisation statistics to stdout
  * @param printassigntree_flag Print the assignment tree and its combination
@@ -218,8 +265,8 @@ void atormsd_calculate(
  *                            and is a permutation of 0..n_padding-1: entry j is
  *                            the atom of molecule 2 placed on line j of
  *                            molecule 1. The smaller molecule is padded with
- *                            dummy atoms appended after its real atoms, so
- *                            values >= n_atoms2 denote dummy atoms of
+ *                            padding atoms appended after its real atoms, so
+ *                            values >= n_atoms2 denote padding atoms of
  *                            molecule 2, and entries j >= n_atoms1 hold the
  *                            extra atoms of molecule 2. The sizes can only
  *                            differ when heavy_flag=true; otherwise
@@ -242,6 +289,9 @@ void atormsd_calculate(
  *                            than 1),
  *                            MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER,
  *                            MOLALIGN_ERROR_NOT_ISOMERS,
+ *                            MOLALIGN_ERROR_INVALID_BOND_TYPE or
+ *                            MOLALIGN_ERROR_UNDEFINED_BOND_TYPE (both only
+ *                            when usebondtype_flag=true),
  *                            MOLALIGN_ERROR_TOO_MANY_FRAGMENTS,
  *                            MOLALIGN_ERROR_ATOM_TYPE_MISMATCH or
  *                            MOLALIGN_ERROR_BOND_MISMATCH (both only when

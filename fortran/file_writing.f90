@@ -29,7 +29,8 @@ public write_file
 contains
 
 subroutine write_file(unit, out_format, title, atoms, bonds, mapping1)
-! Write the atoms in the order atoms(mapping1(i)), in the given format
+! Write the atoms in the order atoms(mapping1(i)), in the given format.
+! Padding atoms (elnum = PADDING_ELNUM) are written as dummy atoms X.
    integer(ik), intent(in) :: unit
    character(*), intent(in) :: out_format
    character(*), intent(in) :: title
@@ -67,7 +68,7 @@ subroutine write_file_xyz(unit, title, atoms, bonds, mapping1)
 
    do i = 1, n_atoms
       iatom = atoms(mapping1(i))
-      write (unit, '(A,3(2X,F12.6))') atomic_symbols(iatom%elnum), iatom%coords
+      write (unit, '(A,3(2X,F12.6))') element_symbol(iatom%elnum), iatom%coords
    end do
 end subroutine
 
@@ -107,15 +108,17 @@ subroutine write_file_sdf(unit, title, atoms, bonds, mapping1)
    do i = 1, n_atoms
       iatom = atoms(mapping1(i))
       write (unit, '(3F10.4,1X,A3,I2,11I3)') &
-         iatom%coords, atomic_symbols(iatom%elnum), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+         iatom%coords, element_symbol(iatom%elnum), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
    end do
 
    ! Bond block
    ! Format: 111222tttsssxxxrrrccc
-   do i = 1, n_bonds
+   do i = 1, size(bonds)
       atomidx1 = mapping2(bonds(i)%atomidx1)
       atomidx2 = mapping2(bonds(i)%atomidx2)
-      bondtype = bonds(i)%bondtype
+      bondtype = sdf_bondnumber(bonds(i)%bondtype)
+      ! V2000 has no coordination (9) or hydrogen (10) bonds
+      if (bondtype > 8) bondtype = 8
       write (unit, '(I3,I3,I3,I3,I3,I3,I3)') atomidx1, atomidx2, bondtype, 0, 0, 0, 0
    end do
 
@@ -138,7 +141,7 @@ subroutine write_file_mol2(unit, title, atoms, bonds, mapping1)
    integer(ik), dimension(:), allocatable :: mapping2
    character(4) :: bondtype, atomtype
    integer(ik) :: atomidx1, atomidx2
-   integer(ik) :: n_atoms, n_bonds, i
+   integer(ik) :: n_atoms, n_bonds, bond_id, i
 
    mapping2 = inverse_permutation(mapping1)
 
@@ -159,7 +162,7 @@ subroutine write_file_mol2(unit, title, atoms, bonds, mapping1)
    do i = 1, n_atoms
       iatom = atoms(mapping1(i))
       select case (iatom%elnum)
-      case (0)
+      case (PADDING_ELNUM)
          atomtype = 'Du'
       case (1)
          atomtype = 'H'
@@ -167,22 +170,17 @@ subroutine write_file_mol2(unit, title, atoms, bonds, mapping1)
          atomtype = 'Hev'
       end select
       write (unit, '(I4,2X,A2,3(1X,F12.6),2X,A4,1X,I2,1X,A4,1X,F7.3)') &
-         i, atomic_symbols(iatom%elnum), iatom%coords, atomtype, 1, 'MOL1', 0.
+         i, element_symbol(iatom%elnum), iatom%coords, atomtype, 1, 'MOL1', 0.
    end do
 
    write (unit, '(A)') '@<TRIPOS>BOND'
-   do i = 1, n_bonds
+   bond_id = 0
+   do i = 1, size(bonds)
+      bond_id = bond_id + 1
       atomidx1 = mapping2(bonds(i)%atomidx1)
       atomidx2 = mapping2(bonds(i)%atomidx2)
-      select case (bonds(i)%bondtype)
-      case (1:3)
-         bondtype = str(bonds(i)%bondtype)
-      case (4)
-         bondtype = 'ar'
-      case default
-         bondtype = 'un'
-      end select
-      write (unit, '(I4,1X,2(1X,I4),1X,A2)') i, atomidx1, atomidx2, bondtype
+      bondtype = mol2_typestr(bonds(i)%bondtype)
+      write (unit, '(I4,1X,2(1X,I4),1X,A2)') bond_id, atomidx1, atomidx2, bondtype
    end do
 end subroutine
 

@@ -24,12 +24,21 @@ Molecule
         respect the bond topology (HNA partitioning); both molecules must
         have the same bond graph.
 
+Bond types
+----------
+A bond type is an opaque label (a short string such as "1", "ar" or "3/2")
+passed to the library as an integer code; bond_type_code and
+bond_type_label convert between the two. Labels have no intrinsic meaning
+and are compared literally. Bonds read from files are given the
+conventional labels (see bond_type_code), so bond types read from
+different formats can be compared.
+
 RMSDResult
     Return value of both methods. Each method returns a list of
-    RMSDResult objects, best (lowest RMSD) first. By default only the single
-    best solution is computed (a list of length 1); pass a larger max_records
-    to get several ranked candidate solutions at once. The returned list may
-    be shorter than max_records if the library did not find that many distinct
+    RMSDResult objects, best first. By default only the single best solution
+    is computed (a list of length 1); pass a larger max_records to get
+    several ranked candidate solutions at once. The returned list may be
+    shorter than max_records if the library did not find that many distinct
     solutions.
 """
 
@@ -42,9 +51,11 @@ from . import molalign as _molalign
 
 __all__ = [
     "ATOMIC_SYMBOLS",
-    "DUMMY_ATOMIC_NUMBER",
+    "PADDING_ATOMIC_NUMBER",
     "symbol_to_atomic_number",
     "atomic_number_to_symbol",
+    "bond_type_code",
+    "bond_type_label",
     "RMSDResult",
     "Molecule",
     "read_molecules",
@@ -54,10 +65,11 @@ __all__ = [
 # ---------------------------------------------------------------------------
 # Element symbol <-> atomic number table
 #
-# Mirrors atomic_symbols(0:n_elems) in chemdata.f90, so index i is element
-# number i of the Fortran core. Entry 0 ("X") is the dummy atom and entry
-# 104 ("LJ") the Lennard-Jones placeholder; every real element's number
-# equals its atomic number.
+# Mirrors atomic_symbols(1:n_elems) in chemdata.f90, so index i is element
+# number i of the Fortran core; entry 104 ("LJ") is the Lennard-Jones
+# placeholder. Entry 0 ("X") is not an element: there is no dummy element,
+# and "X" is only the symbol given to padding atoms (see
+# PADDING_ATOMIC_NUMBER).
 # ---------------------------------------------------------------------------
 
 ATOMIC_SYMBOLS = (
@@ -75,12 +87,18 @@ ATOMIC_SYMBOLS = (
     "Md", "No", "Lr", "LJ",
 )
 
-# Element number of the dummy atom ("X"). Used to pad the smaller molecule;
-# dummy atoms are always excluded from the comparison.
-DUMMY_ATOMIC_NUMBER = 0
+# Number given to the padding atoms ("X") that RMSDResult.apply_to appends,
+# as the Fortran core does (PADDING_ELNUM). It is not an element: the
+# library rejects it, so molecules with padding atoms can be written but
+# not compared.
+PADDING_ATOMIC_NUMBER = 0
 
-# Case-insensitive symbol -> element number lookup (0 = dummy atom).
-_SYMBOL_TO_NUMBER = {sym.upper(): i for i, sym in enumerate(ATOMIC_SYMBOLS)}
+# Symbols of dummy atoms in files. They are not elements, so the readers
+# drop them, together with their bonds.
+_DUMMY_SYMBOLS = {"X", "DU"}
+
+# Case-insensitive symbol -> element number lookup (elements only).
+_SYMBOL_TO_NUMBER = {sym.upper(): i for i, sym in enumerate(ATOMIC_SYMBOLS) if i > 0}
 
 # Highest element number that is a real element (Lr). Above it, chemfiles'
 # numbering (104 = Rf, ...) and the library's (104 = LJ) disagree.
@@ -88,7 +106,11 @@ _LAST_REAL_ELEMENT = _SYMBOL_TO_NUMBER["LR"]
 
 
 def symbol_to_atomic_number(symbol):
-    """Look up the atomic number for an element symbol (case-insensitive)."""
+    """
+    Look up the atomic number (1 to 104) of an element symbol
+    (case-insensitive). Raises ValueError for anything else, including
+    the dummy symbol "X".
+    """
     key = symbol.strip().upper()
     try:
         return _SYMBOL_TO_NUMBER[key]
@@ -97,7 +119,10 @@ def symbol_to_atomic_number(symbol):
 
 
 def atomic_number_to_symbol(number):
-    """Element symbol of an element number, or the number as a string if unknown."""
+    """
+    Element symbol of an element number, "X" for PADDING_ATOMIC_NUMBER, or
+    the number as a string if unknown.
+    """
     number = int(number)
     if 0 <= number < len(ATOMIC_SYMBOLS):
         return ATOMIC_SYMBOLS[number]
@@ -105,11 +130,96 @@ def atomic_number_to_symbol(number):
 
 
 # ---------------------------------------------------------------------------
+# Bond types
+#
+# Mirrors molecule::bondtype_code and molecule::bondtype_str in molecule.f90
+# (see parameters.f90). A label is a digit 1-9, a letter followed by a
+# letter or digit, or a digit, a separator and a digit; valid codes are
+# 1.._BT_MAX.
+# ---------------------------------------------------------------------------
+
+_BT_DIGITS = "0123456789"
+_BT_LETTERS = "abcdefghijklmnopqrstuvwxyz"
+_BT_ALNUM = _BT_DIGITS + _BT_LETTERS
+_BT_SEPARATORS = "/:-.,"
+_BT_BLOCK2 = 10
+_BT_BLOCK3 = _BT_BLOCK2 + len(_BT_LETTERS) * len(_BT_ALNUM)
+_BT_MAX = _BT_BLOCK3 + 100 * len(_BT_SEPARATORS) - 1
+
+
+def bond_type_code(label):
+    """
+    Integer code of a bond type label (case-insensitive, surrounding blanks
+    ignored), for the third column of bond_data. Raises ValueError for a
+    string that is not a bond type label.
+
+    Labels have no intrinsic meaning: the library only checks whether two
+    labels are the same string. Bonds read from files get these
+    conventional labels, so use them for bonds built by hand too:
+
+    =========  ===================================================
+    "1".."6"   single, double, triple, quadruple, ... bond
+    "ar"       aromatic
+    "am"       amide
+    "n/d"      fractional order, e.g. "3/2"
+    "n:m"      n-center m-electron bond, e.g. "3:2"
+    =========  ===================================================
+
+    (see parameters.f90 for the full list). A bond of undefined type (e.g.
+    read without a bond order) has no label: it is read with a code of its
+    own, which cannot be compared with use_bond_type.
+    """
+    s = str(label).strip().lower()
+    if len(s) == 1 and s in _BT_DIGITS[1:]:
+        return _BT_DIGITS.index(s)
+    if len(s) == 2 and s[0] in _BT_LETTERS and s[1] in _BT_ALNUM:
+        return _BT_BLOCK2 + len(_BT_ALNUM) * _BT_LETTERS.index(s[0]) + _BT_ALNUM.index(s[1])
+    if len(s) == 3 and s[0] in _BT_DIGITS and s[1] in _BT_SEPARATORS and s[2] in _BT_DIGITS:
+        return (_BT_BLOCK3 + 100 * _BT_SEPARATORS.index(s[1])
+                + 10 * _BT_DIGITS.index(s[0]) + _BT_DIGITS.index(s[2]))
+    raise ValueError("Not a bond type label: {!r}".format(label))
+
+
+def bond_type_label(code):
+    """
+    Bond type label of an integer code (the inverse of bond_type_code).
+    Raises ValueError for an invalid code.
+    """
+    code = int(code)
+    if 1 <= code < _BT_BLOCK2:
+        return _BT_DIGITS[code]
+    if _BT_BLOCK2 <= code < _BT_BLOCK3:
+        i, j = divmod(code - _BT_BLOCK2, len(_BT_ALNUM))
+        return _BT_LETTERS[i] + _BT_ALNUM[j]
+    if _BT_BLOCK3 <= code <= _BT_MAX:
+        k, rest = divmod(code - _BT_BLOCK3, 100)
+        n, d = divmod(rest, 10)
+        return _BT_DIGITS[n] + _BT_SEPARATORS[k] + _BT_DIGITS[d]
+    raise ValueError("Not a bond type code: {}".format(code))
+
+
+# Conventional label of each chemfiles bond order (chfl_bond_order). Orders
+# not listed (including Unknown) are of undefined type.
+_CHEMFILES_BOND_LABELS = {
+    1: "1",      # Single
+    2: "2",      # Double
+    3: "3",      # Triple
+    4: "4",      # Quadruple
+    5: "5",      # Quintuplet
+    254: "am",   # Amide
+    255: "ar",   # Aromatic
+}
+# Code of a bond of undefined type: the radix, which is not the code of any
+# label (UNDEFINED_BOND_TYPE in parameters.f90)
+_UNDEFINED_BOND_TYPE = _BT_MAX + 1
+
+
+# ---------------------------------------------------------------------------
 # Result type
 # ---------------------------------------------------------------------------
 
 class RMSDResult(object):
-    """Return value of Molecule.atormsd_to / conformsd_to."""
+    """Return value of Molecule.atormsd_to and Molecule.conformsd_to."""
 
     def __init__(self, rmsd, mapping, transform):
         self.rmsd = rmsd
@@ -119,7 +229,7 @@ class RMSDResult(object):
 
         Entry j is the atom of `other` placed on line j of `self`. Its length
         is max(len(self), len(other)); the two differ only with
-        heavy_only=True. Values >= len(other) denote dummy atoms ("X") that
+        heavy_only=True. Values >= len(other) denote padding atoms that
         pad `other`; entries j >= len(self) hold the extra atoms of `other`.
         """
         self.transform = transform
@@ -137,9 +247,10 @@ class RMSDResult(object):
 
         The result has len(mapping) atoms, so line j of it corresponds
         to line j of the reference. If the reference has more atoms (possible
-        only with heavy_only=True), the missing lines are filled with dummy
-        atoms (element "X", atomic number 0) whose coordinates are
-        placeholders. If it has fewer, the extra atoms come last. Bonds are
+        only with heavy_only=True), the missing lines are filled with
+        padding atoms (symbol "X", number PADDING_ATOMIC_NUMBER) whose
+        coordinates are placeholders; such a molecule can be written but not
+        compared. If it has fewer, the extra atoms come last. Bonds are
         renumbered to the new atom order.
         """
         if not isinstance(molecule, Molecule):
@@ -149,18 +260,18 @@ class RMSDResult(object):
         t = self.transform[:3, 3]
         idx = np.asarray(self.mapping)
 
-        # When the permutation is longer than the molecule, pad it with dummy
-        # atoms ("X") appended after the real atoms, as the Fortran core does,
-        # so that every index is valid.
+        # When the permutation is longer than the molecule, pad it with
+        # padding atoms ("X") appended after the real atoms, as the Fortran
+        # core does, so that every index is valid.
         coords = molecule.coords
         atom_data = molecule.atom_data
         symbols = list(molecule.symbols)
-        n_dummy = len(idx) - len(coords)
-        if n_dummy > 0:
-            coords = np.vstack([coords, np.zeros((n_dummy, 3), dtype=coords.dtype)])
-            dummy_row = np.array([[DUMMY_ATOMIC_NUMBER, 0]], dtype=atom_data.dtype)
-            atom_data = np.vstack([atom_data, np.repeat(dummy_row, n_dummy, axis=0)])
-            symbols += [ATOMIC_SYMBOLS[DUMMY_ATOMIC_NUMBER]] * n_dummy
+        n_padding = len(idx) - len(coords)
+        if n_padding > 0:
+            coords = np.vstack([coords, np.zeros((n_padding, 3), dtype=coords.dtype)])
+            padding_row = np.array([[PADDING_ATOMIC_NUMBER, 0]], dtype=atom_data.dtype)
+            atom_data = np.vstack([atom_data, np.repeat(padding_row, n_padding, axis=0)])
+            symbols += [ATOMIC_SYMBOLS[PADDING_ATOMIC_NUMBER]] * n_padding
 
         new_coords = coords[idx] @ R.T + t
         new_atom_data = atom_data[idx]
@@ -192,9 +303,8 @@ class RMSDResult(object):
 def _file_format(path):
     """
     Format tag of a file, taken from its extension (the same way chemfiles
-    infers the format). Molecules read from files with the same tag were
-    parsed by the same chemfiles reader, so their bond types follow the same
-    convention.
+    infers the format), recorded as the bond_source of molecules read from
+    it.
     """
     return Path(path).suffix.lower().lstrip(".")
 
@@ -202,41 +312,50 @@ def _file_format(path):
 def _extract_frame_data(frame):
     """
     Extract atom_data, coords, bond_data and symbols from a chemfiles Frame.
-    Atoms are unlabelled; bonds without a known order get type 1.
+
+    Atoms are unlabelled. Dummy atoms ("X", "Du") are not elements, so they
+    are dropped together with their bonds, and the remaining atoms are
+    renumbered in file order. Bond types are the conventional labels of the
+    chemfiles bond orders ("1".."5", "am", "ar"); bonds without one
+    (chemfiles order Unknown) are of undefined type.
     """
-    n_atoms = len(frame.atoms)
-    atom_data = np.zeros((n_atoms, 2), dtype=np.int32)
+    atom_data = []
     symbols = []
+    newidx = {}   # file index -> 0-based index among the kept atoms
 
     for i, atom in enumerate(frame.atoms):
+        if atom.type.strip().upper() in _DUMMY_SYMBOLS:
+            continue
         # chemfiles reports 0 (or None) for types it doesn't know, such as
-        # "X" and "LJ", and uses its own numbering beyond Lr. In those cases
-        # fall back to the library's table, which raises ValueError for
-        # symbols it doesn't know either.
+        # "LJ", and uses its own numbering beyond Lr. In those cases fall
+        # back to the library's table, which raises ValueError for symbols
+        # it doesn't know either.
         elnum = atom.atomic_number
         if not elnum or elnum > _LAST_REAL_ELEMENT:
             elnum = symbol_to_atomic_number(atom.type)
-        atom_data[i, 0] = elnum
-        atom_data[i, 1] = 0
+        newidx[i] = len(atom_data)
+        atom_data.append((elnum, 0))
         symbols.append(atom.type)
 
-    coords = np.array(frame.positions, dtype=np.float64)
+    if not atom_data:
+        raise ValueError("Frame contains no atoms (other than dummy atoms)")
+
+    keep = sorted(newidx)
+    atom_data = np.array(atom_data, dtype=np.int32).reshape(-1, 2)
+    coords = np.array(frame.positions, dtype=np.float64)[keep]
 
     bonds = frame.topology.bonds
-    try:
-        orders = frame.topology.bond_orders
-    except AttributeError:
-        orders = []
+    orders = frame.topology.bonds_orders
 
-    n_bonds = len(bonds)
-    bond_data = np.empty((n_bonds, 3), dtype=np.int32)
-    for i in range(n_bonds):
-        bond_data[i, 0] = bonds[i][0] + 1
-        bond_data[i, 1] = bonds[i][1] + 1
-        if orders and i < len(orders):
-            bond_data[i, 2] = int(orders[i])
-        else:
-            bond_data[i, 2] = 1
+    bond_data = []
+    for (a1, a2), order in zip(bonds, orders):
+        a1, a2 = int(a1), int(a2)
+        if a1 not in newidx or a2 not in newidx:
+            continue   # bond to a dummy atom
+        label = _CHEMFILES_BOND_LABELS.get(int(order))
+        code = bond_type_code(label) if label else _UNDEFINED_BOND_TYPE
+        bond_data.append((newidx[a1] + 1, newidx[a2] + 1, code))
+    bond_data = np.array(bond_data, dtype=np.int32).reshape(-1, 3)
 
     return atom_data, coords, bond_data, symbols
 
@@ -292,8 +411,9 @@ def read_molecules(path, frames=None):
     """
     Read the frames of a file as Molecule objects: a tuple with the frames
     of the given indices, or a list of all frames if frames is None. Bonds
-    are read when the format provides them, and bond_source is set to the
-    file format.
+    are read when the format provides them, with conventional bond type
+    labels, and bond_source is set to the file format. Dummy atoms are
+    dropped.
     """
     stem = Path(path).stem
     source = _file_format(path)
@@ -321,7 +441,7 @@ class Molecule(object):
     """
     A set of atoms with 3-D coordinates and an optional bond table.
 
-    Use atormsd_to to compare it as an unstructured cluster (bonds ignored)
+    Use atormsd_to to compare it as an unstructured cluster (bonds ignored),
     and conformsd_to to compare it as a conformer (same bond graph
     required).
     """
@@ -332,10 +452,13 @@ class Molecule(object):
         Either ``atom_data`` (an (n, 2) array of element numbers and labels)
         or ``symbols`` (element symbols, e.g. ["C", "H", "H", "H"]) must be
         provided; the other is derived. If both are given, ``atom_data`` is
-        used for the calculations and ``symbols`` only for output.
+        used for the calculations and ``symbols`` only for output. Element
+        numbers are 1 to 104: there is no dummy element.
 
         bond_data : array of shape (b, 3), optional
-            ``[[a1, a2, bond_type], ...]`` with 1-based atom indices.
+            ``[[a1, a2, bond_type], ...]`` with 1-based atom indices; every
+            row is a bond. bond_type is a bond type code (see
+            bond_type_code), only used with ``use_bond_type=True``.
             Defaults to no bonds. Required by conformsd_to unless
             connectivity is inferred with ``bond_tol``.
 
@@ -346,11 +469,10 @@ class Molecule(object):
             (unlabelled).
 
         bond_source : str, optional
-            Tag naming the convention of the bond types in ``bond_data``
-            (the file format for molecules read from files). Bond types are
-            only compared when both molecules share the same tag; see
-            ``use_bond_type``. Defaults to None, which is the tag of all
-            molecules built directly from arrays.
+            Informational tag naming where ``bond_data`` came from (the
+            file format for molecules read from files). It does not affect
+            the comparisons: bond types from any source are compared as
+            labels. Defaults to None.
         """
         self._coords = np.asarray(coords, dtype=np.float64)
 
@@ -447,7 +569,7 @@ class Molecule(object):
 
     @property
     def bond_source(self):
-        """Tag of the bond-type convention (file format, or None)."""
+        """Where the bonds came from (file format, or None); informational."""
         return self._bond_source
 
     def __len__(self):
@@ -472,14 +594,6 @@ class Molecule(object):
     def _check_other(self, other):
         if not isinstance(other, Molecule):
             raise TypeError("Expected Molecule, got {}".format(type(other).__name__))
-
-    def _check_bond_types(self, other, use_bond_type, bonding_flag):
-        """Bond types are only comparable within the same bond_source."""
-        if use_bond_type and not bonding_flag and self._bond_source != other._bond_source:
-            raise ValueError(
-                "use_bond_type=True requires both molecules to have the same bond "
-                "source (got {!r} and {!r})".format(self._bond_source, other._bond_source)
-            )
 
     # -- atormsd ------------------------------------------------------------
 
@@ -509,8 +623,8 @@ class Molecule(object):
         if the library did not find that many distinct solutions.
 
         With heavy_only=True the two molecules may differ in their number of
-        hydrogens. The smaller one is then padded with dummy atoms, and each
-        mapping has max(len(self), len(other)) entries (see
+        hydrogens. The smaller one is then padded with padding atoms, and
+        each mapping has max(len(self), len(other)) entries (see
         RMSDResult.mapping). Hydrogens are not part of the RMSD; they are
         paired afterwards by distance.
 
@@ -582,8 +696,8 @@ class Molecule(object):
         if the library did not find that many distinct solutions.
 
         With heavy_only=True the two molecules may differ in their number of
-        hydrogens. The smaller one is then padded with dummy atoms, and each
-        mapping has max(len(self), len(other)) entries (see
+        hydrogens. The smaller one is then padded with padding atoms, and
+        each mapping has max(len(self), len(other)) entries (see
         RMSDResult.mapping). Hydrogens are not part of the RMSD;
         they are paired afterwards, following their heavy neighbour where
         bonds are known and by distance otherwise.
@@ -600,10 +714,13 @@ class Molecule(object):
         two or more atoms must have bonds connecting all of them.
 
         use_bond_type=True also uses the bond types to guide atom
-        matching. Types are compared, never interpreted, so both molecules
-        must have the same bond_source (e.g. both read from files of the
-        same format); otherwise a ValueError is raised. It has no effect
-        when bond_tol is given, since inferred bonds are untyped.
+        matching. The labels are compared literally, never interpreted:
+        bonds read from files carry conventional labels, so molecules read
+        from different formats can be compared, but the same bond must be
+        given the same label in both molecules (e.g. both Kekule or both
+        aromatic). Bonds of undefined type (e.g. from formats without bond
+        orders) cannot be compared and raise ValueError. It has no
+        effect when bond_tol is given, since inferred bonds are untyped.
 
         With align=True, the search strategy is chosen from the assignment
         tree: random orientations when the total number of assignments
@@ -620,7 +737,6 @@ class Molecule(object):
 
         self._check_other(other)
         bonding_flag = bond_tol is not None
-        self._check_bond_types(other, use_bond_type, bonding_flag)
         bond_data1 = None if bonding_flag else self._bond_data
         bond_data2 = None if bonding_flag else other._bond_data
 
@@ -637,7 +753,7 @@ class Molecule(object):
             useatomtype_flag=use_atom_type,
             usebondtype_flag=use_bond_type,
             bond_tol=bond_tol,
-            bonding_flag=bonding_flag, 
+            bonding_flag=bonding_flag,
             printstats_flag=print_stats,
             printassigntree_flag=print_assignment_tree,
             random_flag=random,

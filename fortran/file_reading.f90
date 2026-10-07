@@ -15,6 +15,12 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module file_reading
+! Molecule file readers. Dummy atoms (symbol X, or SYBYL type Du in MOL2
+! files) are dropped, together with every bond to them, and entries of the
+! bond table that are not bonds (MOL2 du and nc, MOL/SDF type 0) are
+! dropped too. The remaining atoms are renumbered consecutively in file
+! order, so the atoms and bonds returned only hold real atoms and real
+! bonds.
 use parameters
 use str_utils
 use chemdata
@@ -26,18 +32,26 @@ implicit none
 private
 public read_file
 
+! Element symbol of dummy atoms in atom labels
+character(*), parameter :: DUMMY_SYMBOL = 'x'
+
 contains
 
-subroutine parse_label( label, elnum, group)
+subroutine parse_label(label, elnum, group, is_dummy)
 ! Element number and group of an atom label: an element symbol optionally
-! followed by digits (the group, 0 if absent)
+! followed by digits (the group, 0 if absent). is_dummy is true for the
+! dummy symbol X, which is not an element; elnum is then 0 and must not be
+! used.
    character(*), intent(in) :: label
    integer(ik), intent(out) :: elnum, group
+   logical(lk), intent(out) :: is_dummy
    ! Local variables
    character(:), allocatable :: normalized_label, elsym
-   character(symlen), dimension(0:n_elems) :: normalized_atomic_symbols
+   character(symlen), dimension(n_elems) :: normalized_atomic_symbols
    integer(ik) :: pos, z
 
+   elnum = 0
+   is_dummy = .FALSE.
    normalized_label = lowercase(trim(adjustl(label)))
    normalized_atomic_symbols = lowercase(atomic_symbols)
    pos = verify(normalized_label, LOWERCHAR)
@@ -55,9 +69,13 @@ subroutine parse_label( label, elnum, group)
       end if
    end if
 
-   ! atomic_symbols is indexed 0:n_elems, so z is the element number
-   ! directly (0 for the dummy atom 'X')
-   do z = 0, n_elems
+   if (elsym == DUMMY_SYMBOL) then
+      is_dummy = .TRUE.
+      return
+   end if
+
+   ! atomic_symbols is indexed 1:n_elems, so z is the element number
+   do z = 1, n_elems
       if (elsym == normalized_atomic_symbols(z)) then
          elnum = z
          return
@@ -66,6 +84,92 @@ subroutine parse_label( label, elnum, group)
 
    write (stderr, '(A,1X,A)') 'Unknown element symbol:', elsym
    stop
+end subroutine
+
+function next_token(line, pos) result(token)
+! Next blank- or tab-separated token of line from position pos, which is
+! advanced past it. Empty when there are no more tokens. Unlike
+! list-directed input, slashes and commas are ordinary characters, as
+! they can be in bond type labels (see parameters).
+   character(*), intent(in) :: line
+   integer(ik), intent(inout) :: pos
+   character(:), allocatable :: token
+   ! Local variables
+   character(*), parameter :: BLANKS = ' '//achar(9)
+   integer(ik) :: start, length
+
+   token = ''
+   if (pos > len(line)) return
+   start = verify(line(pos:), BLANKS)
+   if (start == 0) then
+      pos = len(line) + 1
+      return
+   end if
+   start = pos + start - 1
+   length = scan(line(start:), BLANKS) - 1
+   if (length < 0) length = len(line) - start + 1
+   token = line(start:start+length-1)
+   pos = start + length
+end function
+
+subroutine drop_dummies(fmtname, atoms, is_dummy, bonds, is_bond)
+! Remove the dummy atoms (is_dummy) and the entries of the bond table that
+! are not bonds (not is_bond) or that involve a dummy atom, renumbering the
+! remaining atoms consecutively. Bond atom indices are those of the file
+! (1..size(atoms) on input) and are checked to be in range.
+   character(*), intent(in) :: fmtname
+   type(atom_t), dimension(:), allocatable, intent(inout) :: atoms
+   logical(lk), dimension(:), intent(in) :: is_dummy
+   type(bond_t), dimension(:), allocatable, intent(inout) :: bonds
+   logical(lk), dimension(:), intent(in) :: is_bond
+   ! Local variables
+   type(atom_t), dimension(:), allocatable :: real_atoms
+   type(bond_t), dimension(:), allocatable :: real_bonds
+   integer(ik), dimension(:), allocatable :: newidx
+   integer(ik) :: n_atoms, n_real, n_bonds, i, a1, a2
+
+   n_atoms = size(atoms)
+
+   ! New index of every atom of the file (0 for dummy atoms)
+   allocate (newidx(n_atoms))
+   n_real = 0
+   do i = 1, n_atoms
+      if (is_dummy(i)) then
+         newidx(i) = 0
+      else
+         n_real = n_real + 1
+         newidx(i) = n_real
+      end if
+   end do
+
+   if (n_real == 0) then
+      stop 'File contains no atoms'
+   end if
+
+   allocate (real_atoms(n_real))
+   do i = 1, n_atoms
+      if (newidx(i) > 0) real_atoms(newidx(i)) = atoms(i)
+   end do
+
+   allocate (real_bonds(size(bonds)))
+   n_bonds = 0
+   do i = 1, size(bonds)
+      if (.not. is_bond(i)) cycle
+      a1 = bonds(i)%atomidx1
+      a2 = bonds(i)%atomidx2
+      if (a1 < 1 .or. a1 > n_atoms .or. a2 < 1 .or. a2 > n_atoms) then
+         write (stderr, '(A,1X,A)') 'Bond to a nonexistent atom in', fmtname
+         stop
+      end if
+      if (newidx(a1) == 0 .or. newidx(a2) == 0) cycle
+      n_bonds = n_bonds + 1
+      real_bonds(n_bonds)%atomidx1 = newidx(a1)
+      real_bonds(n_bonds)%atomidx2 = newidx(a2)
+      real_bonds(n_bonds)%bondtype = bonds(i)%bondtype
+   end do
+
+   call move_alloc(real_atoms, atoms)
+   bonds = real_bonds(1:n_bonds)
 end subroutine
 
 subroutine read_file(unit, in_format, title, atoms, bonds)
@@ -98,6 +202,8 @@ subroutine read_file_xyz(unit, title, atoms, bonds)
    ! Local variables
    character(ll) :: label
    character(ll) :: buffer
+   logical(lk), dimension(:), allocatable :: is_dummy
+   logical(lk), dimension(0) :: is_bond
    integer(ik) :: elnum, group
    integer(ik) :: i, n_atoms, stat
    real(rk) :: coords(3)
@@ -114,6 +220,7 @@ subroutine read_file_xyz(unit, title, atoms, bonds)
    end if
 
    allocate (atoms(n_atoms))
+   allocate (is_dummy(n_atoms))
    allocate (bonds(0))
 
    ! Read title line
@@ -129,13 +236,16 @@ subroutine read_file_xyz(unit, title, atoms, bonds)
          stop 'Invalid XYZ format'
       end if
 
-      call parse_label(label, elnum, group)
+      call parse_label(label, elnum, group, is_dummy(i))
       atoms(i)%elnum = elnum
+      atoms(i)%group = 0
       atoms(i)%coords = coords
       if (useatomtype_flag) then
          atoms(i)%group = group
       end if
    end do
+
+   call drop_dummies('XYZ file', atoms, is_dummy, bonds, is_bond)
 end subroutine
 
 subroutine read_file_mol(unit, title, atoms, bonds)
@@ -179,11 +289,6 @@ subroutine read_file_mol(unit, title, atoms, bonds)
    else
       call read_v2000_format(unit, buffer, atoms, bonds)
    end if
-
-   ! Check for empty molecule
-   if (size(atoms) <= 0) then
-      stop 'File contains no atoms'
-   end if
 end subroutine
 
 subroutine read_file_sdf(unit, title, atoms, bonds)
@@ -223,6 +328,7 @@ subroutine read_v2000_format(unit, counts_line, atoms, bonds)
    real(rk) :: coords(3)
    character(ll) :: label
    character(ll) :: buffer
+   logical(lk), dimension(:), allocatable :: is_dummy, is_bond
    integer(ik) :: elnum, group
    integer(ik) :: atomidx1, atomidx2, bondtype
    integer(ik) :: n_atoms, n_bonds, stat, i
@@ -237,7 +343,13 @@ subroutine read_v2000_format(unit, counts_line, atoms, bonds)
       stop 'Invalid MOL/SDF format'
    end if
 
+   ! Check for empty molecule
+   if (n_atoms <= 0) then
+      stop 'File contains no atoms'
+   end if
+
    allocate (atoms(n_atoms))
+   allocate (is_dummy(n_atoms))
    ! Read atom block
    do i = 1, n_atoms
       read (unit,'(A)',iostat=stat) buffer
@@ -258,8 +370,9 @@ subroutine read_v2000_format(unit, counts_line, atoms, bonds)
       end if
 
       label = adjustl(buffer(32:34))
-      call parse_label(label, elnum, group)
+      call parse_label(label, elnum, group, is_dummy(i))
       atoms(i)%elnum = elnum
+      atoms(i)%group = 0
       atoms(i)%coords = coords
       if (useatomtype_flag) then
          atoms(i)%group = group
@@ -268,6 +381,7 @@ subroutine read_v2000_format(unit, counts_line, atoms, bonds)
 
    ! Read bond block
    allocate (bonds(n_bonds))
+   allocate (is_bond(n_bonds))
    do i = 1, n_bonds
       read (unit, '(A)', iostat=stat) buffer
       if (stat /= 0) then
@@ -288,8 +402,17 @@ subroutine read_v2000_format(unit, counts_line, atoms, bonds)
 
       bonds(i)%atomidx1 = atomidx1
       bonds(i)%atomidx2 = atomidx2
-      bonds(i)%bondtype = bondtype
+      ! Entries that are not bonds are dropped
+      is_bond(i) = .not. is_sdf_nonbond(bondtype)
+      if (is_bond(i)) then
+         bonds(i)%bondtype = sdf_bondtype(bondtype)
+         if (bonds(i)%bondtype < 0) then
+            stop 'Invalid MOL/SDF bond type'
+         end if
+      end if
    end do
+
+   call drop_dummies('MOL/SDF file', atoms, is_dummy, bonds, is_bond)
 end subroutine
 
 subroutine read_v3000_format(unit, counts_line, atoms, bonds)
@@ -299,6 +422,7 @@ subroutine read_v3000_format(unit, counts_line, atoms, bonds)
    type(bond_t), dimension(:), allocatable, intent(out) :: bonds
    ! Local variables
    character(ll) :: buffer
+   logical(lk), dimension(:), allocatable :: is_dummy, is_bond
    integer(ik) :: elnum, group
    real(rk) :: coords(3)
    integer(ik) :: n_atoms, n_bonds, stat, i, pos
@@ -331,7 +455,13 @@ subroutine read_v3000_format(unit, counts_line, atoms, bonds)
       end if
    end do
 
+   ! Check for empty molecule
+   if (n_atoms <= 0) then
+      stop 'File contains no atoms'
+   end if
+
    allocate (atoms(n_atoms))
+   allocate (is_dummy(n_atoms))
 
    ! Find BEGIN ATOM
    do
@@ -355,8 +485,9 @@ subroutine read_v3000_format(unit, counts_line, atoms, bonds)
          stop 'Invalid MOL/SDF format'
       end if
 
-      call parse_label(label, elnum, group)
+      call parse_label(label, elnum, group, is_dummy(i))
       atoms(i)%elnum = elnum
+      atoms(i)%group = 0
       atoms(i)%coords = coords
       if (useatomtype_flag) then
          atoms(i)%group = group
@@ -373,6 +504,7 @@ subroutine read_v3000_format(unit, counts_line, atoms, bonds)
    end do
 
    allocate (bonds(n_bonds))
+   allocate (is_bond(n_bonds))
    if (n_bonds > 0) then
       ! Find BEGIN BOND
       do
@@ -398,7 +530,14 @@ subroutine read_v3000_format(unit, counts_line, atoms, bonds)
 
          bonds(i)%atomidx1 = atomidx1
          bonds(i)%atomidx2 = atomidx2
-         bonds(i)%bondtype = bondtype
+         ! Entries that are not bonds are dropped
+         is_bond(i) = .not. is_sdf_nonbond(bondtype)
+         if (is_bond(i)) then
+            bonds(i)%bondtype = sdf_bondtype(bondtype)
+            if (bonds(i)%bondtype < 0) then
+               stop 'Invalid MOL/SDF bond type'
+            end if
+         end if
       end do
 
       ! Find END BOND
@@ -419,6 +558,8 @@ subroutine read_v3000_format(unit, counts_line, atoms, bonds)
       end if
       if (index(buffer, 'END CTAB') > 0) exit
    end do
+
+   call drop_dummies('MOL/SDF file', atoms, is_dummy, bonds, is_bond)
 end subroutine
 
 subroutine read_file_mol2(unit, title, atoms, bonds)
@@ -430,9 +571,11 @@ subroutine read_file_mol2(unit, title, atoms, bonds)
    real(rk) :: coords(3)
    character(ll) :: label, dummy, typestr
    character(ll) :: buffer
+   character(:), allocatable :: token
+   logical(lk), dimension(:), allocatable :: is_dummy, is_bond
    integer(ik) :: elnum, group
    integer(ik) :: n_atoms, n_bonds, stat
-   integer(ik) :: i, atomidx1, atomidx2
+   integer(ik) :: i, j, pos, atomidx1, atomidx2
 
    ! Find @<TRIPOS>MOLECULE section
    do
@@ -462,6 +605,7 @@ subroutine read_file_mol2(unit, title, atoms, bonds)
    end if
 
    allocate (atoms(n_atoms))
+   allocate (is_dummy(n_atoms))
 
    ! Find @<TRIPOS>ATOM section
    do
@@ -480,9 +624,17 @@ subroutine read_file_mol2(unit, title, atoms, bonds)
          stop 'Invalid MOL2 format'
       end if
 
-      call parse_label(label, elnum, group)
-      atoms(i)%elnum = elnum
+      atoms(i)%elnum = 0
+      atoms(i)%group = 0
       atoms(i)%coords = coords
+      ! Atoms of SYBYL type Du are dummy atoms, whatever their name
+      if (lowercase(trim(adjustl(typestr))) == 'du') then
+         is_dummy(i) = .TRUE.
+         cycle
+      end if
+
+      call parse_label(label, elnum, group, is_dummy(i))
+      atoms(i)%elnum = elnum
       if (useatomtype_flag) then
          atoms(i)%group = group
       end if
@@ -490,6 +642,7 @@ subroutine read_file_mol2(unit, title, atoms, bonds)
 
    ! Read bonds
    allocate (bonds(n_bonds))
+   allocate (is_bond(n_bonds))
    if (n_bonds > 0) then
       ! Find @<TRIPOS>BOND section
       do
@@ -501,18 +654,48 @@ subroutine read_file_mol2(unit, title, atoms, bonds)
       end do
 
       ! Read bond section
-      ! Format: bond_id origin_atom_id target_atom_id typestr
+      ! Format: bond_id origin_atom_id target_atom_id typestr [status_bits]
+      ! The line is split into tokens by hand, because list-directed input
+      ! would end the bond type at a slash or a comma (e.g. 3/2).
       do i = 1, n_bonds
-         read (unit, *, iostat=stat) dummy, atomidx1, atomidx2, typestr
+         read (unit, '(A)', iostat=stat) buffer
          if (stat /= 0) then
             stop 'Invalid MOL2 format'
          end if
 
+         pos = 1
+         do j = 1, 4
+            token = next_token(buffer, pos)
+            if (len(token) == 0) then
+               stop 'Invalid MOL2 format'
+            end if
+            select case (j)
+            case (2)
+               read (token, *, iostat=stat) atomidx1
+            case (3)
+               read (token, *, iostat=stat) atomidx2
+            case (4)
+               typestr = token
+            end select
+            if (stat /= 0) then
+               stop 'Invalid MOL2 format'
+            end if
+         end do
+
          bonds(i)%atomidx1 = atomidx1
          bonds(i)%atomidx2 = atomidx2
-         bonds(i)%bondtype = mol2_bondtype(typestr)
+         ! Entries that are not bonds are dropped
+         is_bond(i) = .not. is_mol2_nonbond(typestr)
+         if (is_bond(i)) then
+            bonds(i)%bondtype = mol2_bondtype(typestr)
+            if (bonds(i)%bondtype < 0) then
+               stop 'Invalid MOL2 bond type'
+            end if
+         end if
       end do
    end if
+
+   call drop_dummies('MOL2 file', atoms, is_dummy, bonds, is_bond)
 end subroutine
 
 end module

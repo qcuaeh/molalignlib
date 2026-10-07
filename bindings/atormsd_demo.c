@@ -25,6 +25,9 @@
  * list. With -align -aligned FILE the aligned cluster 2 is written to FILE
  * instead, one XYZ frame per record with the RMSD in its title line.
  *
+ * Dummy atoms (symbol "X") are skipped when reading, as atormsd does: the
+ * library has no dummy element.
+ *
  * Differences from atormsd: only XYZ files are read and written, and -help
  * is an extra option.
  */
@@ -155,10 +158,11 @@ static void print_options(const long_opt_t *opts, const opt_info_t *info)
 /* ---- Element table ---- */
 
 /* Symbols indexed by element number, as in the library's element table:
- * the dummy atom "X" (0), the real elements up to Lr (103), then the
- * Lennard-Jones pseudo-element "LJ" (104). */
+ * the real elements up to Lr (103), then the Lennard-Jones pseudo-element
+ * "LJ" (104). Entry 0 is not an element: it is "X", the symbol written for
+ * padding atoms. */
 static const char *atomic_symbols[] = {
-    "X",                                                                  /* 0      */
+    "X",                                                                  /* padding */
     "H",  "He",                                                           /* 1-2    */
     "Li", "Be", "B",  "C",  "N",  "O",  "F",  "Ne",                     /* 3-10   */
     "Na", "Mg", "Al", "Si", "P",  "S",  "Cl", "Ar",                     /* 11-18  */
@@ -179,11 +183,11 @@ static const char *atomic_symbols[] = {
 };
 static const int n_elems = (int)(sizeof(atomic_symbols) / sizeof(atomic_symbols[0])) - 1;
 
-/* Element number of an element symbol (case-insensitive), or -1 if
- * unknown. */
+/* Element number (1..n_elems) of an element symbol (case-insensitive), or
+ * -1 if unknown. */
 static int elnum_lookup(const char *elsym)
 {
-    for (int z = 0; z <= n_elems; z++)
+    for (int z = 1; z <= n_elems; z++)
         if (equal_nocase(elsym, atomic_symbols[z])) return z;
     return -1;
 }
@@ -195,10 +199,11 @@ static int elnum_lookup(const char *elsym)
  * The label is matched case-insensitively. Its leading letters are the
  * element symbol and anything after them must be digits, giving the group
  * (0 if absent), e.g. "C", "fe", "H12". Groups only matter with -atomtype.
- * "X" is the dummy atom (element number 0), which is never compared.
+ * "X" marks a dummy atom, which is not an element: *is_dummy is then set
+ * and *elnum must not be used.
  *
  * Returns 0 on success, -1 on invalid label. */
-static int parse_label(const char *label, int *elnum, int *group)
+static int parse_label(const char *label, int *elnum, int *group, bool *is_dummy)
 {
     char elsym[32];
     int i, m = 0;
@@ -214,6 +219,8 @@ static int parse_label(const char *label, int *elnum, int *group)
 
     /* Also rejects an empty or over-long symbol: neither is in the table. */
     snprintf(elsym, sizeof(elsym), "%.*s", m, label);
+    *is_dummy = equal_nocase(elsym, "X");
+    if (*is_dummy) return 0;
     *elnum = elnum_lookup(elsym);
     if (*elnum < 0) {
         fprintf(stderr, "Unknown element symbol: %s\n", elsym);
@@ -236,7 +243,8 @@ static const char *path_format(const char *path, bool *has_basename)
     return dot ? dot + 1 : filename;
 }
 
-/* Read an XYZ file into packed atom_data and coords arrays.
+/* Read an XYZ file into packed atom_data and coords arrays. Dummy atoms
+ * ("X") are skipped, so *n_atoms_out counts the real atoms only.
  *
  * atom_data_out receives a heap-allocated array of length n_atoms*2:
  *   [elnum0, group0, elnum1, group1, ...]
@@ -250,8 +258,8 @@ static int read_xyz(const char *path,
                     double **coords_out)
 {
     FILE *fp;
-    int n_atoms, elnum, group;
-    bool has_basename;
+    int n_atoms, n_real = 0, elnum, group;
+    bool has_basename, is_dummy;
     char label[32], line[256];
     int *atom_data = NULL;
     double *coords = NULL;
@@ -289,18 +297,24 @@ static int read_xyz(const char *path,
     }
 
     for (int i = 0; i < n_atoms; i++) {
-        double *xyz = &coords[i*3];
+        double *xyz = &coords[n_real*3];
         if (fscanf(fp, " %31s %lf %lf %lf", label, &xyz[0], &xyz[1], &xyz[2]) != 4) {
             fprintf(stderr, "Invalid XYZ format in %s (atom line %d)\n", path, i+1);
             goto fail;
         }
-        if (parse_label(label, &elnum, &group) != 0) goto fail;
-        atom_data[i*2]     = elnum;
-        atom_data[i*2 + 1] = group;
+        if (parse_label(label, &elnum, &group, &is_dummy) != 0) goto fail;
+        if (is_dummy) continue;   /* skip dummy atoms */
+        atom_data[n_real*2]     = elnum;
+        atom_data[n_real*2 + 1] = group;
+        n_real++;
+    }
+    if (n_real == 0) {
+        fprintf(stderr, "File %s contains no atoms\n", path);
+        goto fail;
     }
 
     fclose(fp);
-    *n_atoms_out   = n_atoms;
+    *n_atoms_out   = n_real;
     *atom_data_out = atom_data;
     *coords_out    = coords;
     return 0;
@@ -315,8 +329,8 @@ fail:
 /* Write one XYZ frame of cluster 2, transformed by transform and with its
  * atoms reordered by full_atomperm1, like atormsd -aligned. Line i holds
  * atom full_atomperm1[i] (0-based) of the padded cluster 2: indices
- * >= n_atoms2 are padding atoms, written as dummy atoms "X" whose input
- * coordinates are the origin, as in the library. */
+ * >= n_atoms2 are padding atoms, written as "X" with the origin as their
+ * input coordinates, as in the library. */
 static void write_xyz_frame(FILE *fp, const char *title, int n_padding,
                             int n_atoms2, const int *atom_data2, const double *coords2,
                             const int *full_atomperm1, const double *transform)
@@ -345,7 +359,7 @@ static void write_xyz_frame(FILE *fp, const char *title, int n_padding,
 enum {
     OPT_ALIGN = 1, OPT_REMAP, OPT_PRUNETOL, OPT_ATOMTYPE,
     OPT_HEAVY, OPT_MASSWEIGHT, OPT_MIRROR, OPT_ATOFREQ,
-    OPT_MAXTRIALS, OPT_MAXRECORDS, OPT_ALIGNED, OPT_ASSIGNMENT,
+    OPT_MAXTRIALS, OPT_MAXRECS, OPT_ALIGNED, OPT_MAPPING,
     OPT_STATS, OPT_RANDOM, OPT_HELP
 };
 
@@ -360,9 +374,9 @@ static const long_opt_t long_options[] = {
     {"mirror",     0, OPT_MIRROR},
     {"atofreq",    1, OPT_ATOFREQ},
     {"maxtrials",  1, OPT_MAXTRIALS},
-    {"maxrecords", 1, OPT_MAXRECORDS},
+    {"maxrecs",    1, OPT_MAXRECS},
     {"aligned",    1, OPT_ALIGNED},
-    {"assignment", 0, OPT_ASSIGNMENT},
+    {"mapping",    0, OPT_MAPPING},
     {"stats",      0, OPT_STATS},
     {"random",     0, OPT_RANDOM},
     {"help",       0, OPT_HELP},
@@ -379,9 +393,9 @@ static const opt_info_t opt_info[] = {
     [OPT_MIRROR]     = {"Reflect cluster 2 (x -> -x) before comparison",                   NULL  },
     [OPT_ATOFREQ]    = {"Stop once the best solution is found N times (default: 10)",      "N"   },
     [OPT_MAXTRIALS]  = {"Stop after at most N random orientations (default: 10000)",       "N"   },
-    [OPT_MAXRECORDS] = {"Record the N lowest RMSDs found (default: 1)",                    "N"   },
+    [OPT_MAXRECS]    = {"Record the N lowest RMSDs found (default: 1)",                    "N"   },
     [OPT_ALIGNED]    = {"Write the aligned cluster 2 to FILE (XYZ; needs -align)",         "FILE"},
-    [OPT_ASSIGNMENT] = {"Print the atom permutation (1-based; needs -remap)",              NULL  },
+    [OPT_MAPPING]    = {"Print the atom permutation (1-based; needs -remap)",              NULL  },
     [OPT_STATS]      = {"Print optimisation statistics (needs -align -remap)",             NULL  },
     [OPT_RANDOM]     = {"Seed the random-number generator from the system clock",          NULL  },
     [OPT_HELP]       = {"Show this help message",                                          NULL  },
@@ -434,14 +448,14 @@ int main(int argc, char **argv)
         case OPT_MAXTRIALS:
             if (read_int_optarg(option, arg, 1, &max_trials) != 0) return 1;
             break;
-        case OPT_MAXRECORDS:
+        case OPT_MAXRECS:
             if (read_int_optarg(option, arg, 1, &max_records) != 0) return 1;
             break;
         case OPT_ALIGNED:
             write_aligned = true;
             aligned_path = arg;
             break;
-        case OPT_ASSIGNMENT: printmapping_flag = true; break;
+        case OPT_MAPPING:    printmapping_flag = true; break;
         case OPT_STATS:      printstats_flag      = true; break;
         case OPT_RANDOM:     random_flag     = true; break;
         case OPT_HELP:       print_usage(argv[0]); return 0;
@@ -493,8 +507,8 @@ int main(int argc, char **argv)
 
     /* Output buffers for up to max_records solutions. Each permutation has
      * n_padding = max(n_atoms1, n_atoms2) entries: the clusters may differ
-     * in size with -heavy (or when they contain dummy atoms "X"), and the
-     * smaller one is then padded with dummy atoms. */
+     * in size with -heavy, and the smaller one is then padded with padding
+     * atoms. */
     n_padding = n_atoms1 > n_atoms2 ? n_atoms1 : n_atoms2;
     rmsd_list      = malloc((size_t)max_records * sizeof(double));
     mapping_list   = malloc((size_t)max_records * (size_t)n_padding * sizeof(int));
@@ -541,7 +555,7 @@ int main(int argc, char **argv)
         double rmsd = rmsd_list[r];
         const double *transform = &transform_list[(size_t)r * 16];
         /* Entry i (0-based) is the atom of cluster 2 placed on line i of
-         * cluster 1. Values >= n_atoms2 are dummy atoms padding cluster 2,
+         * cluster 1. Values >= n_atoms2 are padding atoms of cluster 2,
          * and entries i >= n_atoms1 hold the extra atoms of cluster 2. */
         const int *full_atomperm1 = &mapping_list[(size_t)r * n_padding];
 

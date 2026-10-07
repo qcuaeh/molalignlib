@@ -123,7 +123,7 @@ Calculate RMSD between two unstructured atom clusters. No bond information is ne
 atormsd file1 file2 [options]
 ```
 
-**Supported file formats:** XYZ, MOL, SDF and Mol2, selected by the lowercase file extension (`.xyz`, `.mol`, `.sdf`, `.mol2`); only the first structure of each file is read. Options may appear before or after the file paths and are case-insensitive.
+**Supported file formats:** XYZ, MOL, SDF and Mol2, selected by the lowercase file extension (`.xyz`, `.mol`, `.sdf`, `.mol2`); only the first structure of each file is read. Dummy atoms (symbol `X`, or SYBYL type `Du` in Mol2 files) are skipped, together with their bonds, and the remaining atoms are numbered consecutively. Options may appear before or after the file paths and are case-insensitive.
 
 **Output:** one line per record with the RMSD (Å). With `-remap -mapping` it is followed by the atom permutation that maps file 2 onto file 1: a comma-separated list of 1-based indices, where entry *i* is the atom of file 2 placed on line *i* of file 1.
 
@@ -135,7 +135,7 @@ atormsd file1 file2 [options]
 | -remap | | Remap atoms to minimise the RMSD |
 | -atomtype | | Only match atoms with the same label. A label is an element symbol optionally followed by digits (e.g. `C`, `C1`, `C2`); atoms with different digit suffixes are never matched |
 | -prunetol | TOL | Prune atom pairs (only with `-remap`): two atoms are never paired if their sorted distances to the atoms of some atom type differ by more than 2√3 × *TOL* Å |
-| -minfreq | N | Stop once the best solution has been found *N* times (default: 10) |
+| -atofreq | N | Stop once the best solution has been found *N* times (default: 10) |
 | -maxtrials | N | Stop after at most *N* random orientations (default: 10000) |
 | -maxrecs | N | Record the *N* lowest RMSDs found (default: 1); more than one record is only produced with `-align -remap` |
 | -mapping | | Print the atom permutation after each RMSD (only with `-remap`; see *Output* above) |
@@ -146,7 +146,7 @@ atormsd file1 file2 [options]
 | -stats | | Print the ranked local minima found and the search statistics (only with `-align -remap`) |
 | -random | | Seed the random-number generator from the system clock (otherwise results are reproducible) |
 
-The integer arguments of `-minfreq`, `-maxtrials` and `-maxrecs` must be at least 1. Option arguments may not start with `-`.
+The integer arguments of `-atofreq`, `-maxtrials` and `-maxrecs` must be at least 1. Option arguments may not start with `-`.
 
 #### Examples
 
@@ -176,7 +176,7 @@ Calculate the symmetry-corrected RMSD between two molecular conformers. Bond top
 conformsd file1 file2 [options]
 ```
 
-**Supported file formats:** XYZ, MOL, SDF and Mol2, selected by the lowercase file extension (`.xyz`, `.mol`, `.sdf`, `.mol2`); only the first structure of each file is read. XYZ files have no bond table, so use `-bondtol` with them. Options may appear before or after the file paths and are case-insensitive.
+**Supported file formats:** XYZ, MOL, SDF and Mol2, selected by the lowercase file extension (`.xyz`, `.mol`, `.sdf`, `.mol2`); only the first structure of each file is read. XYZ files have no bond table, so use `-bondtol` with them. Dummy atoms (symbol `X`, or SYBYL type `Du` in Mol2 files) are skipped, together with their bonds, and the remaining atoms are numbered consecutively. Options may appear before or after the file paths and are case-insensitive.
 
 **Output:** the same as for [atormsd](#atormsd): one line per record with the RMSD (Å), followed with `-remap -mapping` by the comma-separated, 1-based atom permutation.
 
@@ -187,7 +187,7 @@ conformsd file1 file2 [options]
 | -align | | Align atoms to minimise the RMSD |
 | -remap | | Remap atoms to minimise the RMSD |
 | -atomtype | | Only match atoms with the same label. A label is an element symbol optionally followed by digits (e.g. `C`, `C1`, `C2`); atoms with different digit suffixes are never matched |
-| -minfreq | N | Stop the random orientation search once the best solution has been found more than *N* times; also the strategy threshold (see below) (default: 100) |
+| -confofreq | N | Stop the random orientation search once the best solution has been found more than *N* times; also the strategy threshold (see below) (default: 100) |
 | -maxtrials | N | Stop after at most *N* random orientations (default: 10000) |
 | -maxfrags | N | Maximum number of molecular fragments allowed in each molecule (default: 1; see below) |
 | -maxrecs | N | Record the *N* lowest RMSDs found (default: 1); more than one record is only produced with `-align -remap` when the stochastic search is selected (see below) |
@@ -198,13 +198,25 @@ conformsd file1 file2 [options]
 | -massweight | | Use mass-weighted coordinates |
 | -mirror | | Reflect molecule 2 (x → −x) before comparison |
 | -bondtol | TOL | Derive bond connectivity from interatomic distances instead of the file's bond table: atoms are bonded when closer than the sum of their covalent radii plus *TOL* Å |
-| -bondtype | | Use bond types from the files to guide atom matching. Both files must have the same format (this is checked even with `-bondtol`, where bond types otherwise have no effect) |
+| -bondtype | | Use bond types from the files to guide atom matching (see *Bond types* below). No effect with `-bondtol` |
 | -stats | | Print the ranked local minima found and the search statistics (only with `-align -remap`) |
 | -random | | Seed the random-number generator from the system clock (otherwise results are reproducible) |
 
-With `-align -remap`, the search strategy is chosen automatically from the assignment tree: stochastic fixed-orientation search is used when the total number of complete assignments exceeds `-minfreq` times the sum of partial combinations, and exhaustive orientation-independent search otherwise. The default of 100 reproduced the reference assignments on the full CCD and BIRD benchmarks, whereas 25 produced some incorrect ones. Either strategy can be forced at compile time with the `FORCE_STOCHASTIC` and `FORCE_EXHAUSTIVE` parameters in `fortran/parameters.f90`.
+With `-align -remap`, the search strategy is chosen automatically from the assignment tree: stochastic fixed-orientation search is used when the total number of complete assignments exceeds `-confofreq` times the sum of partial combinations, and exhaustive orientation-independent search otherwise. The default of 100 reproduced the reference assignments on the full CCD and BIRD benchmarks, whereas 25 produced some incorrect ones. Either strategy can be forced at compile time with the `FORCE_STOCHASTIC` and `FORCE_EXHAUSTIVE` parameters in `fortran/parameters.f90`.
 
-A molecular fragment is a connected component of the bond graph of the compared atoms (after `-heavy` exclusions). An atom without bonds is a fragment of its own, so with the default `-maxfrags 1` each molecule must be a single connected structure, and a molecule of two or more atoms with no bonds is rejected. Raise `-maxfrags` to compare complexes, salts or solvated systems made of several molecules. The integer arguments of `-minfreq`, `-maxtrials`, `-maxfrags` and `-maxrecs` must be at least 1. Option arguments may not start with `-`.
+A molecular fragment is a connected component of the bond graph of the compared atoms (after `-heavy` exclusions). An atom without bonds is a fragment of its own, so with the default `-maxfrags 1` each molecule must be a single connected structure, and a molecule of two or more atoms with no bonds is rejected. Raise `-maxfrags` to compare complexes, salts or solvated systems made of several molecules. The integer arguments of `-confofreq`, `-maxtrials`, `-maxfrags` and `-maxrecs` must be at least 1. Option arguments may not start with `-`.
+
+#### Bond types
+
+A bond type is an opaque label: a short, case-insensitive string with no intrinsic meaning. With `-bondtype`, two bonds match only when their labels are the same string, so `3/2`, `1.5` and `6/4` are three different types. The only exception is that directed types are compared undirected (`dr`/`dl` as `dv`, `up`/`dn` as `1`). A label is one of:
+
+- a digit `1`–`9`;
+- a letter followed by a letter or a digit (e.g. `ar`, `h3`);
+- a digit, one of the separators `/ : - . ,`, and a digit (e.g. `3/2`, `3:2`).
+
+The readers give bonds conventional labels, so that bond types read from different formats can be compared: Mol2 bond types are kept as they are (`1`, `2`, `3`, `ar`, `am`, or any other valid label as an extension), and MOL/SDF bond numbers 1–10 other than 8 become `1`, `2`, `3`, `ar`, `sd`, `sa`, `da`, `co` and `hb`. Mol2 bonds of type `un` and MOL/SDF bonds of type 8 (any) are of undefined type, which has no label. Entries that are not bonds (Mol2 `du` and `nc`, MOL/SDF type 0) are skipped. The full list of conventional labels is in `fortran/parameters.f90`.
+
+Bonds of undefined type (see above, and all bonds derived with `-bondtol`) cannot be compared, so with `-bondtype` a bond of undefined type between compared atoms is an error. The same molecule written with Kekulé bonds in one file and aromatic bonds in the other does not match either.
 
 #### Examples
 
@@ -215,8 +227,8 @@ conformsd conf1.sdf conf2.sdf -align -remap
 # Derive connectivity from geometry (useful for XYZ input)
 conformsd conf1.xyz conf2.xyz -align -remap -bondtol 0.3
 
-# Also distinguish bond types (both files must have the same format)
-conformsd conf1.sdf conf2.sdf -align -remap -bondtype
+# Also distinguish bond types (labels are compared literally, see Bond types)
+conformsd conf1.sdf conf2.mol2 -align -remap -bondtype
 
 # Heavy atoms only
 conformsd conf1.sdf conf2.sdf -align -remap -heavy
@@ -239,7 +251,7 @@ done
 C Binding
 ---------
 
-Include `molalign.h` and link against `libmolalign`, which contains both `atormsd_calculate` and `conformsd_calculate`: one header and one library, no separate per-binding include or link step. `molalign.h` also defines the `MOLALIGN_SUCCESS` and `MOLALIGN_ERROR_*` constants returned through `error_code`.
+Include `molalign.h` and link against `libmolalign`, which contains both `atormsd_calculate` and `conformsd_calculate`: one header and one library, no separate per-binding include or link step. `molalign.h` also defines the `MOLALIGN_SUCCESS` and `MOLALIGN_ERROR_*` constants returned through `error_code`, and documents the bond type codes.
 
 ```c
 #include "molalign.h"
@@ -256,9 +268,9 @@ Both functions receive atom information as a flat `int` array of length
 [ elnum_0, label_0, elnum_1, label_1, ... ]
 ```
 
-- `elnum`: atomic number, 0 to 104 (e.g. 6 for carbon, 8 for oxygen). 0 is
-  the dummy atom "X", which is always excluded from the comparison, and 104
-  is the Lennard-Jones pseudo-element "LJ"; other values give
+- `elnum`: atomic number, 1 to 104 (e.g. 6 for carbon, 8 for oxygen); 104
+  is the Lennard-Jones pseudo-element "LJ". There is no dummy element, so
+  leave dummy atoms out of the arrays; other values give
   `MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER`.
 - `label`: user-defined integer label; pass `0` for unlabelled atoms. With
   `useatomtype_flag = true`, only atoms with the same label are matched.
@@ -301,13 +313,12 @@ Each permutation has `n_padding = max(n_atoms1, n_atoms2)` entries, so
 `mapping_list` needs `max_records*n_padding` elements, and record `i`
 occupies `mapping_list[i*n_padding .. i*n_padding+n_padding-1]`. Entry `j`
 (0-based) is the atom of molecule 2 placed on line `j` of molecule 1. The
-sizes can only differ when `heavy_flag = true` or when the input contains
-dummy atoms (`elnum = 0`), since only the compared atoms must match: the
-smaller molecule is then padded with dummy atoms appended after its real
-atoms, so values `>= n_atoms2` denote dummy atoms of molecule 2 and entries
-`j >= n_atoms1` hold the extra atoms of molecule 2. Atoms that are not part
-of the RMSD (hydrogens with `heavy_flag = true`, and dummy atoms) are paired
-afterwards: with an atom of the same element, following their bonded heavy
+sizes can only differ when `heavy_flag = true`, since only the compared
+atoms must match: the smaller molecule is then padded with padding atoms
+appended after its real atoms, so values `>= n_atoms2` denote padding atoms
+of molecule 2 and entries `j >= n_atoms1` hold the extra atoms of molecule
+2. Atoms that are not part of the RMSD (hydrogens with `heavy_flag = true`)
+are paired afterwards: with an atom of the same element, following their bonded heavy
 atom in `conformsd_calculate` and by distance otherwise, and then with
 whatever atoms are left.
 
@@ -363,7 +374,7 @@ differ by more than 2√3 × `prune_tol`. When `pruning_flag = true`,
 | **mapping_list** | out | Flattened, **0-based** atom permutations, length `max_records*n_padding` with `n_padding = max(n_atoms1, n_atoms2)` (see [Atom permutations and padding](#atom-permutations-and-padding)); caller allocates ≥ `max_records*n_padding` elements |
 | **transform_list** | out | Flattened row-major 4 × 4 homogeneous transforms, length `max_records*16`. Record `i` occupies `transform_list[i*16 .. i*16+15]`; caller allocates ≥ `max_records*16` elements |
 | **n_records** | out | Actual number of records written (≤ `max_records`) |
-| **error_code** | out | A constant from `enum molalign_error_code` in `molalign.h`: `MOLALIGN_SUCCESS`; `MOLALIGN_ERROR_INVALID_BOUND` (`ato_freq`, `max_trials` or `max_records` less than 1; checked before any output is written); `MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER` (an `elnum` outside 0–104); `MOLALIGN_ERROR_NOT_ISOMERS` (molecules are not isomers); `MOLALIGN_ERROR_ATOM_TYPE_MISMATCH` (atom types do not match; only when `remap_flag = false`); `MOLALIGN_ERROR_ASSIGNMENT_FAILED` (assignment failed, e.g. `prune_tol` too tight; only when `remap_flag = true`) |
+| **error_code** | out | A constant from `enum molalign_error_code` in `molalign.h`: `MOLALIGN_SUCCESS`; `MOLALIGN_ERROR_INVALID_BOUND` (`ato_freq`, `max_trials` or `max_records` less than 1; checked before any output is written); `MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER` (an `elnum` outside 1–104); `MOLALIGN_ERROR_NOT_ISOMERS` (molecules are not isomers); `MOLALIGN_ERROR_ATOM_TYPE_MISMATCH` (atom types do not match; only when `remap_flag = false`); `MOLALIGN_ERROR_ASSIGNMENT_FAILED` (assignment failed, e.g. `prune_tol` too tight; only when `remap_flag = true`) |
 
 #### Minimal example
 
@@ -492,13 +503,34 @@ exclusions). An atom without bonds is a fragment of its own, so with
 `max_fragments = 1` a molecule of two or more atoms without bonds gives
 `MOLALIGN_ERROR_TOO_MANY_FRAGMENTS`.
 
-The bond `type` is any integer code. It is only used when `usebondtype_flag = true`,
-and then only compared for equality between bonds, never interpreted: both
-molecules must therefore use the same bond-type convention (for example,
-read from the same file format with the same parser). Note that the same
-molecule encoded with different Kekulé or aromatic bond types is then
-reported as `MOLALIGN_ERROR_NOT_CONFORMERS` (or
-`MOLALIGN_ERROR_BOND_MISMATCH` when `remap_flag = false`).
+Every entry of the bond array is a bond. The bond `type` is the integer
+code of a bond type label (see [Bond types](#bond-types)). Types are only
+used when `usebondtype_flag = true`, and then the labels are compared
+literally, never interpreted, so the same kind of bond must have the same
+label in both molecules. Without it the type is ignored and any value is
+accepted. Use the conventional labels that the file
+readers use:
+
+| Label | Meaning | Code |
+|-------|---------|------|
+| `1`, `2`, `3` | single, double, triple | 1, 2, 3 |
+| `ar` | aromatic | 37 |
+| `am` | amide | 32 |
+| `3/2` | fractional order 3/2 | 978 |
+| `3:2` | three-center two-electron bond | 1078 |
+
+In general, a digit `d` has code `d`; a letter and a letter-or-digit `ab`
+have code `10 + 36*a + b` (`a` = 0–25 for a–z, `b` = 0–35 for 0–9, a–z);
+and a digit, separator and digit `nsd` have code `946 + 100*s + 10*n + d`
+(`s` = 0–4 for `/ : - . ,`), so valid codes are 1–1445. Code 1446 is not
+the code of any label: it marks a bond of undefined type, such as a bond
+perceived from geometry or read as Mol2 `un` or MOL/SDF type 8. With
+`usebondtype_flag = true`, a bond of undefined type between compared atoms
+gives `MOLALIGN_ERROR_UNDEFINED_BOND_TYPE`, because it cannot be compared,
+and any other invalid code gives `MOLALIGN_ERROR_INVALID_BOND_TYPE`. Note that the same molecule encoded with different
+Kekulé or aromatic bond types is reported as
+`MOLALIGN_ERROR_NOT_CONFORMERS` (or `MOLALIGN_ERROR_BOND_MISMATCH` when
+`remap_flag = false`).
 
 #### Parameters
 
@@ -522,7 +554,7 @@ reported as `MOLALIGN_ERROR_NOT_CONFORMERS` (or
 | **useatomtype_flag** | in | Only match atoms with the same label |
 | **bonding_flag** | in | Derive connectivity from geometry (ignores bond arrays) |
 | **bond_tol** | in | Bond detection tolerance (Å), see above; required when `bonding_flag = true`, ignored otherwise (no default) |
-| **usebondtype_flag** | in | Use bond types to guide atom matching (types compared, not interpreted; see above). Ignored when `bonding_flag = true` |
+| **usebondtype_flag** | in | Use bond types to guide atom matching (labels compared literally, never interpreted; see above). Ignored when `bonding_flag = true` |
 | **printstats_flag** | in | Print optimisation statistics to stdout |
 | **printassigntree_flag** | in | Print the assignment tree and its combination counts to stdout (only when `remap_flag = true`) |
 | **random_flag** | in | Seed the random-number generator from the system clock (otherwise results are reproducible) |
@@ -534,7 +566,7 @@ reported as `MOLALIGN_ERROR_NOT_CONFORMERS` (or
 | **mapping_list** | out | Flattened, **0-based** atom permutations, length `max_records*n_padding` with `n_padding = max(n_atoms1, n_atoms2)` (see [Atom permutations and padding](#atom-permutations-and-padding)); caller allocates ≥ `max_records*n_padding` elements |
 | **transform_list** | out | Flattened row-major 4 × 4 homogeneous transforms, length `max_records*16`. Record `i` occupies `transform_list[i*16 .. i*16+15]`; caller allocates ≥ `max_records*16` elements |
 | **n_records** | out | Actual number of records written (≤ `max_records`) |
-| **error_code** | out | A constant from `enum molalign_error_code` in `molalign.h`: `MOLALIGN_SUCCESS`; `MOLALIGN_ERROR_INVALID_BOUND` (`confo_freq`, `max_trials`, `max_fragments` or `max_records` less than 1; checked before any output is written); `MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER` (an `elnum` outside 0–104); `MOLALIGN_ERROR_NOT_ISOMERS` (molecules are not isomers); `MOLALIGN_ERROR_TOO_MANY_FRAGMENTS` (a molecule has more than `max_fragments` fragments); `MOLALIGN_ERROR_ATOM_TYPE_MISMATCH` (atom types do not match; only when `remap_flag = false`); `MOLALIGN_ERROR_BOND_MISMATCH` (bond connectivity does not match; only when `remap_flag = false`); `MOLALIGN_ERROR_NOT_CONFORMERS` (same composition but different connectivity; only when `remap_flag = true`) |
+| **error_code** | out | A constant from `enum molalign_error_code` in `molalign.h`: `MOLALIGN_SUCCESS`; `MOLALIGN_ERROR_INVALID_BOUND` (`confo_freq`, `max_trials`, `max_fragments` or `max_records` less than 1; checked before any output is written); `MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER` (an `elnum` outside 1–104); `MOLALIGN_ERROR_NOT_ISOMERS` (molecules are not isomers); `MOLALIGN_ERROR_INVALID_BOND_TYPE` (a bond type code that is not the code of any label) and `MOLALIGN_ERROR_UNDEFINED_BOND_TYPE` (a bond of undefined type), both only when `usebondtype_flag = true` and only for bonds between compared atoms; `MOLALIGN_ERROR_TOO_MANY_FRAGMENTS` (a molecule has more than `max_fragments` fragments); `MOLALIGN_ERROR_ATOM_TYPE_MISMATCH` (atom types do not match; only when `remap_flag = false`); `MOLALIGN_ERROR_BOND_MISMATCH` (bond connectivity does not match; only when `remap_flag = false`); `MOLALIGN_ERROR_NOT_CONFORMERS` (same composition but different connectivity; only when `remap_flag = true`) |
 
 #### Minimal example
 
@@ -590,8 +622,8 @@ over the first `n_records` entries. Compile it the same way.
 
 The demo program `bindings/atormsd_demo.c` is a C version of the
 [atormsd](#atormsd) program built on `atormsd_calculate`. It takes the same
-options, with the same defaults, and prints the same output, but only reads
-and writes XYZ files; it also accepts `-help`. It shows how to pack the atom
+options, with the same defaults, and prints the same output (it also skips
+dummy atoms), but only reads and writes XYZ files; it also accepts `-help`. It shows how to pack the atom
 data and coordinates read from the files, size the output buffers for
 several records and padded permutations, and apply the returned transforms
 (`-aligned`). Compile and run instructions are in its header comment.
@@ -637,7 +669,8 @@ from molalignlib import Molecule, read_molecules
 #### Construction
 
 ```python
-# From a file (defaults to the first frame; bonds are read when the format has them)
+# From a file (defaults to the first frame; bonds are read when the format has
+# them, and dummy atoms "X" are skipped)
 mol = Molecule.from_file("conformers.sdf")
 
 # From a file (specific frame in a multi-frame file)
@@ -649,10 +682,11 @@ symbols = ["Fe", "Fe"]
 coords  = np.array([[0.0, 0.0, 0.0], [2.5, 0.0, 0.0]], dtype=np.float64)
 mol = Molecule.from_symbols(symbols, coords, name="dimer")
 
-# From element symbols, coordinates, and bonds
+# From element symbols, coordinates, and bonds: [atom1, atom2, type], with
+# 1-based atom indices and bond type codes (see Bond types below)
 symbols   = ["C", "O", "H", "H"]
 coords    = np.zeros((4, 3), dtype=np.float64)
-bond_data = np.array([[1,2,2],[1,3,1],[1,4,1]], dtype=np.int32)  # 1-based
+bond_data = np.array([[1,2,2],[1,3,1],[1,4,1]], dtype=np.int32)  # C=O, C-H, C-H
 mol = Molecule.from_symbols(symbols, coords, bond_data=bond_data)
 
 # From atomic numbers, coordinates, and (optionally) bonds
@@ -664,11 +698,25 @@ default 0) for use with `use_atom_type=True`, and `name=` (default
 `"molecule"`). Molecules read from files are unlabelled and named after the
 file stem.
 
-Molecules read from files record the file format as their `bond_source`;
-molecules built from arrays have `bond_source=None` unless you pass one.
-`conformsd_to(use_bond_type=True)` only accepts pairs with the same
-`bond_source`, because bond types are compared as plain integers and are
-only meaningful within one convention.
+#### Bond types
+
+Bond types are opaque labels (`"1"`, `"ar"`, `"3/2"`, ...; see
+[Bond types](#bond-types) in the conformsd section), stored in the third
+column of `bond_data` as integer codes. `bond_type_code` and
+`bond_type_label` convert between the two:
+
+```python
+from molalignlib import bond_type_code, bond_type_label
+
+bond_type_code("ar")    # 37
+bond_type_label(978)    # '3/2'
+```
+
+Bonds read from files get the conventional labels of their chemfiles bond
+orders (`"1"` to `"5"`, `"am"`, `"ar"`; bonds without an order are of
+undefined type), so molecules read from different formats can be compared
+with `use_bond_type=True`. Molecules read from files also record the file format
+as their `bond_source`; it is informational only.
 
 #### Reading multiple frames
 
@@ -685,10 +733,10 @@ mol0, mol1 = read_molecules("conformers.sdf", frames=(0, 1))
 | **n_atoms** | Number of atoms (also `len(mol)`) |
 | **n_bonds**, **has_bonds** | Number of bonds, and whether there are any |
 | **symbols** | Element symbols |
-| **atom_data** | `int32 (n_atoms, 2)` array of `[atomic_number, label]` |
+| **atom_data** | `int32 (n_atoms, 2)` array of `[atomic_number, label]` (atomic numbers 1–104) |
 | **coords** | `float64 (n_atoms, 3)` coordinates in Å |
-| **bond_data** | `int32 (n_bonds, 3)` array of `[atom1, atom2, type]`, 1-based (empty when there are no bonds) |
-| **bond_source** | Bond-type convention tag (file format, or `None`) |
+| **bond_data** | `int32 (n_bonds, 3)` array of `[atom1, atom2, type]`, 1-based, with bond type codes (empty when there are no bonds) |
+| **bond_source** | Where the bonds came from (file format, or `None`); informational |
 
 #### Writing output
 
@@ -728,7 +776,7 @@ print(result.rmsd)
 | **mass_weight** | `bool` | `False` | Weight each atom by its atomic mass |
 | **mirror** | `bool` | `False` | Reflect `other` before comparison |
 | **use_atom_type** | `bool` | `False` | Only match atoms with the same label (see `labels` in the constructors) |
-| **stats** | `bool` | `False` | Print detailed optimisation statistics |
+| **print_stats** | `bool` | `False` | Print detailed optimisation statistics |
 | **random** | `bool` | `False` | Seed the random-number generator from the system clock (otherwise results are reproducible) |
 | **prune_tol** | `float` | `None` | Pruning tolerance (Å): two atoms are never paired if their sorted distances to the atoms of some atom type differ by more than 2√3 × `prune_tol`. `None` disables pruning |
 | **ato_freq** | `int` | `10` | Stop searching once the best solution has been found this many times (≥ 1) |
@@ -774,8 +822,8 @@ result = x0.conformsd_to(x1, align=True, remap=True, bond_tol=0.3)[0]
 | **mirror** | `bool` | `False` | Reflect `other` before comparison |
 | **use_atom_type** | `bool` | `False` | Only match atoms with the same label (see `labels` in the constructors) |
 | **bond_tol** | `float` | `None` | Bond-detection tolerance (Å): infer bond connectivity from geometry instead of using each molecule's bond table. `None` uses the bond tables |
-| **use_bond_type** | `bool` | `False` | Use bond types to guide atom matching. Both molecules must have the same `bond_source` (e.g. read from files of the same format), otherwise `ValueError` is raised; no effect when `bond_tol` is given |
-| **stats** | `bool` | `False` | Print detailed optimisation statistics |
+| **use_bond_type** | `bool` | `False` | Use bond types to guide atom matching. Labels are compared literally (see [Bond types](#bond-types-1)); bonds of undefined type between compared atoms raise `ValueError`. No effect when `bond_tol` is given |
+| **print_stats** | `bool` | `False` | Print detailed optimisation statistics |
 | **print_assignment_tree** | `bool` | `False` | Print the assignment tree and its combination counts |
 | **random** | `bool` | `False` | Seed the random-number generator from the system clock (otherwise results are reproducible) |
 | **confo_freq** | `int` | `100` | Stop the random orientation search once the best solution has been found more than this many times; also the threshold that selects it over exhaustive enumeration (see [Algorithm Notes](#algorithm-notes)). 100 is the validated value (≥ 1) |
@@ -795,14 +843,17 @@ holds:
 | Attribute | Type | Description |
 |-----------|------|-------------|
 | **rmsd** | `float` | Root-mean-square deviation in Å |
-| **mapping** | `int32 ndarray (n_padding,)` | 0-based index array: entry `j` is the atom of *other* placed on line `j` of *self*. `n_padding = max(len(self), len(other))`; the lengths can only differ with `heavy_only=True` or when the molecules contain dummy atoms (`"X"`), and then values `>= len(other)` denote dummy atoms padding *other* and entries `j >= len(self)` hold its extra atoms |
+| **mapping** | `int32 ndarray (n_padding,)` | 0-based index array: entry `j` is the atom of *other* placed on line `j` of *self*. `n_padding = max(len(self), len(other))`; the lengths can only differ with `heavy_only=True`, and then values `>= len(other)` denote padding atoms of *other* and entries `j >= len(self)` hold its extra atoms |
 | **transform** | `float64 ndarray (4, 4)` | Homogeneous rotation + translation matrix (maps *other* to *self* frame); includes the reflection when `mirror=True` |
 
 #### Applying the result
 
 Use the `apply_to` method to produce a new `Molecule` that is aligned and
 reordered to match the reference. Its bonds, if any, are renumbered to the
-new atom order, so the result can be written with connectivity:
+new atom order, so the result can be written with connectivity. If the
+reference has more atoms (only possible with `heavy_only=True`), the missing
+lines are filled with padding atoms (`"X"`), which can be written but not
+compared:
 
 ```python
 result = mol0.conformsd_to(mol1, align=True, remap=True)[0]

@@ -37,18 +37,28 @@ subroutine conformsd_calculate(                                              &
 ! Inputs, as flat C arrays:
 !   c_atom_data1/2 : packed atom data, length c_n_atoms*2:
 !                    [elnum0, label0, elnum1, label1, ...]
+!                    elnum is an atomic number in 1..n_elems (there is no
+!                    dummy element: leave dummy atoms out).
 !                    label = 0 means unlabelled.
 !   c_coords1/2    : XYZ coordinates, row-major (c_n_atoms x 3), length c_n_atoms*3
 !   c_n_bonds1/2   : number of bonds (may be 0 when c_bonding_flag is true, i.e. derive from geometry)
 !   c_bond_data1/2 : flat bond array, length c_n_bonds*3, layout: [atom1, atom2, type, ...]
-!                    (1-based atom indices as in the original file)
+!                    (1-based atom indices as in the original file; type
+!                    is the code of a bond type label, see parameters.f90.
+!                    Labels have no intrinsic meaning and are compared
+!                    literally; use the conventional ones so that types
+!                    match those read from files, e.g. 1 for "1" (single),
+!                    2 for "2", 3 for "3", 37 for "ar" (aromatic), 978 for
+!                    "3/2", 1078 for "3:2" (3c-2e bond); UNDEFINED_BOND_TYPE
+!                    (1446) for a bond of undefined type. Without
+!                    c_usebondtype_flag the type is not used, and any value
+!                    is accepted)
 !   c_bond_tol     : bond detection tolerance (only used, and required, when
 !                    c_bonding_flag is true; no default)
 !   c_usebondtype_flag: use the bond types in the HNA refinement. Types
-!                    are compared, never interpreted, so both molecules
-!                    must use the same convention (read from the same
-!                    file format with the same parser). Ignored
-!                    when c_bonding_flag is true (perceived bonds are untyped).
+!                    are compared literally, as labels; only directed
+!                    types (dr/dl, up/dn) are compared undirected. Ignored when
+!                    c_bonding_flag is true (perceived bonds are untyped).
 !   c_confo_freq, c_max_trials : convergence frequency and maximum number of
 !                    random orientations of the stochastic search (>= 1).
 !   c_max_fragments    : maximum number of molecular fragments (connected
@@ -90,7 +100,10 @@ subroutine conformsd_calculate(                                              &
 ! See error_codes.f90 and molalign.h. This function can return MOLALIGN_SUCCESS,
 ! MOLALIGN_ERROR_INVALID_BOUND (c_confo_freq, c_max_trials, c_max_fragments
 ! or c_max_records less than 1), MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER,
-! MOLALIGN_ERROR_NOT_ISOMERS, MOLALIGN_ERROR_TOO_MANY_FRAGMENTS,
+! MOLALIGN_ERROR_NOT_ISOMERS, MOLALIGN_ERROR_INVALID_BOND_TYPE (a code
+! outside 1..MAX_BOND_TYPE) and MOLALIGN_ERROR_UNDEFINED_BOND_TYPE (a
+! bond of undefined type, UNDEFINED_BOND_TYPE) (both only with
+! c_usebondtype_flag), MOLALIGN_ERROR_TOO_MANY_FRAGMENTS,
 ! MOLALIGN_ERROR_ATOM_TYPE_MISMATCH and MOLALIGN_ERROR_BOND_MISMATCH (both
 ! only when c_remap_flag is false), and MOLALIGN_ERROR_NOT_CONFORMERS
 ! (only when c_remap_flag is true; passed through from the conformer
@@ -140,7 +153,6 @@ subroutine conformsd_calculate(                                              &
    real(rk), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, coords2r
    real(rk), dimension(:,:), allocatable :: full_coords1, full_coords2, full_coords2r
    integer(ik), dimension(:), allocatable :: atomset1, atomset2
-   integer(ik), dimension(:), allocatable :: bondtypes
    integer(ik), dimension(:), allocatable :: mapping1, full_atomperm1
    integer(ik) :: max_records, n_padding
    integer(ik) :: i, j, base
@@ -227,17 +239,24 @@ subroutine conformsd_calculate(                                              &
       call bonds_from_atoms(atoms2(1:c_n_atoms2), bonds2)
    end if
 
+   ! With usebondtype_flag, reject invalid bond types between included
+   ! atoms (returns MOLALIGN_ERROR_UNDEFINED_BOND_TYPE or
+   ! MOLALIGN_ERROR_INVALID_BOND_TYPE)
+   call check_bondtypes(atomset1, n_padding, bonds1, c_error_code)
+   if (c_error_code /= MOLALIGN_SUCCESS) return
+   call check_bondtypes(atomset2, n_padding, bonds2, c_error_code)
+   if (c_error_code /= MOLALIGN_SUCCESS) return
+
+   ! Without usebondtype_flag only connectivity counts: adjacency_from_bonds
+   ! makes every bond UNDEFINED_BOND_TYPE. With it, the edges used by the
+   ! refinement carry the bond types; bonds of undefined type are then an
+   ! error.
    ! Set adjacency lists of the included atoms (bonds to excluded atoms are
-   ! dropped). With usebondtype_flag, the edges used by the refinement carry
-   ! the bond types, compacted jointly for both molecules.
-   if (usebondtype_flag) then
-      bondtypes = distinct_bondtypes(bonds1, bonds2)
-   else
-      ! No bond types: every bond is GENERIC_BOND
-      allocate (bondtypes(0))
-   end if
-   call adjacency_from_bonds(atoms1(atomset1), extract_bonds(atomset1, n_padding, bonds1), adjcs1, bondtypes)
-   call adjacency_from_bonds(atoms2(atomset2), extract_bonds(atomset2, n_padding, bonds2), adjcs2, bondtypes)
+   ! dropped)
+   call adjacency_from_bonds(atomset1, n_padding, bonds1, adjcs1, c_error_code)
+   if (c_error_code /= MOLALIGN_SUCCESS) return
+   call adjacency_from_bonds(atomset2, n_padding, bonds2, adjcs2, c_error_code)
+   if (c_error_code /= MOLALIGN_SUCCESS) return
 
    ! Abort if either molecule has more fragments than allowed (counted on
    ! the bond graph of the included atoms, which is what the search uses)
