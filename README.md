@@ -8,7 +8,7 @@ MolAlignLib uses the Hierarchical Neighborhood of Atoms (HNA) partitioning to ac
 ### Try It Online
 
 You can try the Python bindings right away on Binder:
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qcuaeh/molalignlib.git/devel?urlpath=%2Fdoc%2Ftree%2Fpython%2Fexamples%2Fexamples.ipynb)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qcuaeh/molalignlib.git/devel?urlpath=%2Fdoc%2Ftree%2Fexamples%2Fexamples.ipynb)
 
 
 Table of Contents
@@ -56,8 +56,15 @@ Building from Source
 ### Requirements
 
 - CMake ≥ 3.15
-- GFortran ≥ 7.0 (or Intel Fortran; any Fortran 2008-compliant compiler)
-- A C compiler (for the C binding)
+- GFortran ≥ 7.0 or Intel Fortran (`ifort` or `ifx`)
+
+Other Fortran compilers may work but are not supported.
+
+To use Intel Fortran instead of GFortran, select it when configuring:
+
+```bash
+cmake -B build -DCMAKE_Fortran_COMPILER=ifx
+```
 
 ### Steps
 
@@ -456,6 +463,13 @@ Replace `/usr/local` with the install prefix (e.g. `$HOME/.local` for a
 [user-local install](#user-local-install)), or with the build tree when
 using the library before installing it.
 
+If the library was built with Intel Fortran, link with `ifx` instead:
+
+```bash
+gcc -c example.c -I/usr/local/include/molalignlib
+ifx -nofor-main example.o -o example -L/usr/local/lib -lmolalign
+```
+
 
 ### conformsd
 
@@ -635,7 +649,13 @@ The Python bindings provide a higher-level interface to MolAlignLib. (See [Try I
 
 ### Installation
 
-Python ≥ 3.8, scikit-build-core, Cython, NumPy and Chemfiles are required.
+Requirements:
+
+- Python ≥ 3.8 with its development package (`python3-dev` on Debian/Ubuntu, `python3-devel` on Fedora/RHEL)
+- GCC and GFortran
+- scikit-build-core, Cython, NumPy and Chemfiles (installed with pip below)
+
+CMake does not need to be installed separately.
 
 ```bash
 # Upgrade pip (recommended)
@@ -883,11 +903,7 @@ best = results[0]
 Runnable examples
 -----------------
 
-For fully runnable examples see
-[`python/examples/examples.py`](python/examples/examples.py)
-and the equivalent Jupyter notebook
-[`python/examples/examples.ipynb`](python/examples/examples.ipynb)
-(the one launched by the [Binder link](#try-it-online) above).
+For fully runnable examples see the [`examples directory`](examples).
 
 
 Algorithm Notes

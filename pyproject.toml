@@ -10,7 +10,7 @@ build-backend = "scikit_build_core.build"
 name = "molalignlib"
 version = "0.1.0"
 description = "Python bindings for MolAlignLib via Cython"
-requires-python = ">=3.8"
+requires-python = ">=3.6"
 dependencies = [
   "numpy",
   "chemfiles",
@@ -20,4 +20,4 @@ dependencies = [
 where = ["python"]
 
 [tool.scikit-build]
-wheel.packages = ["python/molalignlib"]
+wheel.packages = ["bindings/python/molalignlib"]

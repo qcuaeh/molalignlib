@@ -30,7 +30,7 @@ macro(add_cython_extension EXT_NAME PYX_FILE)
         OUTPUT  ${_c}
         COMMAND ${Python3_EXECUTABLE} -m cython
                 -3
-                -I ${CMAKE_SOURCE_DIR}/bindings
+                -I ${CMAKE_SOURCE_DIR}/bindings/c
                 -o ${_c}
                 ${_pyx}
         DEPENDS ${_pyx}
@@ -63,7 +63,7 @@ macro(add_cython_extension EXT_NAME PYX_FILE)
 
     target_include_directories(${EXT_NAME}_ext PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/molalignlib
-        ${CMAKE_SOURCE_DIR}/bindings
+        ${CMAKE_SOURCE_DIR}/bindings/c
         ${Python3_INCLUDE_DIRS}
         ${Python3_NumPy_INCLUDE_DIRS}
     )

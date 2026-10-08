@@ -1,7 +1,10 @@
 cmake_minimum_required(VERSION 3.15)
 
 
-project(MolAlignLib VERSION 1.0 LANGUAGES Fortran C)
+# Only Fortran is needed for the library, the programs and the C binding
+# (whose wrappers are Fortran bind(C) code; bindings/c only installs the
+# header). C is enabled further down, only for the Python extension.
+project(MolAlignLib VERSION 1.0 LANGUAGES Fortran)
 
 # Set default build type to Release if not specified
 if(NOT CMAKE_BUILD_TYPE)
@@ -35,17 +38,24 @@ elseif(CMAKE_Fortran_COMPILER_ID MATCHES "Intel")
     set(CMAKE_Fortran_FLAGS_DEBUG "-O0 -g -traceback -fpe0 -check bounds -warn all")
 endif()
 
-# C compiler flags
-if(CMAKE_C_COMPILER_ID MATCHES "GNU")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fvisibility=hidden")
-    set(CMAKE_C_FLAGS_RELEASE "-O3")
-    set(CMAKE_C_FLAGS_DEBUG "-O0 -g -Wall -Wextra")
-endif()
-
 add_subdirectory(fortran)
-add_subdirectory(bindings)
+add_subdirectory(bindings/c)
 
 if(SKBUILD)
     message(STATUS "Detected scikit-build environment; enabling Python extension build")
-    add_subdirectory(python)
+
+    # The Cython-generated extension is the only C code in the build.
+    # enable_language() must run here, in the top-level directory, because
+    # it is the highest directory common to the extension and to the
+    # molalignlib library it links against.
+    enable_language(C)
+
+    # C compiler flags
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fvisibility=hidden")
+        set(CMAKE_C_FLAGS_RELEASE "-O3")
+        set(CMAKE_C_FLAGS_DEBUG "-O0 -g -Wall -Wextra")
+    endif()
+
+    add_subdirectory(bindings/python)
 endif()
