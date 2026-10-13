@@ -1,0 +1,171 @@
+! MolAlignLib
+! Copyright (C) 2025 José M. Vásquez
+
+! This program is free software: you can redistribute it and/or modify
+! it under the terms of the GNU General Public License as published by
+! the Free Software Foundation, either version 3 of the License, or
+! (at your option) any later version.
+
+! This program is distributed in the hope that it will be useful,
+! but WITHOUT ANY WARRANTY; without even the implied warranty of
+! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+! GNU General Public License for more details.
+
+! You should have received a copy of the GNU General Public License
+! along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+module eigen
+! Smallest eigenvalue and eigenvector of a symmetric 4x4 matrix (Kearsley's
+! residual matrix) by cyclic Jacobi rotations. Alternative to eigen_lapack.
+use parameters
+
+implicit none
+
+private
+public leasteigval
+public leasteigvec
+
+integer(IK), parameter :: max_iter = 100  ! Maximum number of Jacobi iterations
+
+contains
+
+function leasteigval(A)
+! Smallest eigenvalue; A is diagonalized in place
+   real(RK), intent(inout) :: A(4,4)
+   integer(IK) :: i, j, iter
+   real(RK) :: leasteigval
+   real(RK) :: V(4,4)
+   real(RK) :: threshold, off_diag_norm
+
+   ! Initialize V as identity matrix
+   V = 0.0_RK
+   do i = 1, 4
+      V(i,i) = 1.0_RK
+   end do
+
+   do iter = 1, max_iter
+      ! Compute off-diagonal norm
+      off_diag_norm = 0.0_RK
+      do i = 1, 3
+         do j = i+1, 4
+            off_diag_norm = off_diag_norm + A(i,j)**2
+         end do
+      end do
+      off_diag_norm = sqrt(2.0_RK * off_diag_norm)
+
+      if (off_diag_norm < CONV_TOL) exit
+
+      threshold = off_diag_norm / (4.0_RK * sqrt(real(4, RK)))
+
+      do i = 1, 3
+         do j = i+1, 4
+            if (abs(A(i,j)) > threshold) then
+               call jacobi_rotation(A, V, i, j)
+            end if
+         end do
+      end do
+   end do
+
+   ! Find the smallest eigenvalue
+   leasteigval = A(1,1)
+   do i = 2, 4
+      if (A(i,i) < leasteigval) then
+         leasteigval = A(i,i)
+      end if
+   end do
+end function
+
+function leasteigvec(A)
+! Normalized eigenvector of the smallest eigenvalue; A is diagonalized in
+! place
+   real(RK), intent(inout) :: A(4,4)
+   integer(IK) :: i, j, iter, leastindex
+   real(RK) :: leasteigvec(4)
+   real(RK) :: V(4,4)
+   real(RK) :: threshold, off_diag_norm, leasteigval
+
+   ! Initialize V as identity matrix
+   V = 0.0_RK
+   do i = 1, 4
+      V(i,i) = 1.0_RK
+   end do
+
+   do iter = 1, max_iter
+      ! Compute off-diagonal norm
+      off_diag_norm = 0.0_RK
+      do i = 1, 3
+         do j = i+1, 4
+            off_diag_norm = off_diag_norm + A(i,j)**2
+         end do
+      end do
+      off_diag_norm = sqrt(2.0_RK * off_diag_norm)
+
+      if (off_diag_norm < CONV_TOL) exit
+
+      threshold = off_diag_norm / (4.0_RK * sqrt(real(4, RK)))
+
+      do i = 1, 3
+         do j = i+1, 4
+            if (abs(A(i,j)) > threshold) then
+               call jacobi_rotation(A, V, i, j)
+            end if
+         end do
+      end do
+   end do
+
+   ! Find the index of the smallest eigenvalue
+   leasteigval = A(1,1)
+   leastindex = 1
+   do i = 2, 4
+      if (A(i,i) < leasteigval) then
+         leasteigval = A(i,i)
+         leastindex = i
+      end if
+   end do
+
+   ! Extract the eigenvector corresponding to the smallest eigenvalue
+   leasteigvec = V(:, leastindex)
+
+   ! Normalize the eigenvector
+   leasteigvec = leasteigvec / sqrt(sum(leasteigvec**2))
+end function
+
+subroutine jacobi_rotation(A, V, p, q)
+! Rotation that zeroes A(p,q), accumulated in V
+   real(RK), intent(inout) :: A(4,4), V(4,4)
+   integer(IK), intent(in) :: p, q
+   integer(IK) :: i
+   real(RK) :: c, s, t, tau, temp
+
+   if (abs(A(p,q)) > 1.0e-15_RK) then  ! Avoid division by zero
+      tau = (A(q,q) - A(p,p)) / (2.0_RK * A(p,q))
+      t = sign(1.0_RK, tau) / (abs(tau) + sqrt(1.0_RK + tau**2))
+      c = 1.0_RK / sqrt(1.0_RK + t**2)
+      s = t * c
+   else
+      c = 1.0_RK
+      s = 0.0_RK
+   end if
+
+   temp = A(p,p)
+   A(p,p) = c**2 * temp - 2.0_RK * c * s * A(p,q) + s**2 * A(q,q)
+   A(q,q) = s**2 * temp + 2.0_RK * c * s * A(p,q) + c**2 * A(q,q)
+   A(p,q) = 0.0_RK
+   A(q,p) = 0.0_RK
+
+   do i = 1, 4
+      if (i /= p .and. i /= q) then
+         temp = A(i,p)
+         A(i,p) = c * temp - s * A(i,q)
+         A(p,i) = A(i,p)
+         A(i,q) = s * temp + c * A(i,q)
+         A(q,i) = A(i,q)
+      end if
+
+      temp = V(i,p)
+      V(i,p) = c * temp - s * V(i,q)
+      V(i,q) = s * temp + c * V(i,q)
+   end do
+end subroutine
+
+end module

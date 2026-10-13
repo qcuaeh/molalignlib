@@ -1,0 +1,118 @@
+! MolAlignLib
+! Copyright (C) 2025 José M. Vásquez
+
+! This program is free software: you can redistribute it and/or modify
+! it under the terms of the GNU General Public License as published by
+! the Free Software Foundation, either version 3 of the License, or
+! (at your option) any later version.
+
+! This program is distributed in the hope that it will be useful,
+! but WITHOUT ANY WARRANTY; without even the implied warranty of
+! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+! GNU General Public License for more details.
+
+! You should have received a copy of the GNU General Public License
+! along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+module parameters
+use, intrinsic :: iso_fortran_env, only: stdin => input_unit
+use, intrinsic :: iso_fortran_env, only: stdout => output_unit
+use, intrinsic :: iso_fortran_env, only: stderr => error_unit
+use kinds
+
+implicit none
+
+! Enable internal consistency checks
+logical(LK), parameter :: DEBUG_TESTS = .FALSE.
+
+! Branch-and-bound pruning in the conformer assignment search
+logical(LK), parameter :: PRUNE_ASSIGNMENTS = .TRUE.
+
+! Search strategy for conformer alignment. By default it is chosen from the
+! ratio of total to partial assignment combinations of the assignment tree:
+! stochastic fixed-orientation search when the ratio is high, exhaustive
+! orientation-independent search when it is low. Setting one of these
+! forces that strategy; if both are set, the exhaustive search wins.
+logical(LK), parameter :: FORCE_EXHAUSTIVE = .FALSE.
+logical(LK), parameter :: FORCE_STOCHASTIC = .FALSE.
+
+! Convergence tolerance of the Jacobi eigensolver (use 1E-6 in single
+! precision)
+real(RK), parameter :: CONV_TOL = 1E-10
+
+! Slack added to the distance budget of the pruned assignment search
+real(RK), parameter :: SQDIST_TOL = 1E-6
+
+! Character string lengths
+integer(IK), parameter :: WORD_LEN = 64
+integer(IK), parameter :: LINE_LEN = 1024
+
+! Maximum coordination number
+integer(IK), parameter :: MAX_COORDNUM = 10
+
+! Bond types.
+! A bond type is an opaque label: a short case-insensitive string that has
+! no intrinsic meaning. Bond types are compared literally, as strings
+! (through their integer codes): two bonds match when their labels are
+! the same string and differ otherwise, so 3/2, 1.5 and 6/4 are three
+! different types, and no type is "closer" to another.
+!
+! A bond type string has one of three forms, each stored as an integer code
+! in its own block:
+!   d     a digit 1-9                            code d (1..9)
+!   ab    a letter, then a letter or a digit     code BOND_BLOCK2 + 36*a + b
+!   nsd   a digit, a separator, a digit          code BOND_BLOCK3 + 100*s + 10*n + d
+! with a = 0..25 for a..z, b = 0..35 for 0..9, a..z, n, d = 0..9, and s the
+! position (from 0) of the separator in BONDTYPE_SEPARATORS (/ : - . ,).
+! Every string of these forms is a valid bond type, and no other string is
+! (see file_utils::bondtype_code and file_utils::bondtype_str). The code 0
+! (NO_BOND) is not the code of any string, so it is not a bond type: it is
+! only used in adjacency matrices, for the atom pairs that are not bonded.
+! Every entry of a bond list is a bond.
+!
+! UNDEFINED_BOND_TYPE (BOND_TYPE_RADIX) is not the code of any string either
+! (bondtype_code and bondtype_str map it to and from the blank string): it
+! is the type of a bond whose type is undefined, such as a bond perceived
+! from geometry. It is the only code that is not compared literally.
+!
+! When bond types are not used, they are not validated, and every bond
+! becomes UNDEFINED_BOND_TYPE whatever its code (0 included), so only
+! connectivity is compared. When bond types are used, the types between
+! compared atoms must be valid codes (1 to MAX_BOND_TYPE), and
+! UNDEFINED_BOND_TYPE is an error, because an undefined type cannot be
+! compared (see molecule::check_bondtypes and molecule::adjacency_from_bonds).
+! Two atom pairs match when their bond types are equal, so "no bond"
+! behaves as a bond of type NO_BOND. A partition signature entry encodes
+! (neighbor part index, bond type) as
+!    part_idx*BOND_TYPE_RADIX + bondtype
+! which is unique because the bond types in adjacency lists are 1 to
+! BOND_TYPE_RADIX (NO_BOND never appears in them).
+character(*), parameter :: BONDTYPE_DIGITS = '0123456789'
+character(*), parameter :: BONDTYPE_LETTERS = 'abcdefghijklmnopqrstuvwxyz'
+character(*), parameter :: BONDTYPE_ALNUM = BONDTYPE_DIGITS//BONDTYPE_LETTERS
+character(*), parameter :: BONDTYPE_SEPARATORS = '/:-.,'
+integer(IK), parameter :: NO_BOND = 0
+integer(IK), parameter :: BOND_BLOCK2 = 10
+integer(IK), parameter :: BOND_BLOCK3 = BOND_BLOCK2 &
+      + len(BONDTYPE_LETTERS)*len(BONDTYPE_ALNUM)
+integer(IK), parameter :: MAX_BOND_TYPE = BOND_BLOCK3 &
+      + 100*len(BONDTYPE_SEPARATORS) - 1
+integer(IK), parameter :: BOND_TYPE_RADIX = MAX_BOND_TYPE + 1
+integer(IK), parameter :: UNDEFINED_BOND_TYPE = BOND_TYPE_RADIX
+
+! Default maximum number of random trials
+integer(IK), parameter :: MAX_TRIALS_DEFAULT = 10000
+
+! Default maximum number of molecular fragments (connected components of
+! the bond graph of the included atoms) allowed by conformsd
+integer(IK), parameter :: MAX_FRAGS_DEFAULT = 1
+
+! Default mapping frequencies
+integer(IK), parameter :: ATO_FREQ_DEFAULT = 10
+integer(IK), parameter :: CONFO_FREQ_DEFAULT = 100
+integer(IK), parameter :: ISO_FREQ_DEFAULT = 100
+
+! Displayed decimal places
+integer(IK), parameter :: DECIMAL_PLACES = 6
+
+end module
