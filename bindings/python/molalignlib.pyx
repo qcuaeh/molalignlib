@@ -1,9 +1,9 @@
 # cython: language_level=3
 """
 Python interface of MolAlignLib, compiled with Cython into a single
-extension module. The low-level wrappers _ato_rmsd and
-_confo_rmsd call the C functions of molalign.h directly; the
-high-level classes below are built on them.
+extension module. The low-level wrappers _ato_rmsd and _confo_rmsd call
+the C functions of molalign.h directly; the high-level classes below are
+built on them.
 
 Supported file formats (via chemfiles):
   - XYZ        (.xyz)
@@ -16,8 +16,8 @@ Classes
 Molecule
     A set of atoms with 3-D coordinates and an optional bond table. The same
     object can be compared in two ways, one method per algorithm of the
-    library. In mol0.ato_rmsd(mol1) and mol0.confo_rmsd(mol1), mol0 (self) is
-    the reference: it stays fixed, and mol1 (other) is aligned and
+    library. In mol0.ato_rmsd(mol1) and mol0.confo_rmsd(mol1), mol0 (self)
+    is the reference: it stays fixed, and mol1 (other) is aligned and
     reordered onto it.
 
     ato_rmsd(other, ...)
@@ -37,6 +37,13 @@ bond_type_label convert between the two. Labels have no intrinsic meaning:
 the library compares the codes literally. The blank label "" stands for the
 undefined type, which cannot be compared. Bonds read from files get labels
 translated from the bond orders of the file (see _extract_frame_data).
+
+Bond perception
+---------------
+With rebond=True the bonds are perceived from geometry: two atoms are
+bonded when closer than the sum of their covalent radii plus bond_tol
+(Angstrom), which defaults to BOND_TOL_DEFAULT, the same default as the
+-rebond option of the command-line programs.
 
 RMSDResult
     Return value of both methods. By default (max_recs not given) only
@@ -63,8 +70,8 @@ np.import_array()
 # =========================================================================== #
 
 # The C functions keep their names; the Python wrappers below are private
-# (_ato_rmsd, _confo_rmsd). Validation, buffer allocation, error handling
-# and result packing are shared helpers.
+# (_ato_rmsd, _confo_rmsd). Validation, buffer allocation, error
+# handling and result packing are shared helpers.
 cdef extern from "molalign.h":
     # Error codes of the error_code argument, taken from molalign.h so
     # their values are not repeated here
@@ -80,13 +87,16 @@ cdef extern from "molalign.h":
     enum: MOLALIGN_ERROR_INVALID_BOND_TYPE
     enum: MOLALIGN_ERROR_UNDEFINED_BOND_TYPE
 
+    # Default bond detection tolerance (a macro in molalign.h)
+    const double MOLALIGN_BOND_TOL_DEFAULT
+
     void ato_rmsd(
         int n_atoms1, const int *atom_data1, const double *coords1,
         int n_atoms2, const int *atom_data2, const double *coords2,
         bint align_flag, bint remap_flag, bint heavy_flag, bint massweight_flag,
         bint mirror_flag, bint useatomtype_flag,
         bint printstats_flag, bint random_flag,
-        bint prune_flag, double prune_tol, int ato_freq, int max_trials,
+        bint prune_flag, double prune_tol, int min_freq, int max_trials,
         int max_recs,
         double *rmsd_list, int *mapping_list,
         double *transform_list, int *n_records, int *error_code)
@@ -100,10 +110,15 @@ cdef extern from "molalign.h":
         bint mirror_flag, bint useatomtype_flag, bint rebond_flag, double bond_tol,
         bint usebondtype_flag,
         bint printstats_flag, bint printassigntree_flag, bint random_flag,
-        int confo_freq, int max_trials, int max_frags,
+        int min_freq, int max_trials, int max_frags,
         int max_recs,
         double *rmsd_list, int *mapping_list,
         double *transform_list, int *n_records, int *error_code)
+
+
+# Default bond detection tolerance (Angstrom) of rebond=True, taken from
+# molalign.h (BOND_TOL_DEFAULT in parameters.f90)
+BOND_TOL_DEFAULT = MOLALIGN_BOND_TOL_DEFAULT
 
 
 # Messages for every error code of the C functions. Each function can only
@@ -175,6 +190,13 @@ cdef _validate_bonds(np.ndarray[np.int32_t, ndim=2] bd1,
         raise ValueError("bond_data2 must have shape (b, 3)")
 
 
+cdef double _bond_tol_value(bond_tol) except? -1.0:
+    """C value of bond_tol: BOND_TOL_DEFAULT when bond_tol is None."""
+    if bond_tol is None:
+        return MOLALIGN_BOND_TOL_DEFAULT
+    return <double>bond_tol
+
+
 cdef _raise_on_error(int err, str func_name):
     """Raise ValueError for a nonzero error code from the C library."""
     if err != MOLALIGN_SUCCESS:
@@ -240,7 +262,7 @@ def _ato_rmsd(
     bint   random_flag,
     bint   prune_flag,
     prune_tol,
-    int    ato_freq,
+    int    min_freq,
     int    max_trials,
     int    max_recs = 1,
 ):
@@ -255,7 +277,7 @@ def _ato_rmsd(
         1 to 104 (there is no dummy element).
     coords1, coords2 : float64 array, shape (n, 3)
         Cartesian coordinates in Angstrom.
-    ato_freq, max_trials : int
+    min_freq, max_trials : int
         Convergence frequency and maximum number of random orientations of
         the search; both must be >= 1.
     max_recs : int, default 1
@@ -285,7 +307,7 @@ def _ato_rmsd(
     library actually found; it may be smaller than requested.
     """
     _validate_atoms(atom_data1, coords1, atom_data2, coords2)
-    _validate_counts(ato_freq=ato_freq, max_trials=max_trials, max_recs=max_recs)
+    _validate_counts(min_freq=min_freq, max_trials=max_trials, max_recs=max_recs)
 
     cdef int n1 = atom_data1.shape[0]
     cdef int n2 = atom_data2.shape[0]
@@ -322,7 +344,7 @@ def _ato_rmsd(
             align_flag, remap_flag, heavy_flag, massweight_flag,
             mirror_flag, useatomtype_flag,
             printstats_flag, random_flag,
-            prune_flag, c_prune_tol, ato_freq, max_trials,
+            prune_flag, c_prune_tol, min_freq, max_trials,
             max_recs,
             rmsd_list, mapping_list,
             transform_list, &n_records, &err,
@@ -364,7 +386,7 @@ def _confo_rmsd(
     bint printstats_flag    = False,
     bint printassigntree_flag = False,
     bint random_flag   = False,
-    int  confo_freq      = 100,
+    int  min_freq      = 100,
     int  max_trials    = 10000,
     int  max_frags     = 1,
     int  max_recs     = 1,
@@ -387,9 +409,9 @@ def _confo_rmsd(
         ``usebondtype_flag``, and any value is accepted without it.
         Pass ``None`` (or omit) when ``rebond_flag=True``; in that case the
         library derives connectivity from geometry.
-    bond_tol : float, required when rebond_flag=True
-        Bond detection tolerance (Angstrom) for geometry-based connectivity.
-        Has no default and is ignored when rebond_flag=False.
+    bond_tol : float or None, default None
+        Bond detection tolerance (Angstrom) for geometry-based connectivity;
+        None means ``BOND_TOL_DEFAULT``. Ignored when rebond_flag=False.
     usebondtype_flag : bool, default False
         Use the bond types (third column of ``bond_data``) to guide atom
         matching. The labels are compared literally, never interpreted, so
@@ -400,7 +422,7 @@ def _confo_rmsd(
         that minimises the RMSD.
     printassigntree_flag : bool
         Print the assignment tree and its combination counts to stdout.
-    confo_freq : int, default 100
+    min_freq : int, default 100
         Stop the random orientation search once the best solution has been
         found more than this many times; also the threshold on the ratio of
         total to partial assignment combinations above which that search is
@@ -441,7 +463,7 @@ def _confo_rmsd(
     library actually found; it may be smaller than requested.
     """
     _validate_atoms(atom_data1, coords1, atom_data2, coords2)
-    _validate_counts(confo_freq=confo_freq, max_trials=max_trials,
+    _validate_counts(min_freq=min_freq, max_trials=max_trials,
                      max_frags=max_frags, max_recs=max_recs)
 
     cdef int n1 = atom_data1.shape[0]
@@ -464,12 +486,8 @@ def _confo_rmsd(
     cdef int nb1 = bd1.shape[0]
     cdef int nb2 = bd2.shape[0]
 
-    # bond_tol is required, and only used, when rebond_flag=True
-    cdef double c_bond_tol = 0.0
-    if rebond_flag:
-        if bond_tol is None:
-            raise ValueError("bond_tol is required when rebond_flag=True")
-        c_bond_tol = <double>bond_tol
+    # bond_tol is only used when rebond_flag=True; None means the default
+    cdef double c_bond_tol = _bond_tol_value(bond_tol)
 
     cdef int    n_records = 0
     cdef int    err         = 0
@@ -495,7 +513,7 @@ def _confo_rmsd(
             mirror_flag, useatomtype_flag, rebond_flag, c_bond_tol,
             usebondtype_flag,
             printstats_flag, printassigntree_flag, random_flag,
-            confo_freq, max_trials, max_frags,
+            min_freq, max_trials, max_frags,
             max_recs,
             rmsd_list, mapping_list,
             transform_list, &n_records, &err,
@@ -521,6 +539,7 @@ def _confo_rmsd(
 __all__ = [
     "ATOMIC_SYMBOLS",
     "PADDING_ATOMIC_NUMBER",
+    "BOND_TOL_DEFAULT",
     "symbol_to_atomic_number",
     "atomic_number_to_symbol",
     "bond_type_code",
@@ -930,10 +949,10 @@ class Molecule(object):
     """
     A set of atoms with 3-D coordinates and an optional bond table.
 
-    Use ato_rmsd to compare it as an unstructured cluster (bonds ignored),
-    and confo_rmsd to compare it as a conformer (same bond graph
-    required). In both, this molecule is the reference: the other molecule
-    is aligned and reordered onto it.
+    Use ato_rmsd to compare it as an unstructured cluster (bonds ignored)
+    and confo_rmsd to compare it as a conformer (same bond graph required).
+    In both, this molecule is the reference: the other molecule is aligned
+    and reordered onto it.
     """
 
     def __init__(self, atom_data=None, coords=None, bond_data=None, name="molecule",
@@ -1100,7 +1119,7 @@ class Molecule(object):
         random=False,
         prune=False,
         prune_tol=None,
-        ato_freq=10,
+        min_freq=10,
         max_trials=10000,
         max_recs=None,
     ):
@@ -1129,8 +1148,8 @@ class Molecule(object):
         2*sqrt(3)*prune_tol. prune_tol is ignored when prune=False.
 
         The search over random orientations stops once the best solution
-        has been found ato_freq times, or after max_trials orientations
-        (ato_freq, max_trials and max_recs must be >= 1).
+        has been found min_freq times, or after max_trials orientations
+        (min_freq, max_trials and max_recs must be >= 1).
         random=True seeds it from the clock (otherwise results are
         reproducible), and print_stats=True prints its statistics.
         """
@@ -1152,7 +1171,7 @@ class Molecule(object):
             random_flag=random,
             prune_flag=prune,
             prune_tol=prune_tol,
-            ato_freq=ato_freq,
+            min_freq=min_freq,
             max_trials=max_trials,
             max_recs=1 if max_recs is None else max_recs,
         )
@@ -1175,7 +1194,7 @@ class Molecule(object):
         print_stats=False,
         print_assignment_tree=False,
         random=False,
-        confo_freq=100,
+        min_freq=100,
         max_trials=10000,
         max_frags=1,
         max_recs=None,
@@ -1201,9 +1220,11 @@ class Molecule(object):
         they are paired afterwards, following their heavy neighbour where
         bonds are known and by distance otherwise.
 
-        rebond=True infers the connectivity from geometry, with tolerance
-        bond_tol (Å), which is then required, instead of using each
-        molecule's bond table. bond_tol is ignored when rebond=False.
+        rebond=True infers the connectivity from geometry instead of using
+        each molecule's bond table: two atoms are bonded when closer than
+        the sum of their covalent radii plus bond_tol (Å), which defaults
+        to BOND_TOL_DEFAULT when not given. bond_tol is ignored when
+        rebond=False.
 
         max_frags (>= 1, default 1) is the maximum number of molecular
         fragments (connected components of the bond graph of the compared
@@ -1220,11 +1241,11 @@ class Molecule(object):
 
         With align=True, the search strategy is chosen from the assignment
         tree: random orientations when the total number of assignments
-        exceeds confo_freq times the sum of partial combinations, exhaustive
+        exceeds min_freq times the sum of partial combinations, exhaustive
         enumeration otherwise. The random search stops once the best
-        solution has been found more than confo_freq times, or after
-        max_trials orientations. confo_freq, max_trials and max_recs must
-        be >= 1. The default confo_freq=100 is the value
+        solution has been found more than min_freq times, or after
+        max_trials orientations. min_freq, max_trials and max_recs must
+        be >= 1. The default min_freq=100 is the value
         validated on the CCD and BIRD benchmarks. random=True seeds the
         search from the clock (otherwise results are reproducible),
         print_stats=True prints its statistics and print_assignment_tree=True prints the
@@ -1232,8 +1253,6 @@ class Molecule(object):
         """
 
         self._check_other(other)
-        if rebond and bond_tol is None:
-            raise ValueError("bond_tol is required when rebond=True")
         bond_data1 = None if rebond else self._bond_data
         bond_data2 = None if rebond else other._bond_data
 
@@ -1254,7 +1273,7 @@ class Molecule(object):
             printstats_flag=print_stats,
             printassigntree_flag=print_assignment_tree,
             random_flag=random,
-            confo_freq=confo_freq,
+            min_freq=min_freq,
             max_trials=max_trials,
             max_frags=max_frags,
             max_recs=1 if max_recs is None else max_recs,

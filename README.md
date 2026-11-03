@@ -110,7 +110,8 @@ Both programs share these conventions:
 
 - **Input:** XYZ, MOL, SDF and Mol2 files, selected by the lowercase file extension (`.xyz`, `.mol`, `.sdf`, `.mol2`). Only the first structure of each file is read. Dummy atoms (symbol `X`, or SYBYL type `Du`) are skipped together with their bonds.
 - **Options** may appear before or after the file paths and are case-insensitive. Integer arguments must be at least 1, and option arguments may not start with `-`.
-- **Output:** one line per record with the RMSD (Å). With `-remap -mapping` it is followed by the atom permutation that maps file 2 onto file 1: a comma-separated list of 1-based indices, where entry *i* is the atom of file 2 placed on line *i* of file 1.
+- **Output:** one line per record with the RMSD (Å). With `-printmapping` it is followed by the atom permutation that maps file 2 onto file 1: a comma-separated list of 1-based indices, where entry *i* is the atom of file 2 placed on line *i* of file 1 (the identity without `-remap`).
+- **Coordinates:** with `-coords FORMAT` (`xyz`, `sdf` or `mol2`), each record is instead written to stdout as a structure of molecule 2 in that format, reordered to match molecule 1 (and aligned onto it with `-align`), with `rmsd=` and the RMSD as its title. Redirect stdout to save it to a file. With `-savecoords PREFIX` as well, record *n* (counted from 1) is written instead to its own file, `PREFIX_n.FORMAT` (e.g. `pair_1.xyz`, `pair_2.xyz`, ...), holding molecule 1 followed by molecule 2, and the RMSD lines are printed to stdout as usual.
 - **Reproducibility:** results are reproducible unless `-random` is given.
 
 ### atormsd
@@ -127,15 +128,16 @@ atormsd file1 file2 [options]
 | -remap | | Remap atoms to minimise the RMSD |
 | -useatomtype | | Only match atoms with the same label (an element symbol optionally followed by digits, e.g. `C1`, `C2`) |
 | -prune | TOL | Skip pairings between atoms with incompatible environments, with tolerance *TOL* Å (only with `-remap`; see [Pruning](#pruning-atormsd)) |
-| -atofreq | N | Stop once the best solution has been found *N* times (default: 10) |
+| -minfreq | N | Stop once the best solution has been found *N* times (default: 10) |
 | -maxtrials | N | Stop after at most *N* random orientations (default: 10000) |
 | -maxrecs | N | Record the *N* lowest RMSDs found (default: 1; only with `-align -remap`) |
-| -mapping | | Print the atom permutation after each RMSD (only with `-remap`) |
-| -aligned | FILE | Write molecule 2, aligned and reordered to match molecule 1, to *FILE* (`.xyz`, `.sdf` or `.mol2`) instead of printing the results, with `rmsd=` and the RMSD as its title. A bare extension such as `xyz` writes to stdout. Only with `-align` |
+| -printmapping | | Print the atom permutation after each RMSD |
+| -coords | FORMAT | Write molecule 2, reordered (and aligned with `-align`) to match molecule 1, to stdout in *FORMAT* (`xyz`, `sdf` or `mol2`) instead of printing the results (see [Command-line Programs](#command-line-programs)) |
+| -savecoords | PREFIX | With `-coords`, write each record to the file `PREFIX_n.FORMAT` as a pair of structures, molecule 1 then molecule 2, and print the RMSDs as usual |
 | -heavy | | Ignore hydrogen atoms |
 | -massweight | | Use mass-weighted coordinates |
 | -mirror | | Reflect molecule 2 (x → −x) before comparison |
-| -stats | | Print the ranked local minima and search statistics (only with `-align -remap`) |
+| -printstats | | Print the ranked local minima and search statistics (only with `-align -remap`) |
 | -random | | Seed the random-number generator from the system clock |
 
 ```bash
@@ -143,13 +145,16 @@ atormsd file1 file2 [options]
 atormsd mol1.xyz mol2.xyz
 
 # Align and remap atoms, print the mapping
-atormsd mol1.xyz mol2.xyz -align -remap -mapping
+atormsd mol1.xyz mol2.xyz -align -remap -printmapping
 
 # Remap with pruning, keep the 3 best solutions
 atormsd mol1.xyz mol2.xyz -align -remap -prune 0.5 -maxrecs 3
 
 # Write the aligned and reordered molecule 2 to a new file
-atormsd mol1.xyz mol2.xyz -align -remap -aligned mol2_aligned.xyz
+atormsd mol1.xyz mol2.xyz -align -remap -coords xyz > mol2_coords.xyz
+
+# Write each of the 3 best solutions with the reference to pair_1.sdf, pair_2.sdf, pair_3.sdf
+atormsd mol1.sdf mol2.sdf -align -remap -maxrecs 3 -coords sdf -savecoords pair
 ```
 
 ### conformsd
@@ -167,19 +172,21 @@ XYZ files have no bond table, so use `-rebond` with them.
 | -align | | Align atoms to minimise the RMSD |
 | -remap | | Remap atoms to minimise the RMSD |
 | -useatomtype | | Only match atoms with the same label (an element symbol optionally followed by digits, e.g. `C1`, `C2`) |
-| -rebond | TOL | Derive connectivity from interatomic distances instead of the file's bond table: atoms are bonded when closer than the sum of their covalent radii plus *TOL* Å |
+| -rebond | | Derive connectivity from interatomic distances instead of the file's bond table: atoms are bonded when closer than the sum of their covalent radii plus a tolerance (see `-bondtol`) |
+| -bondtol | TOL | Bond-detection tolerance of `-rebond`, in Å (default: 0.4) |
 | -usebondtype | | Also match bond types from the files (see [Bond types](#bond-types)). No effect with `-rebond` |
-| -confofreq | N | Convergence threshold of the stochastic search (default: 100, the validated value; see [Search strategy](#search-strategy)) |
+| -minfreq | N | Convergence threshold of the stochastic search (default: 100, the validated value; see [Search strategy](#search-strategy)) |
 | -maxtrials | N | Stop after at most *N* random orientations (default: 10000) |
 | -maxfrags | N | Maximum number of molecular fragments per molecule (default: 1; see [Molecular fragments](#molecular-fragments)) |
 | -maxrecs | N | Record the *N* lowest RMSDs found (default: 1; only with `-align -remap`) |
-| -mapping | | Print the atom permutation after each RMSD (only with `-remap`) |
-| -assigntree | | Print the assignment tree and its combination counts (only with `-remap`) |
-| -aligned | FILE | Same as for [atormsd](#atormsd) |
+| -printmapping | | Print the atom permutation after each RMSD |
+| -printassigntree | | Print the assignment tree and its combination counts (only with `-remap`) |
+| -coords | FORMAT | Same as for [atormsd](#atormsd) |
+| -savecoords | PREFIX | Same as for [atormsd](#atormsd) |
 | -heavy | | Ignore hydrogen atoms |
 | -massweight | | Use mass-weighted coordinates |
 | -mirror | | Reflect molecule 2 (x → −x) before comparison |
-| -stats | | Print the ranked local minima and search statistics (only with `-align -remap`) |
+| -printstats | | Print the ranked local minima and search statistics (only with `-align -remap`) |
 | -random | | Seed the random-number generator from the system clock |
 
 ```bash
@@ -187,13 +194,16 @@ XYZ files have no bond table, so use `-rebond` with them.
 conformsd conf1.sdf conf2.sdf -align -remap
 
 # Derive connectivity from geometry (XYZ input)
-conformsd conf1.xyz conf2.xyz -align -remap -rebond 0.3
+conformsd conf1.xyz conf2.xyz -align -remap -rebond
+
+# Same, with a tighter bond-detection tolerance
+conformsd conf1.xyz conf2.xyz -align -remap -rebond -bondtol 0.3
 
 # Also distinguish bond types
 conformsd conf1.sdf conf2.mol2 -align -remap -usebondtype
 
 # Heavy atoms only, printing the atom permutation
-conformsd conf1.sdf conf2.sdf -align -remap -heavy -mapping
+conformsd conf1.sdf conf2.sdf -align -remap -heavy -printmapping
 
 # Allow up to two fragments per molecule (e.g. a host-guest complex)
 conformsd complex1.sdf complex2.sdf -align -remap -maxfrags 2
@@ -251,13 +261,13 @@ void ato_rmsd(
     bool align_flag, bool remap_flag, bool heavy_flag, bool massweight_flag,
     bool mirror_flag, bool useatomtype_flag,
     bool printstats_flag, bool random_flag,
-    bool prune_flag, double prune_tol, int ato_freq, int max_trials,
+    bool prune_flag, double prune_tol, int min_freq, int max_trials,
     int max_recs,
     double *rmsd_list, int *mapping_list,
     double *transform_list, int *n_records, int *error_code);
 ```
 
-The flags have the same meaning as the [atormsd](#atormsd) options. `prune_tol` (Å) is required when `prune_flag` is true and ignored otherwise; `ato_freq`, `max_trials` and `max_recs` must be at least 1 (the program defaults are 10, 10000 and 1).
+The flags have the same meaning as the [atormsd](#atormsd) options. `prune_tol` (Å) is required when `prune_flag` is true and ignored otherwise; `min_freq`, `max_trials` and `max_recs` must be at least 1 (the program defaults are 10, 10000 and 1).
 
 ```c
 #include <stdio.h>
@@ -288,7 +298,7 @@ int main(void)
         /*heavy=*/false, /*mass=*/false,
         /*mirror=*/false, /*label=*/false,
         /*stats=*/false, /*random=*/false,
-        /*prune_flag=*/false, /*prune_tol=*/0.0, /*ato_freq=*/10, /*max_trials=*/10000,
+        /*prune_flag=*/false, /*prune_tol=*/0.0, /*min_freq=*/10, /*max_trials=*/10000,
         /*max_recs=*/5,
         rmsd_list, mapping_list,
         transform_list, &n_records, &error_code);
@@ -312,13 +322,13 @@ void confo_rmsd(
     bool mirror_flag, bool useatomtype_flag, bool rebond_flag, double bond_tol,
     bool usebondtype_flag,
     bool printstats_flag, bool printassigntree_flag, bool random_flag,
-    int confo_freq, int max_trials, int max_frags,
+    int min_freq, int max_trials, int max_frags,
     int max_recs,
     double *rmsd_list, int *mapping_list,
     double *transform_list, int *n_records, int *error_code);
 ```
 
-The flags have the same meaning as the [conformsd](#conformsd) options. Bonds are passed as a flat `int` array of length `n_bonds*3`, `[atom1_0, atom2_0, type_0, ...]`, with **1-based** atom indices. The type is the integer code of a bond type label (see `molalign.h`; code 1446 marks a bond of undefined type) and is only used with `usebondtype_flag`; otherwise any value is accepted. With `rebond_flag`, the bond arrays may be empty (`n_bonds = 0`, `bond_data = NULL`) and `bond_tol` (Å) is required. `confo_freq`, `max_trials`, `max_frags` and `max_recs` must be at least 1 (the program defaults, 100, 10000, 1 and 1, are the usual choice).
+The flags have the same meaning as the [conformsd](#conformsd) options. Bonds are passed as a flat `int` array of length `n_bonds*3`, `[atom1_0, atom2_0, type_0, ...]`, with **1-based** atom indices. The type is the integer code of a bond type label (see `molalign.h`; code 1446 marks a bond of undefined type) and is only used with `usebondtype_flag`; otherwise any value is accepted. With `rebond_flag`, the bond arrays may be empty (`n_bonds = 0`, `bond_data = NULL`) and `bond_tol` (Å) is used; pass `MOLALIGN_BOND_TOL_DEFAULT` (0.4) for the default of the programs. Otherwise `bond_tol` is ignored. `min_freq`, `max_trials`, `max_frags` and `max_recs` must be at least 1 (the program defaults, 100, 10000, 1 and 1, are the usual choice).
 
 ```c
 #include <stdio.h>
@@ -352,7 +362,7 @@ int main(void)
         /*rebond_flag=*/false, /*bond_tol=*/0.0,
         /*usebondtype_flag=*/false,
         /*stats=*/false, /*printassigntree_flag=*/false, /*random=*/false,
-        /*confo_freq=*/100, /*max_trials=*/10000, /*max_frags=*/1,
+        /*min_freq=*/100, /*max_trials=*/10000, /*max_frags=*/1,
         /*max_recs=*/1,
         rmsd_list, mapping_list,
         transform_list, &n_records, &error_code);
@@ -365,7 +375,7 @@ int main(void)
 
 ### Demo program
 
-`bindings/c/atormsd_demo.c` is a C version of the [atormsd](#atormsd) program built on `ato_rmsd`. It takes the same options and prints the same output, but only reads and writes XYZ files (it also accepts `-help`). It shows how to pack the data read from files, size the output buffers, and apply the returned transforms. Compile and run instructions are in its header comment.
+`bindings/c/atormsd_demo.c` is a C version of the [atormsd](#atormsd) program built on `ato_rmsd`. It takes the same options and prints the same output, but only reads and writes XYZ files (so `-coords` only accepts `xyz`, and `-savecoords` writes `PREFIX_n.xyz` files), and it also accepts `-help`. It shows how to pack the data read from files, size the output buffers, and apply the returned transforms. Compile and run instructions are in its header comment.
 
 
 Python Bindings
@@ -377,16 +387,16 @@ The Python bindings provide a higher-level interface to MolAlignLib. (See [Try I
 
 Requirements:
 
-- Python ≥ 3.8 with its development package (`python3-dev` on Debian/Ubuntu, `python3-devel` on Fedora/RHEL)
 - GCC ≥ 5.3 and GFortran ≥ 4.8
-- scikit-build-core, Cython, NumPy and Chemfiles (installed with pip below)
-
-CMake does not need to be installed separately.
+- Python ≥ 3.7 with its development headers (`python3-dev` on Debian/Ubuntu, `python3-devel` on Fedora/RHEL)
 
 ```bash
+python3 -m pip install --user .
+```
+
+If it fails try to upgrade pip first:
+```bash
 python3 -m pip install --user --upgrade pip
-python3 -m pip install --user scikit-build-core cython numpy chemfiles
-python3 -m pip install --user .     # builds the Fortran library automatically
 ```
 
 > **Note:** `pip install .` does not build the standalone executables. Use the
@@ -493,7 +503,7 @@ print(result.rmsd)
 | **random** | `bool` | `False` | Seed the random-number generator from the system clock |
 | **prune** | `bool` | `False` | Skip pairings between atoms with incompatible environments (see [Pruning](#pruning-atormsd)) |
 | **prune_tol** | `float` | `None` | Pruning tolerance (Å); required when `prune=True` |
-| **ato_freq** | `int` | `10` | Stop once the best solution has been found this many times |
+| **min_freq** | `int` | `10` | Stop once the best solution has been found this many times |
 | **max_trials** | `int` | `10000` | Stop after at most this many random orientations |
 | **max_recs** | `int` | `None` | Return up to this many ranked solutions as a list (see [RMSDResult](#rmsdresult)) |
 
@@ -510,7 +520,7 @@ print(result.transform)         # 4×4 float64 array
 
 # XYZ input has no bond table: infer connectivity from geometry
 mol0, mol1 = read_molecules("conformers.xyz", frames=(0, 1))
-result = mol0.confo_rmsd(mol1, align=True, remap=True, rebond=True, bond_tol=0.3)
+result = mol0.confo_rmsd(mol1, align=True, remap=True, rebond=True)
 ```
 
 | Parameter | Type | Default | Description |
@@ -523,17 +533,17 @@ result = mol0.confo_rmsd(mol1, align=True, remap=True, rebond=True, bond_tol=0.3
 | **mirror** | `bool` | `False` | Reflect `other` before comparison |
 | **use_atom_type** | `bool` | `False` | Only match atoms with the same label |
 | **rebond** | `bool` | `False` | Infer connectivity from geometry: atoms are bonded when closer than the sum of their covalent radii plus `bond_tol` |
-| **bond_tol** | `float` | `None` | Bond-detection tolerance (Å); required when `rebond=True` |
+| **bond_tol** | `float` | `None` | Bond-detection tolerance (Å); `None` means `BOND_TOL_DEFAULT` (0.4, the default of `-bondtol`). Ignored without `rebond=True` |
 | **use_bond_type** | `bool` | `False` | Also match bond types (see [Bond types](#bond-types-1)). No effect with `rebond=True` |
 | **print_stats** | `bool` | `False` | Print search statistics |
 | **print_assignment_tree** | `bool` | `False` | Print the assignment tree and its combination counts |
 | **random** | `bool` | `False` | Seed the random-number generator from the system clock |
-| **confo_freq** | `int` | `100` | Convergence threshold of the stochastic search; 100 is the validated value (see [Search strategy](#search-strategy)) |
+| **min_freq** | `int` | `100` | Convergence threshold of the stochastic search; 100 is the validated value (see [Search strategy](#search-strategy)) |
 | **max_trials** | `int` | `10000` | Stop after at most this many random orientations |
 | **max_frags** | `int` | `1` | Maximum number of molecular fragments per molecule (see [Molecular fragments](#molecular-fragments)) |
 | **max_recs** | `int` | `None` | Return up to this many ranked solutions as a list (see [RMSDResult](#rmsdresult)) |
 
-In both methods, integer parameters below 1, `prune=True` without `prune_tol`, `rebond=True` without `bond_tol`, and any error reported by the library raise `ValueError`.
+In both methods, integer parameters below 1, `prune=True` without `prune_tol`, and any error reported by the library raise `ValueError`.
 
 ### RMSDResult
 

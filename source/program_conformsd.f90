@@ -38,9 +38,9 @@ use error_codes
 implicit none
 
 logical(LK) :: printmapping_flag
-logical(LK) :: write_aligned
+logical(LK) :: coords_flag, savecoords_flag
 character(:), allocatable :: title1, title2
-character(:), allocatable :: arg, aligned_path
+character(:), allocatable :: arg, pairs_prefix
 character(:), allocatable :: in_format1, in_format2, out_format
 character(LINE_LEN) :: posargs(2)
 type(atom_t), dimension(:), allocatable :: atoms1, atoms2
@@ -55,10 +55,10 @@ real(RK) :: transmat2(3,3)
 real(RK), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, coords2r
 real(RK), dimension(:,:), allocatable :: full_coords1, full_coords2, full_coords2r
 integer(IK), dimension(:), allocatable :: atomset1, atomset2
-integer(IK), dimension(:), allocatable :: mapping1, full_atomperm1
-integer(IK) :: max_recs, max_trials, confo_freq, max_frags
+integer(IK), dimension(:), allocatable :: mapping1, full_mapping1, ref_mapping
+integer(IK) :: max_recs, max_trials, min_freq, max_frags
 integer(IK) :: n_frags1, n_frags2
-integer(IK) :: in_unit, aligned_unit
+integer(IK) :: in_unit
 integer(IK) :: error_code
 integer(IK) :: n_atoms1, n_atoms2, n_padding
 integer(IK) :: i
@@ -77,12 +77,14 @@ random_flag = .FALSE.
 printstats_flag = .FALSE.
 printassigntree_flag = .FALSE.
 printmapping_flag = .FALSE.
-write_aligned = .FALSE.
+coords_flag = .FALSE.
+savecoords_flag = .FALSE.
 
 max_recs = 1
-confo_freq = CONFO_FREQ_DEFAULT
+min_freq = CONFO_FREQ_DEFAULT
 max_trials = MAX_TRIALS_DEFAULT
 max_frags = MAX_FRAGS_DEFAULT
+bond_tol = BOND_TOL_DEFAULT
 
 ! Read command line options
 
@@ -96,7 +98,8 @@ do while (get_arg(arg))
       remap_flag = .TRUE.
    case ('-rebond')
       rebond_flag = .TRUE.
-      call read_optarg(arg, bond_tol)
+   case ('-bondtol')
+      call read_optarg( arg, bond_tol)
    case ('-usebondtype')
       usebondtype_flag = .TRUE.
    case ('-useatomtype')
@@ -107,22 +110,26 @@ do while (get_arg(arg))
       massweight_flag = .TRUE.
    case ('-mirror')
       mirror_flag = .TRUE.
-   case ('-confofreq')
-      call read_optarg( arg, confo_freq, 1_IK)
+   case ('-minfreq')
+      call read_optarg( arg, min_freq, 1_IK)
    case ('-maxtrials')
       call read_optarg( arg, max_trials, 1_IK)
    case ('-maxfrags')
       call read_optarg( arg, max_frags, 1_IK)
    case ('-maxrecs')
       call read_optarg( arg, max_recs, 1_IK)
-   case ('-aligned')
-      write_aligned = .TRUE.
-      call read_optarg( arg, aligned_path)
-   case ('-mapping')
+   case ('-coords')
+      coords_flag = .TRUE.
+      call read_optarg( arg, out_format)
+      call check_out_format( arg, out_format)
+   case ('-savecoords')
+      savecoords_flag = .TRUE.
+      call read_optarg( arg, pairs_prefix)
+   case ('-printmapping')
       printmapping_flag = .TRUE.
-   case ('-assigntree')
+   case ('-printassigntree')
       printassigntree_flag = .TRUE.
-   case ('-stats')
+   case ('-printstats')
       printstats_flag = .TRUE.
    case ('-random')
       random_flag = .TRUE.
@@ -130,6 +137,11 @@ do while (get_arg(arg))
       call read_posarg( arg, posargs)
    end select
 end do
+
+! -savecoords takes the output format from -coords
+if (savecoords_flag .and. .not. coords_flag) then
+   stop 'Option -savecoords requires -coords'
+end if
 
 select case (ipos)
 case (0)
@@ -159,6 +171,9 @@ n_padding = max(n_atoms1, n_atoms2)
 call pad_atoms( atoms1, n_padding)
 call pad_atoms( atoms2, n_padding)
 
+! Molecule 1 is written in input order (with -savecoords)
+call init_array( ref_mapping, n_padding, identity)
+
 ! Atom sets only ever contain real atoms
 if (heavy_flag) then
    call include_heavy_atoms( atoms1(1:n_atoms1), atomset1)
@@ -171,7 +186,7 @@ end if
 ! From here on the comparison works on the included atoms only, numbered
 ! 1..size(atomset1) in molecule 1 and 1..size(atomset2) in molecule 2.
 ! mapping1 maps included atoms to included atoms in that compact numbering;
-! complete_mapping turns it into full_atomperm1 over all (padded) atoms.
+! complete_mapping turns it into full_mapping1 over all (padded) atoms.
 
 ! Collect atom types in a partition
 call collect_atomtypes( atoms1(atomset1), atoms2(atomset2), atomtypes)
@@ -181,7 +196,8 @@ if (any(atomtypes%parts%n_items1 /= atomtypes%parts%n_items2)) then
    stop 'These molecules are not isomers'
 end if
 
-! With -rebond, perceive bonds from geometry instead of the files
+! With -rebond, perceive bonds from geometry instead of the files, with
+! tolerance bond_tol (-bondtol, BOND_TOL_DEFAULT by default)
 if (rebond_flag) then
    call bonds_from_atoms( atoms1(1:n_atoms1), bonds1)
    call bonds_from_atoms( atoms2(1:n_atoms2), bonds2)
@@ -260,11 +276,6 @@ coords2 = full_coords2(:, atomset2)
 ! Centers of the included atoms. They are taken from the coordinates, so
 ! center2 is in the transformed (e.g. mirrored) frame of molecule 2.
 if (align_flag) then
-
-   if (write_aligned) then
-      call open2write( aligned_path, out_format, aligned_unit)
-   end if
-
    center1 = get_centroid( coords1, weights1)
    center2 = get_centroid( coords2, weights2)
 else
@@ -289,7 +300,7 @@ if (remap_flag) then
 
       call allocate_registry( registry, max_recs)
       call optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
-            coords1w, coords2w, confo_freq, max_trials, registry, error_code)
+            coords1w, coords2w, min_freq, max_trials, registry, error_code)
       if (error_code /= 0) stop 'These molecules are not conformers'
 
       if (printstats_flag) call print_records( registry)
@@ -303,20 +314,9 @@ if (remap_flag) then
 
          ! Pair the excluded atoms in the aligned frame
          call complete_mapping( atomset1, atomset2, mapping1, atoms1, atoms2, &
-               n_atoms1, n_atoms2, bonds1, bonds2, full_coords1, full_coords2r, full_atomperm1)
+               n_atoms1, n_atoms2, bonds1, bonds2, full_coords1, full_coords2r, full_mapping1)
 
-         if (write_aligned) then
-            title2 = 'rmsd=' // str( rmsd)
-            call set_coords( atoms2, full_coords2r)
-            call write_file( aligned_unit, out_format, title2, atoms2, bonds2, full_atomperm1)
-         else
-            write (stdout,'(A)',advance='no') str( rmsd)
-            if (printmapping_flag) then
-               write (stdout,'(1X)',advance='no')
-               call print_permutation(full_atomperm1)
-            end if
-            write (stdout,*)
-         end if
+         call report_result( i)
       end do
 
    else
@@ -329,14 +329,9 @@ if (remap_flag) then
       rmsd = sqrt( sqdistmean( mapping1, weights1, coords1, coords2r))
 
       call complete_mapping( atomset1, atomset2, mapping1, atoms1, atoms2, &
-            n_atoms1, n_atoms2, bonds1, bonds2, full_coords1, full_coords2r, full_atomperm1)
+            n_atoms1, n_atoms2, bonds1, bonds2, full_coords1, full_coords2r, full_mapping1)
 
-      write (stdout,'(A)',advance='no') str( rmsd)
-      if (printmapping_flag) then
-         write (stdout,'(1X)',advance='no')
-         call print_permutation(full_atomperm1)
-      end if
-      write (stdout,*)
+      call report_result( 1_IK)
 
    end if
 
@@ -355,7 +350,7 @@ else
    ! Maintain input atom order, both among the included atoms and in the
    ! full (padded) permutation
    call init_array( mapping1, size(atomset1), identity)
-   call init_array( full_atomperm1, size(atoms1), identity)
+   call init_array( full_mapping1, size(atoms1), identity)
 
    ! Abort if bonds do not match
    if (adjacencydiff( mapping1, adjcs1, adjcs2) > 0) then
@@ -373,15 +368,45 @@ else
 
    rmsd = sqrt( sqdistmean( mapping1, weights1, coords1, coords2r))
 
-   if (align_flag .and. write_aligned) then
-      title2 = 'rmsd=' // str( rmsd)
-      call set_coords( atoms2, full_coords2r)
-      call write_file( aligned_unit, out_format, title2, atoms2, bonds2, full_atomperm1)
-   else
-      write (stdout,'(A)') str( rmsd)
-   end if
+   call report_result( 1_IK)
 
 end if
+
+contains
+
+subroutine report_result(irec)
+! Report result number irec. Without -coords, print the RMSD (and the atom mapping with -printmapping).
+! With -coords, the coordinates of molecule 2 (as aligned, if at all, and
+! reordered) are written in the -coords format with the RMSD in the title:
+! to standard output instead of the RMSD line or, with -savecoords, preceded
+! by the coordinates of molecule 1 in the file <prefix>_<irec>.<format>,
+! and the RMSD line is printed as usual.
+   integer(IK), intent(in) :: irec
+   ! Local variables
+   integer(IK) :: pair_unit
+
+   if (coords_flag) call set_coords( atoms2, full_coords2r)
+
+   if (savecoords_flag) then
+      call open2write_indexed( pairs_prefix, irec, out_format, pair_unit)
+      call write_file( pair_unit, out_format, title1, atoms1, bonds1, ref_mapping)
+      call write_file( pair_unit, out_format, 'rmsd=' // str( rmsd), &
+            atoms2, bonds2, full_mapping1)
+      close (pair_unit)
+   end if
+
+   if (coords_flag .and. .not. savecoords_flag) then
+      call write_file( int(stdout, IK), out_format, 'rmsd=' // str( rmsd), &
+            atoms2, bonds2, full_mapping1)
+   else
+      write (stdout,'(A)',advance='no') str( rmsd)
+      if (printmapping_flag) then
+         write (stdout,'(1X)',advance='no')
+         call print_permutation( full_mapping1)
+      end if
+      write (stdout,*)
+   end if
+end subroutine
 
 end program
 !> @}

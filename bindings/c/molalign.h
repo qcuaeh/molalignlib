@@ -40,6 +40,17 @@ enum molalign_error_code {
 };
 
 /**
+ * Default bond detection tolerance (Angstrom) for rebond_flag=true: the
+ * value the command-line programs use for -rebond unless -bondtol is
+ * given. C has no default arguments, so pass it as bond_tol to get the
+ * same bonds as the programs.
+ *
+ * Hand-maintained mirror of BOND_TOL_DEFAULT in parameters.f90: keep the
+ * values of both in sync.
+ */
+#define MOLALIGN_BOND_TOL_DEFAULT 0.4
+
+/**
  * Bond types.
  *
  * A bond type is an opaque label, a short case-insensitive string with no
@@ -104,7 +115,7 @@ enum molalign_error_code {
  *                      atom type differ by more than 2*sqrt(3)*prune_tol.
  *                      Required (no default) when prune_flag=true;
  *                      unused otherwise.
- * @param ato_freq     Stop the random search once the best solution has
+ * @param min_freq     Stop the random search once the best solution has
  *                      been found this many times (>=1)
  * @param max_trials    Maximum number of random orientations (>=1)
  *
@@ -136,7 +147,7 @@ enum molalign_error_code {
  * @param n_records   [out] Actual number of records written (<= max_recs)
  * @param error_code    [out] A value from enum molalign_error_code
  *                            (above): MOLALIGN_SUCCESS,
- *                            MOLALIGN_ERROR_INVALID_BOUND (ato_freq,
+ *                            MOLALIGN_ERROR_INVALID_BOUND (min_freq,
  *                            max_trials or max_recs less than 1),
  *                            MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER,
  *                            MOLALIGN_ERROR_NOT_ISOMERS,
@@ -151,7 +162,7 @@ void ato_rmsd(
     bool align_flag, bool remap_flag, bool heavy_flag, bool massweight_flag,
     bool mirror_flag, bool useatomtype_flag,
     bool printstats_flag, bool random_flag,
-    bool prune_flag, double prune_tol, int ato_freq, int max_trials,
+    bool prune_flag, double prune_tol, int min_freq, int max_trials,
     int max_recs,
     double *rmsd_list, int *mapping_list,
     double *transform_list, int *n_records, int *error_code);
@@ -202,8 +213,9 @@ void ato_rmsd(
  * @param rebond_flag   Derive connectivity from geometry, not bond table
  * @param bond_tol      Bond detection tolerance (Angstrom): atoms are bonded
  *                      when closer than the sum of their covalent radii plus
- *                      bond_tol. Required (no default) when rebond_flag=true;
- *                      unused otherwise.
+ *                      bond_tol. Pass MOLALIGN_BOND_TOL_DEFAULT for the
+ *                      default of the command-line programs. Only used when
+ *                      rebond_flag=true.
  * @param usebondtype_flag Use bond types to guide atom matching: bonds of
  *                      different type are distinguished in the HNA
  *                      partition. Labels are compared literally, never
@@ -222,7 +234,7 @@ void ato_rmsd(
  *                      counts to stdout
  * @param random_flag   Seed the random number generator from the clock
  *                      (otherwise results are reproducible)
- * @param confo_freq     Stop the random orientation search once the best
+ * @param min_freq     Stop the random orientation search once the best
  *                      solution has been found more than this many times;
  *                      also the threshold on the ratio of total to partial
  *                      assignment combinations above which that search is
@@ -271,7 +283,7 @@ void ato_rmsd(
  * @param n_records   [out] Actual number of records written (<= max_recs)
  * @param error_code    [out] A value from enum molalign_error_code
  *                            (above): MOLALIGN_SUCCESS,
- *                            MOLALIGN_ERROR_INVALID_BOUND (confo_freq,
+ *                            MOLALIGN_ERROR_INVALID_BOUND (min_freq,
  *                            max_trials, max_frags or max_recs less
  *                            than 1),
  *                            MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER,
@@ -295,7 +307,7 @@ void confo_rmsd(
     bool mirror_flag, bool useatomtype_flag, bool rebond_flag, double bond_tol,
     bool usebondtype_flag,
     bool printstats_flag, bool printassigntree_flag, bool random_flag,
-    int confo_freq, int max_trials, int max_frags,
+    int min_freq, int max_trials, int max_frags,
     int max_recs,
     double *rmsd_list, int *mapping_list,
     double *transform_list, int *n_records, int *error_code);

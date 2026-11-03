@@ -100,6 +100,12 @@ integer(IK), parameter :: MAX_BOND_TYPE = BOND_BLOCK3 &
 integer(IK), parameter :: BOND_TYPE_RADIX = MAX_BOND_TYPE + 1
 integer(IK), parameter :: UNDEFINED_BOND_TYPE = BOND_TYPE_RADIX
 
+! Default bond perception tolerance (Angstrom): with -rebond two atoms are
+! bonded when closer than the sum of their covalent radii plus this value
+! (see molecule::bonds_from_atoms; changed with -bondtol). Keep in sync with
+! MOLALIGN_BOND_TOL_DEFAULT in molalign.h.
+real(RK), parameter :: BOND_TOL_DEFAULT = 0.4_RK
+
 ! Default maximum number of random trials
 integer(IK), parameter :: MAX_TRIALS_DEFAULT = 10000
 

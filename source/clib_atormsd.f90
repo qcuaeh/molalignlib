@@ -22,7 +22,7 @@ subroutine ato_rmsd(                                        &
       c_align_flag, c_remap_flag, c_heavy_flag, c_massweight_flag,         &
       c_mirror_flag, c_useatomtype_flag,                               &
       c_printstats_flag, c_random_flag,                                   &
-      c_prune_flag, c_prune_tol, c_ato_freq, c_max_trials,         &
+      c_prune_flag, c_prune_tol, c_min_freq, c_max_trials,         &
       c_max_recs,                                                   &
       c_rmsd_list, c_mapping_list,                                       &
       c_transform_list, c_n_records, c_error_code)                  &
@@ -38,7 +38,7 @@ subroutine ato_rmsd(                                        &
 !   c_coords1/2    : XYZ coordinates, row-major (c_n_atoms x 3), length c_n_atoms*3
 !   c_prune_tol    : pruning tolerance (only used, and required, when
 !                    c_prune_flag is true; no default)
-!   c_ato_freq, c_max_trials : convergence frequency and maximum number of
+!   c_min_freq, c_max_trials : convergence frequency and maximum number of
 !                    random orientations of the search (>= 1).
 !
 ! Multiple ranked candidate solutions:
@@ -70,7 +70,7 @@ subroutine ato_rmsd(                                        &
 !
 ! c_error_code values:
 ! See error_codes.f90 and molalign.h. This function can return MOLALIGN_SUCCESS,
-! MOLALIGN_ERROR_INVALID_BOUND (c_ato_freq, c_max_trials or c_max_recs
+! MOLALIGN_ERROR_INVALID_BOUND (c_min_freq, c_max_trials or c_max_recs
 ! less than 1), MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER, MOLALIGN_ERROR_NOT_ISOMERS,
 ! MOLALIGN_ERROR_ATOM_TYPE_MISMATCH (only when c_remap_flag is false) and
 ! MOLALIGN_ERROR_ASSIGNMENT_FAILED (only when c_remap_flag is true;
@@ -92,7 +92,7 @@ subroutine ato_rmsd(                                        &
    logical(LK), intent(in), value :: c_printstats_flag, c_random_flag
    logical(LK), intent(in), value :: c_prune_flag
    real(RK),    intent(in), value :: c_prune_tol
-   integer(IK), intent(in), value :: c_ato_freq, c_max_trials
+   integer(IK), intent(in), value :: c_min_freq, c_max_trials
 
    ! Requested number of ranked records
    integer(IK), intent(in), value :: c_max_recs
@@ -116,7 +116,7 @@ subroutine ato_rmsd(                                        &
    real(RK), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, coords2r
    real(RK), dimension(:,:), allocatable :: full_coords1, full_coords2, full_coords2r
    integer(IK), dimension(:), allocatable :: atomset1, atomset2
-   integer(IK), dimension(:), allocatable :: mapping1, full_atomperm1
+   integer(IK), dimension(:), allocatable :: mapping1, full_mapping1
    integer(IK) :: max_recs, n_padding
    integer(IK) :: i, j, base
 
@@ -124,7 +124,7 @@ subroutine ato_rmsd(                                        &
    c_n_records = 0
 
    ! Validate the count parameters before touching any output array
-   if (c_ato_freq < 1 .or. c_max_trials < 1 .or. c_max_recs < 1) then
+   if (c_min_freq < 1 .or. c_max_trials < 1 .or. c_max_recs < 1) then
       c_error_code = MOLALIGN_ERROR_INVALID_BOUND
       return
    end if
@@ -182,7 +182,7 @@ subroutine ato_rmsd(                                        &
    ! From here on the comparison works on the included atoms only, numbered
    ! 1..size(atomset1) in molecule 1 and 1..size(atomset2) in molecule 2.
    ! mapping1 maps included atoms to included atoms in that compact
-   ! numbering; complete_mapping turns it into full_atomperm1 over all
+   ! numbering; complete_mapping turns it into full_mapping1 over all
    ! (padded) atoms, which is what the caller receives.
 
    ! Collect atom types in a partition
@@ -254,7 +254,7 @@ subroutine ato_rmsd(                                        &
 
          call allocate_registry(registry, max_recs)
          call optimize_mapping_atoms(atomtypes, prunes, &
-               coords1w, coords2w, c_ato_freq, c_max_trials, registry, c_error_code)
+               coords1w, coords2w, c_min_freq, c_max_trials, registry, c_error_code)
          if (c_error_code /= MOLALIGN_SUCCESS) return
 
          if (printstats_flag) call print_records(registry)
@@ -271,12 +271,12 @@ subroutine ato_rmsd(                                        &
 
             ! Pair the excluded atoms in the aligned frame
             call complete_mapping(atomset1, atomset2, mapping1, atoms1, atoms2, &
-                  c_n_atoms1, c_n_atoms2, no_bonds, no_bonds, full_coords1, full_coords2r, full_atomperm1)
+                  c_n_atoms1, c_n_atoms2, no_bonds, no_bonds, full_coords1, full_coords2r, full_mapping1)
 
             c_rmsd_list(i) = rmsd
             base = (i-1) * n_padding
             do j = 1, n_padding
-               c_mapping_list(base+j) = full_atomperm1(j) - 1  ! 0-based for C
+               c_mapping_list(base+j) = full_mapping1(j) - 1  ! 0-based for C
             end do
          end do
 
@@ -294,12 +294,12 @@ subroutine ato_rmsd(                                        &
          rmsd = sqrt(sqdistmean(mapping1, weights1, coords1, coords2r))
 
          call complete_mapping(atomset1, atomset2, mapping1, atoms1, atoms2, &
-               c_n_atoms1, c_n_atoms2, no_bonds, no_bonds, full_coords1, full_coords2r, full_atomperm1)
+               c_n_atoms1, c_n_atoms2, no_bonds, no_bonds, full_coords1, full_coords2r, full_mapping1)
 
          c_n_records = 1
          c_rmsd_list(1) = rmsd
          do j = 1, n_padding
-            c_mapping_list(j) = full_atomperm1(j) - 1  ! 0-based for C
+            c_mapping_list(j) = full_mapping1(j) - 1  ! 0-based for C
          end do
 
       end if
@@ -321,7 +321,7 @@ subroutine ato_rmsd(                                        &
       ! Maintain input atom order, both among the included atoms and in the
       ! full (padded) permutation
       call init_array(mapping1, size(atomset1), identity)
-      call init_array(full_atomperm1, size(atoms1), identity)
+      call init_array(full_mapping1, size(atoms1), identity)
 
       if (align_flag) then
          rotquat = least_rotquat(mapping1, coords1w, coords2w)
@@ -341,7 +341,7 @@ subroutine ato_rmsd(                                        &
       c_n_records = 1
       c_rmsd_list(1) = rmsd
       do j = 1, n_padding
-         c_mapping_list(j) = full_atomperm1(j) - 1  ! 0-based for C
+         c_mapping_list(j) = full_mapping1(j) - 1  ! 0-based for C
       end do
 
    end if

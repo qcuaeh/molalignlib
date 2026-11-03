@@ -19,24 +19,12 @@ for i, result in enumerate(results, start=1):
 best = results[0]
 
 # %%
-# Example 2a - RMSD matrix over all conformer pairs
+# Example 2 - RMSD matrix over all conformer pairs
 
 conformers = read_molecules('conformers.sdf')   # read all frames
 
 for mol0 in conformers:
     for mol1 in conformers:
         result = mol0.confo_rmsd(mol1, remap=True, align=True)
-        print(f'{result.rmsd:.4f}', end=2*' ')
-    print()
-
-# %%
-# Example 2b - RMSD matrix over all conformer pairs, deriving bond connectivity
-# from geometry (XYZ files have no bond table)
-
-conformers = read_molecules('conformers.xyz')   # read all frames
-
-for mol0 in conformers:
-    for mol1 in conformers:
-        result = mol0.confo_rmsd(mol1, remap=True, align=True, rebond=True, bond_tol=0.3)
         print(f'{result.rmsd:.4f}', end=2*' ')
     print()

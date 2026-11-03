@@ -16,6 +16,7 @@
 
 module file_writing
 use parameters
+use str_utils
 use permutation
 use chemdata
 use molecule
@@ -26,12 +27,31 @@ implicit none
 
 private
 public write_file
+public check_out_format
 
 ! MOL/SDF bond type number 8 (any), written for the bond types that have no
 ! MOL/SDF number
 integer(IK), parameter :: SDF_ANY = 8
 
 contains
+
+subroutine check_out_format(option, out_format)
+! Lowercase out_format, the argument of option, and stop if it is not one of
+! the formats write_file can write
+   character(*), intent(in) :: option
+   character(:), allocatable, intent(inout) :: out_format
+
+   out_format = lowercase(out_format)
+
+   select case (out_format)
+   case ('xyz', 'sdf', 'mol2')
+      return
+   case default
+      write (stderr, '(A,1X,A,1X,A,A,A)') 'Option', option, &
+            'requires an output format (xyz, sdf or mol2), not "', out_format, '"'
+      stop
+   end select
+end subroutine
 
 subroutine write_file(unit, out_format, title, atoms, bonds, mapping1)
 ! Write the atoms in the order atoms(mapping1(i)), in the given format.

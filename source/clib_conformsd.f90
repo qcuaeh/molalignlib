@@ -26,7 +26,7 @@ subroutine confo_rmsd(                                              &
       c_mirror_flag, c_useatomtype_flag, c_rebond_flag, c_bond_tol,           &
       c_usebondtype_flag,                                                      &
       c_printstats_flag, c_printassigntree_flag, c_random_flag,                      &
-      c_confo_freq, c_max_trials, c_max_frags,                              &
+      c_min_freq, c_max_trials, c_max_frags,                              &
       c_max_recs,                                                          &
       c_rmsd_list, c_mapping_list,                                              &
       c_transform_list, c_n_records, c_error_code)                         &
@@ -54,7 +54,7 @@ subroutine confo_rmsd(                                              &
 !                    are compared literally, as labels, and never
 !                    interpreted. Ignored when c_rebond_flag is true
 !                    (perceived bonds are untyped).
-!   c_confo_freq, c_max_trials : convergence frequency and maximum number of
+!   c_min_freq, c_max_trials : convergence frequency and maximum number of
 !                    random orientations of the stochastic search (>= 1).
 !   c_max_frags    : maximum number of molecular fragments (connected
 !                    components of the bond graph of the included atoms)
@@ -93,7 +93,7 @@ subroutine confo_rmsd(                                              &
 !
 ! c_error_code values:
 ! See error_codes.f90 and molalign.h. This function can return MOLALIGN_SUCCESS,
-! MOLALIGN_ERROR_INVALID_BOUND (c_confo_freq, c_max_trials, c_max_frags
+! MOLALIGN_ERROR_INVALID_BOUND (c_min_freq, c_max_trials, c_max_frags
 ! or c_max_recs less than 1), MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER,
 ! MOLALIGN_ERROR_NOT_ISOMERS, MOLALIGN_ERROR_INVALID_BOND_TYPE (a code
 ! outside 1..MAX_BOND_TYPE) and MOLALIGN_ERROR_UNDEFINED_BOND_TYPE (a
@@ -124,7 +124,7 @@ subroutine confo_rmsd(                                              &
    real(RK),    intent(in), value :: c_bond_tol
    logical(LK), intent(in), value :: c_usebondtype_flag
    logical(LK), intent(in), value :: c_printstats_flag, c_printassigntree_flag, c_random_flag
-   integer(IK), intent(in), value :: c_confo_freq, c_max_trials, c_max_frags
+   integer(IK), intent(in), value :: c_min_freq, c_max_trials, c_max_frags
 
    ! Requested number of ranked records
    integer(IK), intent(in), value :: c_max_recs
@@ -148,7 +148,7 @@ subroutine confo_rmsd(                                              &
    real(RK), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, coords2r
    real(RK), dimension(:,:), allocatable :: full_coords1, full_coords2, full_coords2r
    integer(IK), dimension(:), allocatable :: atomset1, atomset2
-   integer(IK), dimension(:), allocatable :: mapping1, full_atomperm1
+   integer(IK), dimension(:), allocatable :: mapping1, full_mapping1
    integer(IK) :: max_recs, n_padding
    integer(IK) :: i, j, base
 
@@ -156,7 +156,7 @@ subroutine confo_rmsd(                                              &
    c_n_records = 0
 
    ! Validate the count parameters before touching any output array
-   if (c_confo_freq < 1 .or. c_max_trials < 1 .or. c_max_frags < 1 .or. c_max_recs < 1) then
+   if (c_min_freq < 1 .or. c_max_trials < 1 .or. c_max_frags < 1 .or. c_max_recs < 1) then
       c_error_code = MOLALIGN_ERROR_INVALID_BOUND
       return
    end if
@@ -215,7 +215,7 @@ subroutine confo_rmsd(                                              &
    ! From here on the comparison works on the included atoms only, numbered
    ! 1..size(atomset1) in molecule 1 and 1..size(atomset2) in molecule 2.
    ! mapping1 maps included atoms to included atoms in that compact
-   ! numbering; complete_mapping turns it into full_atomperm1 over all
+   ! numbering; complete_mapping turns it into full_mapping1 over all
    ! (padded) atoms, which is what the caller receives.
 
    ! Collect atom types in a partition
@@ -318,7 +318,7 @@ subroutine confo_rmsd(                                              &
 
          call allocate_registry(registry, max_recs)
          call optimize_mapping_conformer(adjcs1, adjcs2, atomtypes, &
-               coords1w, coords2w, c_confo_freq, c_max_trials, registry, c_error_code)
+               coords1w, coords2w, c_min_freq, c_max_trials, registry, c_error_code)
          if (c_error_code /= MOLALIGN_SUCCESS) return
 
          if (printstats_flag) call print_records(registry)
@@ -335,12 +335,12 @@ subroutine confo_rmsd(                                              &
 
             ! Pair the excluded atoms in the aligned frame
             call complete_mapping(atomset1, atomset2, mapping1, atoms1, atoms2, &
-                  c_n_atoms1, c_n_atoms2, bonds1, bonds2, full_coords1, full_coords2r, full_atomperm1)
+                  c_n_atoms1, c_n_atoms2, bonds1, bonds2, full_coords1, full_coords2r, full_mapping1)
 
             c_rmsd_list(i) = rmsd
             base = (i-1) * n_padding
             do j = 1, n_padding
-               c_mapping_list(base+j) = full_atomperm1(j) - 1  ! 0-based for C
+               c_mapping_list(base+j) = full_mapping1(j) - 1  ! 0-based for C
             end do
          end do
 
@@ -357,12 +357,12 @@ subroutine confo_rmsd(                                              &
          rmsd = sqrt(sqdistmean(mapping1, weights1, coords1, coords2r))
 
          call complete_mapping(atomset1, atomset2, mapping1, atoms1, atoms2, &
-               c_n_atoms1, c_n_atoms2, bonds1, bonds2, full_coords1, full_coords2r, full_atomperm1)
+               c_n_atoms1, c_n_atoms2, bonds1, bonds2, full_coords1, full_coords2r, full_mapping1)
 
          c_n_records = 1
          c_rmsd_list(1) = rmsd
          do j = 1, n_padding
-            c_mapping_list(j) = full_atomperm1(j) - 1  ! 0-based for C
+            c_mapping_list(j) = full_mapping1(j) - 1  ! 0-based for C
          end do
 
       end if
@@ -385,7 +385,7 @@ subroutine confo_rmsd(                                              &
       ! full (padded) permutation. Identity is meaningful here: it is the
       ! mapping being tested.
       call init_array(mapping1, size(atomset1), identity)
-      call init_array(full_atomperm1, size(atoms1), identity)
+      call init_array(full_mapping1, size(atoms1), identity)
 
       ! Abort if bonds do not match
       if (adjacencydiff(mapping1, adjcs1, adjcs2) > 0) then
@@ -411,7 +411,7 @@ subroutine confo_rmsd(                                              &
       c_n_records = 1
       c_rmsd_list(1) = rmsd
       do j = 1, n_padding
-         c_mapping_list(j) = full_atomperm1(j) - 1  ! 0-based for C
+         c_mapping_list(j) = full_mapping1(j) - 1  ! 0-based for C
       end do
 
    end if

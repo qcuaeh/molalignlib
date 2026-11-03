@@ -156,7 +156,7 @@ subroutine neighbor_table(n_atoms, bonds, nbr_start, nbr_list)
 end subroutine
 
 subroutine complete_mapping(atomset1, atomset2, mapping1, atoms1, atoms2, &
-      n_real1, n_real2, bonds1, bonds2, coords1, coords2, full_atomperm1)
+      n_real1, n_real2, bonds1, bonds2, coords1, coords2, full_mapping1)
 ! Build a full permutation of 1..size(atoms1) from the atom mapping of the
 ! included atoms. mapping1 is a permutation of 1..size(atomset1) in the
 ! compact numbering of the included atoms: included atom i of molecule 1
@@ -176,7 +176,7 @@ subroutine complete_mapping(atomset1, atomset2, mapping1, atoms1, atoms2, &
    integer(IK), intent(in) :: n_real1, n_real2
    type(bond_t), dimension(:), intent(in) :: bonds1, bonds2
    real(RK), dimension(:,:), intent(in) :: coords1, coords2
-   integer(IK), dimension(:), allocatable, intent(out) :: full_atomperm1
+   integer(IK), dimension(:), allocatable, intent(out) :: full_mapping1
    ! Local variables
    logical(LK), dimension(:), allocatable :: in_set1, used2
    integer(IK), dimension(:), allocatable :: nbr1_start, nbr1_list, nbr2_start, nbr2_list
@@ -194,9 +194,9 @@ subroutine complete_mapping(atomset1, atomset2, mapping1, atoms1, atoms2, &
       error stop 'complete_mapping: atom sets and mapping must have the same size'
    end if
 
-   allocate (full_atomperm1(n_atoms))
+   allocate (full_mapping1(n_atoms))
    allocate (in_set1(n_atoms), used2(n_atoms))
-   full_atomperm1 = 0
+   full_mapping1 = 0
    in_set1 = .FALSE.
    used2 = .FALSE.
 
@@ -211,7 +211,7 @@ subroutine complete_mapping(atomset1, atomset2, mapping1, atoms1, atoms2, &
       if (used2(k)) then
          error stop 'complete_mapping: atom of molecule 2 assigned twice'
       end if
-      full_atomperm1(atomset1(i)) = k
+      full_mapping1(atomset1(i)) = k
       in_set1(atomset1(i)) = .TRUE.
       used2(k) = .TRUE.
    end do
@@ -221,13 +221,13 @@ subroutine complete_mapping(atomset1, atomset2, mapping1, atoms1, atoms2, &
    call neighbor_table(n_atoms, bonds2, nbr2_start, nbr2_list)
 
    do i = 1, n_real1
-      if (full_atomperm1(i) /= 0) cycle
+      if (full_mapping1(i) /= 0) cycle
       best = 0
       best_dist = huge(best_dist)
       do p = nbr1_start(i), nbr1_start(i + 1) - 1
          h = nbr1_list(p)
          if (.not. in_set1(h)) cycle
-         j = full_atomperm1(h)
+         j = full_mapping1(h)
          do q = nbr2_start(j), nbr2_start(j + 1) - 1
             k = nbr2_list(q)
             if (k > n_real2) cycle
@@ -241,14 +241,14 @@ subroutine complete_mapping(atomset1, atomset2, mapping1, atoms1, atoms2, &
          end do
       end do
       if (best > 0) then
-         full_atomperm1(i) = best
+         full_mapping1(i) = best
          used2(best) = .TRUE.
       end if
    end do
 
    ! Pass 2: closest remaining real atom of the same element
    do i = 1, n_real1
-      if (full_atomperm1(i) /= 0) cycle
+      if (full_mapping1(i) /= 0) cycle
       best = 0
       best_dist = huge(best_dist)
       do k = 1, n_real2
@@ -261,7 +261,7 @@ subroutine complete_mapping(atomset1, atomset2, mapping1, atoms1, atoms2, &
          end if
       end do
       if (best > 0) then
-         full_atomperm1(i) = best
+         full_mapping1(i) = best
          used2(best) = .TRUE.
       end if
    end do
@@ -270,12 +270,12 @@ subroutine complete_mapping(atomset1, atomset2, mapping1, atoms1, atoms2, &
    ! free slots and free targets are equal, so k never runs past n_atoms.
    k = 0
    do i = 1, n_atoms
-      if (full_atomperm1(i) /= 0) cycle
+      if (full_mapping1(i) /= 0) cycle
       do
          k = k + 1
          if (.not. used2(k)) exit
       end do
-      full_atomperm1(i) = k
+      full_mapping1(i) = k
       used2(k) = .TRUE.
    end do
 end subroutine

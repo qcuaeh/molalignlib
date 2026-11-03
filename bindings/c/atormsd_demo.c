@@ -21,9 +21,13 @@
  * Pass -help for the full list of options.
  *
  * Output (as in atormsd): one line per record with the RMSD and, with
- * -mapping and -remap, the 1-based atom permutation as a comma-separated
- * list. With -align -aligned FILE the aligned cluster 2 is written to FILE
- * instead, one XYZ frame per record with the RMSD in its title line.
+ * -printmapping, the 1-based atom permutation as a comma-separated list. With
+ * -coords xyz the coordinates of cluster 2 (aligned with -align, reordered
+ * with -remap) are written to stdout instead, one XYZ frame per record with
+ * the RMSD in its title line. With -coords xyz -savecoords PREFIX, each record
+ * is written instead to the file PREFIX_<n>.xyz (n = 1, 2, ...) as two
+ * frames, cluster 1 and then cluster 2, and the RMSD lines are printed as
+ * usual.
  *
  * Dummy atoms (symbol "X") are skipped when reading, as atormsd does: the
  * library has no dummy element.
@@ -249,13 +253,16 @@ static const char *path_format(const char *path, bool *has_basename)
  * atom_data_out receives a heap-allocated array of length n_atoms*2:
  *   [elnum0, group0, elnum1, group1, ...]
  * coords_out receives a heap-allocated array of length n_atoms*3.
- * The caller is responsible for freeing both arrays.
+ * The caller is responsible for freeing both arrays. If title_out is not
+ * NULL it receives the title line (at most 255 characters, without the
+ * line break).
  *
  * Returns 0 on success, non-zero on error (message written to stderr). */
 static int read_xyz(const char *path,
                     int *n_atoms_out,
                     int **atom_data_out,
-                    double **coords_out)
+                    double **coords_out,
+                    char *title_out)
 {
     FILE *fp;
     int n_atoms, n_real = 0, elnum, group;
@@ -283,10 +290,14 @@ static int read_xyz(const char *path,
         goto fail;
     }
 
-    /* Skip the rest of the count line and the title line. */
+    /* Skip the rest of the count line and read the title line. */
     if (!fgets(line, sizeof(line), fp) || !fgets(line, sizeof(line), fp)) {
         fprintf(stderr, "Invalid XYZ format in %s\n", path);
         goto fail;
+    }
+    if (title_out) {
+        line[strcspn(line, "\r\n")] = '\0';
+        strcpy(title_out, line);
     }
 
     atom_data = malloc((size_t)n_atoms * 2 * sizeof(int));
@@ -326,28 +337,31 @@ fail:
     return 1;
 }
 
-/* Write one XYZ frame of cluster 2, transformed by transform and with its
- * atoms reordered by full_atomperm1, like atormsd -aligned. Line i holds
- * atom full_atomperm1[i] (0-based) of the padded cluster 2: indices
- * >= n_atoms2 are padding atoms, written as "X" with the origin as their
- * input coordinates, as in the library. */
+/* Write one XYZ frame of a cluster padded to n_padding atoms, transformed
+ * by transform and with its atoms reordered by mapping, like atormsd
+ * -coords. Line i holds atom mapping[i] (0-based) of the padded cluster:
+ * indices >= n_atoms are padding atoms, written as "X" with the origin as
+ * their input coordinates, as in the library. A NULL mapping keeps the
+ * input order and a NULL transform keeps the input coordinates (as for
+ * cluster 1 with -savecoords). */
 static void write_xyz_frame(FILE *fp, const char *title, int n_padding,
-                            int n_atoms2, const int *atom_data2, const double *coords2,
-                            const int *full_atomperm1, const double *transform)
+                            int n_atoms, const int *atom_data, const double *coords,
+                            const int *mapping, const double *transform)
 {
     fprintf(fp, "%d\n%s\n", n_padding, title);
 
     for (int i = 0; i < n_padding; i++) {
-        int j = full_atomperm1[i];
+        int j = mapping ? mapping[i] : i;
         const double origin[3] = {0.0, 0.0, 0.0};
-        const double *p = j < n_atoms2 ? &coords2[j*3] : origin;
-        int elnum = j < n_atoms2 ? atom_data2[j*2] : 0;
+        const double *p = j < n_atoms ? &coords[j*3] : origin;
+        int elnum = j < n_atoms ? atom_data[j*2] : 0;
         double q[3];
 
         /* p_out = R * p_in + t, with the row-major 4x4 transform */
         for (int k = 0; k < 3; k++)
-            q[k] = transform[k*4]*p[0] + transform[k*4+1]*p[1]
-                 + transform[k*4+2]*p[2] + transform[k*4+3];
+            q[k] = transform ? transform[k*4]*p[0] + transform[k*4+1]*p[1]
+                             + transform[k*4+2]*p[2] + transform[k*4+3]
+                             : p[k];
 
         fprintf(fp, "%-2s  %12.6f  %12.6f  %12.6f\n", atomic_symbols[elnum], q[0], q[1], q[2]);
     }
@@ -358,48 +372,50 @@ static void write_xyz_frame(FILE *fp, const char *title, int n_padding,
 /* Option identifiers (also indices into opt_info) */
 enum {
     OPT_ALIGN = 1, OPT_REMAP, OPT_PRUNE, OPT_USEATOMTYPE,
-    OPT_HEAVY, OPT_MASSWEIGHT, OPT_MIRROR, OPT_ATOFREQ,
-    OPT_MAXTRIALS, OPT_MAXRECS, OPT_ALIGNED, OPT_MAPPING,
-    OPT_STATS, OPT_RANDOM, OPT_HELP
+    OPT_HEAVY, OPT_MASSWEIGHT, OPT_MIRROR, OPT_MINFREQ,
+    OPT_MAXTRIALS, OPT_MAXRECS, OPT_COORDS, OPT_SAVEAS, OPT_PRINTMAPPING,
+    OPT_PRINTSTATS, OPT_RANDOM, OPT_HELP
 };
 
 /* Same options, in the same order, as the atormsd program, plus -help */
 static const long_opt_t long_options[] = {
-    {"align",       0, OPT_ALIGN},
-    {"remap",       0, OPT_REMAP},
-    {"prune",       1, OPT_PRUNE},
-    {"useatomtype", 0, OPT_USEATOMTYPE},
-    {"heavy",       0, OPT_HEAVY},
-    {"massweight",  0, OPT_MASSWEIGHT},
-    {"mirror",      0, OPT_MIRROR},
-    {"atofreq",     1, OPT_ATOFREQ},
-    {"maxtrials",   1, OPT_MAXTRIALS},
-    {"maxrecs",     1, OPT_MAXRECS},
-    {"aligned",     1, OPT_ALIGNED},
-    {"mapping",     0, OPT_MAPPING},
-    {"stats",       0, OPT_STATS},
-    {"random",      0, OPT_RANDOM},
-    {"help",        0, OPT_HELP},
-    {NULL, 0, 0}
+    {"align",        0, OPT_ALIGN},
+    {"remap",        0, OPT_REMAP},
+    {"prune",        1, OPT_PRUNE},
+    {"useatomtype",  0, OPT_USEATOMTYPE},
+    {"heavy",        0, OPT_HEAVY},
+    {"massweight",   0, OPT_MASSWEIGHT},
+    {"mirror",       0, OPT_MIRROR},
+    {"minfreq",      1, OPT_MINFREQ},
+    {"maxtrials",    1, OPT_MAXTRIALS},
+    {"maxrecs",      1, OPT_MAXRECS},
+    {"coords",       1, OPT_COORDS},
+    {"saveas",       1, OPT_SAVEAS},
+    {"printmapping", 0, OPT_PRINTMAPPING},
+    {"printstats",   0, OPT_PRINTSTATS},
+    {"random",       0, OPT_RANDOM},
+    {"help",         0, OPT_HELP},
+    {NULL, 0, 0}     
 };
 
 static const opt_info_t opt_info[] = {
-    [OPT_ALIGN]       = {"Align atoms to minimise the RMSD",                                NULL  },
-    [OPT_REMAP]       = {"Remap atoms to minimise the RMSD",                                NULL  },
-    [OPT_PRUNE]       = {"Prune atom pairs with tolerance TOL (Angstrom)",                  "TOL" },
-    [OPT_USEATOMTYPE] = {"Only match atoms with the same label (e.g. C1, C2)",              NULL  },
-    [OPT_HEAVY]       = {"Ignore hydrogen atoms",                                           NULL  },
-    [OPT_MASSWEIGHT]  = {"Use mass-weighted coordinates",                                   NULL  },
-    [OPT_MIRROR]      = {"Reflect cluster 2 (x -> -x) before comparison",                   NULL  },
-    [OPT_ATOFREQ]     = {"Stop once the best solution is found N times (default: 10)",      "N"   },
-    [OPT_MAXTRIALS]   = {"Stop after at most N random orientations (default: 10000)",       "N"   },
-    [OPT_MAXRECS]     = {"Record the N lowest RMSDs found (default: 1)",                    "N"   },
-    [OPT_ALIGNED]     = {"Write the aligned cluster 2 to FILE (XYZ; needs -align)",         "FILE"},
-    [OPT_MAPPING]     = {"Print the atom permutation (1-based; needs -remap)",              NULL  },
-    [OPT_STATS]       = {"Print optimisation statistics (needs -align -remap)",             NULL  },
-    [OPT_RANDOM]      = {"Seed the random-number generator from the system clock",          NULL  },
-    [OPT_HELP]        = {"Show this help message",                                          NULL  },
-};
+    [OPT_ALIGN]        = {"Align atoms to minimise the RMSD",                                NULL  },
+    [OPT_REMAP]        = {"Remap atoms to minimise the RMSD",                                NULL  },
+    [OPT_PRUNE]        = {"Prune atom pairs with tolerance TOL (Angstrom)",                  "TOL" },
+    [OPT_USEATOMTYPE]  = {"Only match atoms with the same label (e.g. C1, C2)",              NULL  },
+    [OPT_HEAVY]        = {"Ignore hydrogen atoms",                                           NULL  },
+    [OPT_MASSWEIGHT]   = {"Use mass-weighted coordinates",                                   NULL  },
+    [OPT_MIRROR]       = {"Reflect cluster 2 (x -> -x) before comparison",                   NULL  },
+    [OPT_MINFREQ]      = {"Stop once the best solution is found N times (default: 10)",      "N"   },
+    [OPT_MAXTRIALS]    = {"Stop after at most N random orientations (default: 10000)",       "N"   },
+    [OPT_MAXRECS]      = {"Record the N lowest RMSDs found (default: 1)",                    "N"   },
+    [OPT_COORDS]       = {"Write the coordinates of cluster 2 to stdout in FORMAT (xyz)",   "FORMAT"},
+    [OPT_SAVEAS]       = {"Write each cluster 1/cluster 2 pair to PREFIX_<n>.xyz (needs -coords)", "PREFIX"},
+    [OPT_PRINTMAPPING] = {"Print the 1-based atom permutation after each RMSD",              NULL  },
+    [OPT_PRINTSTATS]   = {"Print optimisation statistics (needs -align -remap)",             NULL  },
+    [OPT_RANDOM]       = {"Seed the random-number generator from the system clock",          NULL  },
+    [OPT_HELP]         = {"Show this help message",                                          NULL  },
+};                     
 
 static void print_usage(const char *prog)
 {
@@ -417,11 +433,11 @@ int main(int argc, char **argv)
     bool align_flag = false, remap_flag = false, heavy_flag = false, massweight_flag = false;
     bool mirror_flag = false, useatomtype_flag = false;
     bool printstats_flag = false, random_flag = false;
-    bool printmapping_flag = false, write_aligned = false;
-    const char *aligned_path = NULL;
+    bool printmapping_flag = false, coords_flag = false, savecoords_flag = false;
+    const char *pairs_prefix = NULL;
     bool prune_flag = false;
     double prune_tol = 0.0;
-    int ato_freq = 10, max_trials = 10000;
+    int min_freq = 10, max_trials = 10000;
     int max_recs = 1;
     int argi = 1, opt;
 
@@ -442,8 +458,8 @@ int main(int argc, char **argv)
         case OPT_HEAVY:      heavy_flag     = true; break;
         case OPT_MASSWEIGHT: massweight_flag      = true; break;
         case OPT_MIRROR:     mirror_flag    = true; break;
-        case OPT_ATOFREQ:
-            if (read_int_optarg(option, arg, 1, &ato_freq) != 0) return 1;
+        case OPT_MINFREQ:
+            if (read_int_optarg(option, arg, 1, &min_freq) != 0) return 1;
             break;
         case OPT_MAXTRIALS:
             if (read_int_optarg(option, arg, 1, &max_trials) != 0) return 1;
@@ -451,16 +467,31 @@ int main(int argc, char **argv)
         case OPT_MAXRECS:
             if (read_int_optarg(option, arg, 1, &max_recs) != 0) return 1;
             break;
-        case OPT_ALIGNED:
-            write_aligned = true;
-            aligned_path = arg;
+        case OPT_COORDS:
+            /* The argument is a format, not a path; output goes to stdout */
+            if (!equal_nocase(arg, "xyz")) {
+                fprintf(stderr, "Option %s requires an output format "
+                                "(this demo only writes xyz), not \"%s\"\n", option, arg);
+                return 1;
+            }
+            coords_flag = true;
             break;
-        case OPT_MAPPING:    printmapping_flag = true; break;
-        case OPT_STATS:      printstats_flag      = true; break;
+        case OPT_SAVEAS:
+            savecoords_flag = true;
+            pairs_prefix = arg;
+            break;
+        case OPT_PRINTMAPPING: printmapping_flag = true; break;
+        case OPT_PRINTSTATS: printstats_flag      = true; break;
         case OPT_RANDOM:     random_flag     = true; break;
         case OPT_HELP:       print_usage(argv[0]); return 0;
         default:             print_usage(argv[0]); return 1;
         }
+    }
+
+    /* -savecoords takes the output format from -coords */
+    if (savecoords_flag && !coords_flag) {
+        fprintf(stderr, "Option -savecoords requires -coords\n");
+        return 1;
     }
 
     switch (npos) {
@@ -479,31 +510,10 @@ int main(int argc, char **argv)
     double *rmsd_list = NULL, *transform_list = NULL;
     int *mapping_list = NULL;
     int n_records = 0, error_code = MOLALIGN_SUCCESS;
-    FILE *aligned_file = NULL;
+    char title1[256];
 
-    if (read_xyz(posargs[0], &n_atoms1, &atom_data1, &coords1) != 0) goto done;
-    if (read_xyz(posargs[1], &n_atoms2, &atom_data2, &coords2) != 0) goto done;
-
-    /* As in atormsd, -aligned only takes effect with -align; it then
-     * replaces the RMSD output on stdout. A file name without a base name
-     * (e.g. "xyz") writes to stdout. */
-    write_aligned = write_aligned && align_flag;
-    if (write_aligned) {
-        bool has_basename;
-        const char *out_format = path_format(aligned_path, &has_basename);
-        if (strcmp(out_format, "xyz") != 0) {
-            fprintf(stderr, "File format \"%s\" is not supported (this demo only writes .xyz files)\n",
-                    out_format);
-            goto done;
-        }
-        if (has_basename) {
-            aligned_file = fopen(aligned_path, "w");
-            if (!aligned_file) {
-                fprintf(stderr, "Can't open %s for writing\n", aligned_path);
-                goto done;
-            }
-        }
-    }
+    if (read_xyz(posargs[0], &n_atoms1, &atom_data1, &coords1, title1) != 0) goto done;
+    if (read_xyz(posargs[1], &n_atoms2, &atom_data2, &coords2, NULL) != 0) goto done;
 
     /* Output buffers for up to max_recs solutions. Each permutation has
      * n_padding = max(n_atoms1, n_atoms2) entries: the clusters may differ
@@ -518,7 +528,7 @@ int main(int argc, char **argv)
         goto done;
     }
 
-    /* The library prints the -stats output through Fortran I/O */
+    /* The library prints the -printstats output through Fortran I/O */
     fflush(stdout);
 
     ato_rmsd(
@@ -527,7 +537,7 @@ int main(int argc, char **argv)
         align_flag, remap_flag, heavy_flag, massweight_flag,
         mirror_flag, useatomtype_flag,
         printstats_flag, random_flag,
-        prune_flag, prune_tol, ato_freq, max_trials,
+        prune_flag, prune_tol, min_freq, max_trials,
         max_recs,
         rmsd_list, mapping_list,
         transform_list, &n_records, &error_code);
@@ -535,7 +545,7 @@ int main(int argc, char **argv)
     if (error_code != MOLALIGN_SUCCESS) {
         switch (error_code) {
         case MOLALIGN_ERROR_INVALID_BOUND:
-            fprintf(stderr, "Error: -atofreq, -maxtrials and -maxrecs must be at least 1\n"); break;
+            fprintf(stderr, "Error: -minfreq, -maxtrials and -maxrecs must be at least 1\n"); break;
         case MOLALIGN_ERROR_INVALID_ATOMIC_NUMBER:
             fprintf(stderr, "Error: atomic number out of range\n"); break;
         case MOLALIGN_ERROR_NOT_ISOMERS:
@@ -557,20 +567,45 @@ int main(int argc, char **argv)
         /* Entry i (0-based) is the atom of cluster 2 placed on line i of
          * cluster 1. Values >= n_atoms2 are padding atoms of cluster 2,
          * and entries i >= n_atoms1 hold the extra atoms of cluster 2. */
-        const int *full_atomperm1 = &mapping_list[(size_t)r * n_padding];
+        const int *full_mapping1 = &mapping_list[(size_t)r * n_padding];
 
-        if (write_aligned) {
-            char title[64];
-            snprintf(title, sizeof(title), "rmsd=%.6f", rmsd);
-            write_xyz_frame(aligned_file ? aligned_file : stdout, title, n_padding,
-                            n_atoms2, atom_data2, coords2, full_atomperm1, transform);
+        char title[64];
+        snprintf(title, sizeof(title), "rmsd=%.6f", rmsd);
+
+        if (savecoords_flag) {
+            /* As in atormsd -savecoords: cluster 1, then cluster 2, in the
+             * file PREFIX_<n>.xyz, with n counted from 1 */
+            size_t len = strlen(pairs_prefix) + 32;
+            char *pair_path = malloc(len);
+            FILE *pair_file;
+            if (!pair_path) { fprintf(stderr, "Error: out of memory\n"); goto done; }
+            snprintf(pair_path, len, "%s_%d.xyz", pairs_prefix, r + 1);
+            pair_file = fopen(pair_path, "w");
+            if (!pair_file) {
+                fprintf(stderr, "Can't open %s for writing\n", pair_path);
+                free(pair_path);
+                goto done;
+            }
+            write_xyz_frame(pair_file, title1, n_padding,
+                            n_atoms1, atom_data1, coords1, NULL, NULL);
+            write_xyz_frame(pair_file, title, n_padding,
+                            n_atoms2, atom_data2, coords2, full_mapping1, transform);
+            fclose(pair_file);
+            free(pair_path);
+        }
+
+        if (coords_flag && !savecoords_flag) {
+            /* As in atormsd -coords: written to stdout with or without
+             * -align, replacing the RMSD lines */
+            write_xyz_frame(stdout, title, n_padding,
+                            n_atoms2, atom_data2, coords2, full_mapping1, transform);
         } else {
             printf("%.6f", rmsd);
-            if (printmapping_flag && remap_flag) {
+            if (printmapping_flag) {
                 /* 1-based, comma-separated, as printed by atormsd */
                 putchar(' ');
                 for (int i = 0; i < n_padding; i++)
-                    printf(i ? ",%d" : "%d", full_atomperm1[i] + 1);
+                    printf(i ? ",%d" : "%d", full_mapping1[i] + 1);
             }
             putchar('\n');
         }
@@ -578,7 +613,6 @@ int main(int argc, char **argv)
     status = 0;
 
 done:
-    if (aligned_file) fclose(aligned_file);
     free(atom_data1); free(coords1);
     free(atom_data2); free(coords2);
     free(rmsd_list); free(mapping_list); free(transform_list);
