@@ -50,6 +50,10 @@ subroutine optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
 ! Each local minimum is recorded, and the search stops when the best one
 ! has been found more than min_freq times or after max_trials trials.
 !
+! In both strategies registry holds up to size(registry%records) distinct
+! ranked assignments (the -maxrecs option): the distinct local minima of the
+! stochastic search, or the best complete assignments of the exhaustive one.
+!
 ! adjcs, atomtypes and coords hold the included atoms only, in a common
 ! numbering; the atom permutations stored in registry use that numbering.
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
@@ -60,6 +64,7 @@ subroutine optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
    integer(IK), intent(out) :: error_code
 
    ! Local variables
+   integer(IK) :: i
    integer(IK), dimension(:), allocatable :: mapping1, new_mapping
    real(RK), dimension(:,:), allocatable :: coords2r
    real(RK), dimension(4) :: rotation, total_rotation
@@ -141,23 +146,19 @@ subroutine optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
 
    else
 
-      ! Exhaustive search: the best assignment after superposition
-      call assign_atoms_global( coords1, coords2, cache_arrays, mapping1)
-      
-      rotation = least_rotquat( mapping1, coords1, coords2)
-      
-      coords2r = coords2
-      call rotate_coords( coords2r, rotation)
-      mapdist = sqdistsum( mapping1, coords1, coords2r)
-      
-      ! Single record
-      registry%n_records = 1
-      registry%records(1)%mapping1 = mapping1
-      registry%records(1)%mapdiff = 0
-      registry%records(1)%mapdist = mapdist
-      registry%records(1)%freq = 1
-      registry%records(1)%steps = 1
-      registry%records(1)%rotation = rotation
+      ! Exhaustive search: the best assignments after superposition, up to
+      ! the size of the registry, ranked by distance
+      call assign_atoms_global( coords1, coords2, cache_arrays, registry)
+
+      ! Optimal rotation and distance of each ranked assignment
+      do i = 1, registry%n_records
+         mapping1 = registry%records(i)%mapping1
+         rotation = least_rotquat( mapping1, coords1, coords2)
+         coords2r = coords2
+         call rotate_coords( coords2r, rotation)
+         registry%records(i)%rotation = rotation
+         registry%records(i)%mapdist = sqdistsum( mapping1, coords1, coords2r)
+      end do
 
    end if
 end subroutine

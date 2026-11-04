@@ -40,6 +40,7 @@ use common_types
 use permutation
 use euclidean
 use indexed_list_types
+use recording
 implicit none
 private
 public assign_atoms_greedy
@@ -474,34 +475,47 @@ subroutine assign_atoms_greedy(coords1, coords2, cache_arrays, mapping1, mapdist
 end subroutine
 
 recursive subroutine recur_assign_atoms_global(coords1, coords2, cache_arrays, &
-      split_parts, n_split_parts, current_split_idx, this_map, best_map, min_dist)
+      split_parts, n_split_parts, current_split_idx, this_map, registry)
 ! Exhaustive enumeration of complete assignments: every pair choice of split
 ! part current_split_idx is combined with every choice of the following
 ! ones, and each complete assignment is scored by its sum of squared
 ! distances after optimal superposition. The cost is the product of the
 ! branch possibilities, so this is only used when that product is small
 ! compared with their sum (adaptive alignment strategy).
+! Every complete assignment that ranks among the best size(registry%records)
+! found so far is inserted in registry (ranked by mapdist, ties keep the
+! earlier assignment first), so the search yields as many ranked candidates
+! as the registry holds. The rotation of the records is not set here.
    real(RK), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: cache_arrays
    integer(IK), intent(in) :: split_parts(:), n_split_parts, current_split_idx
-   type(partmap_t), intent(inout) :: this_map, best_map
-   real(RK), intent(inout) :: min_dist
+   type(partmap_t), intent(inout) :: this_map
+   type(registry_t), intent(inout) :: registry
 
    integer(IK) :: split_part_idx, child_branch_idx, first_link_idx
    integer(IK) :: n_items2, i, j
    integer(IK) :: branch_link_offset, branch_num_links
    integer(IK) :: saved_size
+   integer(IK), dimension(:), allocatable :: mapping1
    real(RK) :: total_dist
 
    ! All split parts assigned: score the complete assignment
    if (current_split_idx > n_split_parts) then
       n_combinations = n_combinations + 1
       total_dist = least_sqdistsum(this_map%subset(:this_map%subset_size), this_map%mapping, coords1, coords2)
-      if (total_dist < min_dist) then
-         min_dist = total_dist
-         best_map%subset_size = 0
-         call submap_merge(best_map, this_map)
+
+      ! A full registry only accepts an assignment strictly better than its
+      ! last record; skip the export otherwise
+      if (registry%n_records == size(registry%records)) then
+         if (.not. total_dist < registry%records(registry%n_records)%mapdist) then
+            registry%overflow = .TRUE.
+            return
+         end if
       end if
+
+      call get_mapping(this_map, mapping1)
+      call insert_record_mapping(registry, mapping1, 1.0_RK, &
+            [1.0_RK, 0.0_RK, 0.0_RK, 0.0_RK], 0_IK, total_dist)
       return
    end if
 
@@ -534,7 +548,7 @@ recursive subroutine recur_assign_atoms_global(coords1, coords2, cache_arrays, &
       call assign_branch_atoms(cache_arrays, split_part_idx, child_branch_idx, &
             first_link_idx, 1, j, this_map)
       call recur_assign_atoms_global(coords1, coords2, cache_arrays, split_parts, &
-            n_split_parts, current_split_idx + 1, this_map, best_map, min_dist)
+            n_split_parts, current_split_idx + 1, this_map, registry)
 
       this_map%subset_size = saved_size
 
@@ -544,36 +558,44 @@ recursive subroutine recur_assign_atoms_global(coords1, coords2, cache_arrays, &
    end do
 end subroutine
 
-subroutine assign_atoms_global(coords1, coords2, cache_arrays, mapping1)
-! Orientation-independent exhaustive search: the valid assignment with the
-! lowest RMSD after optimal superposition (see recur_assign_atoms_global)
+subroutine assign_atoms_global(coords1, coords2, cache_arrays, registry)
+! Orientation-independent exhaustive search: the valid assignments with the
+! lowest RMSD after optimal superposition (see recur_assign_atoms_global).
+! registry is reset and filled with up to size(registry%records) distinct
+! assignments ranked by their sum of squared distances after superposition
+! (mapdist); records(1) is the best one. Each record has freq = 1 and
+! steps = 1, and its rotation is left to the caller. No random trials are
+! made, so n_trials and total_steps are left at 0.
    real(RK), intent(in) :: coords1(:,:), coords2(:,:)
    type(array_trees_t), intent(inout) :: cache_arrays
-   integer(IK), dimension(:), allocatable, intent(out) :: mapping1
+   type(registry_t), intent(inout) :: registry
    ! Local variables
-   type(partmap_t) :: this_map, best_map
-   real(RK) :: min_dist
+   type(partmap_t) :: this_map
    integer(IK), allocatable :: split_parts(:)
    integer(IK) :: n_split_parts, n_atoms
 
    n_atoms = cache_arrays%n_atoms1
 
    call submap_init(this_map, n_atoms)
-   call submap_init(best_map, n_atoms)
 
    ! Pairs already fixed by the self-consistent partition
    call collect_leaf_assignments(cache_arrays, 1, this_map)
-   call collect_leaf_assignments(cache_arrays, 1, best_map)
 
-   min_dist = huge(min_dist)
+   call reset_registry(registry)
    n_combinations = 0
 
    call collect_split_parts(cache_arrays, split_parts, n_split_parts)
    call recur_assign_atoms_global(coords1, coords2, cache_arrays, split_parts, &
-         n_split_parts, 1, this_map, best_map, min_dist)
+         n_split_parts, 1, this_map, registry)
    deallocate(split_parts)
 
-   call get_mapping(best_map, mapping1)
+   ! insert_record_mapping counts every insertion as a trial
+   registry%n_trials = 0
+   registry%total_steps = 0
+
+   if (registry%n_records < 1) then
+      error stop 'assign_atoms_global: no complete assignment was found'
+   end if
 end subroutine
 
 recursive subroutine recur_assign_atoms_local(coords1, coords2, cache_arrays, &

@@ -15,7 +15,8 @@
 ! along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 module recording
-! Registry of the distinct local minima found by the stochastic searches,
+! Registry of the distinct local minima found by the stochastic search,
+! or of the best assignments found by the exhaustive conformer search,
 ! ranked by adjacency difference and then by squared distance
 use parameters
 use permutation
