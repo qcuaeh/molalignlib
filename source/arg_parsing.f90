@@ -52,7 +52,8 @@ subroutine read_posarg(arg, posargs)
    ipos = ipos + 1
 
    if (ipos > size(posargs)) then
-      stop 'Too many arguments'
+      write (stderr, '(A)') 'Too many arguments'
+      stop
    end if
 
    if (len(arg) > len(posargs)) then

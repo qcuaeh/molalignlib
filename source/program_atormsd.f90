@@ -126,14 +126,17 @@ end do
 
 ! -savecoords takes the output format from -coords
 if (savecoords_flag .and. .not. coords_flag) then
-   stop 'Option -savecoords requires -coords'
+   write (stderr, '(A)') 'Option -savecoords requires -coords'
+   stop
 end if
 
 select case (ipos)
 case (0)
-   stop 'File paths are missing'
+   write (stderr, '(A)') 'File paths are missing'
+   stop
 case (1)
-   stop 'Too few file paths'
+   write (stderr, '(A)') 'Too few file paths'
+   stop
 case (2)
    call open2read( trim(posargs(1)), in_format, in_unit)
    call read_file( in_unit, in_format, title1, atoms1, bonds1)
@@ -142,7 +145,8 @@ case (2)
    call read_file( in_unit, in_format, title2, atoms2, bonds2)
    close (in_unit)
 case default
-   stop 'Too many file paths'
+   write (stderr, '(A)') 'Too many file paths'
+   stop
 end select
 
 ! Pad the smaller cluster with dummy atoms appended at the end. Real atoms
@@ -175,7 +179,8 @@ call collect_atomtypes( atoms1(atomset1), atoms2(atomset2), atomtypes)
 
 ! Abort if molecules are not isomers
 if (any(atomtypes%parts%n_items1 /= atomtypes%parts%n_items2)) then
-   stop 'These molecules are not isomers'
+   write (stderr, '(A)') 'These molecules are not isomers'
+   stop
 end if
 
 ! Weights of the included atoms, normalised to sum 1 over them so both
@@ -239,7 +244,10 @@ if (remap_flag) then
       call allocate_registry( registry, max_recs)
       call optimize_mapping_atoms( atomtypes, prunes, &
             coords1w, coords2w, min_freq, max_trials, registry, error_code)
-      if (error_code /= 0) stop 'Error: Assignment failed'
+      if (error_code /= 0) then
+         write (stderr, '(A)') 'Error: Assignment failed'
+         stop
+      end if
 
       if (printstats_flag) call print_records( registry)
 
@@ -262,7 +270,10 @@ if (remap_flag) then
 
       allocate (mapping1(size(atomset1)))
       call assign_atoms_pruned( atomtypes, coords1w, coords2w, prunes, mapping1, error_code)
-      if (error_code /= 0) stop 'Error: Assignment failed'
+      if (error_code /= 0) then
+         write (stderr, '(A)') 'Error: Assignment failed'
+         stop
+      end if
 
       full_coords2r = full_coords2
       coords2r = coords2
@@ -281,10 +292,12 @@ else
    ! clusters, with the same types (the isomer check above guarantees that
    ! both atom sets have the same size)
    if (any(atomset1 /= atomset2)) then
-      stop 'Atoms do not match'
+      write (stderr, '(A)') 'Atoms do not match'
+      stop
    end if
    if (any(atomtypes%itemdir1 /= atomtypes%itemdir2)) then
-      stop 'Atoms do not match'
+      write (stderr, '(A)') 'Atoms do not match'
+      stop
    end if
 
    ! Maintain input atom order, both among the included atoms and in the

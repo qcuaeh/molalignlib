@@ -140,14 +140,17 @@ end do
 
 ! -savecoords takes the output format from -coords
 if (savecoords_flag .and. .not. coords_flag) then
-   stop 'Option -savecoords requires -coords'
+   write (stderr, '(A)') 'Option -savecoords requires -coords'
+   stop
 end if
 
 select case (ipos)
 case (0)
-   stop 'File paths are missing'
+   write (stderr, '(A)') 'File paths are missing'
+   stop
 case (1)
-   stop 'Too few file paths'
+   write (stderr, '(A)') 'Too few file paths'
+   stop
 case (2)
    call open2read( trim(posargs(1)), in_format1, in_unit)
    call read_file( in_unit, in_format1, title1, atoms1, bonds1)
@@ -156,7 +159,8 @@ case (2)
    call read_file( in_unit, in_format2, title2, atoms2, bonds2)
    close (in_unit)
 case default
-   stop 'Too many file paths'
+   write (stderr, '(A)') 'Too many file paths'
+   stop
 end select
 
 ! Bonds perceived from geometry (-rebond) are untyped, so -usebondtype has
@@ -193,7 +197,8 @@ call collect_atomtypes( atoms1(atomset1), atoms2(atomset2), atomtypes)
 
 ! Abort if molecules are not isomers
 if (any(atomtypes%parts%n_items1 /= atomtypes%parts%n_items2)) then
-   stop 'These molecules are not isomers'
+   write (stderr, '(A)') 'These molecules are not isomers'
+   stop
 end if
 
 ! With -rebond, perceive bonds from geometry instead of the files, with
@@ -209,9 +214,11 @@ if (error_code == MOLALIGN_SUCCESS) then
    call check_bondtypes( atomset2, n_padding, bonds2, error_code)
 end if
 if (error_code == MOLALIGN_ERROR_UNDEFINED_BOND_TYPE) then
-   stop 'Bonds of undefined type cannot be compared (see -usebondtype)'
+   write (stderr, '(A)') 'Bonds of undefined type cannot be compared (see -usebondtype)'
+   stop
 else if (error_code /= MOLALIGN_SUCCESS) then
-   stop 'Invalid bond type between compared atoms'
+   write (stderr, '(A)') 'Invalid bond type between compared atoms'
+   stop
 end if
 
 ! Without -usebondtype only connectivity counts: adjacency_from_bonds makes
@@ -224,7 +231,8 @@ if (error_code == MOLALIGN_SUCCESS) then
    call adjacency_from_bonds( atomset2, n_padding, bonds2, adjcs2, error_code)
 end if
 if (error_code == MOLALIGN_ERROR_UNDEFINED_BOND_TYPE) then
-   stop 'Bonds of undefined type cannot be compared (see -usebondtype)'
+   write (stderr, '(A)') 'Bonds of undefined type cannot be compared (see -usebondtype)'
+   stop
 end if
 
 ! Abort if either molecule has more fragments than allowed (counted on the
@@ -301,7 +309,10 @@ if (remap_flag) then
       call allocate_registry( registry, max_recs)
       call optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
             coords1w, coords2w, min_freq, max_trials, registry, error_code)
-      if (error_code /= 0) stop 'These molecules are not conformers'
+      if (error_code /= 0) then
+         write (stderr, '(A)') 'These molecules are not conformers'
+         stop
+      end if
 
       if (printstats_flag) call print_records( registry)
 
@@ -322,7 +333,10 @@ if (remap_flag) then
    else
 
       call assign_mapping_conformer( adjcs1, adjcs2, atomtypes, coords1w, coords2w, mapping1, error_code)
-      if (error_code /= 0) stop 'These molecules are not conformers'
+      if (error_code /= 0) then
+         write (stderr, '(A)') 'These molecules are not conformers'
+         stop
+      end if
 
       full_coords2r = full_coords2
       coords2r = coords2
@@ -341,10 +355,12 @@ else
    ! molecules, with the same types (the isomer check above guarantees
    ! that both atom sets have the same size)
    if (any(atomset1 /= atomset2)) then
-      stop 'Atoms do not match'
+      write (stderr, '(A)') 'Atoms do not match'
+      stop
    end if
    if (any(atomtypes%itemdir1 /= atomtypes%itemdir2)) then
-      stop 'Atoms do not match'
+      write (stderr, '(A)') 'Atoms do not match'
+      stop
    end if
 
    ! Maintain input atom order, both among the included atoms and in the
@@ -354,7 +370,8 @@ else
 
    ! Abort if bonds do not match
    if (adjacencydiff( mapping1, adjcs1, adjcs2) > 0) then
-      stop 'Bonds do not match'
+      write (stderr, '(A)') 'Bonds do not match'
+      stop
    end if
 
    if (align_flag) then
