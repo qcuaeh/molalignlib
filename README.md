@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/abstract.png" alt="The macrocycle BIRD 002527 and its HNA assignment tree" width="900">
+  <img src="assets/abstract.png" alt="The macrocycle BIRD 002527 and its HNA assignment tree">
 </p>
 
 MolAlignLib
@@ -25,7 +25,7 @@ Table of Contents
 4. [C Bindings](#c-bindings)
    - [ato_rmsd](#ato_rmsd)
    - [confo_rmsd](#confo_rmsd)
-   - [Demo program](#demo-program)
+   - [Demo programs](#demo-programs)
 5. [Python Bindings](#python-bindings)
    - [Installation](#installation)
    - [Molecule](#molecule)
@@ -76,29 +76,9 @@ git clone -b devel https://github.com/qcuaeh/molalignlib.git
 cd molalignlib
 cmake -B build
 make -C build
-sudo make -C build install
 ```
 
-By default, `install` places files under the system prefix (`/usr/local` on Linux/macOS), which typically requires `sudo`.
-
-### User-local install
-
-To install without root privileges, set `CMAKE_INSTALL_PREFIX` to a directory you own, e.g. `~/.local`:
-
-```bash
-cmake -B build -DCMAKE_INSTALL_PREFIX=$HOME/.local
-make -C build
-make -C build install
-export PATH="$HOME/.local/bin:$PATH"   # to run the executables directly
-```
-
-| File | Installation directory |
-|------|------------------------|
-| `atormsd`, `conformsd` | `<prefix>/bin` |
-| `libmolalign.a` | `<prefix>/lib` |
-| `molalign.h` | `<prefix>/include/molalignlib` |
-
-Before installing, the same files are available in `build/source`. `libmolalign.a` contains the core algorithms and both C functions (`ato_rmsd`, `confo_rmsd`).
+The compiled programs `atormsd` and `conformsd` are created in `build/source` along with the static library `libmolalign.a` which contains the `ato_rmsd` and `confo_rmsd` functions.
 
 For the Python extension module, see [Python Bindings](#python-bindings).
 
@@ -224,24 +204,23 @@ The file readers translate each format's bond types into labels (see `source/fil
 C Bindings
 ----------
 
-Include `molalign.h` and link against `libmolalign`, which contains both `ato_rmsd` and `confo_rmsd`. The header is the complete reference for both functions: it documents every parameter, the `MOLALIGN_SUCCESS` and `MOLALIGN_ERROR_*` constants returned through `error_code`, and the bond type codes.
+Include `molalign.h` and link against `libmolalign`, which contains the `ato_rmsd` and `confo_rmsd` functions. The header is the complete reference for both functions: it documents every parameter, the `MOLALIGN_SUCCESS` and `MOLALIGN_ERROR_*` constants returned through `error_code`, and the bond type codes.
 
 ```c
 #include "molalign.h"
 ```
 
-The header is installed in `<prefix>/include/molalignlib`, which is not on the compiler's default search path. Since `libmolalign.a` is a static Fortran library, list it before the Fortran runtime:
+The header is in `bindings/c`, which is not on the compiler's default search path. Since `libmolalign.a` is a static Fortran library, list it before the Fortran runtime:
 
 ```bash
-gcc example.c -o example -I/usr/local/include/molalignlib -L/usr/local/lib \
-    -lmolalign -lgfortran -lm
+gcc program.c -I bindings/c -L build/source -lmolalign -lgfortran -lm
 ```
 
-Replace `/usr/local` with your install prefix (e.g. `$HOME/.local`). If the library was built with Intel Fortran, link with `ifx`:
+If the library was built with Intel Fortran, link with `ifx`:
 
 ```bash
-gcc -c example.c -I/usr/local/include/molalignlib
-ifx -nofor-main example.o -o example -L/usr/local/lib -lmolalign
+gcc -c program.c -I bindings/c
+ifx -nofor-main program.o -o program -L build/source -lmolalign
 ```
 
 ### Inputs and outputs
@@ -374,9 +353,11 @@ int main(void)
 }
 ```
 
-### Demo program
+### Demo programs
 
-`bindings/c/atormsd_demo.c` is a C version of the [atormsd](#atormsd) program built on `ato_rmsd`. It takes the same options and prints the same output, but only reads and writes XYZ files (so `-coords` only accepts `xyz`, `-savecoords` writes `PREFIX_n.xyz` files, and standard input is read with the path `xyz`). Since the library does not see the file's bonds, hydrogens excluded with `-heavy` are paired by distance only (see [Hydrogens and padding atoms](#hydrogens-and-padding-atoms)), which for XYZ files is what atormsd does too. It shows how to pack the data read from files, size the output buffers, and apply the returned transforms. Compile and run instructions are in its header comment.
+`examples/ato_rmsd.c` is a minimal program built on `ato_rmsd`. It reads two XYZ files, packs their atoms and coordinates into the flat input arrays, sizes the output buffers, and prints each record's RMSD and 1-based atom permutation. With `-coords`, it instead applies each returned transform and permutation and writes the moved cluster 2 as XYZ. Its options set the `ato_rmsd` arguments of the same names (`-align`, `-remap`, `-heavy`, `-massweight`, `-mirror`, `-useatomtype`, `-prune`, `-minfreq`, `-maxtrials`, `-maxrecs`, `-printstats`, `-random`), and running it without arguments lists them.
+
+`examples/confo_rmsd.c` does the same with `confo_rmsd`. It reads the first record of two MOL/SDF V2000 files, so it also shows how to pack the bond table into `bond_data`, with the V2000 bond types converted to bond type codes (`1`, `2`, `3` and `ar` for aromatic; the query types 5–8 become the undefined type). Its options set the `confo_rmsd` arguments of the same names (`-align`, `-remap`, `-heavy`, `-massweight`, `-mirror`, `-rebond`, `-bondtol`, `-usebondtype`, `-minfreq`, `-maxtrials`, `-maxfrags`, `-maxrecs`, `-printstats`, `-printassigntree`, `-random`, plus `-coords`); SDF atoms carry no labels, so it has no `-useatomtype`.
 
 
 Python Bindings
@@ -413,7 +394,7 @@ python3 -m pip install --user --upgrade pip
 | [`confo_rmsd`](#moleculeconfo_rmsd) | Required (from the bond table, or inferred from geometry with `rebond=True`). Guarantees chemically valid assignments for any degree of topological symmetry |
 
 ```python
-from molalignlib import Molecule, read_molecules
+from molalignlib import Molecule, read_frames
 ```
 
 #### Construction
@@ -424,12 +405,12 @@ Files are read with chemfiles, so any format it supports can be used (XYZ, SDF/M
 import numpy as np
 
 # From a file (first frame by default, or a given frame)
-mol = Molecule.from_file("conformers.sdf")
-mol = Molecule.from_file("conformers.sdf", frame_idx=2)
+mol = Molecule.from_file("conf1.sdf")
+mol = Molecule.from_file("confs.sdf", frame_idx=2)
 
 # All frames of a file as a list, or selected frames as a tuple
-molecules  = read_molecules("conformers.sdf")
-mol0, mol1 = read_molecules("conformers.sdf", frames=(0, 1))
+molecules  = read_frames("confs.sdf")
+mol0, mol1 = read_frames("confs.sdf", frames=(0, 1))
 
 # From element symbols and coordinates (no bonds)
 coords = np.array([[0.0, 0.0, 0.0], [2.5, 0.0, 0.0]])
@@ -443,7 +424,7 @@ mol = Molecule.from_symbols(["C", "O", "H", "H"], np.zeros((4, 3)), bond_data=bo
 mol = Molecule.from_numbers([6, 8, 1, 1], np.zeros((4, 3)), bond_data=bond_data)
 ```
 
-`from_symbols` and `from_numbers` accept `labels=` (one integer per atom, default 0) for use with `use_atom_type=True`, and `name=` (default `"molecule"`). Molecules read from files are unlabelled and named after the file stem (plus the frame index with `read_molecules`).
+`from_symbols` and `from_numbers` accept `labels=` (one integer per atom, default 0) for use with `use_atom_type=True`, and `name=` (default `"molecule"`). Molecules read from files are unlabelled and named after the file stem (plus the frame index with `read_frames`).
 
 #### Bond types
 
@@ -490,7 +471,8 @@ mol.write("output.xyz")  # coordinates and symbols only
 Compares the two molecules as unstructured atom clusters; bonds are ignored.
 
 ```python
-mol0, mol1 = read_molecules("clusters.xyz", frames=(0, 1))
+mol0 = Molecule.from_file("mol1.xyz")
+mol1 = Molecule.from_file("mol2.xyz")
 result = mol0.ato_rmsd(mol1, align=True, remap=True)
 print(result.rmsd)
 ```
@@ -517,14 +499,16 @@ print(result.rmsd)
 Compares the two molecules as conformers: both must have the same bond graph, and assignments always respect it. A molecule without bonds (e.g. read from XYZ) needs `rebond=True`.
 
 ```python
-mol0, mol1 = read_molecules("conformers.sdf", frames=(0, 1))
+mol0 = Molecule.from_file("conf1.sdf")
+mol1 = Molecule.from_file("conf2.sdf")
 result = mol0.confo_rmsd(mol1, align=True, remap=True)
 print(result.rmsd)              # float, Å
 print(result.mapping)           # int32 array, 0-based
 print(result.transform)         # 4×4 float64 array
 
 # XYZ input has no bond table: infer connectivity from geometry
-mol0, mol1 = read_molecules("conformers.xyz", frames=(0, 1))
+mol0 = Molecule.from_file("conf1.xyz")
+mol1 = Molecule.from_file("conf2.xyz")
 result = mol0.confo_rmsd(mol1, align=True, remap=True, rebond=True)
 ```
 
@@ -579,7 +563,7 @@ for i, result in enumerate(results):
 Runnable Examples
 -----------------
 
-For fully runnable examples, see the [`examples`](examples) directory. The notebook [`examples/examples.ipynb`](examples/examples.ipynb) (also on [Binder](#try-it-online)) walks through ranked cluster solutions, RMSD matrices, the effect of each option, aligned output files, mirror images, molecules built in memory, hydrogens and padding atoms, atom labels, bond types, multi-fragment complexes and conformer deduplication.
+For fully runnable examples, see the [`examples`](examples) directory. Its `clusters` and `conformers` subdirectories hold sample atom clusters (XYZ) and conformers (SDF), each structure in its own file and all together in a multi-frame `_all` file. The single-structure files can also be used as input for the command-line and demo programs, which read only the first structure of each file. The notebook [`examples/examples.ipynb`](examples/examples.ipynb) (also on [Binder](#try-it-online)) walks through ranked cluster solutions, RMSD matrices, the effect of each option, aligned output files, mirror images, molecules built in memory, hydrogens and padding atoms, atom labels, bond types, multi-fragment complexes and conformer deduplication.
 
 
 Algorithm Notes
@@ -608,7 +592,7 @@ With `-prune TOL`, two atoms are never paired if their sorted distances to the a
 
 ### Hydrogens and padding atoms
 
-With `-heavy`, the two molecules may have different numbers of hydrogens. The smaller one is padded with padding atoms appended after its real atoms, so every permutation has `max(n_atoms1, n_atoms2)` entries; indices beyond the real atoms of molecule 2 denote padding atoms. Hydrogens are not part of the RMSD and are paired afterwards with atoms of the same element: in conformsd (and in the atormsd program when the files have bonds) following the image of their bonded heavy atom first, then by distance, and finally with whatever atoms are left. `ato_rmsd` and `Molecule.ato_rmsd` pair them by distance only. With `-coords` and `-savecoords`, padding atoms are written as dummy atoms `X` placed at the origin (moved with molecule 2 when they pad it), so both structures of a record have the same number of lines; the C demo program does the same. In Python, `RMSDResult.apply_to` fills missing lines with padding atoms (`"X"`), which can be written but not compared.
+With `-heavy`, the two molecules may have different numbers of hydrogens. The smaller one is padded with padding atoms appended after its real atoms, so every permutation has `max(n_atoms1, n_atoms2)` entries; indices beyond the real atoms of molecule 2 denote padding atoms. Hydrogens are not part of the RMSD and are paired afterwards with atoms of the same element: in conformsd (and in the atormsd program when the files have bonds) following the image of their bonded heavy atom first, then by distance, and finally with whatever atoms are left. `ato_rmsd` and `Molecule.ato_rmsd` pair them by distance only. With `-coords` and `-savecoords`, padding atoms are written as dummy atoms `X` placed at the origin (moved with molecule 2 when they pad it), so both structures of a record have the same number of lines; the C demo program does the same with `-coords`. In Python, `RMSDResult.apply_to` fills missing lines with padding atoms (`"X"`), which can be written but not compared.
 
 ### Molecular fragments
 

@@ -546,7 +546,7 @@ __all__ = [
     "bond_type_label",
     "RMSDResult",
     "Molecule",
-    "read_molecules",
+    "read_frames",
 ]
 
 
@@ -914,7 +914,7 @@ def _molecule_from_frame(frame, name, bond_source):
 # Public frame reader
 # ---------------------------------------------------------------------------
 
-def read_molecules(path, frames=None):
+def read_frames(path, frames=None):
     """
     Read the frames of a file as Molecule objects: a tuple with the frames
     of the given indices, or a list of all frames if frames is None. Bonds
