@@ -48,7 +48,8 @@ subroutine optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
 ! assignment at that orientation is found and the pair is iterated
 ! (superposition, reassignment) until the assignment no longer changes.
 ! Each local minimum is recorded, and the search stops when the best one
-! has been found more than min_freq times or after max_trials trials.
+! has been found min_freq times or after max_trials trials (the same
+! stopping rules as alignment_atoms::optimize_mapping_atoms).
 !
 ! In both strategies registry holds up to size(registry%records) distinct
 ! ranked assignments (the -maxrecs option): the distinct local minima of the
@@ -92,7 +93,8 @@ subroutine optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
 
       call random_initialize()
 
-      do
+      ! Search until the best local minimum has been found min_freq times
+      do while (registry%records(1)%freq < min_freq)
 
          ! Random orientation of molecule 2
          coords2r = coords2
@@ -135,13 +137,9 @@ subroutine optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
 
          call insert_record_mapping( registry, mapping1, steps, total_rotation, 0, mapdist)
 
-         if (registry%records(1)%freq > min_freq) then
-            exit
-         end if
+         ! Stop after max_trials trials
+         if (registry%n_trials >= max_trials) exit
 
-         if (registry%n_trials > max_trials) then
-            exit
-         end if
       end do
 
    else

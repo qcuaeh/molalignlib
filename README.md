@@ -108,9 +108,10 @@ Command-line Programs
 
 Both programs share these conventions:
 
-- **Input:** XYZ, MOL, SDF and Mol2 files, selected by the lowercase file extension (`.xyz`, `.mol`, `.sdf`, `.mol2`). Only the first structure of each file is read. Dummy atoms (symbol `X`, or SYBYL type `Du`) are skipped together with their bonds.
+- **Input:** XYZ, MOL, SDF and Mol2 files, selected by the lowercase file extension (`.xyz`, `.mol`, `.sdf`, `.mol2`). Only the first structure of each file is read. Dummy atoms (symbol `X`, or SYBYL type `Du`) are skipped together with their bonds. A path that is just a format name, with no base name (`xyz`, `sdf`, ...), reads that structure from standard input instead, e.g. `atormsd xyz mol2.xyz -align -remap < mol1.xyz`.
+- **Usage:** run either program without arguments to print its usage and the list of options.
 - **Options** may appear before or after the file paths and are case-insensitive. Integer arguments must be at least 1, and option arguments may not start with `-`.
-- **Output:** one line per record with the RMSD (Å). With `-printmapping` it is followed by the atom permutation that maps file 2 onto file 1: a comma-separated list of 1-based indices, where entry *i* is the atom of file 2 placed on line *i* of file 1 (the identity without `-remap`).
+- **Output:** one line per record with the RMSD (Å, six decimal places). With `-printmapping` it is followed by the atom permutation that maps file 2 onto file 1: a comma-separated list of 1-based indices, where entry *i* is the atom of file 2 placed on line *i* of file 1 (the identity without `-remap`).
 - **Coordinates:** with `-coords FORMAT` (`xyz`, `sdf` or `mol2`), each record is instead written to stdout as a structure of molecule 2 in that format, reordered to match molecule 1 (and aligned onto it with `-align`), with `rmsd=` and the RMSD as its title. Redirect stdout to save it to a file. With `-savecoords PREFIX` as well, record *n* (counted from 1) is written instead to its own file, `PREFIX_n.FORMAT` (e.g. `pair_1.xyz`, `pair_2.xyz`, ...), holding molecule 1 followed by molecule 2, and the RMSD lines are printed to stdout as usual.
 - **Reproducibility:** results are reproducible unless `-random` is given.
 
@@ -375,7 +376,7 @@ int main(void)
 
 ### Demo program
 
-`bindings/c/atormsd_demo.c` is a C version of the [atormsd](#atormsd) program built on `ato_rmsd`. It takes the same options and prints the same output, but only reads and writes XYZ files (so `-coords` only accepts `xyz`, and `-savecoords` writes `PREFIX_n.xyz` files), and it also accepts `-help`. It shows how to pack the data read from files, size the output buffers, and apply the returned transforms. Compile and run instructions are in its header comment.
+`bindings/c/atormsd_demo.c` is a C version of the [atormsd](#atormsd) program built on `ato_rmsd`. It takes the same options and prints the same output, but only reads and writes XYZ files (so `-coords` only accepts `xyz`, `-savecoords` writes `PREFIX_n.xyz` files, and standard input is read with the path `xyz`). Since the library does not see the file's bonds, hydrogens excluded with `-heavy` are paired by distance only (see [Hydrogens and padding atoms](#hydrogens-and-padding-atoms)), which for XYZ files is what atormsd does too. It shows how to pack the data read from files, size the output buffers, and apply the returned transforms. Compile and run instructions are in its header comment.
 
 
 Python Bindings
@@ -456,7 +457,7 @@ bond_type_label(978)    # '3/2'
 bond_type_code("")      # 1446, the undefined type
 ```
 
-Bonds read from files get their labels from the bond orders reported by chemfiles: `1`–`5` for single to quintuple bonds, `ar` for aromatic, `am` for amide and `dv` for dative bonds. Bonds whose order chemfiles reports as unknown are of undefined type and cannot be used with `use_bond_type=True`.
+Bonds read from files get their labels from the bond orders reported by chemfiles: `1`–`5` for single to quintuple bonds (stereo up/down single bonds included), `ar` for aromatic, `am` for amide and `dv` for dative bonds. Bonds whose order chemfiles reports as unknown are of undefined type and cannot be used with `use_bond_type=True`.
 
 #### Properties
 
@@ -470,6 +471,10 @@ Bonds read from files get their labels from the bond orders reported by chemfile
 | **coords** | `float64 (n_atoms, 3)` coordinates in Å |
 | **bond_data** | `int32 (n_bonds, 3)` array of `[atom1, atom2, type]`, 1-based (empty when there are no bonds) |
 | **bond_source** | Where the bonds came from (file format, or `None`); informational |
+
+#### Element helpers
+
+The module also exports the element table it shares with the library: `ATOMIC_SYMBOLS` (indexed by atomic number; entry 104 is `LJ`, entry 0 is `X`, the symbol of padding atoms), `PADDING_ATOMIC_NUMBER` (0), `symbol_to_atomic_number("fe")` (26; case-insensitive, `ValueError` for unknown symbols and for `X`) and `atomic_number_to_symbol(26)` (`"Fe"`).
 
 #### Writing output
 
@@ -543,7 +548,7 @@ result = mol0.confo_rmsd(mol1, align=True, remap=True, rebond=True)
 | **max_frags** | `int` | `1` | Maximum number of molecular fragments per molecule (see [Molecular fragments](#molecular-fragments)) |
 | **max_recs** | `int` | `None` | Return up to this many ranked solutions as a list (see [RMSDResult](#rmsdresult)) |
 
-In both methods, integer parameters below 1, `prune=True` without `prune_tol`, and any error reported by the library raise `ValueError`.
+In both methods, integer parameters below 1, `prune=True` without `prune_tol`, and any error reported by the library (e.g. molecules that are not isomers, or more fragments than `max_frags`) raise `ValueError`; passing anything other than a `Molecule` raises `TypeError`.
 
 ### RMSDResult
 
@@ -574,7 +579,7 @@ for i, result in enumerate(results):
 Runnable Examples
 -----------------
 
-For fully runnable examples, see the [`examples`](examples) directory.
+For fully runnable examples, see the [`examples`](examples) directory. The notebook [`examples/examples.ipynb`](examples/examples.ipynb) (also on [Binder](#try-it-online)) walks through ranked cluster solutions, RMSD matrices, the effect of each option, aligned output files, mirror images, molecules built in memory, hydrogens and padding atoms, atom labels, bond types, multi-fragment complexes and conformer deduplication.
 
 
 Algorithm Notes
@@ -592,10 +597,10 @@ The optimal superposition for a given assignment is computed with Kearsley's qua
 
 When both alignment and remapping are requested, each assignment implies a different optimal orientation, so the tree decomposition cannot be applied directly. conformsd chooses between two strategies from the shape of the assignment tree:
 
-- **Stochastic search**, when the total number of complete assignments exceeds `confofreq` times the sum of partial combinations (highly branched trees). Random orientations are sampled, the assignment is solved for each, and the search stops once the best solution has been found more than `confofreq` times, or after `maxtrials` orientations.
+- **Stochastic search**, when the total number of complete assignments exceeds `-minfreq` (`min_freq`) times the sum of partial combinations (highly branched trees). Random orientations are sampled, the assignment is solved for each, and the search stops once the best solution has been found `-minfreq` times, or after `-maxtrials` (`max_trials`) orientations.
 - **Exhaustive enumeration**, otherwise (few, long branches). Every complete assignment is enumerated once and superposed.
 
-The default `confofreq` of 100 reproduced the reference assignments on the full CCD and BIRD benchmarks, whereas 25 produced some incorrect ones. atormsd uses a convergence threshold of 10 by default. Either strategy can be forced at compile time with the `FORCE_STOCHASTIC` and `FORCE_EXHAUSTIVE` parameters in `source/parameters.f90`.
+The default `-minfreq` of 100 reproduced the reference assignments on the full CCD and BIRD benchmarks, whereas 25 produced some incorrect ones. atormsd has no assignment tree and always uses the random search, with the same stopping rules and a default `-minfreq` of 10. Either strategy can be forced at compile time with the `FORCE_STOCHASTIC` and `FORCE_EXHAUSTIVE` parameters in `source/parameters.f90`.
 
 ### Pruning (atormsd)
 
@@ -603,7 +608,7 @@ With `-prune TOL`, two atoms are never paired if their sorted distances to the a
 
 ### Hydrogens and padding atoms
 
-With `-heavy`, the two molecules may have different numbers of hydrogens. The smaller one is padded with padding atoms appended after its real atoms, so every permutation has `max(n_atoms1, n_atoms2)` entries; indices beyond the real atoms of molecule 2 denote padding atoms. Hydrogens are not part of the RMSD and are paired afterwards with atoms of the same element: in conformsd (and in the atormsd program when the files have bonds) following the image of their bonded heavy atom first, then by distance, and finally with whatever atoms are left. `ato_rmsd` and `Molecule.ato_rmsd` pair them by distance only. In Python, `RMSDResult.apply_to` fills missing lines with padding atoms (`"X"`), which can be written but not compared.
+With `-heavy`, the two molecules may have different numbers of hydrogens. The smaller one is padded with padding atoms appended after its real atoms, so every permutation has `max(n_atoms1, n_atoms2)` entries; indices beyond the real atoms of molecule 2 denote padding atoms. Hydrogens are not part of the RMSD and are paired afterwards with atoms of the same element: in conformsd (and in the atormsd program when the files have bonds) following the image of their bonded heavy atom first, then by distance, and finally with whatever atoms are left. `ato_rmsd` and `Molecule.ato_rmsd` pair them by distance only. With `-coords` and `-savecoords`, padding atoms are written as dummy atoms `X` placed at the origin (moved with molecule 2 when they pad it), so both structures of a record have the same number of lines; the C demo program does the same. In Python, `RMSDResult.apply_to` fills missing lines with padding atoms (`"X"`), which can be written but not compared.
 
 ### Molecular fragments
 

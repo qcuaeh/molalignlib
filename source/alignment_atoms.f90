@@ -36,7 +36,8 @@ subroutine optimize_mapping_atoms(atomtypes, prunes, coords1, &
 ! Alignment of two atom clusters by random orientations followed by
 ! alternating assignment and superposition until the assignment is stable
 ! (J. Chem. Inf. Model. 2023, 63, 1157). The search stops when the best
-! local minimum has been found min_freq times or after max_trials trials.
+! local minimum has been found min_freq times or after max_trials trials
+! (the same stopping rules as alignment_conformer::optimize_mapping_conformer).
 ! coords1 and coords2 hold the included atoms only, in the numbering of
 ! atomtypes; the atom permutations stored in registry use that numbering.
    type(partition_t), intent(in) :: atomtypes
@@ -60,7 +61,8 @@ subroutine optimize_mapping_atoms(atomtypes, prunes, coords1, &
    call reset_registry( registry)
    call random_initialize()
 
-   do while (registry%records(1)%freq < min_freq .and. registry%n_trials < max_trials)
+   ! Search until the best local minimum has been found min_freq times
+   do while (registry%records(1)%freq < min_freq)
 
       ! Random orientation of molecule 2
       coords2r = coords2
@@ -90,6 +92,9 @@ subroutine optimize_mapping_atoms(atomtypes, prunes, coords1, &
       ! Record the local minimum
       mapdist = sqrt( sqdistsum( mapping1, coords1, coords2r))
       call insert_record_mapping( registry, mapping1, steps, total_rotation, 0, mapdist)
+
+      ! Stop after max_trials trials
+      if (registry%n_trials >= max_trials) exit
 
    end do
 

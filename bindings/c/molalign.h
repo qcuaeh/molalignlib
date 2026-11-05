@@ -235,7 +235,7 @@ void ato_rmsd(
  * @param random_flag   Seed the random number generator from the clock
  *                      (otherwise results are reproducible)
  * @param min_freq     Stop the random orientation search once the best
- *                      solution has been found more than this many times;
+ *                      solution has been found this many times;
  *                      also the threshold on the ratio of total to partial
  *                      assignment combinations above which that search is
  *                      used instead of exhaustive enumeration. 100 is the

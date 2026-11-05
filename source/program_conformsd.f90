@@ -86,6 +86,13 @@ max_trials = MAX_TRIALS_DEFAULT
 max_frags = MAX_FRAGS_DEFAULT
 bond_tol = BOND_TOL_DEFAULT
 
+! Print the usage when no arguments are given
+
+if (command_argument_count() == 0) then
+   call print_usage()
+   stop
+end if
+
 ! Read command line options
 
 call init_args()
@@ -111,13 +118,13 @@ do while (get_arg(arg))
    case ('-mirror')
       mirror_flag = .TRUE.
    case ('-minfreq')
-      call read_optarg( arg, min_freq, 1_IK)
+      call read_optarg( arg, min_freq, 1)
    case ('-maxtrials')
-      call read_optarg( arg, max_trials, 1_IK)
+      call read_optarg( arg, max_trials, 1)
    case ('-maxfrags')
-      call read_optarg( arg, max_frags, 1_IK)
+      call read_optarg( arg, max_frags, 1)
    case ('-maxrecs')
-      call read_optarg( arg, max_recs, 1_IK)
+      call read_optarg( arg, max_recs, 1)
    case ('-coords')
       coords_flag = .TRUE.
       call read_optarg( arg, out_format)
@@ -345,7 +352,7 @@ if (remap_flag) then
       call complete_mapping( atomset1, atomset2, mapping1, atoms1, atoms2, &
             n_atoms1, n_atoms2, bonds1, bonds2, full_coords1, full_coords2r, full_mapping1)
 
-      call report_result( 1_IK)
+      call report_result( 1)
 
    end if
 
@@ -385,11 +392,49 @@ else
 
    rmsd = sqrt( sqdistmean( mapping1, weights1, coords1, coords2r))
 
-   call report_result( 1_IK)
+   call report_result( 1)
 
 end if
 
 contains
+
+subroutine print_usage()
+   character(4) :: bond_tol_str
+
+   write (bond_tol_str, '(F4.2)') BOND_TOL_DEFAULT
+   write (stderr, '(A)') 'Usage: conformsd file1 file2 [options]'
+   write (stderr, '(A)') ''
+   write (stderr, '(A)') 'Calculate the symmetry-corrected RMSD between two molecular conformers.'
+   write (stderr, '(A)') ''
+   write (stderr, '(A)') 'Files are read by extension (.xyz, .mol, .sdf or .mol2); a path that is'
+   write (stderr, '(A)') 'just a format name (e.g. sdf) reads standard input. XYZ files have no'
+   write (stderr, '(A)') 'bonds, so use -rebond with them.'
+   write (stderr, '(A)') ''
+   write (stderr, '(A)') 'Options:'
+   call print_option('-align', 'Align atoms to minimise the RMSD')
+   call print_option('-remap', 'Remap atoms to minimise the RMSD')
+   call print_option('-rebond', 'Derive connectivity from interatomic distances')
+   call print_option('-bondtol TOL', 'Bond-detection tolerance of -rebond in Angstrom (default: ' &
+         // bond_tol_str // ')')
+   call print_option('-usebondtype', 'Also match bond types (no effect with -rebond)')
+   call print_option('-useatomtype', 'Only match atoms with the same label (e.g. C1, C2)')
+   call print_option('-heavy', 'Ignore hydrogen atoms')
+   call print_option('-massweight', 'Use mass-weighted coordinates')
+   call print_option('-mirror', 'Reflect molecule 2 (x -> -x) before comparison')
+   call print_option('-minfreq N', 'Convergence threshold of the stochastic search (default: ' &
+         // str(CONFO_FREQ_DEFAULT) // ')')
+   call print_option('-maxtrials N', 'Stop after at most N random orientations (default: ' &
+         // str(MAX_TRIALS_DEFAULT) // ')')
+   call print_option('-maxfrags N', 'Maximum number of molecular fragments per molecule (default: ' &
+         // str(MAX_FRAGS_DEFAULT) // ')')
+   call print_option('-maxrecs N', 'Record the N lowest RMSDs found (default: 1)')
+   call print_option('-coords FORMAT', 'Write the coordinates of molecule 2 to stdout in FORMAT (xyz, sdf or mol2)')
+   call print_option('-savecoords PREFIX', 'Write each molecule 1/molecule 2 pair to PREFIX_<n>.FORMAT (needs -coords)')
+   call print_option('-printmapping', 'Print the 1-based atom permutation after each RMSD')
+   call print_option('-printassigntree', 'Print the assignment tree and its combination counts (needs -remap)')
+   call print_option('-printstats', 'Print optimisation statistics (needs -align -remap)')
+   call print_option('-random', 'Seed the random-number generator from the system clock')
+end subroutine
 
 subroutine report_result(irec)
 ! Report result number irec. Without -coords, print the RMSD (and the atom mapping with -printmapping).
@@ -423,6 +468,16 @@ subroutine report_result(irec)
       end if
       write (stdout,*)
    end if
+end subroutine
+
+subroutine print_option(head, desc)
+! One line of the option list: the option and its argument, then the
+! description.
+   character(*), intent(in) :: head, desc
+   character(18) :: column
+
+   column = head
+   write (stderr, '(2X,A,1X,A)') column, desc
 end subroutine
 
 end program

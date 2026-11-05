@@ -424,7 +424,7 @@ def _confo_rmsd(
         Print the assignment tree and its combination counts to stdout.
     min_freq : int, default 100
         Stop the random orientation search once the best solution has been
-        found more than this many times; also the threshold on the ratio of
+        found this many times; also the threshold on the ratio of
         total to partial assignment combinations above which that search is
         used instead of exhaustive enumeration. Must be >= 1.
     max_trials : int, default 10000
@@ -883,12 +883,11 @@ def _build_frame(coords, symbols, comment=None, bond_data=None):
             # bond_data atom indices are 1-based; chemfiles is 0-based.
             frame.add_bond(int(row[0]) - 1, int(row[1]) - 1)
 
+    # chemfiles frames have no comment attribute (they reject new
+    # attributes with TypeError): the title is the "name" property, which
+    # chemfiles writes as the title line of formats that have one
     if comment:
-        try:
-            frame.comment = comment
-        except AttributeError:
-            # Some chemfiles versions/formats don't expose a settable comment.
-            pass
+        frame["name"] = str(comment)
 
     return frame
 
@@ -1091,6 +1090,9 @@ class Molecule(object):
         Write this molecule, with its bond connectivity, using chemfiles.
         The format is inferred from the file extension (e.g. .xyz, .sdf,
         .mol2, .pdb), as when reading. Bond types are not written.
+        comment, if given, is stored as the "name" property of the
+        chemfiles frame, which chemfiles writes as the title of formats
+        that have one (e.g. the first line of an SDF or MOL2 record).
         """
         frame = _build_frame(
             self._coords, self._symbols, comment=comment,
@@ -1243,7 +1245,7 @@ class Molecule(object):
         tree: random orientations when the total number of assignments
         exceeds min_freq times the sum of partial combinations, exhaustive
         enumeration otherwise. The random search stops once the best
-        solution has been found more than min_freq times, or after
+        solution has been found min_freq times, or after
         max_trials orientations. min_freq, max_trials and max_recs must
         be >= 1. The default min_freq=100 is the value
         validated on the CCD and BIRD benchmarks. random=True seeds the

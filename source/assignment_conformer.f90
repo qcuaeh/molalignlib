@@ -515,7 +515,7 @@ recursive subroutine recur_assign_atoms_global(coords1, coords2, cache_arrays, &
 
       call get_mapping(this_map, mapping1)
       call insert_record_mapping(registry, mapping1, 1.0_RK, &
-            [1.0_RK, 0.0_RK, 0.0_RK, 0.0_RK], 0_IK, total_dist)
+            [1.0_RK, 0.0_RK, 0.0_RK, 0.0_RK], 0, total_dist)
       return
    end if
 

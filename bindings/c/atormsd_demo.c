@@ -18,7 +18,7 @@
  * Run:
  *   ./atormsd_demo file1.xyz file2.xyz [options]
  *
- * Pass -help for the full list of options.
+ * Run it without arguments for the full list of options.
  *
  * Output (as in atormsd): one line per record with the RMSD and, with
  * -printmapping, the 1-based atom permutation as a comma-separated list. With
@@ -30,10 +30,11 @@
  * usual.
  *
  * Dummy atoms (symbol "X") are skipped when reading, as atormsd does: the
- * library has no dummy element.
+ * library has no dummy element. As in atormsd, a file path given as just
+ * the format name, "xyz", reads standard input instead of a file, e.g.
+ *   ./atormsd_demo xyz file2.xyz -align -remap < file1.xyz
  *
- * Differences from atormsd: only XYZ files are read and written, and -help
- * is an extra option.
+ * Differences from atormsd: only XYZ files are read and written.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -235,15 +236,26 @@ static int parse_label(const char *label, int *elnum, int *group, bool *is_dummy
 
 /* Format of a path, taken from its extension as atormsd does: the text
  * after the last '.' of the file name. A file name without a '.' has no
- * base name (e.g. "xyz") and the whole name is the format. */
+ * base name, and the whole name is the format (e.g. "xyz"): atormsd then
+ * reads standard input. Returns NULL, after printing a message, for a path
+ * that ends in '/' or a file name with an empty base name or extension
+ * (e.g. ".xyz" or "mol."), which atormsd rejects. */
 static const char *path_format(const char *path, bool *has_basename)
 {
     const char *filename = strrchr(path, '/');
     const char *dot;
 
     filename = filename ? filename + 1 : path;
+    if (*filename == '\0') {
+        fprintf(stderr, "Invalid path\n");
+        return NULL;
+    }
     dot = strrchr(filename, '.');
     *has_basename = (dot != NULL);
+    if (dot && (dot == filename || dot[1] == '\0')) {
+        fprintf(stderr, "Invalid file name %s\n", filename);
+        return NULL;
+    }
     return dot ? dot + 1 : filename;
 }
 
@@ -255,7 +267,8 @@ static const char *path_format(const char *path, bool *has_basename)
  * coords_out receives a heap-allocated array of length n_atoms*3.
  * The caller is responsible for freeing both arrays. If title_out is not
  * NULL it receives the title line (at most 255 characters, without the
- * line break).
+ * line break). As in atormsd, a path that is just a format name (no base
+ * name, e.g. "xyz") reads standard input.
  *
  * Returns 0 on success, non-zero on error (message written to stderr). */
 static int read_xyz(const char *path,
@@ -272,14 +285,19 @@ static int read_xyz(const char *path,
     double *coords = NULL;
 
     const char *in_format = path_format(path, &has_basename);
-    if (!has_basename || strcmp(in_format, "xyz") != 0) {
+    if (!in_format) return 1;
+    if (strcmp(in_format, "xyz") != 0) {
         fprintf(stderr, "File format \"%s\" is not supported (this demo only reads .xyz files)\n",
                 in_format);
         return 1;
     }
 
-    fp = fopen(path, "r");
-    if (!fp) { fprintf(stderr, "Error opening %s for reading\n", path); return 1; }
+    if (has_basename) {
+        fp = fopen(path, "r");
+        if (!fp) { fprintf(stderr, "Error opening %s for reading\n", path); return 1; }
+    } else {
+        fp = stdin;
+    }
 
     if (fscanf(fp, " %d", &n_atoms) != 1) {
         fprintf(stderr, "Invalid XYZ format in %s\n", path);
@@ -324,7 +342,7 @@ static int read_xyz(const char *path,
         goto fail;
     }
 
-    fclose(fp);
+    if (fp != stdin) fclose(fp);
     *n_atoms_out   = n_real;
     *atom_data_out = atom_data;
     *coords_out    = coords;
@@ -333,7 +351,7 @@ static int read_xyz(const char *path,
 fail:
     free(atom_data);
     free(coords);
-    fclose(fp);
+    if (fp != stdin) fclose(fp);
     return 1;
 }
 
@@ -363,7 +381,7 @@ static void write_xyz_frame(FILE *fp, const char *title, int n_padding,
                              + transform[k*4+2]*p[2] + transform[k*4+3]
                              : p[k];
 
-        fprintf(fp, "%-2s  %12.6f  %12.6f  %12.6f\n", atomic_symbols[elnum], q[0], q[1], q[2]);
+        fprintf(fp, "%-3s  %12.6f  %12.6f  %12.6f\n", atomic_symbols[elnum], q[0], q[1], q[2]);
     }
 }
 
@@ -373,11 +391,11 @@ static void write_xyz_frame(FILE *fp, const char *title, int n_padding,
 enum {
     OPT_ALIGN = 1, OPT_REMAP, OPT_PRUNE, OPT_USEATOMTYPE,
     OPT_HEAVY, OPT_MASSWEIGHT, OPT_MIRROR, OPT_MINFREQ,
-    OPT_MAXTRIALS, OPT_MAXRECS, OPT_COORDS, OPT_SAVEAS, OPT_PRINTMAPPING,
-    OPT_PRINTSTATS, OPT_RANDOM, OPT_HELP
+    OPT_MAXTRIALS, OPT_MAXRECS, OPT_COORDS, OPT_SAVECOORDS, OPT_PRINTMAPPING,
+    OPT_PRINTSTATS, OPT_RANDOM
 };
 
-/* Same options, in the same order, as the atormsd program, plus -help */
+/* Same options, in the same order, as the atormsd program */
 static const long_opt_t long_options[] = {
     {"align",        0, OPT_ALIGN},
     {"remap",        0, OPT_REMAP},
@@ -390,12 +408,11 @@ static const long_opt_t long_options[] = {
     {"maxtrials",    1, OPT_MAXTRIALS},
     {"maxrecs",      1, OPT_MAXRECS},
     {"coords",       1, OPT_COORDS},
-    {"saveas",       1, OPT_SAVEAS},
+    {"savecoords",   1, OPT_SAVECOORDS},
     {"printmapping", 0, OPT_PRINTMAPPING},
     {"printstats",   0, OPT_PRINTSTATS},
     {"random",       0, OPT_RANDOM},
-    {"help",         0, OPT_HELP},
-    {NULL, 0, 0}     
+    {NULL, 0, 0}
 };
 
 static const opt_info_t opt_info[] = {
@@ -410,20 +427,19 @@ static const opt_info_t opt_info[] = {
     [OPT_MAXTRIALS]    = {"Stop after at most N random orientations (default: 10000)",       "N"   },
     [OPT_MAXRECS]      = {"Record the N lowest RMSDs found (default: 1)",                    "N"   },
     [OPT_COORDS]       = {"Write the coordinates of cluster 2 to stdout in FORMAT (xyz)",   "FORMAT"},
-    [OPT_SAVEAS]       = {"Write each cluster 1/cluster 2 pair to PREFIX_<n>.xyz (needs -coords)", "PREFIX"},
+    [OPT_SAVECOORDS]   = {"Write each cluster 1/cluster 2 pair to PREFIX_<n>.xyz (needs -coords)", "PREFIX"},
     [OPT_PRINTMAPPING] = {"Print the 1-based atom permutation after each RMSD",              NULL  },
     [OPT_PRINTSTATS]   = {"Print optimisation statistics (needs -align -remap)",             NULL  },
     [OPT_RANDOM]       = {"Seed the random-number generator from the system clock",          NULL  },
-    [OPT_HELP]         = {"Show this help message",                                          NULL  },
-};                     
+};
 
 static void print_usage(const char *prog)
 {
     fprintf(stderr, "Usage: %s file1.xyz file2.xyz [options]\n\n"
                     "Calculate the RMSD between two atom clusters (XYZ format).\n\n"
+                    "A path that is just the format name, xyz, reads standard input.\n\n"
                     "Options:\n", prog);
     print_options(long_options, opt_info);
-    fputc('\n', stderr);
 }
 
 int main(int argc, char **argv)
@@ -440,6 +456,12 @@ int main(int argc, char **argv)
     int min_freq = 10, max_trials = 10000;
     int max_recs = 1;
     int argi = 1, opt;
+
+    /* Print the usage when no arguments are given, as atormsd does */
+    if (argc < 2) {
+        print_usage(argv[0]);
+        return 0;
+    }
 
     /* Positional arguments (the two file paths) */
     const char *posargs[2] = {NULL, NULL};
@@ -476,15 +498,14 @@ int main(int argc, char **argv)
             }
             coords_flag = true;
             break;
-        case OPT_SAVEAS:
+        case OPT_SAVECOORDS:
             savecoords_flag = true;
             pairs_prefix = arg;
             break;
         case OPT_PRINTMAPPING: printmapping_flag = true; break;
         case OPT_PRINTSTATS: printstats_flag      = true; break;
         case OPT_RANDOM:     random_flag     = true; break;
-        case OPT_HELP:       print_usage(argv[0]); return 0;
-        default:             print_usage(argv[0]); return 1;
+        default:             return 1;   /* message already printed */
         }
     }
 
@@ -495,10 +516,10 @@ int main(int argc, char **argv)
     }
 
     switch (npos) {
-    case 0:  fprintf(stderr, "File paths are missing\n"); print_usage(argv[0]); return 1;
-    case 1:  fprintf(stderr, "Too few file paths\n");     print_usage(argv[0]); return 1;
+    case 0:  fprintf(stderr, "File paths are missing\n"); return 1;
+    case 1:  fprintf(stderr, "Too few file paths\n");     return 1;
     case 2:  break;
-    default: fprintf(stderr, "Too many file paths\n");    print_usage(argv[0]); return 1;
+    default: fprintf(stderr, "Too many file paths\n");    return 1;
     }
 
     /* Everything below is released at `done`; free(NULL) is a no-op, so
