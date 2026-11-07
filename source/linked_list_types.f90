@@ -48,6 +48,8 @@ public link_to_partition
 public find_child_part
 public add_branch_part
 public delete_chain
+public delete_chain_tree
+public delete_link
 public delete_part
 public delete_part_tree
 public print_part_tree
@@ -460,6 +462,46 @@ subroutine delete_chain(root_chain)
    root_chain => null()
 end subroutine
 
+subroutine delete_chain_tree(root_chain)
+! Delete a whole chain tree (an assignment tree, or a single chain such as
+! hna_chain): every chain node, its links and the counters shared by the
+! tree, which new_root_chain allocates. The referenced parts are preserved.
+! Does nothing if root_chain is not associated.
+   type(chaintree_node_t), pointer, intent(inout) :: root_chain
+
+   if (.not. associated(root_chain)) return
+
+   call delete_chain_children(root_chain)
+
+   if (associated(root_chain%n_atoms1)) deallocate(root_chain%n_atoms1)
+   if (associated(root_chain%n_atoms2)) deallocate(root_chain%n_atoms2)
+   if (associated(root_chain%total_chains)) deallocate(root_chain%total_chains)
+   if (associated(root_chain%total_links)) deallocate(root_chain%total_links)
+   if (associated(root_chain%total_partrefs)) deallocate(root_chain%total_partrefs)
+
+   call delete_chain(root_chain)
+end subroutine
+
+recursive subroutine delete_chain_children(parent_chain)
+! Delete all descendants of a chain node (not the shared counters)
+   type(chaintree_node_t), pointer, intent(in) :: parent_chain
+   type(chaintree_node_t), pointer :: child_chain, next_child
+
+   if (.not. associated(parent_chain)) error stop
+
+   child_chain => parent_chain%first_child_chain
+   do while (associated(child_chain))
+      next_child => child_chain%next_sibling_chain
+      call delete_chain_children(child_chain)
+      call delete_chain(child_chain)
+      child_chain => next_child
+   end do
+
+   parent_chain%first_child_chain => null()
+   parent_chain%last_child_chain => null()
+   parent_chain%n_children = 0
+end subroutine
+
 subroutine delete_link(link)
 ! Delete a link and its part references, but not the parts
    type(chain_node_t), pointer, intent(inout) :: link
@@ -474,8 +516,9 @@ subroutine delete_link(link)
       partref => nextref
    end do
 
-   deallocate(link%itemdir1)
-   deallocate(link%itemdir2)
+   ! Bare links (candidate lists) have no vertex directory
+   if (associated(link%itemdir1)) deallocate(link%itemdir1)
+   if (associated(link%itemdir2)) deallocate(link%itemdir2)
    deallocate(link)
    link => null()
 end subroutine
@@ -675,6 +718,8 @@ function new_bare_link() result(link)
    link%first_partref => null()
    link%last_partref => null()
    link%next_link => null()
+   link%itemdir1 => null()
+   link%itemdir2 => null()
 end function
 
 function new_chain_link(chain) result(link)
@@ -749,13 +794,15 @@ subroutine print_part_tree(partition_tree)
    deallocate(is_last_child)
 end subroutine
 
-function chain_from_partition(partition) result(chain)
+function chain_from_partition(partition, partition_tree) result(chain)
 ! Chain whose first link holds the parts of partition (typically the atom
-! types), as children of a new part tree, with a complete vertex directory
+! types), as children of a new part tree, with a complete vertex directory.
+! partition_tree returns the root of that part tree: the caller owns it
+! and must delete it with delete_part_tree, after the chain.
    type(partition_t), intent(in) :: partition
+   type(partition_node_t), pointer, intent(out) :: partition_tree
    ! Local variables
    type(chaintree_node_t), pointer :: chain
-   type(partition_node_t), pointer :: partition_tree
    type(chain_node_t), pointer :: first_link
    type(partition_node_t), pointer :: new_part
    integer(IK) :: i, j

@@ -71,14 +71,19 @@ subroutine optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
    real(RK), dimension(4) :: rotation, total_rotation
    real(RK) :: steps, mapdist, new_mapdist
    type(chaintree_node_t), pointer :: hna_chain
+   type(partition_node_t), pointer :: hna_tree
    type(array_trees_t) :: cache_arrays
 
    allocate (coords2r(size(coords2, 1), size(coords2, 2)))
 
-   ! Self-consistent HNA partition and assignment tree
-   call compute_sc_hna_chain( adjcs1, adjcs2, atomtypes, hna_chain, error_code)
-   if (error_code /= MOLALIGN_SUCCESS) return
-   call build_assignment_tree( adjcs1, adjcs2, hna_chain%last_link, cache_arrays, error_code)
+   ! Self-consistent HNA partition and assignment tree. The searches only
+   ! use cache_arrays, so the linked lists are freed as soon as it is built
+   ! (and on error).
+   call compute_sc_hna_chain( adjcs1, adjcs2, atomtypes, hna_chain, hna_tree, error_code)
+   if (error_code == MOLALIGN_SUCCESS) then
+      call build_assignment_tree( adjcs1, adjcs2, hna_chain%last_link, cache_arrays, error_code)
+   end if
+   call delete_hna_chain( hna_chain, hna_tree)
    if (error_code /= MOLALIGN_SUCCESS) return
 
    if (printassigntree_flag) then
@@ -172,13 +177,18 @@ subroutine assign_mapping_conformer( adjcs1, adjcs2, atomtypes, coords1, coords2
 
    ! Local variables
    type(chaintree_node_t), pointer :: hna_chain
+   type(partition_node_t), pointer :: hna_tree
    type(array_trees_t) :: cache_arrays
    real(RK) :: mapdist
 
-   ! Self-consistent HNA partition and assignment tree
-   call compute_sc_hna_chain( adjcs1, adjcs2, atomtypes, hna_chain, error_code)
-   if (error_code /= MOLALIGN_SUCCESS) return
-   call build_assignment_tree( adjcs1, adjcs2, hna_chain%last_link, cache_arrays, error_code)
+   ! Self-consistent HNA partition and assignment tree. The searches only
+   ! use cache_arrays, so the linked lists are freed as soon as it is built
+   ! (and on error).
+   call compute_sc_hna_chain( adjcs1, adjcs2, atomtypes, hna_chain, hna_tree, error_code)
+   if (error_code == MOLALIGN_SUCCESS) then
+      call build_assignment_tree( adjcs1, adjcs2, hna_chain%last_link, cache_arrays, error_code)
+   end if
+   call delete_hna_chain( hna_chain, hna_tree)
    if (error_code /= MOLALIGN_SUCCESS) return
 
    if (printassigntree_flag) then

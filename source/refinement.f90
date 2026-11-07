@@ -42,6 +42,7 @@ public refine_hna_part
 public refine_hna_partition
 public compute_sc_hna_chain
 public build_assignment_tree
+public delete_hna_chain
 
 contains
 
@@ -151,21 +152,26 @@ subroutine refine_hna_partition(adjcs1, adjcs2, hna_chain, n_splits)
    end do
 end subroutine
 
-subroutine compute_sc_hna_chain(adjcs1, adjcs2, atomtypes, hna_chain, error_code)
+subroutine compute_sc_hna_chain(adjcs1, adjcs2, atomtypes, hna_chain, hna_tree, error_code)
 ! Self-consistent HNA partition of both molecules: starting from the atom
 ! types, refine until no part splits. The result is the last link of
 ! hna_chain. Fails with MOLALIGN_ERROR_NOT_CONFORMERS when a part holds
 ! different numbers of atoms of each molecule (non-isomorphic graphs).
+!
+! hna_chain and hna_tree (the part tree its links refer to) are returned
+! on success and on error; the caller owns both and must free them with
+! delete_hna_chain.
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(partition_t), intent(in) :: atomtypes
    type(chaintree_node_t), pointer, intent(out) :: hna_chain
+   type(partition_node_t), pointer, intent(out) :: hna_tree
    integer(IK), intent(out) :: error_code
    ! Local variables
    integer(IK) :: n_splits
 
    error_code = MOLALIGN_SUCCESS
 
-   hna_chain => chain_from_partition( atomtypes)
+   hna_chain => chain_from_partition( atomtypes, hna_tree)
 
    do
       call refine_hna_partition(adjcs1, adjcs2, hna_chain, n_splits)
@@ -176,6 +182,17 @@ subroutine compute_sc_hna_chain(adjcs1, adjcs2, atomtypes, hna_chain, error_code
       error_code = MOLALIGN_ERROR_NOT_CONFORMERS
       return
    end if
+end subroutine
+
+subroutine delete_hna_chain(hna_chain, hna_tree)
+! Free what compute_sc_hna_chain returns: the chain first (its links refer
+! to the parts), then the part tree. Either may be unassociated.
+   type(chaintree_node_t), pointer, intent(inout) :: hna_chain
+   type(partition_node_t), pointer, intent(inout) :: hna_tree
+
+   call delete_chain_tree(hna_chain)
+   if (associated(hna_tree)) call delete_part_tree(hna_tree)
+   hna_tree => null()
 end subroutine
 
 subroutine update_hna_part(adjcs1, adjcs2, itemdir1, itemdir2, part, link)
@@ -615,11 +632,15 @@ recursive subroutine split_independent_parts(adjcs1, adjcs2, hna_chain, branch, 
    do while (associated(partref))
       if (partref%part%n_children == 0) then
          new_branch => branch
+         ! Candidate list for this subtree only: freed once it is processed
          new_branch_parts => new_bare_link()
          call split_dependent_parts(adjcs1, adjcs2, hna_chain, new_branch, new_branch_parts, &
                partref%part, partref%part, error_code)
-         if (error_code /= MOLALIGN_SUCCESS) return
-         call split_independent_parts(adjcs1, adjcs2, hna_chain, new_branch, new_branch_parts, error_code)
+         if (error_code == MOLALIGN_SUCCESS) then
+            call split_independent_parts(adjcs1, adjcs2, hna_chain, new_branch, new_branch_parts, &
+                  error_code)
+         end if
+         call delete_link(new_branch_parts)
          if (error_code /= MOLALIGN_SUCCESS) return
       end if
       partref => partref%nextref
@@ -664,12 +685,21 @@ subroutine build_assignment_tree( adjcs1, adjcs2, hna_link, cache_arrays, error_
    end do
 
    call split_independent_parts( adjcs1, adjcs2, hna_chain, assignment_tree, branch_parts, error_code)
-   if (error_code /= MOLALIGN_SUCCESS) return
 
-   ! Array representation for the searches
-   call cache_partition_tree( partition_tree, cache_arrays)
-   call cache_assignment_tree( assignment_tree, cache_arrays)
-   call cache_adjacency_lists( adjcs1, adjcs2, cache_arrays)
+   if (error_code == MOLALIGN_SUCCESS) then
+      ! Array representation for the searches
+      call cache_partition_tree( partition_tree, cache_arrays)
+      call cache_assignment_tree( assignment_tree, cache_arrays)
+      call cache_adjacency_lists( adjcs1, adjcs2, cache_arrays)
+   end if
+
+   ! The searches only use cache_arrays: free the linked lists, on success
+   ! and on error. Chains and candidate lists refer to the parts, so they
+   ! go first and the part tree last.
+   call delete_link( branch_parts)
+   call delete_chain_tree( hna_chain)
+   call delete_chain_tree( assignment_tree)
+   call delete_part_tree( partition_tree)
 end subroutine
 
 end module
