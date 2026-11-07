@@ -5,14 +5,37 @@
 MolAlignLib
 ===========
 
-A high-performance library to compute symmetry-corrected RMSD between conformational isomers.
+<p align="center">
+  <a href="https://github.com/qcuaeh/molalignlib/tree/2.x"><img src="https://img.shields.io/badge/You%20are%20reading-2.x%20(current)-brightgreen?style=for-the-badge&logo=github" alt="2.x branch (current)"></a>
+  &nbsp;
+  <a href="https://github.com/qcuaeh/molalignlib/tree/1.x"><img src="https://img.shields.io/badge/Looking%20for-1.x%20(original)-lightgrey?style=for-the-badge&logo=github" alt="1.x branch (original)"></a>
+</p>
 
-MolAlignLib uses the Hierarchical Neighborhood of Atoms (HNA) partitioning to find topologically valid atom assignments between conformers in milliseconds, even for highly symmetric molecules that are intractable by conventional graph-isomorphism approaches.
+A high-performance library to compute the minimum RMSD between two structures of the same atoms, finding the optimal atom matching and superposition at the same time.
 
-### Try It Online
+MolAlignLib compares structures in two ways:
 
-You can try MolAlignLib right away on Binder:
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qcuaeh/molalignlib.git/devel?urlpath=%2Fdoc%2Ftree%2Fexamples%2Fexamples.ipynb)
+- **Molecular conformers** (`conformsd`). The bond graph is partitioned into a Hierarchical Neighborhood of Atoms (HNA), which restricts the search to topologically valid atom assignments. This gives the exact symmetry-corrected RMSD in milliseconds, even for highly symmetric molecules that are intractable by conventional graph-isomorphism approaches ([Vásquez-Pérez, 2026](https://doi.org/10.1021/acs.jctc.6c00545)).
+- **Atom clusters** (`atormsd`). Without bond information, atoms are matched by element and position, using random orientations refined by alternating atom assignment and superposition. This suits metal clusters, nanoparticles and other systems where connectivity is absent or irrelevant ([Vásquez-Pérez et al., 2023](https://doi.org/10.1021/acs.jcim.2c01187)).
+
+Both methods are available as command-line programs, as C functions in a static library, and from Python. You can try the Python examples right away on Binder:
+
+<p align="center">
+  <a href="https://mybinder.org/v2/gh/qcuaeh/molalignlib.git/2.x?urlpath=%2Fdoc%2Ftree%2Fexamples%2Fexamples.ipynb"><img src="https://img.shields.io/badge/Try%20MolAlignLib-on%20Binder-579ACA?style=for-the-badge&logo=data%3Aimage%2Fpng%3Bbase64%2CiVBORw0KGgoAAAANSUhEUgAAAFkAAABZCAMAAABi1XidAAAB8lBMVEX%2F%2F%2F9XmsrmZYH1olJXmsr1olJXmsrmZYH1olJXmsr1olJXmsrmZYH1olL1olJXmsr1olJXmsrmZYH1olL1olJXmsrmZYH1olJXmsr1olL1olJXmsrmZYH1olL1olJXmsrmZYH1olL1olL0nFf1olJXmsrmZYH1olJXmsq8dZb1olJXmsrmZYH1olJXmspXmspXmsr1olL1olJXmsrmZYH1olJXmsr1olL1olJXmsrmZYH1olL1olLeaIVXmsrmZYH1olL1olL1olJXmsrmZYH1olLna31Xmsr1olJXmsr1olJXmsrmZYH1olLqoVr1olJXmsr1olJXmsrmZYH1olL1olKkfaPobXvviGabgadXmsqThKuofKHmZ4Dobnr1olJXmsr1olJXmspXmsr1olJXmsrfZ4TuhWn1olL1olJXmsqBi7X1olJXmspZmslbmMhbmsdemsVfl8ZgmsNim8Jpk8F0m7R4m7F5nLB6jbh7jbiDirOEibOGnKaMhq%2BPnaCVg6qWg6qegKaff6WhnpKofKGtnomxeZy3noG6dZi%2Bn3vCcpPDcpPGn3bLb4%2FMb47UbIrVa4rYoGjdaIbeaIXhoWHmZYHobXvpcHjqdHXreHLroVrsfG%2FuhGnuh2bwj2Hxk17yl1vzmljzm1j0nlX1olL3AJXWAAAAbXRSTlMAEBAQHx8gICAuLjAwMDw9PUBAQEpQUFBXV1hgYGBkcHBwcXl8gICAgoiIkJCQlJicnJ2goKCmqK%2BwsLC4usDAwMjP0NDQ1NbW3Nzg4ODi5%2B3v8PDw8%2FT09PX29vb39%2Ff5%2Bfr7%2B%2Fz8%2FPz9%2Fv7%2BzczCxgAABC5JREFUeAHN1ul3k0UUBvCb1CTVpmpaitAGSLSpSuKCLWpbTKNJFGlcSMAFF63iUmRccNG6gLbuxkXU66JAUef%2F9LSpmXnyLr3T5AO%2Frzl5zj137p136BISy44fKJXuGN%2Fd19PUfYeO67Znqtf2KH33Id1psXoFdW30sPZ1sMvs2D060AHqws4FHeJojLZqnw53cmfvg%2BXR8mC0OEjuxrXEkX5ydeVJLVIlV0e10PXk5k7dYeHu7Cj1j%2B49uKg7uLU61tGLw1lq27ugQYlclHC4bgv7VQ%2BTAyj5Zc%2FUjsPvs1sd5cWryWObtvWT2EPa4rtnWW3JkpjggEpbOsPr7F7EyNewtpBIslA7p43HCsnwooXTEc3UmPmCNn5lrqTJxy6nRmcavGZVt%2F3Da2pD5NHvsOHJCrdc1G2r3DITpU7yic7w%2F7Rxnjc0kt5GC4djiv2Sz3Fb2iEZg41%2FddsFDoyuYrIkmFehz0HR2thPgQqMyQYb2OtB0WxsZ3BeG3%2BwpRb1vzl2UYBog8FfGhttFKjtAclnZYrRo9ryG9uG%2FFZQU4AEg8ZE9LjGMzTmqKXPLnlWVnIlQQTvxJf8ip7VgjZjyVPrjw1te5otM7RmP7xm%2BsK2Gv9I8Gi%2B%2BBRbEkR9EBw8zRUcKxwp73xkaLiqQb%2BkGduJTNHG72zcW9LoJgqQxpP3%2FTj%2F%2Fc3yB0tqzaml05%2F%2BorHLksVO%2B95kX7%2F7qgJvnjlrfr2Ggsyx0eoy9uPzN5SPd86aXggOsEKW2Prz7du3VID3%2Ftzs%2FsSRs2w7ovVHKtjrX2pd7ZMlTxAYfBAL9jiDwfLkq55Tm7ifhMlTGPyCAs7RFRhn47JnlcB9RM5T97ASuZXIcVNuUDIndpDbdsfrqsOppeXl5Y%2BXVKdjFCTh%2BzGaVuj0d9zy05PPK3QzBamxdwtTCrzyg%2F2Rvf2EstUjordGwa%2Fkx9mSJLr8mLLtCW8HHGJc2R5hS219IiF6PnTusOqcMl57gm0Z8kanKMAQg0qSyuZfn7zItsbGyO9QlnxY0eCuD1XL2ys%2FMsrQhltE7Ug0uFOzufJFE2PxBo%2FYAx8XPPdDwWN0MrDRYIZF0mSMKCNHgaIVFoBbNoLJ7tEQDKxGF0kcLQimojCZopv0OkNOyWCCg9XMVAi7ARJzQdM2QUh0gmBozjc3Skg6dSBRqDGYSUOu66Zg%2BI2fNZs%2FM3%2Ff%2FGrl%2FXnyF1Gw3VKCez0PN5IUfFLqvgUN4C0qNqYs5YhPL%2BaVZYDE4IpUk57oSFnJm4FyCqqOE0jhY2SMyLFoo56zyo6becOS5UVDdj7Vih0zp%2BtcMhwRpBeLyqtIjlJKAIZSbI8SGSF3k0pA3mR5tHuwPFoa7N7reoq2bqCsAk1HqCu5uvI1n6JuRXI%2BS1Mco54YmYTwcn6Aeic%2BkssXi8XpXC4V3t7%2FADuTNKaQJdScAAAAAElFTkSuQmCC" alt="Launch on Binder"></a>
+</p>
+
+> [!IMPORTANT]
+> **This branch is a complete rewrite of the [1.x branch](https://github.com/qcuaeh/molalignlib/tree/1.x) and is not compatible with it:**
+>
+> The 1.x branch is still the repository's default, so a plain `git clone` or `pip install git+https://github.com/qcuaeh/molalignlib.git` gets 1.x. The command-line options, the bindings and the Python API have all changed, so scripts and code written for 1.x must be adapted. Both versions install a Python module named `molalignlib`, so installing one replaces the other.
+>
+> |  | 1.x | 2.x |
+> |--|-----|-----|
+> | Methods | Near-congruence algorithm for rigid molecules and clusters (2023) | The 2023 algorithm (`atormsd`) plus HNA partitioning for conformers (2026, `conformsd`) |
+> | Programs | `molalign` | `atormsd` and `conformsd`, with new options |
+> | C API | None | `ato_rmsd` and `confo_rmsd` (`molalign.h`) |
+> | Python API | `assign_atoms` on ASE `Atoms` objects | `Molecule` class with `ato_rmsd` and `confo_rmsd` methods, files read with chemfiles |
+> | Build | `build.sh` | CMake (programs and C library) or pip (Python) |
 
 
 Table of Contents
@@ -72,7 +95,7 @@ cmake -B build -DCMAKE_Fortran_COMPILER=ifort
 ### Steps
 
 ```bash
-git clone -b devel https://github.com/qcuaeh/molalignlib.git
+git clone -b 2.x https://github.com/qcuaeh/molalignlib.git
 cd molalignlib
 cmake -B build
 make -C build
@@ -372,8 +395,16 @@ Requirements:
 - GCC ≥ 5.3 and GFortran ≥ 4.8
 - Python ≥ 3.7 with its development headers (`python3-dev` on Debian/Ubuntu, `python3-devel` on Fedora/RHEL)
 
+From a clone of the `2.x` branch (see [Steps](#steps)), run:
+
 ```bash
 python3 -m pip install --user .
+```
+
+Or install directly from GitHub, naming the branch (without `@2.x`, pip installs 1.x):
+
+```bash
+python3 -m pip install --user git+https://github.com/qcuaeh/molalignlib.git@2.x
 ```
 
 If it fails try to upgrade pip first:
@@ -602,7 +633,7 @@ A molecular fragment is a connected component of the bond graph of the compared 
 Citing
 ------
 
-If you use conformsd or the HNA partitioning, please cite:
+MolAlignLib 2.x implements the methods of two publications (1.x implements only the second). If you use conformsd or the HNA partitioning, please cite:
 
 > J. M. Vásquez-Pérez, Fast Computation of Exact Symmetry-Corrected RMSD of Conformers, *J. Chem. Theory Comput.* (2026). https://doi.org/10.1021/acs.jctc.6c00545
 
