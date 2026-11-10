@@ -1,0 +1,17 @@
+name: molalignlib
+channels:
+  - conda-forge
+dependencies:
+  - gcc>=5
+  - gfortran>=4.8
+  - python>=3.8
+# Python 3.7 also works but needs libxcrypt
+#  - libxcrypt
+#  - python=3.7
+  - pip
+  - numpy
+  - cython
+  - scikit-build-core
+  - chemfiles
+  - pip:
+    - .

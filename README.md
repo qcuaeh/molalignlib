@@ -35,7 +35,7 @@ Both methods are available as command-line programs, as C functions in a static 
 > | Programs | `molalign` | `atormsd` and `conformsd`, with new options |
 > | C API | None | `ato_rmsd` and `confo_rmsd` (`molalign.h`) |
 > | Python API | `assign_atoms` on ASE `Atoms` objects | `Molecule` class with `ato_rmsd` and `confo_rmsd` methods, files read with chemfiles |
-> | Build | `build.sh` | CMake (programs and C library) or pip (Python) |
+> | Build | `build.sh` | CMake (programs and C library) or conda/pip (Python) |
 
 
 Table of Contents
@@ -86,7 +86,7 @@ Building from Source
 - CMake ≥ 3.15
 - GFortran ≥ 4.8 or Intel Fortran (`ifort` or `ifx`)
 
-Other Fortran compilers may work but are not supported. To use Intel Fortran instead of GNU Fortran, select it when configuring:
+To use Intel Fortran, select it when configuring:
 
 ```bash
 cmake -B build -DCMAKE_Fortran_COMPILER=ifort
@@ -101,9 +101,7 @@ cmake -B build
 make -C build
 ```
 
-The compiled programs `atormsd` and `conformsd` are created in `build/source` along with the static library `libmolalign.a` which contains the `ato_rmsd` and `confo_rmsd` functions.
-
-For the Python extension module, see [Python Bindings](#python-bindings).
+This creates the programs `atormsd` and `conformsd` and the static library `libmolalign.a` in `build/source`.
 
 
 Command-line Programs
@@ -115,7 +113,7 @@ Both programs share these conventions:
 - **Usage:** run either program without arguments to print its usage and the list of options.
 - **Options** may appear before or after the file paths and are case-insensitive. Integer arguments must be at least 1, and option arguments may not start with `-`.
 - **Output:** one line per record with the RMSD (Å, six decimal places). With `-printmapping` it is followed by the atom permutation that maps file 2 onto file 1: a comma-separated list of 1-based indices, where entry *i* is the atom of file 2 placed on line *i* of file 1 (the identity without `-remap`).
-- **Coordinates:** with `-coords FORMAT` (`xyz`, `sdf` or `mol2`), each record is instead written to stdout as a structure of molecule 2 in that format, reordered to match molecule 1 (and aligned onto it with `-align`), with `rmsd=` and the RMSD as its title. Redirect stdout to save it to a file. With `-savecoords PREFIX` as well, record *n* (counted from 1) is written instead to its own file, `PREFIX_n.FORMAT` (e.g. `pair_1.xyz`, `pair_2.xyz`, ...), holding molecule 1 followed by molecule 2, and the RMSD lines are printed to stdout as usual.
+- **Coordinates:** with `-coords FORMAT` (`xyz`, `sdf` or `mol2`), molecule 2 is written to stdout instead, reordered (and aligned with `-align`) to match molecule 1, with `rmsd=` and the RMSD as its title. With `-savecoords PREFIX` as well, record *n* is written to `PREFIX_n.FORMAT` as molecule 1 followed by molecule 2, and the RMSDs are printed as usual.
 - **Reproducibility:** results are reproducible unless `-random` is given.
 
 ### atormsd
@@ -227,13 +225,7 @@ The file readers translate each format's bond types into labels (see `source/fil
 C Bindings
 ----------
 
-Include `molalign.h` and link against `libmolalign`, which contains the `ato_rmsd` and `confo_rmsd` functions. The header is the complete reference for both functions: it documents every parameter, the `MOLALIGN_SUCCESS` and `MOLALIGN_ERROR_*` constants returned through `error_code`, and the bond type codes.
-
-```c
-#include "molalign.h"
-```
-
-The header is in `bindings/c`, which is not on the compiler's default search path. Since `libmolalign.a` is a static Fortran library, list it before the Fortran runtime:
+Include `molalign.h` (in `bindings/c`) and link against `libmolalign.a`, before the Fortran runtime. The header documents every parameter, the `MOLALIGN_SUCCESS` and `MOLALIGN_ERROR_*` error codes, and the bond type codes.
 
 ```bash
 gcc program.c -I bindings/c -L build/source -lmolalign -lgfortran -lm
@@ -386,34 +378,34 @@ int main(void)
 Python Bindings
 ---------------
 
-The Python bindings provide a higher-level interface to MolAlignLib. (See [Try It Online](#try-it-online) to test them on Binder without installing anything.)
+The Python bindings provide a higher-level interface to MolAlignLib. You can try them on [Binder](https://mybinder.org/v2/gh/qcuaeh/molalignlib.git/2.x?urlpath=%2Fdoc%2Ftree%2Fexamples%2Fexamples.ipynb) without installing anything.
 
 ### Installation
 
-Requirements:
+The Python module does not include the `atormsd` and `conformsd` programs; build those with [CMake](#building-from-source).
 
-- GCC ≥ 5.3 and GFortran ≥ 4.8
-- Python ≥ 3.7 with its development headers (`python3-dev` on Debian/Ubuntu, `python3-devel` on Fedora/RHEL)
+#### With conda
 
-From a clone of the `2.x` branch (see [Steps](#steps)), run:
+The conda environment provides the compilers and all dependencies. Create it from the root of the `2.x` branch:
 
 ```bash
-python3 -m pip install --user .
+git clone -b 2.x https://github.com/qcuaeh/molalignlib.git
+cd molalignlib
+conda env create -f environment.yml
+conda activate molalignlib
 ```
 
-Or install directly from GitHub, naming the branch (without `@2.x`, pip installs 1.x):
+With mamba or micromamba, replace `conda` with `mamba` or `micromamba` (micromamba uses `micromamba create -f environment.yml`).
+
+#### With pip
+
+Requirements: GCC ≥ 5, GFortran ≥ 4.8 and Python ≥ 3.7 with its development headers (`python3-dev` on Debian/Ubuntu, `python3-devel` on Fedora/RHEL).
 
 ```bash
 python3 -m pip install --user git+https://github.com/qcuaeh/molalignlib.git@2.x
 ```
 
-If it fails try to upgrade pip first:
-```bash
-python3 -m pip install --user --upgrade pip
-```
-
-> **Note:** `pip install .` does not build the standalone executables. Use the
-> CMake workflow above to build `atormsd` and `conformsd`.
+Without `@2.x`, pip installs 1.x. From a clone of the `2.x` branch, use `python3 -m pip install --user .` instead.
 
 ### Molecule
 
@@ -594,7 +586,7 @@ for i, result in enumerate(results):
 Runnable Examples
 -----------------
 
-For fully runnable examples, see the [`examples`](examples) directory. Its `clusters` and `conformers` subdirectories hold sample atom clusters (XYZ) and conformers (SDF), each structure in its own file and all together in a multi-frame `_all` file. The single-structure files can also be used as input for the command-line and demo programs, which read only the first structure of each file. The notebook [`examples/examples.ipynb`](examples/examples.ipynb) (also on [Binder](#try-it-online)) walks through ranked cluster solutions, RMSD matrices, the effect of each option, aligned output files, mirror images, molecules built in memory, hydrogens and padding atoms, atom labels, bond types, multi-fragment complexes and conformer deduplication.
+For fully runnable examples, see the [`examples`](examples) directory. Its `clusters` and `conformers` subdirectories hold sample atom clusters (XYZ) and conformers (SDF), each structure in its own file and all together in a multi-frame `_all` file. The single-structure files can also be used as input for the command-line and demo programs, which read only the first structure of each file. The notebook [`examples/examples.ipynb`](examples/examples.ipynb) (also on [Binder](https://mybinder.org/v2/gh/qcuaeh/molalignlib.git/2.x?urlpath=%2Fdoc%2Ftree%2Fexamples%2Fexamples.ipynb)) walks through ranked cluster solutions, RMSD matrices, the effect of each option, aligned output files, mirror images, molecules built in memory, hydrogens and padding atoms, atom labels, bond types, multi-fragment complexes and conformer deduplication.
 
 
 Algorithm Notes

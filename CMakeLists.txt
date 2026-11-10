@@ -54,9 +54,9 @@ if(SKBUILD)
     # C compiler flags and version check (the C compiler is only used for
     # the Cython-generated extension, so it is only checked here)
     if(CMAKE_C_COMPILER_ID MATCHES "GNU")
-        if(CMAKE_C_COMPILER_VERSION VERSION_LESS "5.3")
+        if(CMAKE_C_COMPILER_VERSION VERSION_LESS "5")
             message(FATAL_ERROR
-                "GCC 5.3 or newer is required to build the Python extension "
+                "GCC 5 or newer is required to build the Python extension "
                 "(found ${CMAKE_C_COMPILER_VERSION}).")
         endif()
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fvisibility=hidden")
