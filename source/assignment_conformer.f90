@@ -48,9 +48,6 @@ public assign_atoms_global
 public assign_atoms_local
 public assign_atoms_local_pruned
 
-! Maximum number of children of a part
-integer(IK), parameter :: MAX_CHILD = 10
-
 ! Complete assignments (global search) or tree leaves (local searches)
 ! visited by the last search; diagnostic counter
 integer(IK) :: n_combinations
@@ -172,12 +169,12 @@ subroutine update_hna_part(cache_arrays, part_idx, read_link_idx, write_link_idx
 ! enter the signature; the others contribute equally to all atoms of a
 ! self-consistent part.
 ! Pairs of new singleton children are added to atom_map.
-! The work arrays are saved, so this routine is not thread safe.
+! The number of atoms placed so far in each child is kept in the child
+! itself (n_filled1/2), so a part can have any number of children.
    type(array_trees_t), intent(inout) :: cache_arrays
    integer(IK), intent(in) :: part_idx, read_link_idx, write_link_idx
    type(partmap_t), intent(inout) :: atom_map
-   integer(IK), save :: signature_size, signature(MAX_COORDNUM)
-   integer(IK), dimension(MAX_CHILD), save :: items1_trackers, items2_trackers
+   integer(IK) :: signature_size, signature(MAX_COORDNUM)
    integer(IK) :: target_relative_idx, target_part_idx, item_idx, target_idx, part_ref_idx
    integer(IK) :: items1_offset, n_items1, items2_offset, n_items2, n_children
    integer(IK) :: adj_atom
@@ -191,8 +188,9 @@ subroutine update_hna_part(cache_arrays, part_idx, read_link_idx, write_link_idx
 
    ! Number of atoms placed so far in each child
    do i = 1, n_children
-      items1_trackers(i) = 0
-      items2_trackers(i) = 0
+      target_part_idx = cache_arrays%partree(part_idx)%child_indices(i)
+      cache_arrays%partree(target_part_idx)%n_filled1 = 0
+      cache_arrays%partree(target_part_idx)%n_filled2 = 0
    end do
 
    ! Atoms of molecule 1
@@ -215,9 +213,10 @@ subroutine update_hna_part(cache_arrays, part_idx, read_link_idx, write_link_idx
       ! Move the atom to the child with the same signature
       target_relative_idx = find_child_part_array(cache_arrays, part_idx, signature_size, signature)
       target_part_idx = cache_arrays%partree(part_idx)%child_indices(target_relative_idx)
-      items1_trackers(target_relative_idx) = items1_trackers(target_relative_idx) + 1
+      cache_arrays%partree(target_part_idx)%n_filled1 = &
+         cache_arrays%partree(target_part_idx)%n_filled1 + 1
       target_idx = cache_arrays%partree(target_part_idx)%items1_offset &
-                 + items1_trackers(target_relative_idx)
+                 + cache_arrays%partree(target_part_idx)%n_filled1
       cache_arrays%atomidcs1(target_idx) = item_idx
 
       cache_arrays%itemdir1_entries(item_idx, write_link_idx) = target_part_idx
@@ -243,9 +242,10 @@ subroutine update_hna_part(cache_arrays, part_idx, read_link_idx, write_link_idx
       ! Move the atom to the child with the same signature
       target_relative_idx = find_child_part_array(cache_arrays, part_idx, signature_size, signature)
       target_part_idx = cache_arrays%partree(part_idx)%child_indices(target_relative_idx)
-      items2_trackers(target_relative_idx) = items2_trackers(target_relative_idx) + 1
+      cache_arrays%partree(target_part_idx)%n_filled2 = &
+         cache_arrays%partree(target_part_idx)%n_filled2 + 1
       target_idx = cache_arrays%partree(target_part_idx)%items2_offset &
-                 + items2_trackers(target_relative_idx)
+                 + cache_arrays%partree(target_part_idx)%n_filled2
       cache_arrays%atomidcs2(target_idx) = item_idx
 
       cache_arrays%itemdir2_entries(item_idx, write_link_idx) = target_part_idx

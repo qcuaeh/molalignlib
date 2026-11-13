@@ -52,6 +52,10 @@ type, public :: partree_item_t
    ! and likewise for molecule 2
    integer(IK) :: items1_offset, n_items1
    integer(IK) :: items2_offset, n_items2
+   ! Atoms of each molecule placed so far in the part while its parent is
+   ! refined by the search (write cursors of
+   ! assignment_conformer::update_hna_part)
+   integer(IK) :: n_filled1, n_filled2
    ! Signature as distinct values with their frequencies
    integer(IK) :: signature_values(MAX_COORDNUM)
    integer(IK) :: signature_frequencies(MAX_COORDNUM)
@@ -294,6 +298,9 @@ recursive subroutine convert_parts_recurse(part, cache_arrays, item1_idx, item2_
 
    cache_arrays%partree(part_idx)%items2_offset = item2_idx
    cache_arrays%partree(part_idx)%n_items2 = part%n_items2
+
+   cache_arrays%partree(part_idx)%n_filled1 = 0
+   cache_arrays%partree(part_idx)%n_filled2 = 0
 
    call convert_signature(part, cache_arrays, part_idx)
 
