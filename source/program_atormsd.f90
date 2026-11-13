@@ -26,7 +26,7 @@ use euclidean
 use permutation
 use assorting
 use pruning_atoms
-use recording
+use registry
 use alignment_atoms
 use file_utils
 use file_reading
@@ -45,7 +45,7 @@ type(atom_t), dimension(:), allocatable :: atoms1, atoms2
 type(bond_t), dimension(:), allocatable :: bonds1, bonds2
 type(bool_matrix), dimension(:), allocatable :: prunes
 type(partition_t) :: atomtypes
-type(registry_t) :: registry
+type(register_t) :: register
 real(RK) :: rmsd
 real(RK) :: center1(3), center2(3), rotquat(4)
 real(RK), dimension(:), allocatable :: weights1, weights2, unit_weights
@@ -248,18 +248,18 @@ if (remap_flag) then
 
    if (align_flag) then
 
-      call allocate_registry( registry, max_recs)
+      call allocate_register( register, max_recs)
       call optimize_mapping_atoms( atomtypes, prunes, &
-            coords1w, coords2w, min_freq, max_trials, registry, error_code)
+            coords1w, coords2w, min_freq, max_trials, register, error_code)
       if (error_code /= 0) then
          write (stderr, '(A)') 'Error: Assignment failed'
          stop
       end if
 
-      if (printstats_flag) call print_records( registry)
+      if (printstats_flag) call print_records( register)
 
-      do i = 1, registry%n_records
-         mapping1 = registry%records(i)%mapping1
+      do i = 1, register%n_records
+         mapping1 = register%records(i)%mapping1
          rotquat = least_rotquat( mapping1, coords1w, coords2w)
          full_coords2r = rotated_coords( full_coords2, rotquat, center1)
          coords2r = rotated_coords( coords2, rotquat, center1)

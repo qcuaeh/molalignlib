@@ -29,7 +29,7 @@ use indexed_list_types
 use refinement
 use assignment_atoms
 use assignment_conformer
-use recording
+use registry
 use flags
 use error_codes
 implicit none
@@ -37,7 +37,7 @@ implicit none
 contains
 
 subroutine optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
-      coords1, coords2, min_freq, max_trials, registry, error_code)
+      coords1, coords2, min_freq, max_trials, register, error_code)
 ! Symmetry-corrected alignment of two conformers (Figure S1 of the paper).
 ! The assignment tree is built once and the strategy is chosen from its
 ! shape: when the total number of assignments exceeds min_freq times the
@@ -51,17 +51,17 @@ subroutine optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
 ! has been found min_freq times or after max_trials trials (the same
 ! stopping rules as alignment_atoms::optimize_mapping_atoms).
 !
-! In both strategies registry holds up to size(registry%records) distinct
+! In both strategies register holds up to size(register%records) distinct
 ! ranked assignments (the -maxrecs option): the distinct local minima of the
 ! stochastic search, or the best complete assignments of the exhaustive one.
 !
 ! adjcs, atomtypes and coords hold the included atoms only, in a common
-! numbering; the atom permutations stored in registry use that numbering.
+! numbering; the atom permutations stored in register use that numbering.
    type(adjc_t), dimension(:), intent(in) :: adjcs1, adjcs2
    type(partition_t), intent(in) :: atomtypes
    real(RK), dimension(:,:), intent(in) :: coords1, coords2
    integer(IK), intent(in) :: min_freq, max_trials
-   type(registry_t), target, intent(inout) :: registry
+   type(register_t), target, intent(inout) :: register
    integer(IK), intent(out) :: error_code
 
    ! Local variables
@@ -90,7 +90,7 @@ subroutine optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
       call print_chain_tree_array( atomtypes, cache_arrays)
    end if
 
-   call reset_registry( registry)
+   call reset_register( register)
 
    ! Adaptive choice of strategy (see FORCE_EXHAUSTIVE and FORCE_STOCHASTIC)
    if (.not. FORCE_EXHAUSTIVE .and. (FORCE_STOCHASTIC .or. &
@@ -99,7 +99,7 @@ subroutine optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
       call random_initialize()
 
       ! Search until the best local minimum has been found min_freq times
-      do while (registry%records(1)%freq < min_freq)
+      do while (register%records(1)%freq < min_freq)
 
          ! Random orientation of molecule 2
          coords2r = coords2
@@ -140,27 +140,27 @@ subroutine optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
             steps = steps + 1
          end do
 
-         call insert_record_mapping( registry, mapping1, steps, total_rotation, 0, mapdist)
+         call insert_record_mapping( register, mapping1, steps, total_rotation, 0, mapdist)
 
          ! Stop after max_trials trials
-         if (registry%n_trials >= max_trials) exit
+         if (register%n_trials >= max_trials) exit
 
       end do
 
    else
 
       ! Exhaustive search: the best assignments after superposition, up to
-      ! the size of the registry, ranked by distance
-      call assign_atoms_global( coords1, coords2, cache_arrays, registry)
+      ! the size of the register, ranked by distance
+      call assign_atoms_global( coords1, coords2, cache_arrays, register)
 
       ! Optimal rotation and distance of each ranked assignment
-      do i = 1, registry%n_records
-         mapping1 = registry%records(i)%mapping1
+      do i = 1, register%n_records
+         mapping1 = register%records(i)%mapping1
          rotation = least_rotquat( mapping1, coords1, coords2)
          coords2r = coords2
          call rotate_coords( coords2r, rotation)
-         registry%records(i)%rotation = rotation
-         registry%records(i)%mapdist = sqdistsum( mapping1, coords1, coords2r)
+         register%records(i)%rotation = rotation
+         register%records(i)%mapdist = sqdistsum( mapping1, coords1, coords2r)
       end do
 
    end if

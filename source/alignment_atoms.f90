@@ -24,7 +24,7 @@ use assignment_atoms
 use linked_list_types
 use refinement
 use pruning_atoms
-use recording
+use registry
 use flags
 use error_codes
 implicit none
@@ -32,19 +32,19 @@ implicit none
 contains
 
 subroutine optimize_mapping_atoms(atomtypes, prunes, coords1, &
-      coords2, min_freq, max_trials, registry, error_code)
+      coords2, min_freq, max_trials, register, error_code)
 ! Alignment of two atom clusters by random orientations followed by
 ! alternating assignment and superposition until the assignment is stable
 ! (J. Chem. Inf. Model. 2023, 63, 1157). The search stops when the best
 ! local minimum has been found min_freq times or after max_trials trials
 ! (the same stopping rules as alignment_conformer::optimize_mapping_conformer).
 ! coords1 and coords2 hold the included atoms only, in the numbering of
-! atomtypes; the atom permutations stored in registry use that numbering.
+! atomtypes; the atom permutations stored in register use that numbering.
    type(partition_t), intent(in) :: atomtypes
    type(bool_matrix), dimension(:), intent(in) :: prunes
    real(RK), dimension(:,:), intent(in) :: coords1, coords2
    integer(IK), intent(in) :: min_freq, max_trials
-   type(registry_t), intent(inout) :: registry
+   type(register_t), intent(inout) :: register
    integer(IK), intent(out) :: error_code
 
    ! Local variables
@@ -58,11 +58,11 @@ subroutine optimize_mapping_atoms(atomtypes, prunes, coords1, &
 
    error_code = MOLALIGN_SUCCESS
 
-   call reset_registry( registry)
+   call reset_register( register)
    call random_initialize()
 
    ! Search until the best local minimum has been found min_freq times
-   do while (registry%records(1)%freq < min_freq)
+   do while (register%records(1)%freq < min_freq)
 
       ! Random orientation of molecule 2
       coords2r = coords2
@@ -91,10 +91,10 @@ subroutine optimize_mapping_atoms(atomtypes, prunes, coords1, &
 
       ! Record the local minimum
       mapdist = sqrt( sqdistsum( mapping1, coords1, coords2r))
-      call insert_record_mapping( registry, mapping1, steps, total_rotation, 0, mapdist)
+      call insert_record_mapping( register, mapping1, steps, total_rotation, 0, mapdist)
 
       ! Stop after max_trials trials
-      if (registry%n_trials >= max_trials) exit
+      if (register%n_trials >= max_trials) exit
 
    end do
 

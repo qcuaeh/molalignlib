@@ -7,7 +7,7 @@ module cbind_utils
    use permutation
    use assorting
    use pruning_atoms
-   use recording
+   use registry
    use alignment_atoms
    use flags
    use error_codes

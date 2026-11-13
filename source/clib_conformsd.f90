@@ -7,7 +7,7 @@ module clib_conformsd
    use chemdata
    use permutation
    use assorting
-   use recording
+   use registry
    use assignment_conformer
    use alignment_conformer
    use cbind_utils
@@ -141,7 +141,7 @@ subroutine confo_rmsd(                                              &
    type(bond_t), dimension(:), allocatable :: bonds1, bonds2
    type(adjc_t), dimension(:), allocatable :: adjcs1, adjcs2
    type(partition_t) :: atomtypes
-   type(registry_t)  :: registry
+   type(register_t)  :: register
    real(RK) :: rmsd, center1(3), center2(3), rotquat(4)
    real(RK), dimension(:),   allocatable :: weights1, weights2, unit_weights
    real(RK) :: transmat2(3,3)
@@ -316,16 +316,16 @@ subroutine confo_rmsd(                                              &
 
       if (align_flag) then
 
-         call allocate_registry(registry, max_recs)
+         call allocate_register(register, max_recs)
          call optimize_mapping_conformer(adjcs1, adjcs2, atomtypes, &
-               coords1w, coords2w, c_min_freq, c_max_trials, registry, c_error_code)
+               coords1w, coords2w, c_min_freq, c_max_trials, register, c_error_code)
          if (c_error_code /= MOLALIGN_SUCCESS) return
 
-         if (printstats_flag) call print_records(registry)
+         if (printstats_flag) call print_records(register)
 
-         c_n_records = registry%n_records
-         do i = 1, registry%n_records
-            mapping1 = registry%records(i)%mapping1
+         c_n_records = register%n_records
+         do i = 1, register%n_records
+            mapping1 = register%records(i)%mapping1
             rotquat = least_rotquat(mapping1, coords1w, coords2w)
             full_coords2r = rotated_coords(full_coords2, rotquat, center1)
             coords2r = rotated_coords(coords2, rotquat, center1)

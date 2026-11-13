@@ -15,6 +15,7 @@ euclidean.f90
 chemdata.f90
 adjacency.f90
 molecule.f90
+registry.f90
 linked_list_types.f90
 indexed_list_types.f90
 assorting.f90
@@ -22,7 +23,6 @@ refinement.f90
 pruning_atoms.f90
 assignment_atoms.f90
 assignment_conformer.f90
-recording.f90
 alignment_atoms.f90
 alignment_conformer.f90
 cbind_utils.f90
