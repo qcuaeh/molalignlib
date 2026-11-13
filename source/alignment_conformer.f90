@@ -79,7 +79,7 @@ subroutine optimize_mapping_conformer( adjcs1, adjcs2, atomtypes, &
    ! Self-consistent HNA partition and assignment tree. The searches only
    ! use cache_arrays, so the linked lists are freed as soon as it is built
    ! (and on error).
-   call compute_sc_hna_chain( adjcs1, adjcs2, atomtypes, hna_chain, hna_tree, error_code)
+   call build_schna_chain( adjcs1, adjcs2, atomtypes, hna_chain, hna_tree, error_code)
    if (error_code == MOLALIGN_SUCCESS) then
       call build_assignment_tree( adjcs1, adjcs2, hna_chain%last_link, cache_arrays, error_code)
    end if
@@ -184,7 +184,7 @@ subroutine assign_mapping_conformer( adjcs1, adjcs2, atomtypes, coords1, coords2
    ! Self-consistent HNA partition and assignment tree. The searches only
    ! use cache_arrays, so the linked lists are freed as soon as it is built
    ! (and on error).
-   call compute_sc_hna_chain( adjcs1, adjcs2, atomtypes, hna_chain, hna_tree, error_code)
+   call build_schna_chain( adjcs1, adjcs2, atomtypes, hna_chain, hna_tree, error_code)
    if (error_code == MOLALIGN_SUCCESS) then
       call build_assignment_tree( adjcs1, adjcs2, hna_chain%last_link, cache_arrays, error_code)
    end if

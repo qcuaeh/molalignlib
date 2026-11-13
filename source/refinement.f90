@@ -40,7 +40,7 @@ implicit none
 private
 public refine_hna_part
 public refine_hna_partition
-public compute_sc_hna_chain
+public build_schna_chain
 public build_assignment_tree
 public delete_hna_chain
 
@@ -152,7 +152,7 @@ subroutine refine_hna_partition(adjcs1, adjcs2, hna_chain, n_splits)
    end do
 end subroutine
 
-subroutine compute_sc_hna_chain(adjcs1, adjcs2, atomtypes, hna_chain, hna_tree, error_code)
+subroutine build_schna_chain(adjcs1, adjcs2, atomtypes, hna_chain, hna_tree, error_code)
 ! Self-consistent HNA partition of both molecules: starting from the atom
 ! types, refine until no part splits. The result is the last link of
 ! hna_chain. Fails with MOLALIGN_ERROR_NOT_CONFORMERS when a part holds
@@ -185,7 +185,7 @@ subroutine compute_sc_hna_chain(adjcs1, adjcs2, atomtypes, hna_chain, hna_tree, 
 end subroutine
 
 subroutine delete_hna_chain(hna_chain, hna_tree)
-! Free what compute_sc_hna_chain returns: the chain first (its links refer
+! Free what build_schna_chain returns: the chain first (its links refer
 ! to the parts), then the part tree. Either may be unassociated.
    type(chaintree_node_t), pointer, intent(inout) :: hna_chain
    type(partition_node_t), pointer, intent(inout) :: hna_tree
