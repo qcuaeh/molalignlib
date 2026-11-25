@@ -36,9 +36,9 @@ use flags
 implicit none
 
 logical(LK) :: printmapping_flag
-logical(LK) :: coords_flag, savecoords_flag
+logical(LK) :: coords_flag
 character(:), allocatable :: title1, title2
-character(:), allocatable :: arg, pairs_prefix
+character(:), allocatable :: arg
 character(:), allocatable :: in_format, out_format
 character(LINE_LEN) :: posargs(2)
 type(atom_t), dimension(:), allocatable :: atoms1, atoms2
@@ -53,7 +53,7 @@ real(RK) :: transmat2(3,3)
 real(RK), dimension(:,:), allocatable :: coords1, coords2, coords1w, coords2w, coords2r
 real(RK), dimension(:,:), allocatable :: full_coords1, full_coords2, full_coords2r
 integer(IK), dimension(:), allocatable :: atomset1, atomset2
-integer(IK), dimension(:), allocatable :: mapping1, full_mapping1, ref_mapping
+integer(IK), dimension(:), allocatable :: mapping1, full_mapping1
 integer(IK) :: max_recs, max_trials, min_freq
 integer(IK) :: in_unit
 integer(IK) :: error_code
@@ -72,7 +72,6 @@ random_flag = .FALSE.
 printstats_flag = .FALSE.
 printmapping_flag = .FALSE.
 coords_flag = .FALSE.
-savecoords_flag = .FALSE.
 
 max_recs = 1
 min_freq = ATO_FREQ_DEFAULT
@@ -117,9 +116,6 @@ do while (get_arg(arg))
       coords_flag = .TRUE.
       call read_optarg( arg, out_format)
       call check_out_format( arg, out_format)
-   case ('-savecoords')
-      savecoords_flag = .TRUE.
-      call read_optarg( arg, pairs_prefix)
    case ('-printmapping')
       printmapping_flag = .TRUE.
    case ('-printstats')
@@ -130,12 +126,6 @@ do while (get_arg(arg))
       call read_posarg( arg, posargs)
    end select
 end do
-
-! -savecoords takes the output format from -coords
-if (savecoords_flag .and. .not. coords_flag) then
-   write (stderr, '(A)') 'Option -savecoords requires -coords'
-   stop
-end if
 
 select case (ipos)
 case (0)
@@ -163,9 +153,6 @@ n_atoms2 = size(atoms2)
 n_padding = max(n_atoms1, n_atoms2)
 call pad_atoms( atoms1, n_padding)
 call pad_atoms( atoms2, n_padding)
-
-! Molecule 1 is written in input order (with -savecoords)
-call init_array( ref_mapping, n_padding, identity)
 
 ! Atom sets only ever contain real atoms
 if (heavy_flag) then
@@ -270,7 +257,7 @@ if (remap_flag) then
          call complete_mapping( atomset1, atomset2, mapping1, atoms1, atoms2, &
                n_atoms1, n_atoms2, bonds1, bonds2, full_coords1, full_coords2r, full_mapping1)
 
-         call report_result( i)
+         call report_result()
       end do
 
    else
@@ -289,7 +276,7 @@ if (remap_flag) then
       call complete_mapping( atomset1, atomset2, mapping1, atoms1, atoms2, &
             n_atoms1, n_atoms2, bonds1, bonds2, full_coords1, full_coords2r, full_mapping1)
 
-      call report_result( 1)
+      call report_result()
 
    end if
 
@@ -323,7 +310,7 @@ else
 
    rmsd = sqrt( sqdistmean( mapping1, weights1, coords1, coords2r))
 
-   call report_result( 1)
+   call report_result()
 
 end if
 
@@ -351,34 +338,20 @@ subroutine print_usage()
          // str(MAX_TRIALS_DEFAULT) // ')')
    call print_option('-maxrecs N', 'Record the N lowest RMSDs found (default: 1)')
    call print_option('-coords FORMAT', 'Write the coordinates of cluster 2 to stdout in FORMAT (xyz, sdf or mol2)')
-   call print_option('-savecoords PREFIX', 'Write each cluster 1/cluster 2 pair to PREFIX_<n>.FORMAT (needs -coords)')
    call print_option('-printmapping', 'Print the 1-based atom permutation after each RMSD')
    call print_option('-printstats', 'Print optimisation statistics (needs -align -remap)')
    call print_option('-random', 'Seed the random-number generator from the system clock')
 end subroutine
 
-subroutine report_result(irec)
-! Report result number irec. Without -coords, print the RMSD (and the atom mapping with -printmapping).
+subroutine report_result()
+! Report the current result. Without -coords, print the RMSD (and the atom mapping with -printmapping).
 ! With -coords, the coordinates of molecule 2 (as aligned, if at all, and
-! reordered) are written in the -coords format with the RMSD in the title:
-! to standard output instead of the RMSD line or, with -savecoords, preceded
-! by the coordinates of molecule 1 in the file <prefix>_<irec>.<format>,
-! and the RMSD line is printed as usual.
-   integer(IK), intent(in) :: irec
-   ! Local variables
-   integer(IK) :: pair_unit
+! reordered) are written in the -coords format with the RMSD in the title
+! to standard output instead of the RMSD line.
 
    if (coords_flag) call set_coords( atoms2, full_coords2r)
 
-   if (savecoords_flag) then
-      call open2write_indexed( pairs_prefix, irec, out_format, pair_unit)
-      call write_file( pair_unit, out_format, title1, atoms1, bonds1, ref_mapping)
-      call write_file( pair_unit, out_format, 'rmsd=' // str( rmsd), &
-            atoms2, bonds2, full_mapping1)
-      close (pair_unit)
-   end if
-
-   if (coords_flag .and. .not. savecoords_flag) then
+   if (coords_flag) then
       call write_file( int(stdout, IK), out_format, 'rmsd=' // str( rmsd), &
             atoms2, bonds2, full_mapping1)
    else

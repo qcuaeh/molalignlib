@@ -113,7 +113,7 @@ Both programs share these conventions:
 - **Usage:** run either program without arguments to print its usage and the list of options.
 - **Options** may appear before or after the file paths and are case-insensitive. Integer arguments must be at least 1, and option arguments may not start with `-`.
 - **Output:** one line per record with the RMSD (Å, six decimal places). With `-printmapping` it is followed by the atom permutation that maps file 2 onto file 1: a comma-separated list of 1-based indices, where entry *i* is the atom of file 2 placed on line *i* of file 1 (the identity without `-remap`).
-- **Coordinates:** with `-coords FORMAT` (`xyz`, `sdf` or `mol2`), molecule 2 is written to stdout instead, reordered (and aligned with `-align`) to match molecule 1, with `rmsd=` and the RMSD as its title. With `-savecoords PREFIX` as well, record *n* is written to `PREFIX_n.FORMAT` as molecule 1 followed by molecule 2, and the RMSDs are printed as usual.
+- **Coordinates:** with `-coords FORMAT` (`xyz`, `sdf` or `mol2`), molecule 2 is written to stdout instead, reordered (and aligned with `-align`) to match molecule 1, with `rmsd=` and the RMSD as its title.
 - **Reproducibility:** results are reproducible unless `-random` is given.
 
 ### atormsd
@@ -135,7 +135,6 @@ atormsd file1 file2 [options]
 | -maxrecs | N | Record the *N* lowest RMSDs found (default: 1; only with `-align -remap`) |
 | -printmapping | | Print the atom permutation after each RMSD |
 | -coords | FORMAT | Write molecule 2, reordered (and aligned with `-align`) to match molecule 1, to stdout in *FORMAT* (`xyz`, `sdf` or `mol2`) instead of printing the results (see [Command-line Programs](#command-line-programs)) |
-| -savecoords | PREFIX | With `-coords`, write each record to the file `PREFIX_n.FORMAT` as a pair of structures, molecule 1 then molecule 2, and print the RMSDs as usual |
 | -heavy | | Ignore hydrogen atoms |
 | -massweight | | Use mass-weighted coordinates |
 | -mirror | | Reflect molecule 2 (x → −x) before comparison |
@@ -154,9 +153,6 @@ atormsd mol1.xyz mol2.xyz -align -remap -prune 0.5 -maxrecs 3
 
 # Write the aligned and reordered molecule 2 to a new file
 atormsd mol1.xyz mol2.xyz -align -remap -coords xyz > mol2_coords.xyz
-
-# Write each of the 3 best solutions with the reference to pair_1.sdf, pair_2.sdf, pair_3.sdf
-atormsd mol1.sdf mol2.sdf -align -remap -maxrecs 3 -coords sdf -savecoords pair
 ```
 
 ### conformsd
@@ -184,7 +180,6 @@ XYZ files have no bond table, so use `-rebond` with them.
 | -printmapping | | Print the atom permutation after each RMSD |
 | -printassigntree | | Print the assignment tree and its combination counts (only with `-remap`) |
 | -coords | FORMAT | Same as for [atormsd](#atormsd) |
-| -savecoords | PREFIX | Same as for [atormsd](#atormsd) |
 | -heavy | | Ignore hydrogen atoms |
 | -massweight | | Use mass-weighted coordinates |
 | -mirror | | Reflect molecule 2 (x → −x) before comparison |
@@ -615,7 +610,7 @@ With `-prune TOL`, two atoms are never paired if their sorted distances to the a
 
 ### Hydrogens and padding atoms
 
-With `-heavy`, the two molecules may have different numbers of hydrogens. The smaller one is padded with padding atoms appended after its real atoms, so every permutation has `max(n_atoms1, n_atoms2)` entries; indices beyond the real atoms of molecule 2 denote padding atoms. Hydrogens are not part of the RMSD and are paired afterwards with atoms of the same element: in conformsd (and in the atormsd program when the files have bonds) following the image of their bonded heavy atom first, then by distance, and finally with whatever atoms are left. `ato_rmsd` and `Molecule.ato_rmsd` pair them by distance only. With `-coords` and `-savecoords`, padding atoms are written as dummy atoms `X` placed at the origin (moved with molecule 2 when they pad it), so both structures of a record have the same number of lines; the C demo program does the same with `-coords`. In Python, `RMSDResult.apply_to` fills missing lines with padding atoms (`"X"`), which can be written but not compared.
+With `-heavy`, the two molecules may have different numbers of hydrogens. The smaller one is padded with padding atoms appended after its real atoms, so every permutation has `max(n_atoms1, n_atoms2)` entries; indices beyond the real atoms of molecule 2 denote padding atoms. Hydrogens are not part of the RMSD and are paired afterwards with atoms of the same element: in conformsd (and in the atormsd program when the files have bonds) following the image of their bonded heavy atom first, then by distance, and finally with whatever atoms are left. `ato_rmsd` and `Molecule.ato_rmsd` pair them by distance only. With `-coords`, padding atoms are written as dummy atoms `X` placed at the origin (moved with molecule 2 when they pad it), so the written structure always has `max(n_atoms1, n_atoms2)` atoms; the C demo program does the same with `-coords`. In Python, `RMSDResult.apply_to` fills missing lines with padding atoms (`"X"`), which can be written but not compared.
 
 ### Molecular fragments
 

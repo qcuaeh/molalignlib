@@ -21,7 +21,6 @@ use chemdata
 implicit none
 private
 public open2read
-public open2write_indexed
 public bondtype_code
 public bondtype_str
 public SDF_BONDTYPES
@@ -97,28 +96,6 @@ subroutine open2read(path, extension, unit)
    open(newunit=unit, file=path, action='read', status='old', iostat=stat)
    if (stat /= 0) then
       write (stderr, '(A,1X,A,1X,A)') 'opening', path, 'for reading'
-      stop
-   end if
-end subroutine
-
-subroutine open2write_indexed(prefix, num, extension, unit)
-! Open the file <prefix>_<num>.<extension> for writing, replacing it if
-! it exists (used by -writeto)
-   character(*), intent(in) :: prefix
-   integer(IK), intent(in) :: num
-   character(*), intent(in) :: extension
-   integer(IK), intent(out) :: unit
-   ! Local variables
-   character(:), allocatable :: path
-   character(32) :: index_str
-   integer(IK) :: stat
-
-   write (index_str, '(I0)') num
-   path = prefix // '_' // trim(index_str) // '.' // extension
-
-   open(newunit=unit, file=path, action='write', status='replace', iostat=stat)
-   if (stat /= 0) then
-      write (stderr, '(A,1X,A,1X,A)') 'Can''t open', path, 'for writing'
       stop
    end if
 end subroutine
